@@ -96,6 +96,7 @@ function MatchesPage() {
   const [matches, setMatches] = useState<MatchRow[] | null>(null);
   const { busy, error, note, run, setError } = useAction();
   const [showRuledOut, setShowRuledOut] = useState(false);
+  const [minAward, setMinAward] = useState(50000);
   const autoRan = useRef(false);
 
   const load = useCallback(async () => {
@@ -189,15 +190,22 @@ function MatchesPage() {
    * ones regardless of which happened to score higher, because "priority" was
    * the actual ask and a relevance-only order cannot express it.
    */
+  // Calls whose published maximum is below the floor are hidden; calls with no
+  // published amount stay, because "unknown" is not "too small".
+  const bigEnough = (m: MatchRow) =>
+    minAward <= 0 || m.grants?.amount_max == null || m.grants.amount_max >= minAward;
+
   const grouped = (verdict: Verdict) =>
     (matches ?? [])
-      .filter((m) => m.verdict === verdict)
+      .filter((m) => m.verdict === verdict && bigEnough(m))
       .map((m, index) => ({ m, index, band: bandOf(m.grants?.country, jurisdictions) }))
       .sort((a, b) => {
         const priority = (band: string) => (band === "home" ? 0 : 1);
         return priority(a.band) - priority(b.band) || a.index - b.index;
       })
       .map(({ m }) => m);
+
+  const hiddenBySize = (matches ?? []).filter((m) => !bigEnough(m)).length;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -234,6 +242,25 @@ function MatchesPage() {
           </p>
         )}
       </div>
+
+      <label className="mt-4 flex flex-wrap items-center gap-2 text-sm text-[var(--color-ink-soft)]">
+        Minimum award
+        <input
+          type="number"
+          min={0}
+          step={5000}
+          value={minAward}
+          onChange={(e) => setMinAward(Number(e.target.value) || 0)}
+          data-testid="min-award"
+          className="w-32 rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-2 py-1 font-mono tabular-nums"
+        />
+        {hiddenBySize > 0 && (
+          <span>
+            {hiddenBySize} smaller call{hiddenBySize === 1 ? "" : "s"} hidden. Calls with no published
+            amount are kept.
+          </span>
+        )}
+      </label>
 
       {error && (
         <p role="alert" className="mt-4 text-sm text-[var(--color-ineligible)]">
@@ -276,26 +303,33 @@ function MatchesPage() {
             </div>
             <p className="mt-1 text-sm text-[var(--color-ink-soft)]">{group.blurb}</p>
 
-            {open && (
-              <ul className="mt-3 flex flex-col gap-px overflow-hidden rounded-md border border-[var(--color-rule)] bg-[var(--color-rule)]">
-                {visible.map((row) => (
-                  <MatchCard
-                    key={row.id}
-                    row={row}
-                    clientId={clientId}
-                    isHome={bandOf(row.grants?.country, jurisdictions) === "home"}
-                  />
-                ))}
-                {visible.length < rows.length && (
-                  <li
-                    data-testid="ruled-out-truncated"
-                    className="bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-ink-soft)]"
-                  >
-                    Showing {visible.length} of {rows.length}. The rest were rejected the same way
-                    and are kept with this client's record.
-                  </li>
-                )}
-              </ul>
+            {open &&
+              byCountry(visible).map(([country, list]) => (
+                <div key={country} className="mt-4" data-testid="country-group">
+                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-soft)]">
+                    {countryName(country)}{" "}
+                    <span className="font-mono tabular-nums">{list.length}</span>
+                  </h3>
+                  <ul className="flex flex-col gap-px overflow-hidden rounded-md border border-[var(--color-rule)] bg-[var(--color-rule)]">
+                    {list.map((row) => (
+                      <MatchCard
+                        key={row.id}
+                        row={row}
+                        clientId={clientId}
+                        isHome={bandOf(row.grants?.country, jurisdictions) === "home"}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            {open && visible.length < rows.length && (
+              <p
+                data-testid="ruled-out-truncated"
+                className="mt-3 text-sm text-[var(--color-ink-soft)]"
+              >
+                Showing {visible.length} of {rows.length}. The rest were rejected the same way and
+                are kept with this client's record.
+              </p>
             )}
           </section>
         );
@@ -309,6 +343,26 @@ function MatchesPage() {
  * checks that can produce a needs_input verdict (assessSubmission's gates)
  * need an entry — the others never leave a client stuck on this screen.
  */
+/** Groups rows by the funder's country, keeping the incoming order. */
+function byCountry(rows: MatchRow[]): Array<[string, MatchRow[]]> {
+  const map = new Map<string, MatchRow[]>();
+  for (const row of rows) {
+    const key = row.grants?.country?.toUpperCase() || "—";
+    const list = map.get(key) ?? [];
+    list.push(row);
+    map.set(key, list);
+  }
+  return [...map.entries()];
+}
+
+function countryName(code: string): string {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 const FIELD_FOR_RULE: Partial<Record<string, string>> = {
   jurisdiction: "profile-jurisdictions",
   applicant_type: "profile-stage",
