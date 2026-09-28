@@ -111,6 +111,7 @@ export type Database = {
           currency: string | null
           extracted_from: Json
           jurisdictions: string[]
+          lead_time_weeks: number | null
           reviewed_at: string | null
           sectors: string[]
           stage: string | null
@@ -124,6 +125,7 @@ export type Database = {
           currency?: string | null
           extracted_from?: Json
           jurisdictions?: string[]
+          lead_time_weeks?: number | null
           reviewed_at?: string | null
           sectors?: string[]
           stage?: string | null
@@ -137,6 +139,7 @@ export type Database = {
           currency?: string | null
           extracted_from?: Json
           jurisdictions?: string[]
+          lead_time_weeks?: number | null
           reviewed_at?: string | null
           sectors?: string[]
           stage?: string | null
@@ -148,6 +151,49 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_team_members: {
+        Row: {
+          added_at: string
+          added_by: string
+          client_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          client_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          client_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_team_members_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "consultants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_team_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_team_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "consultants"
             referencedColumns: ["id"]
           },
         ]
@@ -229,7 +275,7 @@ export type Database = {
           id?: string
           is_hard_gate?: boolean
           match_id: string
-          passed: boolean
+          passed?: boolean
           rule_key: string
           status: string
         }
@@ -321,6 +367,7 @@ export type Database = {
         Row: {
           amount_max: number | null
           amount_min: number | null
+          assistance_listings: string[]
           country: string
           currency: string | null
           deadline: string | null
@@ -343,6 +390,7 @@ export type Database = {
         Insert: {
           amount_max?: number | null
           amount_min?: number | null
+          assistance_listings?: string[]
           country: string
           currency?: string | null
           deadline?: string | null
@@ -365,6 +413,7 @@ export type Database = {
         Update: {
           amount_max?: number | null
           amount_min?: number | null
+          assistance_listings?: string[]
           country?: string
           currency?: string | null
           deadline?: string | null
@@ -445,30 +494,39 @@ export type Database = {
       past_awards: {
         Row: {
           amount: number | null
+          assistance_listing: string | null
           awarded_on: string | null
+          fetched_at: string
           funder_id: string | null
           grant_id: string | null
           id: string
+          recipient_location: string | null
           recipient_name: string
           source_hash: string
           source_key: string
         }
         Insert: {
           amount?: number | null
+          assistance_listing?: string | null
           awarded_on?: string | null
+          fetched_at?: string
           funder_id?: string | null
           grant_id?: string | null
           id?: string
+          recipient_location?: string | null
           recipient_name: string
           source_hash: string
           source_key: string
         }
         Update: {
           amount?: number | null
+          assistance_listing?: string | null
           awarded_on?: string | null
+          fetched_at?: string
           funder_id?: string | null
           grant_id?: string | null
           id?: string
+          recipient_location?: string | null
           recipient_name?: string
           source_hash?: string
           source_key?: string
@@ -586,6 +644,49 @@ export type Database = {
           },
         ]
       }
+      requirement_acknowledgements: {
+        Row: {
+          acknowledged_at: string
+          acknowledged_by: string
+          proposal_id: string
+          requirement_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          acknowledged_by: string
+          proposal_id: string
+          requirement_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          acknowledged_by?: string
+          proposal_id?: string
+          requirement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requirement_acknowledgements_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "consultants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requirement_acknowledgements_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requirement_acknowledgements_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       requirements: {
         Row: {
           detail: string | null
@@ -678,7 +779,9 @@ export type Database = {
           human_reviewed_by: string
           id: string
           method: string | null
+          notes: string | null
           outcome: string | null
+          overridden_blockers: Json
           proposal_id: string
           submitted_at: string
         }
@@ -687,7 +790,9 @@ export type Database = {
           human_reviewed_by: string
           id?: string
           method?: string | null
+          notes?: string | null
           outcome?: string | null
+          overridden_blockers?: Json
           proposal_id: string
           submitted_at?: string
         }
@@ -696,7 +801,9 @@ export type Database = {
           human_reviewed_by?: string
           id?: string
           method?: string | null
+          notes?: string | null
           outcome?: string | null
+          overridden_blockers?: Json
           proposal_id?: string
           submitted_at?: string
         }
@@ -730,6 +837,10 @@ export type Database = {
     }
     Functions: {
       ensure_consultant: { Args: never; Returns: undefined }
+      find_consultant_by_email: {
+        Args: { target_email: string }
+        Returns: string
+      }
       grant_text_config: { Args: { lang: string }; Returns: unknown }
       match_answers: {
         Args: {
@@ -746,6 +857,11 @@ export type Database = {
         }[]
       }
       owns_client: { Args: { target: string }; Returns: boolean }
+      record_answer_use: { Args: { answer_ids: string[] }; Returns: undefined }
+      replace_extracted_requirements: {
+        Args: { target_grant: string }
+        Returns: number
+      }
       search_grants: {
         Args: {
           countries?: string[]
