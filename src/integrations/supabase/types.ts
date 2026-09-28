@@ -206,6 +206,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          tenant_id: string | null
           updated_at: string
           website: string | null
         }
@@ -216,6 +217,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          tenant_id?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -226,6 +228,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          tenant_id?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -235,6 +238,13 @@ export type Database = {
             columns: ["consultant_id"]
             isOneToOne: false
             referencedRelation: "consultants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -294,6 +304,76 @@ export type Database = {
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_outbox: {
+        Row: {
+          body_html: string
+          client_id: string | null
+          created_at: string
+          created_date: string
+          error: string | null
+          grant_id: string | null
+          id: string
+          kind: string
+          recipient_email: string
+          sent_at: string | null
+          status: string
+          subject: string
+          tenant_id: string | null
+        }
+        Insert: {
+          body_html: string
+          client_id?: string | null
+          created_at?: string
+          created_date?: string
+          error?: string | null
+          grant_id?: string | null
+          id?: string
+          kind: string
+          recipient_email: string
+          sent_at?: string | null
+          status?: string
+          subject: string
+          tenant_id?: string | null
+        }
+        Update: {
+          body_html?: string
+          client_id?: string | null
+          created_at?: string
+          created_date?: string
+          error?: string | null
+          grant_id?: string | null
+          id?: string
+          kind?: string
+          recipient_email?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_outbox_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_outbox_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_outbox_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -548,10 +628,56 @@ export type Database = {
           },
         ]
       }
+      proposal_section_revisions: {
+        Row: {
+          content: string
+          created_at: string
+          drafted_by: string | null
+          id: string
+          proposal_id: string
+          requirement_id: string | null
+          word_count: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          drafted_by?: string | null
+          id?: string
+          proposal_id: string
+          requirement_id?: string | null
+          word_count?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          drafted_by?: string | null
+          id?: string
+          proposal_id?: string
+          requirement_id?: string | null
+          word_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_section_revisions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_section_revisions_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_sections: {
         Row: {
           content: string | null
           drafted_by: string | null
+          fabrication_concerns: Json
           heading: string
           id: string
           proposal_id: string
@@ -564,6 +690,7 @@ export type Database = {
         Insert: {
           content?: string | null
           drafted_by?: string | null
+          fabrication_concerns?: Json
           heading: string
           id?: string
           proposal_id: string
@@ -576,6 +703,7 @@ export type Database = {
         Update: {
           content?: string | null
           drafted_by?: string | null
+          fabrication_concerns?: Json
           heading?: string
           id?: string
           proposal_id?: string
@@ -648,18 +776,21 @@ export type Database = {
         Row: {
           acknowledged_at: string
           acknowledged_by: string
+          location: string | null
           proposal_id: string
           requirement_id: string
         }
         Insert: {
           acknowledged_at?: string
           acknowledged_by: string
+          location?: string | null
           proposal_id: string
           requirement_id: string
         }
         Update: {
           acknowledged_at?: string
           acknowledged_by?: string
+          location?: string | null
           proposal_id?: string
           requirement_id?: string
         }
@@ -680,6 +811,45 @@ export type Database = {
           },
           {
             foreignKeyName: "requirement_acknowledgements_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      requirement_assessments: {
+        Row: {
+          assessed_at: string
+          assessment: string
+          model: string
+          proposal_id: string
+          requirement_id: string
+        }
+        Insert: {
+          assessed_at?: string
+          assessment: string
+          model: string
+          proposal_id: string
+          requirement_id: string
+        }
+        Update: {
+          assessed_at?: string
+          assessment?: string
+          model?: string
+          proposal_id?: string
+          requirement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requirement_assessments_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requirement_assessments_requirement_id_fkey"
             columns: ["requirement_id"]
             isOneToOne: false
             referencedRelation: "requirements"
@@ -824,6 +994,69 @@ export type Database = {
           },
         ]
       }
+      tenant_members: {
+        Row: {
+          joined_at: string
+          role: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          role?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          role?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_members_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "consultants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          branding: Json
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          subdomain: string
+        }
+        Insert: {
+          branding?: Json
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          subdomain: string
+        }
+        Update: {
+          branding?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          subdomain?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       source_freshness: {
@@ -836,11 +1069,16 @@ export type Database = {
       }
     }
     Functions: {
+      belongs_to_tenant: {
+        Args: { target_tenant_id: string }
+        Returns: boolean
+      }
       ensure_consultant: { Args: never; Returns: undefined }
       find_consultant_by_email: {
         Args: { target_email: string }
         Returns: string
       }
+      get_tenant_id_by_slug: { Args: { target_slug: string }; Returns: string }
       grant_text_config: { Args: { lang: string }; Returns: unknown }
       match_answers: {
         Args: {
@@ -861,6 +1099,10 @@ export type Database = {
       replace_extracted_requirements: {
         Args: { target_grant: string }
         Returns: number
+      }
+      replace_matches: {
+        Args: { match_rows: Json; matched_at: string; target_client: string }
+        Returns: undefined
       }
       search_grants: {
         Args: {
