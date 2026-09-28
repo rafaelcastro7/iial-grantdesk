@@ -14,3 +14,6 @@ export async function accessToken(): Promise<string> {
   if (!token) throw new Error("Your session expired. Sign in again.");
   return token;
 }
+
+/** Shown when a server function is called without a usable session. */
+export const ACCESS_TOKEN_MESSAGE = "Your session expired. Sign in again.";
