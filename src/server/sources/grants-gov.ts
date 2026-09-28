@@ -97,7 +97,7 @@ export function readDetail(body: unknown): OppDetail {
   const data = (body as { data?: Record<string, unknown> })?.data ?? {};
   const detail = ((data["synopsis"] ?? data["forecast"] ?? {}) as Record<string, unknown>) || {};
   const applicantTypes = (detail["applicantTypes"] ?? []) as Array<{ id?: string }>;
-  const description = detail["synopsis"]Desc ?? detail["forecast"]Desc ?? "";
+  const description = detail["synopsisDesc"] ?? detail["forecastDesc"] ?? "";
 
   return {
     // The description is HTML in this feed; the tsvector and the embedding both
