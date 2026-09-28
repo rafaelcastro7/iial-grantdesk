@@ -6,8 +6,15 @@ import { refreshCatalog } from "@/lib/refresh.functions";
 import { accessToken } from "@/lib/session";
 import { errorMessage } from "@/lib/error-message";
 import type { MarketCoverage } from "@/lib/coverage";
+import { meta } from "@/lib/head";
 
-export const Route = createFileRoute("/catalog")({ component: CatalogPage });
+export const Route = createFileRoute("/catalog")({
+  component: CatalogPage,
+  head: () => meta(
+    "Funder coverage — Grant Desk",
+    "Which markets Grant Desk refreshes automatically, which are directory-only, and how many open calls are in the catalog right now.",
+  ),
+});
 
 const LEVEL_STYLE: Record<MarketCoverage["level"], { label: string; className: string }> = {
   automatic: { label: "Automatic", className: "text-[var(--color-eligible)]" },

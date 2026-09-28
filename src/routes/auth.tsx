@@ -1,8 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAction } from "@/lib/use-action";
 import { supabase } from "@/lib/supabase";
+import { meta } from "@/lib/head";
 
-export const Route = createFileRoute("/auth")({ component: AuthPage });
+export const Route = createFileRoute("/auth")({
+  component: AuthPage,
+  head: () => meta(
+    "Sign in — Grant Desk",
+    "Sign in to your grant desk. Each client's profile, matches and drafts stay isolated at the database level.",
+  ),
+});
 
 /**
  * The form is uncontrolled on purpose.

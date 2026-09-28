@@ -5,8 +5,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { extractProfile } from "@/lib/profile.functions";
 import { assessProfile, nextGap, type ProfileFields } from "@/lib/profile-completeness";
+import { meta } from "@/lib/head";
 
-export const Route = createFileRoute("/clients/$clientId")({ component: ClientDetail });
+export const Route = createFileRoute("/clients/$clientId")({
+  component: ClientDetail,
+  head: () => meta(
+    "Client profile — Grant Desk",
+    "The profile a client is matched on: sectors, jurisdictions, stage, budget and lead time, read from their own pages.",
+  ),
+});
 
 type ClientRow = { id: string; name: string; website: string | null; consultant_id: string };
 
