@@ -10,33 +10,116 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CatalogRouteImport } from './routes/catalog'
+import { Route as ClientsIndexRouteImport } from './routes/clients.index'
+import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
+import { Route as ClientsClientIdMatchesRouteImport } from './routes/clients_.$clientId.matches'
+import { Route as ClientsClientIdProposalsGrantIdRouteImport } from './routes/clients_.$clientId.proposals.$grantId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CatalogRoute = CatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsIndexRoute = ClientsIndexRouteImport.update({
+  id: '/clients/',
+  path: '/clients/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsClientIdRoute = ClientsClientIdRouteImport.update({
+  id: '/clients/$clientId',
+  path: '/clients/$clientId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsClientIdMatchesRoute = ClientsClientIdMatchesRouteImport.update({
+  id: '/clients_/$clientId/matches',
+  path: '/clients/$clientId/matches',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsClientIdProposalsGrantIdRoute =
+  ClientsClientIdProposalsGrantIdRouteImport.update({
+    id: '/clients_/$clientId/proposals/$grantId',
+    path: '/clients/$clientId/proposals/$grantId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/catalog': typeof CatalogRoute
+  '/clients/$clientId': typeof ClientsClientIdRoute
+  '/clients/': typeof ClientsIndexRoute
+  '/clients/$clientId/matches': typeof ClientsClientIdMatchesRoute
+  '/clients/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/catalog': typeof CatalogRoute
+  '/clients/$clientId': typeof ClientsClientIdRoute
+  '/clients': typeof ClientsIndexRoute
+  '/clients/$clientId/matches': typeof ClientsClientIdMatchesRoute
+  '/clients/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/catalog': typeof CatalogRoute
+  '/clients/$clientId': typeof ClientsClientIdRoute
+  '/clients/': typeof ClientsIndexRoute
+  '/clients_/$clientId/matches': typeof ClientsClientIdMatchesRoute
+  '/clients_/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/catalog'
+    | '/clients/$clientId'
+    | '/clients/'
+    | '/clients/$clientId/matches'
+    | '/clients/$clientId/proposals/$grantId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/catalog'
+    | '/clients/$clientId'
+    | '/clients'
+    | '/clients/$clientId/matches'
+    | '/clients/$clientId/proposals/$grantId'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/catalog'
+    | '/clients/$clientId'
+    | '/clients/'
+    | '/clients_/$clientId/matches'
+    | '/clients_/$clientId/proposals/$grantId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
+  CatalogRoute: typeof CatalogRoute
+  ClientsClientIdRoute: typeof ClientsClientIdRoute
+  ClientsIndexRoute: typeof ClientsIndexRoute
+  ClientsClientIdMatchesRoute: typeof ClientsClientIdMatchesRoute
+  ClientsClientIdProposalsGrantIdRoute: typeof ClientsClientIdProposalsGrantIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +131,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/catalog': {
+      id: '/catalog'
+      path: '/catalog'
+      fullPath: '/catalog'
+      preLoaderRoute: typeof CatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients/': {
+      id: '/clients/'
+      path: '/clients'
+      fullPath: '/clients/'
+      preLoaderRoute: typeof ClientsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients/$clientId': {
+      id: '/clients/$clientId'
+      path: '/clients/$clientId'
+      fullPath: '/clients/$clientId'
+      preLoaderRoute: typeof ClientsClientIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients_/$clientId/matches': {
+      id: '/clients_/$clientId/matches'
+      path: '/clients/$clientId/matches'
+      fullPath: '/clients/$clientId/matches'
+      preLoaderRoute: typeof ClientsClientIdMatchesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients_/$clientId/proposals/$grantId': {
+      id: '/clients_/$clientId/proposals/$grantId'
+      path: '/clients/$clientId/proposals/$grantId'
+      fullPath: '/clients/$clientId/proposals/$grantId'
+      preLoaderRoute: typeof ClientsClientIdProposalsGrantIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
+  CatalogRoute: CatalogRoute,
+  ClientsClientIdRoute: ClientsClientIdRoute,
+  ClientsIndexRoute: ClientsIndexRoute,
+  ClientsClientIdMatchesRoute: ClientsClientIdMatchesRoute,
+  ClientsClientIdProposalsGrantIdRoute: ClientsClientIdProposalsGrantIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
