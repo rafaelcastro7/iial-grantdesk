@@ -62,24 +62,33 @@ export type Database = {
         Row: {
           client_id: string
           content: string
+          content_hash: string | null
+          embedding: string | null
           id: string
           label: string
+          last_used_at: string | null
           times_used: number
           updated_at: string
         }
         Insert: {
           client_id: string
           content: string
+          content_hash?: string | null
+          embedding?: string | null
           id?: string
           label: string
+          last_used_at?: string | null
           times_used?: number
           updated_at?: string
         }
         Update: {
           client_id?: string
           content?: string
+          content_hash?: string | null
+          embedding?: string | null
           id?: string
           label?: string
+          last_used_at?: string | null
           times_used?: number
           updated_at?: string
         }
@@ -213,6 +222,7 @@ export type Database = {
           match_id: string
           passed: boolean
           rule_key: string
+          status: string
         }
         Insert: {
           detail: string
@@ -221,6 +231,7 @@ export type Database = {
           match_id: string
           passed: boolean
           rule_key: string
+          status: string
         }
         Update: {
           detail?: string
@@ -229,6 +240,7 @@ export type Database = {
           match_id?: string
           passed?: boolean
           rule_key?: string
+          status?: string
         }
         Relationships: [
           {
@@ -312,12 +324,15 @@ export type Database = {
           country: string
           currency: string | null
           deadline: string | null
+          eligibility_note: string | null
+          eligible_applicant_types: string[]
           first_seen_at: string
           funder_id: string
           id: string
           language: string
           last_seen_at: string
           search_tsv: unknown
+          search_tsv_ml: unknown
           source_hash: string
           source_key: string
           status: string
@@ -331,12 +346,15 @@ export type Database = {
           country: string
           currency?: string | null
           deadline?: string | null
+          eligibility_note?: string | null
+          eligible_applicant_types?: string[]
           first_seen_at?: string
           funder_id: string
           id?: string
           language?: string
           last_seen_at?: string
           search_tsv?: unknown
+          search_tsv_ml?: unknown
           source_hash: string
           source_key: string
           status?: string
@@ -350,12 +368,15 @@ export type Database = {
           country?: string
           currency?: string | null
           deadline?: string | null
+          eligibility_note?: string | null
+          eligible_applicant_types?: string[]
           first_seen_at?: string
           funder_id?: string
           id?: string
           language?: string
           last_seen_at?: string
           search_tsv?: unknown
+          search_tsv_ml?: unknown
           source_hash?: string
           source_key?: string
           status?: string
@@ -379,7 +400,9 @@ export type Database = {
           decided_at: string
           grant_id: string
           id: string
+          matched_at: string
           relevance: number | null
+          retrieval: Json
           verdict: string
         }
         Insert: {
@@ -387,7 +410,9 @@ export type Database = {
           decided_at?: string
           grant_id: string
           id?: string
+          matched_at?: string
           relevance?: number | null
+          retrieval?: Json
           verdict: string
         }
         Update: {
@@ -395,7 +420,9 @@ export type Database = {
           decided_at?: string
           grant_id?: string
           id?: string
+          matched_at?: string
           relevance?: number | null
+          retrieval?: Json
           verdict?: string
         }
         Relationships: [
@@ -466,30 +493,39 @@ export type Database = {
       proposal_sections: {
         Row: {
           content: string | null
+          drafted_by: string | null
           heading: string
           id: string
           proposal_id: string
           requirement_id: string | null
+          reused_answer_ids: string[]
           sort_order: number
           updated_at: string
+          word_count: number | null
         }
         Insert: {
           content?: string | null
+          drafted_by?: string | null
           heading: string
           id?: string
           proposal_id: string
           requirement_id?: string | null
+          reused_answer_ids?: string[]
           sort_order?: number
           updated_at?: string
+          word_count?: number | null
         }
         Update: {
           content?: string | null
+          drafted_by?: string | null
           heading?: string
           id?: string
           proposal_id?: string
           requirement_id?: string | null
+          reused_answer_ids?: string[]
           sort_order?: number
           updated_at?: string
+          word_count?: number | null
         }
         Relationships: [
           {
@@ -553,27 +589,45 @@ export type Database = {
       requirements: {
         Row: {
           detail: string | null
+          evaluation_note: string | null
+          extracted_at: string | null
+          extracted_from: string | null
           grant_id: string
           id: string
           is_critical: boolean
+          kind: string
           label: string
           sort_order: number
+          source_quote: string | null
+          word_limit: number | null
         }
         Insert: {
           detail?: string | null
+          evaluation_note?: string | null
+          extracted_at?: string | null
+          extracted_from?: string | null
           grant_id: string
           id?: string
           is_critical?: boolean
+          kind?: string
           label: string
           sort_order?: number
+          source_quote?: string | null
+          word_limit?: number | null
         }
         Update: {
           detail?: string | null
+          evaluation_note?: string | null
+          extracted_at?: string | null
+          extracted_from?: string | null
           grant_id?: string
           id?: string
           is_critical?: boolean
+          kind?: string
           label?: string
           sort_order?: number
+          source_quote?: string | null
+          word_limit?: number | null
         }
         Relationships: [
           {
@@ -676,7 +730,38 @@ export type Database = {
     }
     Functions: {
       ensure_consultant: { Args: never; Returns: undefined }
+      grant_text_config: { Args: { lang: string }; Returns: unknown }
+      match_answers: {
+        Args: {
+          max_results?: number
+          min_similarity?: number
+          q_embedding: string
+          target_client: string
+        }
+        Returns: {
+          content: string
+          id: string
+          label: string
+          similarity: number
+        }[]
+      }
       owns_client: { Args: { target: string }; Returns: boolean }
+      search_grants: {
+        Args: {
+          countries?: string[]
+          pool?: number
+          q: string
+          q_embedding: string
+          q_language?: string
+          result_limit?: number
+        }
+        Returns: {
+          grant_id: string
+          lexical_rank: number
+          score: number
+          vector_rank: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
