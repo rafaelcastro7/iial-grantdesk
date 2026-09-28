@@ -1,15 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { ACCESS_TOKEN_MESSAGE, callerClient } from "./caller";
-import { readRequirementsForGrant } from "./read-requirements";
-import { assessCondition } from "./assess-condition";
-import { draftSection, NoProfileError, saveAnswer, type DraftRequirement } from "./draft";
+import { ACCESS_TOKEN_MESSAGE } from "./session";
+import type { DraftRequirement } from "@/server/draft";
 
 const auth = z.string().min(10, ACCESS_TOKEN_MESSAGE);
 
 export const readRequirements = createServerFn({ method: "POST" })
-  .validator(z.object({ grantId: z.string().uuid(), accessToken: auth }))
+  .inputValidator(z.object({ grantId: z.string().uuid(), accessToken: auth }))
   .handler(async ({ data }) => {
+    // Server-only modules load inside handlers; only handler bodies are kept
+    // out of the browser bundle.
+    const { callerClient } = await import("@/server/caller");
+    const { readRequirementsForGrant } = await import("@/server/read-requirements");
     try {
       const result = await readRequirementsForGrant(callerClient(data.accessToken), data.grantId);
       return { ok: true as const, ...result };
@@ -26,7 +28,7 @@ export const readRequirements = createServerFn({ method: "POST" })
  * waste charged against the same token budget drafting shares.
  */
 export const assessRequirement = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       clientId: z.string().uuid(),
       proposalId: z.string().uuid(),
@@ -35,6 +37,9 @@ export const assessRequirement = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
+    const { assessCondition } = await import("@/server/assess-condition");
+    const { NoProfileError } = await import("@/server/draft");
     const supabase = callerClient(data.accessToken);
     try {
       const { data: cached, error: cacheError } = await supabase
@@ -83,7 +88,7 @@ export const assessRequirement = createServerFn({ method: "POST" })
   });
 
 export const draftProposalSection = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       clientId: z.string().uuid(),
       proposalId: z.string().uuid(),
@@ -92,6 +97,8 @@ export const draftProposalSection = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
+    const { draftSection, NoProfileError } = await import("@/server/draft");
     const supabase = callerClient(data.accessToken);
     try {
       const { data: requirement, error } = await supabase
@@ -207,7 +214,7 @@ export const draftProposalSection = createServerFn({ method: "POST" })
 
 /** Keep a section the consultant approved, so the next call reuses it. */
 export const saveToAnswerLibrary = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       clientId: z.string().uuid(),
       label: z.string().min(2),
@@ -216,6 +223,8 @@ export const saveToAnswerLibrary = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
+    const { saveAnswer } = await import("@/server/draft");
     try {
       const saved = await saveAnswer(
         callerClient(data.accessToken),

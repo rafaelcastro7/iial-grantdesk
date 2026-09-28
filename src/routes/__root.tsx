@@ -45,7 +45,7 @@ function RootDocument({ children }: { children: ReactNode }) {
   // signal for when the page is actually interactive, and guessing with a
   // sleep is how flaky suites are born.
   useEffect(() => {
-    document.documentElement.dataset.hydrated = "true";
+    document.documentElement.dataset["hydrated"] = "true";
   }, []);
 
   return (

@@ -8,8 +8,15 @@ import { relevanceFrom } from "@/lib/match-explain";
 import { bandOf } from "@/lib/regions";
 import { axisBreakdown } from "@/lib/axis-breakdown";
 import { findMatches } from "@/lib/match.functions";
+import { meta } from "@/lib/head";
 
-export const Route = createFileRoute("/clients_/$clientId/matches")({ component: MatchesPage });
+export const Route = createFileRoute("/clients_/$clientId/matches")({
+  component: MatchesPage,
+  head: () => meta(
+    "Matches — Grant Desk",
+    "Open calls this client can apply for, each with the eligibility rules that decided the verdict.",
+  ),
+});
 
 type Verdict = "eligible" | "needs_input" | "ineligible";
 
@@ -393,7 +400,7 @@ function MatchCard({
               <Link
                 to="/clients/$clientId"
                 params={{ clientId }}
-                hash={FIELD_FOR_RULE[deciding.rule_key]}
+                hash={FIELD_FOR_RULE[deciding.rule_key] ?? ""}
                 className="font-medium text-[var(--color-accent)]"
               >
                 Fill it in →

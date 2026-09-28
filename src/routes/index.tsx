@@ -2,8 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Landing } from "@/components/Landing";
+import { meta } from "@/lib/head";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/")({
+  component: Home,
+  head: () => meta(
+    "Grant Desk — funding matches your clients can actually win",
+    "A consultant's desk for grant work: real calls from public sources, eligibility decided by rules you can read, and drafts grounded in the client's own profile.",
+  ),
+});
 
 type Row = {
   id: string;

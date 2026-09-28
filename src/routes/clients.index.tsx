@@ -2,8 +2,15 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useAction } from "@/lib/use-action";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { meta } from "@/lib/head";
 
-export const Route = createFileRoute("/clients/")({ component: ClientsPage });
+export const Route = createFileRoute("/clients/")({
+  component: ClientsPage,
+  head: () => meta(
+    "Clients — Grant Desk",
+    "Every organization you represent, with the profile that drives matching quality.",
+  ),
+});
 
 type ClientRow = { id: string; name: string; website: string | null; country: string };
 

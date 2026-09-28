@@ -1,9 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { ACCESS_TOKEN_MESSAGE, callerClient } from "./caller";
+import { ACCESS_TOKEN_MESSAGE } from "./session";
 import { assessSubmission, type Blocker, type SubmitCandidate } from "@/lib/submit-gate";
-import { loadPastAwards } from "./past-awards";
 
 const auth = z.string().min(10, ACCESS_TOKEN_MESSAGE);
 
@@ -118,8 +117,9 @@ async function buildCandidate(
 
 /** What is standing between this application and being sent. */
 export const checkReadiness = createServerFn({ method: "POST" })
-  .validator(z.object({ proposalId: z.string().uuid(), accessToken: auth }))
+  .inputValidator(z.object({ proposalId: z.string().uuid(), accessToken: auth }))
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
     try {
       const { candidate } = await buildCandidate(
         callerClient(data.accessToken),
@@ -137,7 +137,7 @@ export const checkReadiness = createServerFn({ method: "POST" })
   });
 
 export const submitProposal = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       proposalId: z.string().uuid(),
       method: z.string().max(120).optional(),
@@ -149,6 +149,7 @@ export const submitProposal = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
     const supabase = callerClient(data.accessToken);
     try {
       const { data: user } = await supabase.auth.getUser();
@@ -198,8 +199,10 @@ export const submitProposal = createServerFn({ method: "POST" })
 
 /** Who has won this program before — the first question a consultant asks. */
 export const getPastAwards = createServerFn({ method: "POST" })
-  .validator(z.object({ grantId: z.string().uuid(), accessToken: auth }))
+  .inputValidator(z.object({ grantId: z.string().uuid(), accessToken: auth }))
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
+    const { loadPastAwards } = await import("@/server/past-awards");
     try {
       return {
         ok: true as const,

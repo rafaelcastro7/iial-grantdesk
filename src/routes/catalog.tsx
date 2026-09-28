@@ -1,11 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getCoverage } from "@/lib/catalog.functions";
+import { refreshCatalog } from "@/lib/refresh.functions";
+import { accessToken } from "@/lib/session";
 import { errorMessage } from "@/lib/error-message";
 import type { MarketCoverage } from "@/lib/coverage";
+import { meta } from "@/lib/head";
 
-export const Route = createFileRoute("/catalog")({ component: CatalogPage });
+export const Route = createFileRoute("/catalog")({
+  component: CatalogPage,
+  head: () => meta(
+    "Funder coverage — Grant Desk",
+    "Which markets Grant Desk refreshes automatically, which are directory-only, and how many open calls are in the catalog right now.",
+  ),
+});
 
 const LEVEL_STYLE: Record<MarketCoverage["level"], { label: string; className: string }> = {
   automatic: { label: "Automatic", className: "text-[var(--color-eligible)]" },
@@ -31,20 +40,51 @@ const MARKET_NAMES: Record<string, string> = {
  */
 function CatalogPage() {
   const fetchCoverage = useServerFn(getCoverage);
+  const refresh = useServerFn(refreshCatalog);
   const [data, setData] = useState<{ coverage: MarketCoverage[]; totalGrants: number } | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setData(await fetchCoverage({ data: {} }));
+    } catch (caught) {
+      setError(errorMessage(caught));
+    }
+  }, [fetchCoverage]);
 
   useEffect(() => {
-    void (async () => {
-      try {
-        setData(await fetchCoverage({ data: {} }));
-      } catch (caught) {
-        setError(errorMessage(caught));
+    void load();
+  }, [load]);
+
+  // No nightly daemon here, so the refresh is a deliberate act with a visible
+  // result: a consultant who suspects the catalog is stale can prove it.
+  async function runRefresh() {
+    setRefreshing(true);
+    setRefreshNote(null);
+    setError(null);
+    try {
+      const token = await accessToken();
+      const result = await refresh({ data: { accessToken: token } });
+      if (!result.ok) {
+        setError(result.message);
+        return;
       }
-    })();
-  }, [fetchCoverage]);
+      const grants = result.sources.reduce((total, source) => total + source.grants, 0);
+      setRefreshNote(
+        `${grants.toLocaleString()} calls checked, ${result.embedded.embedded.toLocaleString()} re-indexed.`,
+      );
+      await load();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -54,11 +94,26 @@ function CatalogPage() {
         directory, not padded out to look like the rest.
       </p>
 
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void runRefresh()}
+          disabled={refreshing}
+          className="rounded-md border border-[var(--color-rule)] px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+        >
+          {refreshing ? "Refreshing…" : "Refresh the catalog"}
+        </button>
+        {refreshNote && (
+          <span className="text-sm text-[var(--color-ink-soft)]">{refreshNote}</span>
+        )}
+      </div>
+
       {error && (
         <p role="alert" className="mt-6 text-sm text-[var(--color-ineligible)]">
           {error}
         </p>
       )}
+
 
       {data && (
         <>

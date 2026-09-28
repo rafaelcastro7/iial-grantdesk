@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { extractProfileFromUrl } from "./extract-profile";
 
 /**
  * Profile extraction runs on the server because it needs provider API keys.
@@ -10,7 +9,7 @@ import { extractProfileFromUrl } from "./extract-profile";
  * somewhere easier to get wrong.
  */
 export const extractProfile = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       url: z
         .string()
@@ -19,6 +18,7 @@ export const extractProfile = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const { extractProfileFromUrl } = await import("@/server/extract-profile");
     try {
       const { profile, provenance } = await extractProfileFromUrl(data.url);
       return { ok: true as const, profile, provenance };

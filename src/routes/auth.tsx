@@ -1,8 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAction } from "@/lib/use-action";
 import { supabase } from "@/lib/supabase";
+import { meta } from "@/lib/head";
 
-export const Route = createFileRoute("/auth")({ component: AuthPage });
+export const Route = createFileRoute("/auth")({
+  component: AuthPage,
+  head: () => meta(
+    "Sign in — Grant Desk",
+    "Sign in to your grant desk. Each client's profile, matches and drafts stay isolated at the database level.",
+  ),
+});
 
 /**
  * The form is uncontrolled on purpose.
@@ -43,6 +50,12 @@ function AuthPage() {
         const followUp = await auth.signInWithPassword({ email, password });
         if (followUp.error) throw followUp.error;
       }
+
+      // Every desk needs its consultant row before any client can reference it.
+      // Done here rather than by a trigger on the auth tables, which are out of
+      // reach; the function is idempotent, so signing in again is harmless.
+      const { error: ensureError } = await supabase().rpc("ensure_consultant");
+      if (ensureError) throw ensureError;
 
       await navigate({ to: "/clients" });
     });
