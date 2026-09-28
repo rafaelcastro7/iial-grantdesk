@@ -1,8 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
-import { serverEnv } from "@/lib/env.server";
-import { SOURCES } from "./sources";
 import { coverageByMarket, type MarketCoverage, type SourceHealth } from "@/lib/coverage";
 
 /**
@@ -12,14 +9,15 @@ import { coverageByMarket, type MarketCoverage, type SourceHealth } from "@/lib/
  * the database (what actually landed and when). Neither half alone is
  * trustworthy: the registry describes intent, and row counts alone cannot tell
  * a healthy quiet source from a broken one.
+ *
+ * Counts only — no client, consultant, or proposal data passes through here,
+ * which is why it can answer before anyone signs in.
  */
 export const getCoverage = createServerFn({ method: "GET" })
-  .validator(z.object({}))
+  .inputValidator(z.object({}))
   .handler(async (): Promise<{ coverage: MarketCoverage[]; totalGrants: number }> => {
-    const env = serverEnv();
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    const { SOURCES } = await import("@/server/sources");
+    const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
 
     const [{ data: freshness }, { data: counts }] = await Promise.all([
       supabase.from("source_freshness").select("source_key, last_ok_at"),

@@ -1,15 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { ACCESS_TOKEN_MESSAGE, callerClient } from "./caller";
-import { readRequirementsForGrant } from "./read-requirements";
-import { assessCondition } from "./assess-condition";
-import { draftSection, NoProfileError, saveAnswer, type DraftRequirement } from "./draft";
+import { ACCESS_TOKEN_MESSAGE } from "./session";
+import type { DraftRequirement } from "@/server/draft";
 
 const auth = z.string().min(10, ACCESS_TOKEN_MESSAGE);
 
 export const readRequirements = createServerFn({ method: "POST" })
-  .validator(z.object({ grantId: z.string().uuid(), accessToken: auth }))
+  .inputValidator(z.object({ grantId: z.string().uuid(), accessToken: auth }))
   .handler(async ({ data }) => {
+    // Server-only modules load inside handlers; only handler bodies are kept
+    // out of the browser bundle.
+    const { callerClient } = await import("@/server/caller");
+    const { readRequirementsForGrant } = await import("@/server/read-requirements");
     try {
       const result = await readRequirementsForGrant(callerClient(data.accessToken), data.grantId);
       return { ok: true as const, ...result };
