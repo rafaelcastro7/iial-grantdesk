@@ -44,6 +44,12 @@ function AuthPage() {
         if (followUp.error) throw followUp.error;
       }
 
+      // Every desk needs its consultant row before any client can reference it.
+      // Done here rather than by a trigger on the auth tables, which are out of
+      // reach; the function is idempotent, so signing in again is harmless.
+      const { error: ensureError } = await supabase().rpc("ensure_consultant");
+      if (ensureError) throw ensureError;
+
       await navigate({ to: "/clients" });
     });
   }
