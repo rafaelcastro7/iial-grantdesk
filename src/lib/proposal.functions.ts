@@ -28,7 +28,7 @@ export const readRequirements = createServerFn({ method: "POST" })
  * waste charged against the same token budget drafting shares.
  */
 export const assessRequirement = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       clientId: z.string().uuid(),
       proposalId: z.string().uuid(),
@@ -37,6 +37,9 @@ export const assessRequirement = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
+    const { assessCondition } = await import("@/server/assess-condition");
+    const { NoProfileError } = await import("@/server/draft");
     const supabase = callerClient(data.accessToken);
     try {
       const { data: cached, error: cacheError } = await supabase
@@ -85,7 +88,7 @@ export const assessRequirement = createServerFn({ method: "POST" })
   });
 
 export const draftProposalSection = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       clientId: z.string().uuid(),
       proposalId: z.string().uuid(),
@@ -94,6 +97,8 @@ export const draftProposalSection = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
+    const { draftSection, NoProfileError } = await import("@/server/draft");
     const supabase = callerClient(data.accessToken);
     try {
       const { data: requirement, error } = await supabase
@@ -209,7 +214,7 @@ export const draftProposalSection = createServerFn({ method: "POST" })
 
 /** Keep a section the consultant approved, so the next call reuses it. */
 export const saveToAnswerLibrary = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       clientId: z.string().uuid(),
       label: z.string().min(2),
@@ -218,6 +223,8 @@ export const saveToAnswerLibrary = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const { callerClient } = await import("@/server/caller");
+    const { saveAnswer } = await import("@/server/draft");
     try {
       const saved = await saveAnswer(
         callerClient(data.accessToken),
