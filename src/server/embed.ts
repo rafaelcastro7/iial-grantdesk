@@ -9,9 +9,8 @@ import { serverEnv } from "@/lib/env.server";
  * and with an English-only embedder every French and Spanish call in the
  * catalog was reachable by exact wording alone. See migration 0014.
  *
- * Two widths, kept apart on purpose. Grant vectors are 1024 wide, matching the
- * `vector(1024)` column, and answer-library vectors are 768, matching theirs.
- * The two spaces never meet: grant vectors are only ever compared to grant
+ * Two spaces, kept apart on purpose: grant vectors are only ever compared to
+ * grant queries, answer vectors only to requirement queries. They never meet: grant vectors are only ever compared to grant
  * queries, answer vectors only to requirement queries. A width change would
  * corrupt every distance in its table, so it is a migration, never a swap.
  */
@@ -19,10 +18,10 @@ import { serverEnv } from "@/lib/env.server";
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/embeddings";
 const GATEWAY_MODEL = "google/gemini-embedding-2";
 
-export const EMBED_MODEL = "gemini-embedding-2/1024";
-export const EMBED_DIMENSIONS = 1024;
+export const EMBED_MODEL = "gemini-embedding-2/768";
+export const EMBED_DIMENSIONS = 768;
 
-export const ANSWER_EMBED_MODEL = "gemini-embedding-2/768";
+export const ANSWER_EMBED_MODEL = "gemini-embedding-2/answers";
 export const ANSWER_EMBED_DIMENSIONS = 768;
 
 /** Rows per request: grant descriptions run to 8000 characters each. */
@@ -47,7 +46,6 @@ export async function embed(texts: string[], model: string = EMBED_MODEL): Promi
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ model: GATEWAY_MODEL, input: chunk, dimensions }),
-      signal: AbortSignal.timeout(300_000),
     });
     if (!response.ok) {
       const detail = await response.text();

@@ -132,7 +132,7 @@ async function readStream(response: Response): Promise<string> {
   return text.trim();
 }
 
-async function callGateway(request: LlmRequest, timeoutMs: number): Promise<LlmResponse> {
+async function callGateway(request: LlmRequest): Promise<LlmResponse> {
   const env = serverEnv();
   const started = Date.now();
 
@@ -151,7 +151,6 @@ async function callGateway(request: LlmRequest, timeoutMs: number): Promise<LlmR
       stream: true,
       ...(request.json ? { text: { format: { type: "json_object" } } } : {}),
     }),
-    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!response.ok) {
@@ -181,15 +180,16 @@ function retryable(message: string): boolean {
 
 export async function callLlm(
   request: LlmRequest,
-  options: { timeoutMs?: number } = {},
+  // Accepted for call-site compatibility and deliberately unused: a deadline
+  // here would abandon a generation that still finishes and still bills.
+  _options: { timeoutMs?: number } = {},
 ): Promise<LlmResponse> {
-  const timeoutMs = options.timeoutMs ?? 120_000;
   const attempts: string[] = [];
   const maxTries = request.noWait ? 1 : 3;
 
   for (let attempt = 0; attempt < maxTries; attempt++) {
     try {
-      const result = await callGateway(request, timeoutMs);
+      const result = await callGateway(request);
       if (request.validate && !request.validate(result.text)) {
         attempts.push("lovable-ai: failed caller validation");
         continue;
