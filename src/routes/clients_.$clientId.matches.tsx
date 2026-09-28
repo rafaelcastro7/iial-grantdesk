@@ -393,7 +393,7 @@ function MatchCard({
               <Link
                 to="/clients/$clientId"
                 params={{ clientId }}
-                hash={FIELD_FOR_RULE[deciding.rule_key]}
+                hash={FIELD_FOR_RULE[deciding.rule_key] ?? ""}
                 className="font-medium text-[var(--color-accent)]"
               >
                 Fill it in →

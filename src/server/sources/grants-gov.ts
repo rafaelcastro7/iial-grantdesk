@@ -95,21 +95,21 @@ export function readDetail(body: unknown): OppDetail {
   // forecasted call — a third of the feed, and precisely the third a consultant
   // most wants early warning of.
   const data = (body as { data?: Record<string, unknown> })?.data ?? {};
-  const detail = ((data.synopsis ?? data.forecast ?? {}) as Record<string, unknown>) || {};
-  const applicantTypes = (detail.applicantTypes ?? []) as Array<{ id?: string }>;
-  const description = detail.synopsisDesc ?? detail.forecastDesc ?? "";
+  const detail = ((data["synopsis"] ?? data["forecast"] ?? {}) as Record<string, unknown>) || {};
+  const applicantTypes = (detail["applicantTypes"] ?? []) as Array<{ id?: string }>;
+  const description = detail["synopsis"]Desc ?? detail["forecast"]Desc ?? "";
 
   return {
     // The description is HTML in this feed; the tsvector and the embedding both
     // want prose, and a consultant reading the card wants it even more.
     summary: htmlToText(String(description)).slice(0, 4000) || null,
     eligibilityNote:
-      htmlToText(String(detail.applicantEligibilityDesc ?? "")).slice(0, 2000) || null,
+      htmlToText(String(detail["applicantEligibilityDesc"] ?? "")).slice(0, 2000) || null,
     eligibleApplicantTypes: fromGrantsGovCodes(
       applicantTypes.map((t) => String(t?.id ?? "")).filter(Boolean),
     ),
-    amountMin: parseAmount(detail.awardFloor),
-    amountMax: parseAmount(detail.awardCeiling),
+    amountMin: parseAmount(detail["awardFloor"]),
+    amountMax: parseAmount(detail["awardCeiling"]),
   };
 }
 

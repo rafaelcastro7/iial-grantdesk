@@ -50,7 +50,7 @@ export async function runSource(
   const runId = (run as { id: string } | null)?.id;
 
   try {
-    const harvest = await adapter.harvest({ limit: options.limit });
+    const harvest = await adapter.harvest(options.limit === undefined ? {} : { limit: options.limit });
 
     // Funders first: grants reference them, and a grant whose funder failed to
     // land must be skipped loudly rather than attached to the wrong one.

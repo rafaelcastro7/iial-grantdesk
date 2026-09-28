@@ -199,10 +199,10 @@ export async function scanAndAlertNewGrants({
           status: "open",
         },
         client: {
-          jurisdictions: profile.jurisdictions,
-          stage: profile.stage,
-          annualBudget: profile.annual_budget,
-          leadTimeWeeks: profile.lead_time_weeks,
+          jurisdictions: profile.jurisdictions ?? null,
+          stage: profile.stage ?? null,
+          annualBudget: profile.annual_budget ?? null,
+          leadTimeWeeks: profile.lead_time_weeks ?? null,
         },
         today,
       });
