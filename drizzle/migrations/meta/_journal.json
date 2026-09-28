@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790620150458,
+      "tag": "0000_grantdesk_core_schema_and_rls",
+      "breakpoints": true
+    }
+  ]
 }
