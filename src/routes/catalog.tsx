@@ -87,11 +87,26 @@ function CatalogPage() {
         directory, not padded out to look like the rest.
       </p>
 
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void runRefresh()}
+          disabled={refreshing}
+          className="rounded-md border border-[var(--color-rule)] px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+        >
+          {refreshing ? "Refreshing…" : "Refresh the catalog"}
+        </button>
+        {refreshNote && (
+          <span className="text-sm text-[var(--color-ink-soft)]">{refreshNote}</span>
+        )}
+      </div>
+
       {error && (
         <p role="alert" className="mt-6 text-sm text-[var(--color-ineligible)]">
           {error}
         </p>
       )}
+
 
       {data && (
         <>
