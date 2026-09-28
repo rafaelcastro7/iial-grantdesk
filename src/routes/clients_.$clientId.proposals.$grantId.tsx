@@ -316,6 +316,19 @@ function ProposalPage() {
     });
   }
 
+  async function addSectionLabel(label: string) {
+    await run("add", async () => {
+      const { error: insertError } = await supabase()
+        .from("requirements")
+        .upsert(
+          { grant_id: grantId, label, kind: "section", word_limit: null, sort_order: (requirements?.length ?? 0) + 100 },
+          { onConflict: "grant_id, label" },
+        );
+      if (insertError) throw insertError;
+      await load();
+    });
+  }
+
   /**
    * A condition only the consultant can clear — audited statements, a signed
    * letter. The software cannot verify it, so it records that a person said
@@ -717,9 +730,12 @@ function ProposalPage() {
                 ? "No section list came out of this automatically — read it here and add the headings below."
                 : "No structure came out of this automatically — read it here and add the headings below."}
             </p>
-            <pre className="mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] p-4 text-sm">
-              {readText}
-            </pre>
+            <ReadTextView
+              text={readText}
+              existing={(requirements ?? []).map((r) => r.label)}
+              disabled={busy !== null}
+              onAddSection={(label) => void addSectionLabel(label)}
+            />
           </section>
         )}
 
