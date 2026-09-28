@@ -22,7 +22,12 @@ export function sourceHash(sourceKey: string, externalId: string): string {
 
 function adminClient(): SupabaseClient {
   const env = serverEnv();
-  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  // Ingest writes the shared catalog, which no consultant owns and RLS keeps
+  // read-only to them. Without the service role there is nothing to fall back
+  // to, so say so rather than failing later on a permission error.
+  if (!key) throw new Error("Catalog ingest needs SUPABASE_SERVICE_ROLE_KEY.");
+  return createClient(env.SUPABASE_URL, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
