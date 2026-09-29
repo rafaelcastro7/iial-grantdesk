@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { accessToken } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
@@ -97,6 +97,7 @@ function MatchesPage() {
   const { busy, error, note, run, setError } = useAction();
   const [showRuledOut, setShowRuledOut] = useState(false);
   const [minAward, setMinAward] = useState(50000);
+  const [countryFilter, setCountryFilter] = useState("any");
   const autoRan = useRef(false);
 
   const load = useCallback(async () => {
@@ -195,8 +196,22 @@ function MatchesPage() {
   const bigEnough = (m: MatchRow) =>
     minAward <= 0 || m.grants?.amount_max == null || m.grants.amount_max >= minAward;
 
+  const countries = useMemo(
+    () =>
+      [...new Set((matches ?? []).map((m) => m.grants?.country?.toUpperCase()).filter((c): c is string => !!c))].sort(),
+    [matches],
+  );
+
+  const filteredMatches = useMemo(
+    () =>
+      (matches ?? []).filter(
+        (m) => countryFilter === "any" || m.grants?.country?.toUpperCase() === countryFilter,
+      ),
+    [matches, countryFilter],
+  );
+
   const grouped = (verdict: Verdict) =>
-    (matches ?? [])
+    filteredMatches
       .filter((m) => m.verdict === verdict && bigEnough(m))
       .map((m, index) => ({ m, index, band: bandOf(m.grants?.country, jurisdictions) }))
       .sort((a, b) => {
@@ -205,7 +220,7 @@ function MatchesPage() {
       })
       .map(({ m }) => m);
 
-  const hiddenBySize = (matches ?? []).filter((m) => !bigEnough(m)).length;
+  const hiddenBySize = filteredMatches.filter((m) => !bigEnough(m)).length;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -260,6 +275,19 @@ function MatchesPage() {
             amount are kept.
           </span>
         )}
+      </label>
+      <label className="mt-4 flex flex-wrap items-center gap-2 text-sm text-[var(--color-ink-soft)]">
+        Country
+        <select
+          value={countryFilter}
+          onChange={(e) => setCountryFilter(e.target.value)}
+          className="w-36 rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-2 py-1"
+        >
+          <option value="any">Any country</option>
+          {countries.map((c) => (
+            <option key={c} value={c}>{countryName(c)}</option>
+          ))}
+        </select>
       </label>
 
       {error && (
