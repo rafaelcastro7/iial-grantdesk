@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CatalogRouteImport } from './routes/catalog'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
+import { Route as ClientsClientIdGrantsRouteImport } from './routes/clients_.$clientId.grants'
 import { Route as ClientsClientIdMatchesRouteImport } from './routes/clients_.$clientId.matches'
 import { Route as ClientsClientIdProposalsGrantIdRouteImport } from './routes/clients_.$clientId.proposals.$grantId'
 
@@ -42,6 +43,11 @@ const ClientsClientIdRoute = ClientsClientIdRouteImport.update({
   path: '/clients/$clientId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClientsClientIdGrantsRoute = ClientsClientIdGrantsRouteImport.update({
+  id: '/clients_/$clientId/grants',
+  path: '/clients/$clientId/grants',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClientsClientIdMatchesRoute = ClientsClientIdMatchesRouteImport.update({
   id: '/clients_/$clientId/matches',
   path: '/clients/$clientId/matches',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/catalog': typeof CatalogRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/clients/': typeof ClientsIndexRoute
+  '/clients/$clientId/grants': typeof ClientsClientIdGrantsRoute
   '/clients/$clientId/matches': typeof ClientsClientIdMatchesRoute
   '/clients/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
 }
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/catalog': typeof CatalogRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/clients': typeof ClientsIndexRoute
+  '/clients/$clientId/grants': typeof ClientsClientIdGrantsRoute
   '/clients/$clientId/matches': typeof ClientsClientIdMatchesRoute
   '/clients/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
 }
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/catalog': typeof CatalogRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/clients/': typeof ClientsIndexRoute
+  '/clients_/$clientId/grants': typeof ClientsClientIdGrantsRoute
   '/clients_/$clientId/matches': typeof ClientsClientIdMatchesRoute
   '/clients_/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
 }
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/clients/$clientId'
     | '/clients/'
+    | '/clients/$clientId/grants'
     | '/clients/$clientId/matches'
     | '/clients/$clientId/proposals/$grantId'
   fileRoutesByTo: FileRoutesByTo
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/clients/$clientId'
     | '/clients'
+    | '/clients/$clientId/grants'
     | '/clients/$clientId/matches'
     | '/clients/$clientId/proposals/$grantId'
   id:
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/clients/$clientId'
     | '/clients/'
+    | '/clients_/$clientId/grants'
     | '/clients_/$clientId/matches'
     | '/clients_/$clientId/proposals/$grantId'
   fileRoutesById: FileRoutesById
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   CatalogRoute: typeof CatalogRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
+  ClientsClientIdGrantsRoute: typeof ClientsClientIdGrantsRoute
   ClientsClientIdMatchesRoute: typeof ClientsClientIdMatchesRoute
   ClientsClientIdProposalsGrantIdRoute: typeof ClientsClientIdProposalsGrantIdRoute
 }
@@ -159,6 +172,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsClientIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clients_/$clientId/grants': {
+      id: '/clients_/$clientId/grants'
+      path: '/clients/$clientId/grants'
+      fullPath: '/clients/$clientId/grants'
+      preLoaderRoute: typeof ClientsClientIdGrantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clients_/$clientId/matches': {
       id: '/clients_/$clientId/matches'
       path: '/clients/$clientId/matches'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   CatalogRoute: CatalogRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
+  ClientsClientIdGrantsRoute: ClientsClientIdGrantsRoute,
   ClientsClientIdMatchesRoute: ClientsClientIdMatchesRoute,
   ClientsClientIdProposalsGrantIdRoute: ClientsClientIdProposalsGrantIdRoute,
 }

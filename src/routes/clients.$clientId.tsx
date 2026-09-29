@@ -526,14 +526,24 @@ function ClientDetail() {
             Offering it earlier would produce a page of results the rules cannot
             stand behind, which is the failure mode this product is built against. */}
         {completeness.canMatch && (
-          <Link
-            to="/clients/$clientId/matches"
-            params={{ clientId }}
-            data-testid="to-matches"
-            className="mt-4 inline-block rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
-          >
-            Find what they can apply for →
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              to="/clients/$clientId/matches"
+              params={{ clientId }}
+              data-testid="to-matches"
+              className="inline-block rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+            >
+              Find what they can apply for →
+            </Link>
+            <Link
+              to="/clients_/$clientId/grants"
+              params={{ clientId }}
+              data-testid="to-grants"
+              className="inline-block rounded-md border border-[var(--color-rule)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium"
+            >
+              View all matched grants →
+            </Link>
+          </div>
         )}
       </section>
 
