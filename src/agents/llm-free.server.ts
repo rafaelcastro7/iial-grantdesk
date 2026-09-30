@@ -1,9 +1,9 @@
 // Gap-fill LLM entry point (enricher's missing-field cascade).
 //
-// Single provider: the Lovable AI Gateway. The old free-provider chain
-// (Cerebras -> Groq -> Gemini -> local Ollama) is gone — one key, one
-// endpoint, one model served for us. The name and result shape stay so the
-// enricher and its callers keep working unchanged.
+// Provider chain: Cerebras -> Groq -> Gemini first, Lovable AI Gateway as the
+// paid floor. The external free tiers carry the volume so gateway credits are
+// spent only when every external key is missing or failing. The name and
+// result shape stay so the enricher and its callers keep working unchanged.
 
 import { newRunId } from "@/lib/otel";
 import { callLlm } from "@/agents/llm.server";
@@ -31,7 +31,7 @@ export type FreeLlmResult = {
 };
 
 export function freeProvidersAvailable(): string[] {
-  return ["lovable-ai"];
+  return ["cerebras", "groq", "gemini", "lovable-ai"];
 }
 
 export async function callFreeLlm(opts: FreeLlmOptions): Promise<FreeLlmResult> {

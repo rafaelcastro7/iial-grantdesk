@@ -1,14 +1,14 @@
 import { serverEnv } from "@/lib/env.server";
 
 /**
- * Language model access, through the Lovable AI Gateway.
+ * Language model access.
  *
- * The provider chain this replaced (Groq, Cerebras, Gemini, and a local Ollama
- * floor) existed because each account could disappear on its own. The gateway
- * removes that problem: one key, one endpoint, and a model that is served for
- * us. What survives from the old design is the part that mattered — a caller
- * asks for a *role*, gets back the text plus a record of what was attempted,
- * and a failure is reported rather than silently degraded.
+ * Provider chain, in order: Cerebras, Groq, Gemini, and finally the Lovable
+ * AI Gateway as the floor. The external providers carry the volume so the
+ * gateway's credits are spent only when every external key is missing or
+ * failing. What survives from the original design is the part that mattered —
+ * a caller asks for a *role*, gets back the text plus a record of what was
+ * attempted, and a failure is reported rather than silently degraded.
  */
 
 export type Role = "extract" | "judge" | "write";
@@ -132,6 +132,99 @@ async function readStream(response: Response): Promise<string> {
   return text.trim();
 }
 
+// ---- External providers (tried first, to save gateway credits) ----
+
+type ExternalProvider = {
+  name: string;
+  model: string;
+  call: (request: LlmRequest, apiKey: string) => Promise<string>;
+};
+
+/** OpenAI-compatible chat completions (Cerebras and Groq share the shape). */
+function openAiCompatible(url: string, model: string): ExternalProvider["call"] {
+  return async (request, apiKey) => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: request.messages,
+        temperature: request.temperature ?? 0.2,
+        ...(request.maxTokens ? { max_tokens: request.maxTokens } : {}),
+        ...(request.json ? { response_format: { type: "json_object" } } : {}),
+      }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`HTTP ${response.status}: ${detail.slice(0, 300)}`);
+    }
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const text = data.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error("the model returned an empty answer");
+    return text;
+  };
+}
+
+/** Gemini generateContent (non-streamed; these calls are short gap-fills). */
+async function callGemini(request: LlmRequest, apiKey: string): Promise<string> {
+  const model = "gemini-3.1-flash-lite";
+  const system = request.messages.find((m) => m.role === "system")?.content;
+  const turns = request.messages.filter((m) => m.role !== "system");
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+        contents: turns.map((m) => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }],
+        })),
+        generationConfig: {
+          temperature: request.temperature ?? 0.2,
+          ...(request.maxTokens ? { maxOutputTokens: request.maxTokens } : {}),
+          ...(request.json ? { responseMimeType: "application/json" } : {}),
+        },
+      }),
+    },
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`HTTP ${response.status}: ${detail.slice(0, 300)}`);
+  }
+  const data = (await response.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = data.candidates?.[0]?.content?.parts
+    ?.map((p) => p.text ?? "")
+    .join("")
+    .trim();
+  if (!text) throw new Error("the model returned an empty answer");
+  return text;
+}
+
+const EXTERNAL_PROVIDERS: (ExternalProvider & { envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GEMINI_API_KEY" })[] = [
+  {
+    name: "cerebras",
+    model: "qwen-3.8-27b",
+    envKey: "CEREBRAS_API_KEY",
+    call: openAiCompatible("https://api.cerebras.ai/v1/chat/completions", "qwen-3.8-27b"),
+  },
+  {
+    name: "groq",
+    model: "qwen/qwen3.8-27b",
+    envKey: "GROQ_API_KEY",
+    call: openAiCompatible("https://api.groq.com/openai/v1/chat/completions", "qwen/qwen3.8-27b"),
+  },
+  { name: "gemini", model: "gemini-3.1-flash-lite", envKey: "GEMINI_API_KEY", call: callGemini },
+];
+
 async function callGateway(request: LlmRequest): Promise<LlmResponse> {
   const env = serverEnv();
   const started = Date.now();
@@ -185,6 +278,33 @@ export async function callLlm(
   _options: { timeoutMs?: number } = {},
 ): Promise<LlmResponse> {
   const attempts: string[] = [];
+  const env = serverEnv();
+
+  // External providers first: each gets one shot, then we move on. Their
+  // free tiers carry the volume; the gateway below is the paid floor.
+  for (const provider of EXTERNAL_PROVIDERS) {
+    const apiKey = env[provider.envKey];
+    if (!apiKey) continue;
+    const started = Date.now();
+    try {
+      const text = await provider.call(request, apiKey);
+      if (request.validate && !request.validate(text)) {
+        attempts.push(`${provider.name}: failed caller validation`);
+        continue;
+      }
+      return {
+        text,
+        provider: provider.name,
+        model: provider.model,
+        latencyMs: Date.now() - started,
+        attempts,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      attempts.push(`${provider.name}: ${message}`);
+    }
+  }
+
   const maxTries = request.noWait ? 1 : 3;
 
   for (let attempt = 0; attempt < maxTries; attempt++) {

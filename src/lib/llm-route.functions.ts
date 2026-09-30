@@ -3,9 +3,10 @@
 /**
  * Reports where agent prompts actually go, so the UI can say so honestly.
  *
- * All agent calls go through the Lovable AI Gateway — one provider, one key,
- * no local models. The status is still derived from configuration rather than
- * hardcoded, and returns provider names only — never key material.
+ * Agent calls try the external providers first (Cerebras, Groq, Gemini) and
+ * fall back to the Lovable AI Gateway. The status is derived from
+ * configuration rather than hardcoded, and returns provider names only —
+ * never key material.
  */
 
 import { createServerFn } from "@tanstack/react-start";
@@ -23,9 +24,10 @@ export const getLlmRouteStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({}))
   .handler(async (): Promise<LlmRouteStatus> => {
-    const configured = !!process.env.LOVABLE_API_KEY;
-    return {
-      cloudProviders: configured ? ["Lovable AI"] : ["Lovable AI (key missing)"],
-      localOnly: false,
-    };
+    const providers: string[] = [];
+    if (process.env.CEREBRAS_API_KEY) providers.push("Cerebras");
+    if (process.env.GROQ_API_KEY) providers.push("Groq");
+    if (process.env.GEMINI_API_KEY) providers.push("Gemini");
+    providers.push(process.env.LOVABLE_API_KEY ? "Lovable AI (respaldo)" : "Lovable AI (key missing)");
+    return { cloudProviders: providers, localOnly: false };
   });

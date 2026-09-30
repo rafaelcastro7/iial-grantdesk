@@ -13,6 +13,10 @@ const schema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(10).optional(),
   /** Lovable AI Gateway. One key for chat models and embeddings alike. */
   LOVABLE_API_KEY: z.string().min(10),
+  /** External chat providers, tried before the gateway to save its credits. */
+  CEREBRAS_API_KEY: z.string().min(10).optional(),
+  GROQ_API_KEY: z.string().min(10).optional(),
+  GEMINI_API_KEY: z.string().min(10).optional(),
 });
 
 export type ServerEnv = z.infer<typeof schema>;
