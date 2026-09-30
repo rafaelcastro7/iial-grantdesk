@@ -13,19 +13,34 @@ export async function reviewClaimedGrant(opts: {
   try {
     const { data: before, error: beforeError } = await db.from("grants").select("status").eq("id", item.grant_id).single();
     if (beforeError) throw beforeError;
-    if (before.status === "discovered") {
+    if (!["won", "lost", "archived", "expired"].includes(before.status)) {
       const { enrichGrantImpl } = await import("@/agents/enricher.functions");
-      const result = await enrichGrantImpl(item.grant_id, { db: db as never, userId });
+      const result = await enrichGrantImpl(item.grant_id, { db: db as never, userId, force: true });
       if (!result.ok) throw new Error(result.error ?? "source_enrichment_failed");
     }
 
-    const [{ data: grant, error: grantError }, { data: evidence }, { data: embedding }] = await Promise.all([
+    const [{ data: grant, error: grantError }, { data: evidence }, { data: existingEmbedding }] = await Promise.all([
       db.from("grants").select("*").eq("id", item.grant_id).single(),
       db.from("evidence_spans").select("field").eq("grant_id", item.grant_id),
       db.from("grant_embeddings").select("grant_id").eq("grant_id", item.grant_id).maybeSingle(),
     ]);
     if (grantError) throw grantError;
-    const coverage = computeGrantCoverage(grant, (evidence ?? []).map((row) => row.field), !!embedding);
+    let embeddingExists = !!existingEmbedding;
+    if (!embeddingExists) {
+      const { embedOne, grantText, contentHash, EMBED_MODEL } = await import("@/server/embed");
+      const text = grantText(grant);
+      const vector = await embedOne(text);
+      const { error: embedError } = await db.from("grant_embeddings").upsert({
+        grant_id: grant.id,
+        embedding: JSON.stringify(vector),
+        content_hash: contentHash(text),
+        model: EMBED_MODEL,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "grant_id" });
+      if (embedError) throw embedError;
+      embeddingExists = true;
+    }
+    const coverage = computeGrantCoverage(grant, (evidence ?? []).map((row) => row.field), embeddingExists);
 
     let status = coverage.criticalIssues.length > 0 ? "remediable" : "needs_verification";
     let evaluatedAt: string | null = null;

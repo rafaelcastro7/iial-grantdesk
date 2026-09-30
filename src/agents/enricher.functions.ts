@@ -24,7 +24,7 @@ type EnricherDb = {
 
 export async function enrichGrantImpl(
   grantId: string,
-  opts?: { db?: EnricherDb; userId?: string | null },
+  opts?: { db?: EnricherDb; userId?: string | null; force?: boolean },
 ): Promise<EnricherResult> {
   const data = { grantId };
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -70,12 +70,12 @@ export async function enrichGrantImpl(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!g) throw new Error("grant_not_found");
-  if (g.status !== "discovered") {
+  if (g.status !== "discovered" && !opts?.force) {
     await trace("skip", `Skipped - status is "${g.status}", not "discovered"`, "warn");
     return { ok: true, skipped: true, reason: `status=${g.status}`, runId };
   }
   const currentAttempts = (g as { enrich_attempts?: number }).enrich_attempts ?? 0;
-  if (currentAttempts >= MAX_ENRICH_ATTEMPTS) {
+  if (currentAttempts >= MAX_ENRICH_ATTEMPTS && !opts?.force) {
     await trace("skip", `Skipped - max ${MAX_ENRICH_ATTEMPTS} enrich attempts reached`, "warn");
     return { ok: true, skipped: true, reason: "max_attempts_reached", runId };
   }
@@ -86,16 +86,16 @@ export async function enrichGrantImpl(
   // zero rows and skips. This also makes the attempt counter exact (the
   // increment happens once, here, instead of read-modify-write on each
   // failure path).
-  const { data: claimed, error: claimErr } = await db
+  let claimQuery = db
     .from("grants")
     .update({
       enrich_attempts: currentAttempts + 1,
       enrich_last_attempt_at: new Date().toISOString(),
     })
     .eq("id", g.id)
-    .eq("status", "discovered")
-    .eq("enrich_attempts", currentAttempts)
-    .select("id");
+    .eq("enrich_attempts", currentAttempts);
+  if (!opts?.force) claimQuery = claimQuery.eq("status", "discovered");
+  const { data: claimed, error: claimErr } = await claimQuery.select("id");
   if (claimErr) throw new Error(claimErr.message);
   if (!claimed || (Array.isArray(claimed) && claimed.length === 0)) {
     await trace("skip", "Skipped - another worker claimed this grant concurrently", "warn");
@@ -117,7 +117,7 @@ export async function enrichGrantImpl(
     { hasAmount, hasAmountMin, hasAmountMax, hasDeadline, hasSectors, hasEligibility },
   );
 
-  if (hasAmount && hasDeadline && hasSectors && hasEligibility) {
+  if (hasAmount && hasDeadline && hasSectors && hasEligibility && !opts?.force) {
     await trace("done", "Grant already complete - marking enriched without scraping", "done");
     await db
       .from("grants")
@@ -984,6 +984,22 @@ export async function enrichGrantImpl(
     const reqs = analyzeGrantRequirements(combinedMarkdown);
     if (reqs.requirements.length > 0) {
       patch.requirements = reqs.requirements;
+      for (const requirement of reqs.requirements) {
+        if (!requirement.value) continue;
+        await recordEvidence({
+          grantId: g.id,
+          agent: "enricher",
+          field: `requirement:${requirement.category}`,
+          value: requirement,
+          sourceUrl: g.url,
+          sourceMarkdown: combinedMarkdown,
+          snippet: requirement.value,
+          method: "rule",
+          confidence: 0.95,
+          runId,
+          db,
+        });
+      }
       await trace("requirements", reqs.summary, "ok", {
         count: reqs.requirements.length,
         critical: reqs.requirements.filter((r) => r.isCritical).length,
