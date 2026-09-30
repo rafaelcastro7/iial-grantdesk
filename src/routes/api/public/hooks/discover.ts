@@ -1,0 +1,54 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { verifyWebhookRequest } from "@/lib/webhook-auth.server";
+
+// Public cron endpoint — pg_cron calls this hourly to discover new grants.
+// Auth: HMAC-SHA256 signature with timestamp + single-use nonce.
+// See src/lib/webhook-auth.server.ts and docs/evidence/webhook-auth.md.
+export const Route = createFileRoute("/api/public/hooks/discover")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const { result } = await verifyWebhookRequest(request, "discover");
+        if (!result.ok) return new Response(result.reason, { status: result.status });
+
+        // The `public_webhooks` module flag was toggleable from /admin/modules
+        // but nothing checked it — every one of these 7 routes ran regardless
+        // of the flag's state.
+        const { assertModuleEnabled } = await import("@/lib/admin-modules.server");
+        try {
+          await assertModuleEnabled("public_webhooks");
+        } catch (e) {
+          return Response.json(
+            { ok: false, error: e instanceof Error ? e.message : String(e) },
+            { status: 503 },
+          );
+        }
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { discoverFunderImpl } = await import("@/agents/discoverer.impl.server");
+
+        const { data: funders, error } = await supabaseAdmin
+          .from("funders")
+          .select("id, name")
+          .eq("active", true)
+          .not("source_url", "is", null);
+        if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
+
+        const results: Array<{ funder: string; result: unknown; error?: string }> = [];
+        for (const f of funders ?? []) {
+          try {
+            const r = await discoverFunderImpl(f.id);
+            results.push({ funder: f.name, result: r });
+          } catch (e) {
+            results.push({
+              funder: f.name,
+              result: null,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+        return Response.json({ ok: true, results });
+      },
+    },
+  },
+});

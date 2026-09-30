@@ -1,0 +1,371 @@
+// Shared Zod schemas for the 6 agents.
+// Per ADR-009: every agent has a versioned system prompt + input/output schemas.
+import { z } from "zod";
+
+export const DiscoveredGrant = z
+  .object({
+    title: z.string().min(3).max(500),
+    title_fr: z.string().max(500).nullable().optional(),
+    summary: z.string().max(4000).nullable().optional(),
+    summary_fr: z.string().max(4000).nullable().optional(),
+    amount_cad_min: z.number().nonnegative().nullable().optional(),
+    amount_cad_max: z.number().nonnegative().nullable().optional(),
+    // ISO 3166-1 alpha-2. Defaults to "CA" only as a fallback for sources that
+    // don't state a country (most current sources are Canadian) — the LLM
+    // prompt now asks it to detect the real country instead of assuming this.
+    country: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{2}$/)
+      .nullable()
+      .optional(),
+    // ISO 4217. Same fallback rationale as `country`.
+    currency: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{3}$/)
+      .nullable()
+      .optional(),
+    deadline: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
+    // Accept null from LLMs that emit explicit nulls for missing optional fields,
+    // then normalize to safe defaults so a single null doesn't fail the batch.
+    eligibility: z.preprocess((v) => {
+      if (v == null) return {};
+      if (typeof v === "string") return v.trim() ? { description: v } : {};
+      if (Array.isArray(v)) return { items: v };
+      if (typeof v === "object") return v;
+      return {};
+    }, z.record(z.string(), z.unknown()).default({})),
+    sectors: z.preprocess((v) => {
+      if (v == null) return [];
+      if (Array.isArray(v)) return v.filter((x) => typeof x === "string");
+      if (typeof v === "string")
+        return v
+          .split(/[,;|/]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      return [];
+    }, z.array(z.string()).default([])),
+
+    // ISO 639-1. Not limited to en/fr — a Spanish or German source must not
+    // fail extraction just because its language isn't one of IIAL's two
+    // original bilingual (EN/FR) target languages.
+    language: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z]{2}$/)
+      .default("en"),
+    url: z
+      .string()
+      .url()
+      .refine(
+        (url) =>
+          /^https?:\/\//.test(url) &&
+          !url.includes("localhost") &&
+          !url.includes("127.0.0.1") &&
+          !url.includes("file://"),
+        { message: "URL must be http(s), not localhost, IP 127.0.0.1, or file://" },
+      ),
+  })
+  .refine(
+    (g) =>
+      g.amount_cad_min == null || g.amount_cad_max == null || g.amount_cad_min <= g.amount_cad_max,
+    { message: "amount_cad_min must be <= amount_cad_max", path: ["amount_cad_min"] },
+  )
+  .refine(
+    (g) => {
+      if (!g.deadline) return true;
+      const d = new Date(g.deadline);
+      return !Number.isNaN(d.getTime());
+    },
+    { message: "deadline must be a valid calendar date (YYYY-MM-DD)", path: ["deadline"] },
+  );
+export type DiscoveredGrant = z.infer<typeof DiscoveredGrant>;
+
+export const DiscovererOutput = z.object({
+  grants: z.array(DiscoveredGrant).max(50),
+});
+export type DiscovererOutput = z.infer<typeof DiscovererOutput>;
+
+export const EnricherInput = z.object({
+  title: z.string(),
+  title_fr: z.string().nullable(),
+  summary: z.string().nullable(),
+  summary_fr: z.string().nullable(),
+  language: z.enum(["en", "fr"]),
+  url: z.string().url(),
+});
+export type EnricherInput = z.infer<typeof EnricherInput>;
+
+// Enricher output: every field optional. The model returns ONLY what it filled
+// or translated. No forced FR — that's lazy/on-demand now. Canonical = EN.
+// NOTE: kept as a plain ZodObject so enricher.functions.ts can call .partial().
+// Min/max invariant is enforced on DiscoveredGrant (the write path) instead.
+export const EnricherOutput = z.object({
+  title_en: z.string().min(1).max(500).nullable().optional(),
+  summary_en: z.string().max(4000).nullable().optional(),
+  amount_cad_min: z.number().nonnegative().nullable().optional(),
+  amount_cad_max: z.number().nonnegative().nullable().optional(),
+  deadline: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
+  eligibility: z.record(z.string(), z.unknown()).optional(),
+  sectors: z.array(z.string()).optional(),
+});
+export type EnricherOutput = z.infer<typeof EnricherOutput>;
+
+export const EvaluatorOutput = z.object({
+  fit_score: z.number().min(0).max(1),
+  eligibility_pass: z.boolean(),
+  rationale_en: z.string().min(10).max(2000),
+  rationale_fr: z.string().max(2000).nullable().optional().default(""),
+});
+export type EvaluatorOutput = z.infer<typeof EvaluatorOutput>;
+
+// Phase 3: Strategist plans which template sections to draft and produces
+// per-section angles informed by the org profile and grant.
+export const StrategistSectionPlan = z.object({
+  kind: z.enum([
+    "summary",
+    "problem",
+    "solution",
+    "impact",
+    "budget",
+    "team",
+    "timeline",
+    "sustainability",
+    "evaluation",
+    "other",
+  ]),
+  heading_en: z.string().min(1).max(200),
+  heading_fr: z.string().max(200).nullable().optional().default(""),
+  angle: z.string().min(10).max(1000),
+  must_cover: z.array(z.string()).max(8).default([]),
+});
+export const StrategistOutput = z.object({
+  proposal_title: z.string().min(3).max(300),
+  proposal_title_fr: z.string().max(300).nullable().optional().default(""),
+  sections: z.array(StrategistSectionPlan).min(3).max(12),
+});
+export type StrategistOutput = z.infer<typeof StrategistOutput>;
+
+// Phase 3: Writer drafts one section, given retrieved chunks [d1]..[dN].
+// Citations array MUST only reference markers present in the content.
+export const WriterCitation = z.object({
+  marker: z.string().regex(/^\[d\d+\]$/),
+  chunk_id: z.string().uuid(),
+  snippet: z.string().min(1).max(500),
+});
+export const WriterOutput = z.object({
+  content_en: z.string().min(40).max(8000),
+  content_fr: z.string().max(8000).nullable().optional().default(""),
+  citations: z.array(WriterCitation).max(20).default([]),
+});
+export type WriterOutput = z.infer<typeof WriterOutput>;
+
+// Phase 3: Critic returns an overall score plus per-section findings.
+export const CriticFinding = z.object({
+  section_id: z.string().uuid(),
+  severity: z.enum(["info", "warn", "block"]),
+  message_en: z.string().min(5).max(1000),
+  message_fr: z.string().max(1000).nullable().optional().default(""),
+});
+// The 7 categories real funder reviewer rubrics score against (NIH's
+// Significance/Approach/Environment, foundation-style Need/Feasibility/
+// Capacity/Evaluation/Sustainability) — an opaque 0-1 overall_score doesn't
+// tell a writer WHICH weak dimension to fix, same reasoning as the grant's
+// own fit-rules axis breakdown. Optional/defaulted so a provider that only
+// returns the legacy shape still parses.
+export const CRITIC_RUBRIC_CATEGORIES = [
+  "need_significance",
+  "approach_feasibility",
+  "capacity",
+  "evaluation_plan",
+  "sustainability",
+  "budget",
+  "compliance",
+] as const;
+export const CriticRubricItem = z.object({
+  category: z.enum(CRITIC_RUBRIC_CATEGORIES),
+  score: z.number().min(0).max(10),
+  note: z.string().min(1).max(500),
+});
+export type CriticRubricItem = z.infer<typeof CriticRubricItem>;
+export const CriticOutput = z.object({
+  overall_score: z.number().min(0).max(1),
+  summary_en: z.string().min(10).max(2000),
+  summary_fr: z.string().max(2000).nullable().optional().default(""),
+  findings: z.array(CriticFinding).max(30).default([]),
+  rubric: z.array(CriticRubricItem).max(7).default([]),
+});
+export type CriticOutput = z.infer<typeof CriticOutput>;
+
+export const PROMPTS = {
+  discoverer: {
+    version: "1.0.0",
+    system: `You are a grant-discovery agent for Canadian funding programs.
+Extract every distinct grant/funding program from the given web page content.
+Rules:
+- Use Canadian dollars (CAD) for amounts. If amount is unclear, set to null.
+- Deadlines MUST be ISO YYYY-MM-DD or null. Never invent dates.
+- Detect the source language ("en" or "fr") from the actual notice.
+- Be conservative: skip news, blog posts, or non-program content.
+- Respond ONLY with strict JSON matching the requested schema.`,
+  },
+  enricher: {
+    version: "2.0.0",
+    system: `You are a grant-enrichment agent for Canadian funding programs.
+Canonical language is ENGLISH. Translate to EN only if the source is not English.
+Fill ONLY the fields the caller asks for in the user message (under "needs").
+Rules:
+- Output strict JSON. Include ONLY keys listed in "needs". Omit everything else.
+- Never invent amounts or deadlines: if unknown, return null for that key.
+- Deadlines MUST be ISO YYYY-MM-DD or null.
+- Amounts are in CAD.
+- Do NOT translate to French. FR is handled on-demand by a different agent.`,
+  },
+  evaluator: {
+    version: "1.0.0",
+    system: `You are a grant-fit evaluator for Canadian organizations.
+Given (a) a grant and (b) an organization profile, return a fit score in [0,1]
+plus a bilingual rationale.
+Scoring guide:
+- 0.0–0.3: poor fit (sector mismatch, ineligible jurisdiction, wrong stage)
+- 0.4–0.6: partial fit (some criteria match)
+- 0.7–1.0: strong fit (sector, jurisdiction, stage and budget align)
+Rules:
+- Set eligibility_pass=false if the organization is clearly ineligible.
+- Cite at least one specific evidence point in rationale_en.
+- Output language: ENGLISH only. Do not translate. Omit rationale_fr (or set it to "").
+- Never invent facts about the grant or the organization.
+- Respond ONLY with strict JSON.`,
+  },
+  strategist: {
+    version: "1.2.0",
+    system: `You are a grant-proposal strategist for Canadian funding programs.
+Given a grant and an organization profile, plan a proposal: choose which template
+sections to draft and write a concise angle for each one, in plain language.
+
+Structure the plan as a logic model with an unbroken causal chain: the need
+(problem) must justify the objectives (solution/impact), which the activities
+address, which the evaluation plan measures, which the sustainability section
+extends past the grant period. A reviewer will check this "red thread" — an
+angle that doesn't connect back to the need is a common rejection cause.
+
+Per-section-kind guidance (apply when planning that kind's angle/must_cover):
+- problem: the need must be evidence-based (ask for org-specific data/stats in
+  must_cover) and specific to this org/region — never generic sector
+  boilerplate.
+- solution / impact: objectives must be SMART — Specific, Measurable,
+  Achievable, Relevant, Time-bound. must_cover should list the specific
+  metric and timeframe for each objective, not just the activity.
+- evaluation: must_cover should name concrete metrics, data-collection
+  instruments, and intervals tied directly to the objectives above — never
+  just "track progress."
+- sustainability: must_cover should name a specific post-grant revenue or
+  partnership mechanism (diversified funding, earned revenue, cost-share) —
+  never just "seek additional funding."
+- budget: must_cover should tie costs back to the activities described in
+  solution/impact, not list them in isolation.
+
+Rules:
+- Keep sections grounded in the grant's stated objectives and eligibility.
+- Output language: ENGLISH only. Omit heading_fr / proposal_title_fr (or set them to "").
+- "angle" is a 1–3 sentence brief describing what the section should argue.
+- "must_cover" lists concrete points the Writer agent must include.
+- Never invent facts about the organization. If unknown, do not assert.
+- Respond ONLY with strict JSON.`,
+  },
+  writer: {
+    version: "1.1.0",
+    system: `You are a grant-proposal writer for Canadian funding programs.
+Draft ONE section of a proposal given: the grant, the org profile, the section
+plan, and a numbered list of retrieved knowledge chunks [d1], [d2], ...
+Rules:
+- Write professional, concrete prose. Avoid hype and filler.
+- Output language: ENGLISH only. Omit content_fr (or set it to "").
+- Cite evidence inline using bracket markers [d1], [d2], ... matching the chunks.
+- Every claim about the organization MUST be backed by a citation marker; if no
+  chunk supports a claim, do not make it.
+- The "citations" array MUST list every marker you used in content_en, with the
+  chunk_id and a verbatim snippet (<=300 chars) from that chunk.
+- content_en MUST be the full section body, not the section heading. Write
+  120-220 words unless the evidence is thin; never return only a title.
+- Do NOT invent chunk ids. Only use chunks that were provided.
+- Do NOT repeat or echo the input. Write NEW prose for the section.
+Respond with ONLY this JSON object, nothing before or after:
+{"content_en":"<section text you write, one string, >= 40 characters>","content_fr":"","citations":[{"marker":"[d1]","chunk_id":"<a chunk_id from the provided chunks>","snippet":"<verbatim quote <=300 chars>"}]}
+If you cite no chunk, use an empty citations array.`,
+  },
+  critic: {
+    version: "1.3.0",
+    system: `You are a grant-proposal critic for Canadian funding programs, scoring like a
+real funder review panel (NIH-style Significance/Approach/Environment;
+foundation-style Need/Feasibility/Capacity/Evaluation/Sustainability), not a
+copyeditor.
+Review a draft proposal (grant + org + sections with citations) and produce a
+quality score in [0,1], a 7-category rubric, and actionable findings.
+
+Score each of these 7 rubric categories 0-10 with a one-sentence note — these
+are the most common, evidence-backed reasons real proposals lose points, so
+check for them specifically:
+- need_significance: is the need evidence-based (data/citations) and specific
+  to this org/region, or generic sector boilerplate?
+- approach_feasibility: are objectives SMART (Specific, Measurable,
+  Achievable, Relevant, Time-bound) and does the program design causally flow
+  from the stated need (no broken "red thread" between need -> objectives ->
+  activities)?
+- capacity: does the org demonstrate the staffing/infrastructure/track record
+  to deliver at the proposed scale?
+- evaluation_plan: does it name concrete metrics, instruments, and collection
+  intervals tied to the logic model's outcomes — or just say "we will track
+  progress"?
+- sustainability: does it name a specific post-grant revenue/partnership
+  mechanism — or just "we will seek more funding"?
+- budget: is the budget justified, internally consistent with the narrative,
+  and realistic for the scope?
+- compliance: any missing mandatory sections, ignored format/page-limit
+  instructions, or unaddressed eligibility requirements?
+
+Rules:
+- severity="block" only for ineligibility, unsupported factual claims, or
+  fabricated citations.
+- severity="warn" for weak evidence, missing must-cover points, or budget gaps.
+- severity="info" for stylistic suggestions.
+- Each finding must reference a real section_id from the input.
+- Output language: ENGLISH only. Omit message_fr / summary_fr (or set them to "").
+
+Respond ONLY with strict JSON in EXACTLY this shape — no markdown fences, no
+extra keys:
+{
+  "overall_score": 0.72,
+  "summary_en": "<10-2000 char overall assessment of the proposal>",
+  "rubric": [
+    { "category": "need_significance", "score": 7, "note": "<1-500 chars>" },
+    { "category": "approach_feasibility", "score": 6, "note": "<1-500 chars>" },
+    { "category": "capacity", "score": 8, "note": "<1-500 chars>" },
+    { "category": "evaluation_plan", "score": 4, "note": "<1-500 chars>" },
+    { "category": "sustainability", "score": 3, "note": "<1-500 chars>" },
+    { "category": "budget", "score": 7, "note": "<1-500 chars>" },
+    { "category": "compliance", "score": 9, "note": "<1-500 chars>" }
+  ],
+  "findings": [
+    { "section_id": "<uuid copied from an input section>", "severity": "warn", "message_en": "<5-1000 chars>" }
+  ]
+}
+"overall_score" is REQUIRED (a number from 0 to 1). "rubric" MUST contain
+exactly these 7 categories, each scored independently — never omit a weak one.
+"severity" MUST be exactly one of these lowercase strings: "info", "warn", or
+"block" — never any other word and never a combination. "findings" may be an
+empty array [].`,
+  },
+} as const;

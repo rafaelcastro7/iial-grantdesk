@@ -1,0 +1,591 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+  listDiscoverySources,
+  setSourceEnabled,
+  runDiscoveryTier,
+  promoteStaleCandidates,
+  recentSourceRuns,
+  listRegistrationGates,
+  resolveRegistrationGate,
+} from "@/lib/admin-sources.functions";
+import { funderActivityRollup, type FunderActivityRow } from "@/lib/admin-sources-audit.functions";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { CrawlLedgerWidget } from "@/components/admin/CrawlLedgerWidget";
+import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
+import { PageContainer, PageHeader } from "@/components/PageLayout";
+
+export const Route = createFileRoute("/_authenticated/admin/sources")({
+  component: SourcesPage,
+});
+
+const TIER_LABEL: Record<string, string> = {
+  A_daily: "Tier A · Daily",
+  B_weekly: "Tier B · Weekly",
+  C_monthly: "Tier C · Monthly",
+  scout: "Scout (web-wide)",
+};
+
+type SourceRow = {
+  id: string;
+  dataset_key: string;
+  label: string;
+  tier: string;
+  format: string;
+  source_url: string | null;
+  cadence_cron: string | null;
+  enabled: boolean;
+  last_run_at: string | null;
+  last_status: string | null;
+  last_error: string | null;
+  notes: string | null;
+  owner_label: string;
+  recovery_playbook: string;
+  expected_refresh_hours: number;
+  coverage_dimensions: string[];
+};
+
+type AccountabilityRow = {
+  dataset_key: string;
+  accountable_state: "healthy" | "overdue" | "failed" | "never_run" | "disabled";
+  age_hours: number | null;
+};
+
+type HealthRow = {
+  dataset: string | null;
+  runs: number | null;
+  success_rate: number | null;
+  rows_in_total: number | null;
+  candidates_total: number | null;
+  auto_approved_total: number | null;
+  errors_total: number | null;
+  avg_latency_ms: number | null;
+  last_run_at: string | null;
+};
+
+type RunRow = {
+  id: string;
+  dataset: string;
+  status: string;
+  rows_in: number | null;
+  candidates_out: number | null;
+  auto_approved: number | null;
+  errors: number | null;
+  latency_ms: number | null;
+  error_message: string | null;
+  run_at: string;
+};
+
+type RegistrationGateRow = {
+  id: string;
+  funder_id: string | null;
+  url: string;
+  reason: string;
+  snippet: string | null;
+  status: string;
+  first_detected_at: string;
+  last_detected_at: string;
+  times_seen: number;
+  funders: { name: string } | null;
+};
+
+function SourcesPage() {
+  const listFn = useServerFn(listDiscoverySources);
+  const toggleFn = useServerFn(setSourceEnabled);
+  const runFn = useServerFn(runDiscoveryTier);
+  const promoteFn = useServerFn(promoteStaleCandidates);
+  const runsFn = useServerFn(recentSourceRuns);
+  const funderFn = useServerFn(funderActivityRollup);
+  const gatesFn = useServerFn(listRegistrationGates);
+  const resolveGateFn = useServerFn(resolveRegistrationGate);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const q = useQuery({
+    queryKey: ["admin-discovery-sources"],
+    queryFn: () => listFn(),
+  });
+  const qRuns = useQuery({
+    queryKey: ["admin-source-runs"],
+    queryFn: () => runsFn(),
+  });
+  const qFunders = useQuery({
+    queryKey: ["admin-funder-activity"],
+    queryFn: () => funderFn(),
+    refetchInterval: 30_000,
+  });
+  const qGates = useQuery({
+    queryKey: ["admin-registration-gates"],
+    queryFn: () => gatesFn(),
+  });
+
+  async function resolveGate(id: string, status: "registered" | "not_needed") {
+    setBusy(`gate:${id}`);
+    try {
+      await resolveGateFn({ data: { id, status } });
+      qGates.refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const sources: SourceRow[] = q.data?.sources ?? [];
+  const health: HealthRow[] = q.data?.health ?? [];
+  const healthMap = new Map(health.map((h) => [h.dataset ?? "", h]));
+  const accountability: AccountabilityRow[] = q.data?.accountability ?? [];
+  const accountabilityMap = new Map(accountability.map((row) => [row.dataset_key, row]));
+  const openGaps = accountability.filter((row) =>
+    ["overdue", "failed", "never_run"].includes(row.accountable_state),
+  );
+
+  const byTier = sources.reduce<Record<string, SourceRow[]>>((acc, s) => {
+    (acc[s.tier] ??= []).push(s);
+    return acc;
+  }, {});
+
+  async function runTier(tier: "A" | "B" | "C" | "scout" | "all") {
+    setBusy(`tier:${tier}`);
+    try {
+      const r = await runFn({ data: { tier } });
+      toast.success(`Tier ${tier}: ${r.totals.new} new candidates, ${r.totals.auto} auto-approved`);
+      q.refetch();
+      qRuns.refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggle(datasetKey: string, enabled: boolean) {
+    setBusy(`toggle:${datasetKey}`);
+    try {
+      await toggleFn({ data: { datasetKey, enabled } });
+      q.refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function promote() {
+    setBusy("promote");
+    try {
+      const r = await promoteFn();
+      toast.success(`Promoted ${r.promoted.length} candidates`);
+      qRuns.refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <PageContainer size="wide">
+      <PageHeader
+        eyebrow="Admin"
+        title="Discovery Sources"
+        description={
+          <>
+            Self-growing catalog of grant funders. {sources.length} sources registered ·{" "}
+            {sources.filter((s) => s.enabled).length} enabled.
+          </>
+        }
+        actions={
+          <>
+            <Button variant="outline" onClick={() => runTier("A")} disabled={busy !== null}>
+              Run Tier A
+            </Button>
+            <Button variant="outline" onClick={() => runTier("B")} disabled={busy !== null}>
+              Run Tier B
+            </Button>
+            <Button variant="outline" onClick={() => runTier("C")} disabled={busy !== null}>
+              Run Tier C
+            </Button>
+            <Button variant="outline" onClick={() => runTier("scout")} disabled={busy !== null}>
+              Run Scout
+            </Button>
+            <Button onClick={() => runTier("all")} disabled={busy !== null}>
+              Run ALL
+            </Button>
+            <Button variant="secondary" onClick={promote} disabled={busy !== null}>
+              Promote stale
+            </Button>
+            <Link to="/admin/candidates">
+              <Button variant="ghost">View candidates →</Button>
+            </Link>
+            <Link to="/admin/discovery-config">
+              <Button variant="ghost">Configure search →</Button>
+            </Link>
+          </>
+        }
+      />
+
+      <CrawlLedgerWidget />
+
+      <Card className={openGaps.length ? "border-warning/50" : "border-emerald-500/40"}>
+        <CardHeader>
+          <CardTitle className="text-base">Coverage SLA: {openGaps.length} open gap(s)</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Every registered source has an owner, refresh interval, coverage dimensions, and a
+            recovery playbook. Disabled sources are accountable but do not count as overdue.
+          </p>
+        </CardHeader>
+        {openGaps.length > 0 && (
+          <CardContent className="flex flex-wrap gap-2">
+            {openGaps.map((gap) => (
+              <Badge key={gap.dataset_key} variant="outline">
+                {gap.dataset_key}: {gap.accountable_state}
+              </Badge>
+            ))}
+          </CardContent>
+        )}
+      </Card>
+
+      {(() => {
+        const gates: RegistrationGateRow[] = qGates.data ?? [];
+        const pending = gates.filter((g) => g.status === "pending");
+        if (gates.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Needs manual sign-up ({pending.length} pending)
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Pages that gated content behind a login/registration wall during discovery. This
+                system never creates accounts on external sites — sign up yourself, then mark the
+                row resolved so discovery stops flagging it.
+              </p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Funder</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead>Why</TableHead>
+                    <TableHead>Seen</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Accountability</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {gates.map((g) => (
+                    <TableRow key={g.id} className={g.status !== "pending" ? "opacity-50" : ""}>
+                      <TableCell>{g.funders?.name ?? "—"}</TableCell>
+                      <TableCell className="max-w-xs">
+                        <ExternalLinkPreview
+                          url={g.url}
+                          showIcon={false}
+                          className="text-xs truncate block hover:underline"
+                        >
+                          {g.url}
+                        </ExternalLinkPreview>
+                      </TableCell>
+                      <TableCell className="text-xs max-w-xs truncate" title={g.snippet ?? ""}>
+                        {g.reason === "redirected_to_login_url"
+                          ? "Redirected to a login page"
+                          : "Login-wall text detected"}
+                        {g.snippet && <div className="text-muted-foreground">{g.snippet}</div>}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {g.times_seen}x · {new Date(g.last_detected_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={g.status === "pending" ? "secondary" : "default"}>
+                          {g.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        {g.status === "pending" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy !== null}
+                              onClick={() => resolveGate(g.id, "registered")}
+                            >
+                              Registered
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy !== null}
+                              onClick={() => resolveGate(g.id, "not_needed")}
+                            >
+                              Not needed
+                            </Button>
+                          </>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {Object.keys(TIER_LABEL).map((tier) => {
+        const rows = byTier[tier] ?? [];
+        if (!rows.length) return null;
+        return (
+          <Card key={tier}>
+            <CardHeader>
+              <CardTitle className="text-base">{TIER_LABEL[tier]}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Format</TableHead>
+                    <TableHead>Last run</TableHead>
+                    <TableHead>30-day yield</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Enabled</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((s) => {
+                    const h = healthMap.get(s.dataset_key);
+                    const successRate = h?.success_rate;
+                    const statusVariant: "default" | "secondary" | "destructive" =
+                      s.last_status === "succeeded"
+                        ? "default"
+                        : s.last_status === "failed"
+                          ? "destructive"
+                          : "secondary";
+                    const accountable = accountabilityMap.get(s.dataset_key);
+                    return (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <div className="font-medium">{s.label}</div>
+                          <div className="text-xs text-muted-foreground">{s.dataset_key}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{s.format}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {s.last_run_at ? new Date(s.last_run_at).toLocaleString() : "—"}
+                          {s.last_error && (
+                            <div
+                              className="text-destructive max-w-xs truncate"
+                              title={s.last_error}
+                            >
+                              {s.last_error}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {h ? (
+                            <>
+                              {h.candidates_total ?? 0} cand · {h.auto_approved_total ?? 0} auto
+                              {successRate != null && (
+                                <div className="text-muted-foreground">
+                                  {Math.round(successRate * 100)}% ok · {h.errors_total ?? 0} err
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusVariant}>{s.last_status ?? "never run"}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xs text-xs">
+                          <Badge
+                            variant={
+                              accountable?.accountable_state === "healthy"
+                                ? "default"
+                                : accountable?.accountable_state === "disabled"
+                                  ? "secondary"
+                                  : "destructive"
+                            }
+                          >
+                            {accountable?.accountable_state ?? "unknown"}
+                          </Badge>
+                          <div className="mt-1 text-muted-foreground">
+                            {s.owner_label} · SLA {s.expected_refresh_hours}h
+                          </div>
+                          <div
+                            className="truncate text-muted-foreground"
+                            title={s.recovery_playbook}
+                          >
+                            {s.coverage_dimensions.join(", ")}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Switch
+                            checked={s.enabled}
+                            disabled={busy !== null}
+                            onCheckedChange={(v) => toggle(s.dataset_key, v)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Per-funder activity (live)</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Verifies every funder is actually being scanned AND that screening rules produce
+            evidence. Counts auto-refresh every 30 s.
+          </p>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Funder</TableHead>
+                <TableHead className="text-right">Grants</TableHead>
+                <TableHead className="text-right">Enriched</TableHead>
+                <TableHead className="text-right">Scored</TableHead>
+                <TableHead className="text-right">Shortlisted</TableHead>
+                <TableHead className="text-right">Evidences</TableHead>
+                <TableHead>Last discovery</TableHead>
+                <TableHead>Last evidence</TableHead>
+                <TableHead>Recent grants</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(qFunders.data ?? []).map((f: FunderActivityRow) => {
+                const stale = !f.last_discovered_at;
+                return (
+                  <TableRow key={f.funder_id} className={stale ? "opacity-60" : ""}>
+                    <TableCell>
+                      <div className="font-medium">{f.funder_name}</div>
+                      {f.source_url && (
+                        <ExternalLinkPreview
+                          url={f.source_url}
+                          showIcon={false}
+                          className="text-xs text-muted-foreground hover:underline truncate block max-w-xs"
+                        >
+                          {f.source_url}
+                        </ExternalLinkPreview>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{f.grants_total}</TableCell>
+                    <TableCell className="text-right tabular-nums">{f.grants_enriched}</TableCell>
+                    <TableCell className="text-right tabular-nums">{f.grants_scored}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {f.grants_shortlisted}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <Badge variant={f.evidences_total > 0 ? "default" : "secondary"}>
+                        {f.evidences_total}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {f.last_discovered_at
+                        ? new Date(f.last_discovered_at).toLocaleString()
+                        : "never"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {f.last_evidence_at ? new Date(f.last_evidence_at).toLocaleString() : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs space-y-0.5 max-w-xs">
+                      {f.recent_grants.map((g, index) => (
+                        <Link
+                          key={`${g.id}-${index}`}
+                          to="/grants/$id/audit"
+                          params={{ id: g.id }}
+                          className="block truncate hover:underline"
+                        >
+                          · {g.title}
+                        </Link>
+                      ))}
+                      {f.recent_grants.length === 0 && (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {(qFunders.data ?? []).length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-4">
+                    No funders registered.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent runs</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>When</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Rows / cand / auto / err</TableHead>
+                <TableHead>Latency</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(qRuns.data ?? []).map((r: RunRow) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-xs">{new Date(r.run_at).toLocaleString()}</TableCell>
+                  <TableCell>{r.dataset}</TableCell>
+                  <TableCell>
+                    <Badge variant={r.status === "succeeded" ? "default" : "destructive"}>
+                      {r.status}
+                    </Badge>
+                    {r.status !== "succeeded" && r.error_message ? (
+                      <p
+                        className="mt-0.5 max-w-xs truncate text-xs text-destructive/90"
+                        title={r.error_message}
+                      >
+                        {r.error_message}
+                      </p>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {r.rows_in ?? 0} / {r.candidates_out ?? 0} / {r.auto_approved ?? 0} /{" "}
+                    {r.errors ?? 0}
+                  </TableCell>
+                  <TableCell className="text-xs">{r.latency_ms ?? 0} ms</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </PageContainer>
+  );
+}

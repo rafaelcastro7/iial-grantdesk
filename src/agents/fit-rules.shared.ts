@@ -1,0 +1,499 @@
+// Shared fit-rules types - can be imported from both client and server
+
+export type FitRules = {
+  min_amount_cad: number | null;
+  max_amount_cad: number | null;
+  required_jurisdictions: string[];
+  excluded_jurisdictions: string[];
+  required_sectors: string[];
+  excluded_sectors: string[];
+  required_keywords: string[];
+  excluded_keywords: string[];
+  min_days_to_deadline: number | null;
+  weight_llm: number;
+  threshold_fit_pass: number;
+  hard_fail_on_jurisdiction: boolean;
+  hard_fail_on_excluded_keyword: boolean;
+  hard_fail_on_amount: boolean;
+  hard_fail_on_deadline: boolean;
+  auto_archive_on_fail: boolean;
+  // Read by evaluateRules()'s F1 legal-eligibility check (fit-rules.server.ts)
+  // as "what applicant category IS this org" — when a grant explicitly
+  // restricts to a category, the org passes only if that category matches
+  // one of these. Not exposed in the Screening Rules UI; derived from the
+  // org profile's `stage` in deriveRulesFromOrg() below.
+  applicant_types_allowed: string[];
+  applicant_types_excluded: string[];
+  lead_min_weeks: number | null;
+  partner_min_weeks: number | null;
+  iial_capabilities: string[];
+  max_cost_share_pct_org_carries: number | null;
+  require_match_verification: boolean;
+  rolling_intake_passes_runway: boolean;
+  hard_fail_on_applicant_type: boolean;
+  hard_fail_on_runway: boolean;
+  hard_fail_on_capability: boolean;
+};
+
+export const DEFAULT_RULES: FitRules = {
+  min_amount_cad: null,
+  max_amount_cad: null,
+  required_jurisdictions: ["CA"],
+  excluded_jurisdictions: [],
+  required_sectors: [],
+  excluded_sectors: [],
+  required_keywords: [],
+  excluded_keywords: [],
+  min_days_to_deadline: null,
+  weight_llm: 0.4,
+  threshold_fit_pass: 60,
+  hard_fail_on_jurisdiction: true,
+  hard_fail_on_excluded_keyword: true,
+  hard_fail_on_amount: false,
+  hard_fail_on_deadline: false,
+  auto_archive_on_fail: true,
+  // Empty until deriveRulesFromOrg() sets these from the org's declared
+  // `stage` — a fixed "nonprofit"/exclude-for-profit default here would be
+  // wrong for the (very common) for-profit SME/startup case, and the F1
+  // check is skipped entirely when both lists are empty (see
+  // evaluateRules() in fit-rules.server.ts), so an unconfigured org gets no
+  // applicant-type screening rather than a wrong one.
+  applicant_types_allowed: [],
+  applicant_types_excluded: [],
+  lead_min_weeks: 4,
+  partner_min_weeks: 8,
+  iial_capabilities: [
+    "supply chain",
+    "wcis",
+    "traceability",
+    "certification",
+    "micro-credential",
+    "microcredential",
+    "applied research",
+    "feasibility",
+    "smart city",
+    "aiot",
+    "iot",
+    "climate",
+    "circular economy",
+    "circular",
+    "ai",
+    "artificial intelligence",
+    "machine learning",
+    "data",
+    "digitization",
+    "digital transformation",
+  ],
+  // Scale is 0-100 (percentage points), matching what detectCostShare()
+  // returns and the "<= N%" label in evaluateRules — NOT a 0-1 fraction. This
+  // was previously 0.5 (i.e. "0.5%"), which made the SOP F3 check compare a
+  // detected value like 20 against 0.5 and fail for virtually every grant
+  // with cost-share language, silently corrupting rule_score for any org
+  // using the default rules.
+  max_cost_share_pct_org_carries: 50,
+  require_match_verification: true,
+  rolling_intake_passes_runway: true,
+  hard_fail_on_applicant_type: true,
+  hard_fail_on_runway: true,
+  hard_fail_on_capability: false,
+};
+
+// ─── Transparent multi-axis breakdown ─────────────────────────────────────────
+// The best grant tools (Grantable) show WHY a grant scores what it does across
+// named axes instead of one opaque number; Instrumentl's weakness is exactly the
+// opposite (keyword matches with no competitiveness signal). We derive a
+// per-axis 0–10 breakdown DETERMINISTICALLY from the screening checks we already
+// compute — no extra LLM call, fully cited by each check's detail string.
+
+export type AxisKey = "eligibility" | "geography" | "sector" | "budget" | "timeline" | "capacity";
+
+export type AxisScore = {
+  axis: AxisKey;
+  label: string;
+  /** 0–10, or null when no check in this axis was evaluable (N/A). */
+  score: number | null;
+  status: "pass" | "partial" | "fail" | "na";
+  /** Human-readable reasons straight from the deterministic checks. */
+  reasons: string[];
+  hardFail: boolean;
+};
+
+type CheckLite = {
+  id: string;
+  status: "pass" | "fail" | "warn" | "skip";
+  hard: boolean;
+  detail: string;
+};
+
+const AXIS_OF: Record<string, AxisKey> = {
+  sop_filter_1_legal: "eligibility",
+  jurisdiction_required: "geography",
+  jurisdiction_excluded: "geography",
+  sectors_required: "sector",
+  sectors_excluded: "sector",
+  sop_filter_4_strategic: "sector",
+  keywords_required: "sector",
+  keywords_excluded: "sector",
+  amount_min: "budget",
+  amount_max: "budget",
+  sop_filter_3_costshare: "budget",
+  sop_filter_3_match_verify: "budget",
+  sop_filter_5_runway: "timeline",
+  deadline: "timeline",
+};
+
+const AXIS_LABELS: Record<AxisKey, string> = {
+  eligibility: "Eligibility",
+  geography: "Geographic fit",
+  sector: "Mission & sector fit",
+  budget: "Budget fit",
+  timeline: "Timeline & runway",
+  capacity: "Operational capacity",
+};
+
+const AXIS_ORDER: AxisKey[] = ["eligibility", "geography", "sector", "budget", "timeline"];
+
+/**
+ * Group the deterministic checks into named axes with a 0–10 sub-score each.
+ * Pure: same checks → same breakdown. "warn"/"skip" count as not-evaluable so a
+ * soft warning never fabricates a passing score.
+ */
+export function computeAxisBreakdown(checks: CheckLite[]): AxisScore[] {
+  const byAxis = new Map<AxisKey, CheckLite[]>();
+  for (const c of checks) {
+    const axis = AXIS_OF[c.id];
+    if (!axis) continue;
+    (byAxis.get(axis) ?? byAxis.set(axis, []).get(axis)!).push(c);
+  }
+
+  return AXIS_ORDER.map((axis) => {
+    const list = byAxis.get(axis) ?? [];
+    const evaluable = list.filter((c) => c.status === "pass" || c.status === "fail");
+    const passed = evaluable.filter((c) => c.status === "pass").length;
+    const hardFail = list.some((c) => c.status === "fail" && c.hard);
+    const score = evaluable.length === 0 ? null : Math.round((passed / evaluable.length) * 10);
+    const status: AxisScore["status"] =
+      evaluable.length === 0
+        ? "na"
+        : passed === evaluable.length
+          ? "pass"
+          : passed === 0
+            ? "fail"
+            : "partial";
+    return {
+      axis,
+      label: AXIS_LABELS[axis],
+      score,
+      status,
+      reasons: list.map((c) => c.detail).filter(Boolean),
+      hardFail,
+    };
+  });
+}
+
+/**
+ * Operational-capacity signal: can the org realistically manage & co-fund a
+ * grant of this size given its annual budget? This is the "operational capacity"
+ * / "historical funding size" dimension the best tools score (FundRobin,
+ * Grantable) and the strongest guard against the market's #1 weakness —
+ * surfacing grants an org is eligible for but can't actually deliver.
+ *
+ * Advisory only (never a hard-fail). Returns null (N/A) when either figure is
+ * unknown — we never fabricate a capacity score from missing data.
+ *
+ * Bands by grant-amount / annual-budget ratio (grant mgmt reality: orgs comfortably
+ * run projects up to ~1× budget; beyond ~5× the co-fund/admin load exceeds capacity):
+ *   ratio ≤ 1        → 10  fully within capacity
+ *   1 < ratio ≤ 3    → 7   manageable with effort
+ *   3 < ratio ≤ 5    → 4   stretch
+ *   ratio > 5        → 1   likely exceeds capacity (soft warn)
+ * A grant < 2% of annual budget is flagged as low-ROI-on-effort (still scored 8).
+ */
+export function assessBudgetCapacity(
+  orgAnnualBudgetCad: number | null | undefined,
+  grantMinCad: number | null | undefined,
+  grantMaxCad: number | null | undefined,
+): AxisScore {
+  const budget =
+    typeof orgAnnualBudgetCad === "number" && orgAnnualBudgetCad > 0 ? orgAnnualBudgetCad : null;
+  const amount =
+    typeof grantMaxCad === "number" && grantMaxCad > 0
+      ? grantMaxCad
+      : typeof grantMinCad === "number" && grantMinCad > 0
+        ? grantMinCad
+        : null;
+
+  if (budget == null || amount == null) {
+    return {
+      axis: "capacity",
+      label: AXIS_LABELS.capacity,
+      score: null,
+      status: "na",
+      reasons: [
+        budget == null
+          ? "Org annual budget unknown — capacity not assessed"
+          : "Grant amount unknown — capacity not assessed",
+      ],
+      hardFail: false,
+    };
+  }
+
+  const ratio = amount / budget;
+  const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`;
+  let score: number;
+  let reason: string;
+  if (ratio <= 1) {
+    score = 10;
+    reason = `Grant (${fmt(amount)}) is within the org's annual budget (${fmt(budget)}) — fully manageable`;
+  } else if (ratio <= 3) {
+    score = 7;
+    reason = `Grant (${fmt(amount)}) is ${ratio.toFixed(1)}× the annual budget — manageable with effort`;
+  } else if (ratio <= 5) {
+    score = 4;
+    reason = `Grant (${fmt(amount)}) is ${ratio.toFixed(1)}× the annual budget — a capacity stretch`;
+  } else {
+    score = 1;
+    reason = `Grant (${fmt(amount)}) is ${ratio.toFixed(1)}× the annual budget — likely exceeds capacity to manage/co-fund`;
+  }
+  const reasons = [reason];
+  if (amount < budget * 0.02) {
+    score = Math.min(score, 8);
+    reasons.push(`Grant is under 2% of annual budget — low return on application effort`);
+  }
+
+  return {
+    axis: "capacity",
+    label: AXIS_LABELS.capacity,
+    score,
+    status: score >= 7 ? "pass" : score >= 4 ? "partial" : "fail",
+    reasons,
+    hardFail: false,
+  };
+}
+
+// Minimal shape of the org profile the screening engine cares about.
+export type OrgProfileLite = {
+  sectors?: string[] | null;
+  jurisdictions?: string[] | null;
+  stage?: string | null;
+  annual_budget_cad?: number | null;
+  focus_areas?: string | string[] | null;
+  applicant_types?: string[] | null;
+  activities?: string[] | null;
+  capabilities?: string[] | null;
+  mission?: string | null;
+  funding_min_cad?: number | null;
+  funding_max_cad?: number | null;
+  cost_share_max_pct?: number | null;
+};
+
+/**
+ * Personalize screening rules from the organization's real profile.
+ *
+ * Why: the deterministic engine used to score every org against the same static
+ * config (DEFAULT_RULES: jurisdictions=["CA"], no sectors), so "fit" ignored who
+ * the applicant actually is. This is the org-vs-criteria gating the best grant
+ * tools do (Granter.ai/Grantable). We only override a field when the org
+ * actually declares it — otherwise we keep the caller's base rules, so an admin
+ * who configured explicit fit_rules is never overridden.
+ */
+export function deriveRulesFromOrg(
+  org: OrgProfileLite | null | undefined,
+  base: FitRules = DEFAULT_RULES,
+): FitRules {
+  if (!org) return base;
+  const rules: FitRules = { ...base };
+
+  // Where the org can operate → required jurisdictions (soft by default).
+  const juris = (org.jurisdictions ?? []).map((j) => String(j).trim()).filter(Boolean);
+  if (juris.length > 0) rules.required_jurisdictions = Array.from(new Set(juris));
+
+  // Org sectors + focus areas → soft required sectors (drives strategic-fit).
+  const focus = Array.isArray(org.focus_areas)
+    ? org.focus_areas
+    : org.focus_areas
+      ? String(org.focus_areas)
+          .replace(/^\{(.*)\}$/, "$1")
+          .split(/[,;]+/)
+          .map((s) => s.trim().replace(/^"|"$/g, ""))
+      : [];
+  const sectors = [...(org.sectors ?? []), ...focus].map((s) => String(s).trim()).filter(Boolean);
+  if (sectors.length > 0) {
+    rules.required_sectors = Array.from(new Set(sectors));
+    // SOP F4's strategic-fit check (`iial_capabilities`) used to stay pinned
+    // to DEFAULT_RULES' fixed keyword list ("wcis", "smart city", "aiot", …)
+    // for every org, since only required_sectors was derived here — a
+    // second org with a completely different profile (e.g. sectors
+    // "technology, ai" instead of IIAL's own) was screened against a
+    // capability list that was never theirs. The same declared
+    // sectors/focus-areas ARE the org's own capabilities, so reuse them here
+    // too rather than leaving a single hardcoded tenant's keywords as the
+    // permanent default for every organization using this system.
+    const capabilities = [...sectors, ...(org.capabilities ?? []), ...(org.activities ?? [])]
+      .map((value) => String(value).trim())
+      .filter(Boolean);
+    rules.iial_capabilities = Array.from(new Set(capabilities));
+  }
+
+  // Org's legal/organizational type → SOP F1's applicant-type check. A
+  // for-profit SME and a nonprofit need opposite defaults here (a grant
+  // restricted to "for-profit only" should PASS a for-profit SME and FAIL a
+  // nonprofit, and vice versa for "charity only") — a single fixed default
+  // for every org, regardless of what they actually are, would silently
+  // mis-screen whichever org-types don't match that one hardcoded shape.
+  const stageTypes = STAGE_APPLICANT_TYPES[(org.stage ?? "").trim().toLowerCase()];
+  if (stageTypes) {
+    rules.applicant_types_allowed = stageTypes.allowed;
+    rules.applicant_types_excluded = stageTypes.excluded;
+  }
+
+  // Explicit verified applicant categories take precedence over the coarse
+  // stage mapping (e.g. IIAL may be both nonprofit and an eligible research
+  // partner). This prevents the UI from collecting richer facts that the
+  // deterministic gate then silently ignores.
+  const applicantTypes = (org.applicant_types ?? []).map((value) => value.trim()).filter(Boolean);
+  if (applicantTypes.length > 0) {
+    rules.applicant_types_allowed = Array.from(new Set(applicantTypes));
+  }
+
+  if (org.funding_min_cad != null) rules.min_amount_cad = org.funding_min_cad;
+  if (org.funding_max_cad != null) rules.max_amount_cad = org.funding_max_cad;
+  if (org.cost_share_max_pct != null) {
+    rules.max_cost_share_pct_org_carries = org.cost_share_max_pct;
+  }
+
+  return rules;
+}
+
+const STAGE_APPLICANT_TYPES: Record<string, { allowed: string[]; excluded: string[] }> = {
+  startup: {
+    allowed: ["business", "sme", "startup", "for-profit"],
+    excluded: ["charity_only", "municipality_only", "university_only", "individual_only"],
+  },
+  sme: {
+    allowed: ["business", "sme", "enterprise", "for-profit"],
+    excluded: ["charity_only", "municipality_only", "university_only", "individual_only"],
+  },
+  nonprofit: {
+    allowed: ["non-profit", "charity", "not-for-profit"],
+    excluded: ["for_profit_only", "municipality_only", "university_only", "individual_only"],
+  },
+  research: {
+    allowed: ["university", "research institution"],
+    excluded: ["for_profit_only", "charity_only", "municipality_only", "individual_only"],
+  },
+  public_sector: {
+    allowed: ["government", "municipality"],
+    excluded: ["for_profit_only", "charity_only", "university_only", "individual_only"],
+  },
+};
+
+// ─── Org ↔ Fit Rules drift detection ─────────────────────────────────────────
+// Pure function: compares what deriveRulesFromOrg would produce from the current
+// org profile against the actually-stored fit rules and returns a list of human-
+// readable inconsistencies that could silently corrupt evaluation quality.
+
+export type DriftIssue = {
+  id: string;
+  level: "error" | "warn";
+  label: string;
+  hint: string;
+};
+
+/**
+ * Detect inconsistencies between the org profile and the stored fit rules.
+ * Returns an empty array when rules are consistent or when either input is
+ * missing (no false alarms).
+ */
+export function detectOrgRulesDrift(
+  org: OrgProfileLite | null | undefined,
+  storedRules: FitRules | null | undefined,
+): DriftIssue[] {
+  if (!org || !storedRules) return [];
+
+  const derived = deriveRulesFromOrg(org, DEFAULT_RULES);
+  const issues: DriftIssue[] = [];
+  const norm = (s: string) => s.trim().toLowerCase();
+
+  // 1. Jurisdiction mismatch: org says ON but rules say AB
+  const orgJuris = new Set((derived.required_jurisdictions ?? []).map(norm));
+  const rulesJuris = new Set((storedRules.required_jurisdictions ?? []).map(norm));
+  if (orgJuris.size > 0 && rulesJuris.size > 0) {
+    const missing = [...orgJuris].filter((j) => !rulesJuris.has(j));
+    const extra = [...rulesJuris].filter((j) => !orgJuris.has(j));
+    if (missing.length > 0 || extra.length > 0) {
+      issues.push({
+        id: "jurisdiction_drift",
+        level: "error",
+        label: `Jurisdiction mismatch: org profile says [${[...orgJuris].join(", ").toUpperCase()}] but screening rules have [${[...rulesJuris].join(", ").toUpperCase()}]`,
+        hint: "Re-sync your screening rules from the org profile, or update the org profile.",
+      });
+    }
+  }
+
+  // 2. Sector/capability mismatch: org declares sectors/focus_areas but rules
+  //    have completely different capabilities
+  const orgCaps = new Set((derived.iial_capabilities ?? []).map(norm));
+  const rulesCaps = new Set((storedRules.iial_capabilities ?? []).map(norm));
+  if (orgCaps.size > 0 && rulesCaps.size > 0) {
+    const overlap = [...orgCaps].filter((c) => rulesCaps.has(c));
+    if (overlap.length === 0) {
+      issues.push({
+        id: "capability_drift",
+        level: "error",
+        label:
+          "Capability mismatch: org sectors/focus areas share no overlap with screening rule capabilities",
+        hint: "The screening rules may be filtering for a different organization's strengths.",
+      });
+    } else if (overlap.length < orgCaps.size * 0.5) {
+      issues.push({
+        id: "capability_partial_drift",
+        level: "warn",
+        label: `Only ${overlap.length} of ${orgCaps.size} org capabilities are reflected in screening rules`,
+        hint: "Some org sectors may not be screened for. Consider re-syncing.",
+      });
+    }
+  }
+
+  // 3. Applicant type mismatch: org stage says nonprofit but rules say for-profit
+  const orgAllowed = new Set((derived.applicant_types_allowed ?? []).map(norm));
+  const rulesAllowed = new Set((storedRules.applicant_types_allowed ?? []).map(norm));
+  if (orgAllowed.size > 0 && rulesAllowed.size > 0) {
+    const overlap = [...orgAllowed].filter((t) => rulesAllowed.has(t));
+    if (overlap.length === 0) {
+      issues.push({
+        id: "applicant_type_drift",
+        level: "error",
+        label:
+          "Applicant type conflict: org profile and screening rules disagree on organization type",
+        hint: `Org profile implies [${[...orgAllowed].join(", ")}] but rules allow [${[...rulesAllowed].join(", ")}]. Grants will be mis-screened.`,
+      });
+    }
+  }
+
+  // 4. Budget range mismatch
+  if (derived.min_amount_cad != null && storedRules.min_amount_cad != null) {
+    const diff = Math.abs(derived.min_amount_cad - storedRules.min_amount_cad);
+    if (diff > 0 && diff / Math.max(derived.min_amount_cad, storedRules.min_amount_cad) > 0.5) {
+      issues.push({
+        id: "min_amount_drift",
+        level: "warn",
+        label: `Min amount differs: org profile ${derived.min_amount_cad.toLocaleString()} vs rules ${storedRules.min_amount_cad.toLocaleString()}`,
+        hint: "Screening rules may filter out grants the org would pursue.",
+      });
+    }
+  }
+  if (derived.max_amount_cad != null && storedRules.max_amount_cad != null) {
+    const diff = Math.abs(derived.max_amount_cad - storedRules.max_amount_cad);
+    if (diff > 0 && diff / Math.max(derived.max_amount_cad, storedRules.max_amount_cad) > 0.5) {
+      issues.push({
+        id: "max_amount_drift",
+        level: "warn",
+        label: `Max amount differs: org profile ${derived.max_amount_cad.toLocaleString()} vs rules ${storedRules.max_amount_cad.toLocaleString()}`,
+        hint: "Screening rules may filter out grants the org would pursue.",
+      });
+    }
+  }
+
+  return issues;
+}

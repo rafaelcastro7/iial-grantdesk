@@ -1,0 +1,787 @@
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSuspenseQuery, queryOptions, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useTranslation } from "react-i18next";
+import {
+  listGrants,
+  discoverAllFunders,
+  enrichGrant,
+  autoEvaluatePending,
+  moveGrants,
+} from "@/lib/grants.functions";
+import type { GrantStatus } from "@/agents/pipeline-stages.shared";
+import { DiscoveryProgress } from "@/components/grants/DiscoveryProgress";
+import { runEvaluator } from "@/agents/evaluator.functions";
+import { runStrategist } from "@/agents/strategist.functions";
+import { useIsAdmin } from "@/lib/use-platform";
+
+import { Button } from "@/components/ui/button";
+import { GrantFilters } from "@/components/grants/GrantFilters";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  applyGrantFilters,
+  sortGrants,
+  type AmountPresetKey,
+  type SortKey,
+} from "@/components/grants/grant-filters.utils";
+import { EventLog } from "@/components/grants/EventLog";
+import { FunderSelector } from "@/components/grants/FunderSelector";
+import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
+import { GrantExpressView } from "@/components/grants/GrantExpressView";
+import { GrantKanban } from "@/components/grants/GrantKanban";
+import { AppTopBar } from "@/components/AppSidebar";
+import { PageContainer, PageHeader } from "@/components/PageLayout";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { PageTransition } from "@/components/PageTransition";
+import { GrantsListSkeleton } from "@/components/Skeletons";
+import { V2GrantsWorkspace } from "@/components/v2/V2GrantsWorkspace";
+import { useUiVersion } from "@/components/v2/ui-version";
+import type { GrantRowData } from "@/components/grants/GrantRow";
+import { isActiveGrantStatus } from "@/agents/pipeline-stages.shared";
+import { GrantSearchProfileBar } from "@/components/grants/GrantSearchProfileBar";
+import { OrgRulesDriftBanner } from "@/components/grants/OrgRulesDriftBanner";
+import { GrantFacetFilters, type GrantFacetSelection } from "@/components/grants/GrantFacetFilters";
+import {
+  markGrantSearchProfileReviewed,
+  recordGrantSearchFeedback,
+} from "@/lib/grant-search-profiles.functions";
+import type { GrantFeedbackDecision } from "@/components/grants/GrantFeedbackControls";
+import "@/i18n";
+
+const grantsQueryOptions = (search = "", profileId?: string) =>
+  queryOptions({
+    queryKey: ["grants", "all", search, profileId ?? "general"],
+    queryFn: () => listGrants({ data: { limit: 100, search: search || undefined, profileId } }),
+  });
+
+// SSR-safe sessionStorage access (component renders on the server too).
+const ss = {
+  get: (k: string) => (typeof window !== "undefined" ? window.sessionStorage.getItem(k) : null),
+  set: (k: string, v: string) => {
+    if (typeof window !== "undefined") window.sessionStorage.setItem(k, v);
+  },
+};
+
+export const Route = createFileRoute("/_authenticated/grants/")({
+  head: () => ({
+    meta: [
+      { title: "Grants - IIAL" },
+      {
+        name: "description",
+        content: "Manage Canadian grant opportunities through a clear, stage-by-stage pipeline.",
+      },
+    ],
+  }),
+  loader: ({ context }) => context.queryClient.ensureQueryData(grantsQueryOptions()),
+  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error} reset={reset} />,
+  pendingComponent: GrantsListSkeleton,
+  component: GrantsPage,
+});
+
+function GrantsPage() {
+  const { t } = useTranslation();
+  const { version } = useUiVersion();
+  const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
+  const fetchGrants = useServerFn(listGrants);
+  const evaluate = useServerFn(runEvaluator);
+  const strategize = useServerFn(runStrategist);
+  const discoverAll = useServerFn(discoverAllFunders);
+  const enrichOne = useServerFn(enrichGrant);
+  const autoEvaluate = useServerFn(autoEvaluatePending);
+  const recordSearchFeedback = useServerFn(recordGrantSearchFeedback);
+  const markProfileReviewed = useServerFn(markGrantSearchProfileReviewed);
+
+  const qc = useQueryClient();
+  const [pending, setPending] = useState<string | null>(null);
+  const [evaluatingIds, setEvaluatingIds] = useState<Set<string>>(new Set());
+  const [evalError, setEvalError] = useState<string | null>(null);
+  const [discoveryMsg, setDiscoveryMsg] = useState<string | null>(null);
+  const [activeJob, setActiveJob] = useState<{ jobId: string; queued: number } | null>(null);
+  const [autoMsg, setAutoMsg] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>(() => ss.get("grants.search") ?? "");
+  const [serverSearch, setServerSearch] = useState(search.trim());
+  const [searchProfileId, setSearchProfileId] = useState<string | null>(
+    () => ss.get("grants.searchProfileId") || null,
+  );
+  const [jurisdiction, setJurisdiction] = useState<string>(
+    () => ss.get("grants.jurisdiction") ?? "all",
+  );
+  const [country, setCountry] = useState<string>(() => ss.get("grants.country") ?? "all");
+  const [sector, setSector] = useState<string>(() => ss.get("grants.sector") ?? "all");
+  const [amountPreset, setAmountPreset] = useState<AmountPresetKey>(
+    () => (ss.get("grants.amountPreset") as AmountPresetKey) ?? "all",
+  );
+  const [sortKey, setSortKey] = useState<SortKey>(
+    () => (ss.get("grants.sort") as SortKey) ?? "fit",
+  );
+  const [eligibleOnly, setEligibleOnly] = useState(() => ss.get("grants.eligibleOnly") === "1");
+  const [onlyWithDeadline, setOnlyWithDeadline] = useState(
+    () => ss.get("grants.onlyWithDeadline") === "1",
+  );
+  const [facetSelection, setFacetSelection] = useState<GrantFacetSelection>(() => ({
+    applicantType: ss.get("grants.facet.applicantType") ?? "all",
+    population: ss.get("grants.facet.population") ?? "all",
+    fundingUse: ss.get("grants.facet.fundingUse") ?? "all",
+    funderType: ss.get("grants.facet.funderType") ?? "all",
+    deadlineKind: ss.get("grants.facet.deadlineKind") ?? "all",
+    evidenceState: ss.get("grants.facet.evidenceState") ?? "all",
+  }));
+  const [includeHardBlocked, setIncludeHardBlocked] = useState(
+    () => ss.get("grants.includeHardBlocked") === "1",
+  );
+  const [includeDismissed, setIncludeDismissed] = useState(
+    () => ss.get("grants.includeDismissed") === "1",
+  );
+  const previouslySearching = useRef(search.trim().length >= 2);
+  const [selectedFunders, setSelectedFunders] = useState<Set<string>>(new Set());
+  // Progressive disclosure: "express" is the simple default (prioritized list,
+  // plain language, one action); "advanced" is the full Kanban + filters.
+  const [viewMode, setViewMode] = useState<"express" | "advanced">(
+    () => (ss.get("grants.viewMode") as "express" | "advanced") ?? "express",
+  );
+  const switchView = (mode: "express" | "advanced") => {
+    setViewMode(mode);
+    ss.set("grants.viewMode", mode);
+  };
+
+  // Persist filter + sort state across reloads (session scope, per house rules).
+  useEffect(() => {
+    ss.set("grants.search", search);
+    ss.set("grants.jurisdiction", jurisdiction);
+    ss.set("grants.country", country);
+    ss.set("grants.sector", sector);
+    ss.set("grants.amountPreset", amountPreset);
+    ss.set("grants.sort", sortKey);
+    ss.set("grants.eligibleOnly", eligibleOnly ? "1" : "0");
+    ss.set("grants.onlyWithDeadline", onlyWithDeadline ? "1" : "0");
+  }, [
+    search,
+    jurisdiction,
+    country,
+    sector,
+    amountPreset,
+    sortKey,
+    eligibleOnly,
+    onlyWithDeadline,
+  ]);
+
+  useEffect(() => {
+    for (const [key, value] of Object.entries(facetSelection)) {
+      ss.set(`grants.facet.${key}`, value);
+    }
+  }, [facetSelection]);
+
+  useEffect(() => {
+    ss.set("grants.includeHardBlocked", includeHardBlocked ? "1" : "0");
+    ss.set("grants.includeDismissed", includeDismissed ? "1" : "0");
+  }, [includeHardBlocked, includeDismissed]);
+
+  useEffect(() => {
+    ss.set("grants.searchProfileId", searchProfileId ?? "");
+    if (searchProfileId) setSortKey("relevance");
+  }, [searchProfileId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setServerSearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    const isSearching = search.trim().length >= 2;
+    if (isSearching !== previouslySearching.current) {
+      setSortKey(isSearching ? "relevance" : "fit");
+      previouslySearching.current = isSearching;
+    }
+  }, [search]);
+
+  // Country is a server-side filter, not a client-side one: the server returns
+  // a Canada-first page of 100, so filtering that page for another country
+  // would show almost nothing. Changing it refetches instead.
+  const { data } = useSuspenseQuery({
+    queryKey: [
+      "grants",
+      "all",
+      serverSearch,
+      searchProfileId ?? "general",
+      country,
+      facetSelection,
+      includeHardBlocked,
+      includeDismissed,
+    ],
+    queryFn: () =>
+      fetchGrants({
+        data: {
+          limit: 100,
+          search: serverSearch.length >= 2 ? serverSearch : undefined,
+          profileId: searchProfileId ?? undefined,
+          country: country !== "all" ? country : undefined,
+          applicantTypes:
+            facetSelection.applicantType === "all" ? undefined : [facetSelection.applicantType],
+          populationsServed:
+            facetSelection.population === "all" ? undefined : [facetSelection.population],
+          fundingUses:
+            facetSelection.fundingUse === "all" ? undefined : [facetSelection.fundingUse],
+          funderTypes:
+            facetSelection.funderType === "all" ? undefined : [facetSelection.funderType],
+          deadlineKinds:
+            facetSelection.deadlineKind === "all"
+              ? undefined
+              : [
+                  facetSelection.deadlineKind as
+                    | "confirmed"
+                    | "predicted"
+                    | "rolling"
+                    | "closed"
+                    | "unknown",
+                ],
+          evidenceStates:
+            facetSelection.evidenceState === "all"
+              ? undefined
+              : [facetSelection.evidenceState as "known" | "unknown" | "conflicting"],
+          includeHardBlocked,
+          includeDismissed,
+        },
+      }),
+  });
+
+  // Optimistic board move: update the cache immediately, roll back on error,
+  // reconcile with the server on settle. The server (and the DB trigger)
+  // remain the source of truth for valid transitions.
+  const moveFn = useServerFn(moveGrants);
+  const moveMutation = useMutation({
+    mutationFn: (vars: { grantIds: string[]; toStatus: GrantStatus }) => moveFn({ data: vars }),
+    onMutate: async (vars) => {
+      const activeKey = ["grants", "all", serverSearch, searchProfileId ?? "general"];
+      await qc.cancelQueries({ queryKey: activeKey });
+      const prev = qc.getQueryData<typeof data>(activeKey);
+      qc.setQueryData<typeof data>(activeKey, (old) =>
+        old
+          ? {
+              ...old,
+              grants: old.grants.map((g) =>
+                vars.grantIds.includes(g.id) ? { ...g, status: vars.toStatus } : g,
+              ),
+            }
+          : old,
+      );
+      return { prev };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.prev)
+        qc.setQueryData(["grants", "all", serverSearch, searchProfileId ?? "general"], ctx.prev);
+      setEvalError(e instanceof Error ? e.message : String(e));
+    },
+    onSuccess: (r) => {
+      if (r.skipped.length > 0) {
+        setAutoMsg(
+          `${r.updated} grant(s) moved - ${r.skipped.length} skipped (invalid transition).`,
+        );
+      } else if (r.updated > 1) {
+        setAutoMsg(`${r.updated} grants moved.`);
+      }
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["grants"] }),
+  });
+  const onMove = (grantIds: string[], toStatus: GrantStatus) =>
+    moveMutation.mutate({ grantIds, toStatus });
+
+  const feedbackMutation = useMutation({
+    mutationFn: ({ grant, decision }: { grant: GrantRowData; decision: GrantFeedbackDecision }) => {
+      if (!searchProfileId) throw new Error("Select a project profile before saving feedback.");
+      return recordSearchFeedback({
+        data: {
+          profile_id: searchProfileId,
+          grant_id: grant.id,
+          action: decision.action,
+          reason: decision.reason ?? null,
+          note: decision.note ?? null,
+          query_text: serverSearch || null,
+          rank_position: data.grants.findIndex((item) => item.id === grant.id) + 1,
+          score_snapshot: {
+            combined_relevance: grant.combinedRelevance ?? null,
+            profile_match: grant.profileMatch ?? null,
+            lexical_match: grant.searchMatch ?? null,
+            ranking_breakdown: grant.rankingBreakdown ?? null,
+          },
+        },
+      });
+    },
+    onSuccess: async (_result, variables) => {
+      setAutoMsg(
+        variables.decision.action === "hidden"
+          ? "Grant hidden for this project profile."
+          : variables.decision.action === "rejected"
+            ? "Not-relevant feedback recorded for this project profile."
+            : variables.decision.action === "restored"
+              ? "Grant restored to this project profile."
+              : variables.decision.action === "pursued"
+                ? "Grant marked as pursued for this project profile."
+                : "Grant saved to this project profile.",
+      );
+      await qc.invalidateQueries({ queryKey: ["grants"] });
+    },
+    onError: (cause) => setEvalError(cause instanceof Error ? cause.message : String(cause)),
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: () => {
+      if (!searchProfileId) throw new Error("Select a project profile before marking a review.");
+      return markProfileReviewed({ data: { id: searchProfileId } });
+    },
+    onSuccess: async () => {
+      setAutoMsg("Project results marked as reviewed. Future discoveries will be labelled new.");
+      await qc.invalidateQueries({ queryKey: ["grant-search-profiles"] });
+      await qc.invalidateQueries({ queryKey: ["grants"] });
+    },
+    onError: (cause) => setEvalError(cause instanceof Error ? cause.message : String(cause)),
+  });
+
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current) return;
+    autoRan.current = true;
+    const pendingIds = data.grants
+      .filter(
+        (g) =>
+          !g.evaluation && ["discovered", "enriched", "scored", "shortlisted"].includes(g.status),
+      )
+      .map((g) => g.id);
+    if (pendingIds.length === 0) return;
+    setEvaluatingIds(new Set(pendingIds));
+    autoEvaluate({ data: { limit: 10 } })
+      .then(async (r) => {
+        if (r.evaluated > 0) setAutoMsg(`${r.evaluated} grant(s) auto-evaluated.`);
+        else if ("reason" in r && r.reason === "org_profile_missing")
+          setAutoMsg("Complete your organization profile to enable AI fit evaluation.");
+        await qc.invalidateQueries({ queryKey: ["grants"] });
+      })
+      .catch((e) => setEvalError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setEvaluatingIds(new Set()));
+  }, [data.grants, autoEvaluate, qc]);
+
+  async function onEvaluate(grantId: string) {
+    setPending(grantId);
+    setEvalError(null);
+    setEvaluatingIds((s) => new Set(s).add(grantId));
+    try {
+      await evaluate({ data: { grantId } });
+      await qc.invalidateQueries({ queryKey: ["grants"] });
+    } catch (e) {
+      setEvalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPending(null);
+      setEvaluatingIds((s) => {
+        const n = new Set(s);
+        n.delete(grantId);
+        return n;
+      });
+    }
+  }
+  async function onDraft(grantId: string) {
+    setPending(grantId + ":draft");
+    setEvalError(null);
+    try {
+      const r = await strategize({ data: { grantId } });
+      await qc.invalidateQueries({ queryKey: ["grants"] });
+      await navigate({ to: "/proposals/$id", params: { id: r.proposalId } });
+    } catch (e) {
+      setEvalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPending(null);
+    }
+  }
+  async function onDiscoverAll() {
+    setPending("__discover__");
+    const requestedCount = selectedFunders.size;
+    setDiscoveryMsg(
+      requestedCount > 0
+        ? `Discovery is running locally for ${requestedCount} selected funder(s). Keep this page open while official sources are checked.`
+        : "Discovery is running locally across all active funders. Keep this page open while official sources are checked.",
+    );
+    setEvalError(null);
+    try {
+      const funderIds = selectedFunders.size > 0 ? [...selectedFunders] : undefined;
+      const r = await discoverAll({ data: { funderIds } });
+      if (r?.jobId) {
+        setActiveJob({ jobId: r.jobId, queued: r.queued ?? 0 });
+        const scope = funderIds ? ` (${funderIds.length} selected)` : "";
+        setDiscoveryMsg(
+          `Discovery ${r.status === "failed" ? "finished with errors" : "complete"}. Checked ${r.queued} funder(s)${scope}. Found ${r.totalInserted ?? 0} new opportunities and ${r.totalSeenAgain ?? 0} we were already tracking.`,
+        );
+      } else setDiscoveryMsg("Discovery enqueued.");
+      autoRan.current = false;
+    } catch (e) {
+      setEvalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPending(null);
+    }
+  }
+  async function onEnrich(grantId: string) {
+    setPending(grantId + ":enrich");
+    setEvalError(null);
+    try {
+      const r = await enrichOne({ data: { grantId } });
+      // enrichOne resolves (never throws) on scrape failure or max-attempts —
+      // both used to look identical to success from here (card just re-renders
+      // unchanged, no feedback at all).
+      if (!r.ok) {
+        setEvalError(`Enrichment failed: ${r.error ?? "unknown error"}`);
+      } else if (r.skipped && r.reason === "max_attempts_reached") {
+        setEvalError(
+          "This grant has reached the maximum number of enrichment attempts and could not be completed automatically. Review the official page manually.",
+        );
+      }
+      await qc.invalidateQueries({ queryKey: ["grants"] });
+    } catch (e) {
+      setEvalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  const filtered = useMemo(
+    () =>
+      sortGrants(
+        applyGrantFilters(data.grants, {
+          search: serverSearch.length >= 2 ? "" : search,
+          jurisdiction,
+          country,
+          sector,
+          amountPreset,
+          eligibleOnly,
+          onlyWithDeadline,
+        }),
+        sortKey,
+      ) as GrantRowData[],
+    [
+      data.grants,
+      search,
+      serverSearch,
+      jurisdiction,
+      country,
+      sector,
+      amountPreset,
+      sortKey,
+      eligibleOnly,
+      onlyWithDeadline,
+    ],
+  );
+
+  // Both Express and Advanced views now share the same filters UI and logic,
+  // preventing confusion where filters left on from one mode silently affect the other.
+  const expressGrants = useMemo(
+    () => sortGrants(filtered, sortKey) as GrantRowData[],
+    [filtered, sortKey],
+  );
+
+  const activeFiltered = useMemo(
+    () => filtered.filter((g) => isActiveGrantStatus(g.status)),
+    [filtered],
+  );
+
+  const kpis = useMemo(() => {
+    const total = activeFiltered.length;
+    const needsAction = activeFiltered.filter((g) => {
+      if (g.status === "discovered") return true;
+      if (g.status === "enriched" && !g.evaluation) return true;
+      const d = g.deadline
+        ? Math.ceil((new Date(g.deadline).getTime() - Date.now()) / 86400000)
+        : null;
+      return (
+        d != null &&
+        d >= 0 &&
+        d <= 7 &&
+        !["submitted", "won", "lost", "expired", "archived"].includes(g.status)
+      );
+    }).length;
+    const scored = activeFiltered
+      .map((g) => g.evaluation?.fit_score ?? g.fit_score)
+      .filter((v): v is number => v != null);
+    const avgFit = scored.length ? scored.reduce((a, b) => a + b, 0) / scored.length : null;
+    const pipelineValueCad = activeFiltered.reduce(
+      (sum, g) => sum + (g.amount_cad_max ?? g.amount_cad_min ?? 0),
+      0,
+    );
+    return { total, needsAction, avgFit, pipelineValueCad };
+  }, [activeFiltered]);
+
+  const searchTrustControls = (
+    <div className="mb-4 space-y-2 rounded-lg border bg-card px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={includeHardBlocked}
+              onChange={(event) => setIncludeHardBlocked(event.target.checked)}
+            />
+            Show blocked grants
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={includeDismissed}
+              onChange={(event) => setIncludeDismissed(event.target.checked)}
+            />
+            Show hidden / rejected
+          </label>
+        </div>
+        {searchProfileId && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={reviewMutation.isPending}
+            onClick={() => reviewMutation.mutate()}
+          >
+            {reviewMutation.isPending ? "Marking…" : "Mark current results reviewed"}
+          </Button>
+        )}
+      </div>
+      {serverSearch.length >= 2 && (
+        <p className="text-xs text-muted-foreground">
+          Ranking {data.rankingVersion} · mode {data.searchMode ?? "catalog"}
+        </p>
+      )}
+      {data.searchDegradedReason && (
+        <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
+          Semantic search is degraded ({data.searchDegradedReason}). Results are from the lexical
+          fallback, not an empty provider response.
+        </p>
+      )}
+      {data.searchTelemetryError && (
+        <p role="status" className="text-xs text-destructive">
+          Search results loaded, but this run could not be recorded: {data.searchTelemetryError}
+        </p>
+      )}
+    </div>
+  );
+
+  if (version === "v2") {
+    return (
+      <PageTransition>
+        <OrgRulesDriftBanner />
+        <GrantSearchProfileBar selectedProfileId={searchProfileId} onSelect={setSearchProfileId} />
+        <GrantFacetFilters
+          counts={data.facetCounts}
+          value={facetSelection}
+          onChange={setFacetSelection}
+        />
+        {searchTrustControls}
+        <V2GrantsWorkspace
+          activeJob={activeJob}
+          allGrants={data.grants as GrantRowData[]}
+          autoMsg={autoMsg}
+          discoveryMsg={discoveryMsg}
+          eligibleOnly={eligibleOnly}
+          error={evalError}
+          evaluatingIds={evaluatingIds}
+          filteredGrants={filtered}
+          isAdmin={isAdmin}
+          jurisdiction={jurisdiction}
+          country={country}
+          availableCountries={data.availableCountries}
+          sector={sector}
+          amountPreset={amountPreset}
+          onlyWithDeadline={onlyWithDeadline}
+          pending={pending}
+          search={search}
+          selectedFunders={selectedFunders}
+          sortKey={sortKey}
+          onClearAutoMsg={() => setAutoMsg(null)}
+          onClearDiscoveryMsg={() => setDiscoveryMsg(null)}
+          onClearError={() => setEvalError(null)}
+          onCloseJob={() => {
+            setActiveJob(null);
+            qc.invalidateQueries({ queryKey: ["grants"] });
+          }}
+          onDiscoverAll={onDiscoverAll}
+          onDraft={onDraft}
+          onEligibleOnlyChange={setEligibleOnly}
+          onEnrich={onEnrich}
+          onEvaluate={onEvaluate}
+          onFeedback={
+            searchProfileId
+              ? (grant, decision) => feedbackMutation.mutate({ grant, decision })
+              : undefined
+          }
+          onJurisdictionChange={setJurisdiction}
+          onCountryChange={setCountry}
+          onSectorChange={setSector}
+          onAmountPresetChange={setAmountPreset}
+          onOnlyWithDeadlineChange={setOnlyWithDeadline}
+          onSearchChange={setSearch}
+          onSelectedFundersChange={setSelectedFunders}
+          onSortKeyChange={setSortKey}
+        />
+      </PageTransition>
+    );
+  }
+
+  return (
+    <PageTransition>
+      <div className="min-h-screen text-foreground">
+        <AppTopBar title={t("nav.grants")} />
+
+        <PageContainer size="wide">
+          <PageHeader
+            eyebrow="Grants"
+            title="Grants workspace"
+            description={
+              viewMode === "express"
+                ? "Your best opportunities first. Plain and simple. Switch to Advanced for the full pipeline."
+                : "Manage the lifecycle of IIAL funding opportunities from discovery to submission. Each card guides the next step."
+            }
+            actions={
+              <Tabs value={viewMode} onValueChange={(v) => switchView(v as "express" | "advanced")}>
+                <TabsList
+                  className="h-11 rounded-full border border-border/70 bg-card/90 p-1 shadow-sm"
+                  aria-label="View mode"
+                >
+                  <TabsTrigger value="express" className="min-h-9 rounded-full px-4 text-xs">
+                    Express
+                  </TabsTrigger>
+                  <TabsTrigger value="advanced" className="min-h-9 rounded-full px-4 text-xs">
+                    Advanced
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            }
+          />
+
+          <OrgRulesDriftBanner />
+          <GrantSearchProfileBar
+            selectedProfileId={searchProfileId}
+            onSelect={setSearchProfileId}
+          />
+          <GrantFacetFilters
+            counts={data.facetCounts}
+            value={facetSelection}
+            onChange={setFacetSelection}
+          />
+          {searchTrustControls}
+
+          {activeJob && (
+            <DiscoveryProgress
+              jobId={activeJob.jobId}
+              queued={activeJob.queued}
+              fr={false}
+              onClose={() => {
+                setActiveJob(null);
+                qc.invalidateQueries({ queryKey: ["grants"] });
+              }}
+            />
+          )}
+          {discoveryMsg && !activeJob && (
+            <div className="mb-4 rounded-md border bg-card px-3 py-2">
+              <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                {discoveryMsg}
+              </pre>
+            </div>
+          )}
+          {autoMsg && <p className="text-sm text-muted-foreground mb-4">{autoMsg}</p>}
+          {evalError && (
+            <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 flex items-start justify-between gap-3">
+              <p className="text-sm text-destructive break-words">{evalError}</p>
+              <button
+                type="button"
+                onClick={() => setEvalError(null)}
+                className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {viewMode === "express" && (
+            <GrantExpressView
+              grants={expressGrants}
+              evaluatingIds={evaluatingIds}
+              onEvaluate={onEvaluate}
+              filters={filtersNode}
+              isAdmin={isAdmin}
+              onFeedback={
+                searchProfileId
+                  ? (grant, decision) => feedbackMutation.mutate({ grant, decision })
+                  : undefined
+              }
+            />
+          )}
+
+          {viewMode === "advanced" && (
+            <GrantKanban
+              grants={filtered}
+              isAdmin={isAdmin}
+              pending={pending}
+              evaluatingIds={evaluatingIds}
+              onEnrich={onEnrich}
+              onEvaluate={onEvaluate}
+              onDraft={onDraft}
+              onFeedback={
+                searchProfileId
+                  ? (grant, decision) => feedbackMutation.mutate({ grant, decision })
+                  : undefined
+              }
+              onMove={isAdmin ? onMove : undefined}
+              kpis={kpis}
+              filters={filtersNode}
+              toolbarRight={
+                <>
+                  <NotebookLMBridge />
+                  {isAdmin && (
+                    <>
+                      <FunderSelector
+                        fr={false}
+                        selected={selectedFunders}
+                        onChange={setSelectedFunders}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={onDiscoverAll}
+                        disabled={pending === "__discover__"}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        {pending === "__discover__" ? t("app.loading") : "Discover & Enrich"}
+                      </Button>
+                    </>
+                  )}
+                </>
+              }
+            />
+          )}
+
+          {data.grants.length === 0 && (
+            <div className="mt-6 rounded-2xl border border-border/70 bg-card/90 p-10 text-center shadow-sm">
+              <h2 className="mb-2 font-display text-3xl text-foreground">No grants yet</h2>
+              <p className="mx-auto mb-4 max-w-xl text-sm text-muted-foreground">
+                Click <b>Discover & Enrich</b> above to scan the Canadian funder catalog (Mitacs,
+                NRC IRAP, SSHRC, NSERC, CIHR, Canada Council, OTF, provincial portals...). The agent
+                fetches each source, extracts opportunities, and applies your Screening Rules
+                automatically.
+              </p>
+              {isAdmin ? (
+                <Button
+                  onClick={onDiscoverAll}
+                  disabled={pending === "__discover__"}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {pending === "__discover__" ? "Starting..." : "Run discovery now"}
+                </Button>
+              ) : (
+                <p className="text-xs text-muted-foreground">Ask an admin to run discovery.</p>
+              )}
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="mt-8">
+              <EventLog fr={false} />
+            </div>
+          )}
+        </PageContainer>
+      </div>
+    </PageTransition>
+  );
+}

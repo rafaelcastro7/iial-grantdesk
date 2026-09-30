@@ -1,0 +1,199 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import type { User } from "@supabase/supabase-js";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAdmin } from "@/lib/admin-guard";
+
+export type AdminUserRow = {
+  id: string;
+  email: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+  banned_until: string | null;
+  is_admin: boolean;
+  preferred_lang: "en" | "fr" | null;
+  org_name: string | null;
+};
+
+type AuditInsert = {
+  user_id: string | null;
+  action: string;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+async function audit(entry: AuditInsert) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // service_role bypasses RLS; generated types omit the locked INSERT — cast.
+  await supabaseAdmin.from("audit_log").insert(entry as never);
+}
+
+export const listAdminUsers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // A single page-1/200 call silently truncated any workspace past 200
+    // users — no pagination control existed anywhere in the UI, so the roster
+    // just looked complete when it wasn't. Page through everything, with a
+    // generous cap (4,000 users) as a backstop against a runaway loop rather
+    // than an expected real limit.
+    const perPage = 200;
+    const maxPages = 20;
+    let page = 1;
+    const allUsers: User[] = [];
+    let truncated = false;
+    for (; page <= maxPages; page++) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+      if (error) throw new Error(error.message);
+      allUsers.push(...data.users);
+      if (data.users.length < perPage) break;
+      if (page === maxPages) truncated = true;
+    }
+
+    const ids = allUsers.map((u) => u.id);
+    const [rolesResp, profilesResp] = await Promise.all([
+      supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids),
+      supabaseAdmin.from("profiles").select("id, preferred_lang, org_name").in("id", ids),
+    ]);
+    const roles = rolesResp.data ?? [];
+    const profiles = profilesResp.data ?? [];
+    const adminSet = new Set(roles.filter((r) => r.role === "admin").map((r) => r.user_id));
+    const profileMap = new Map(profiles.map((p) => [p.id, p]));
+
+    const rows: AdminUserRow[] = allUsers.map((u) => {
+      const p = profileMap.get(u.id);
+      return {
+        id: u.id,
+        email: u.email ?? null,
+        created_at: u.created_at,
+        last_sign_in_at: u.last_sign_in_at ?? null,
+        banned_until: (u as { banned_until?: string | null }).banned_until ?? null,
+        is_admin: adminSet.has(u.id),
+        preferred_lang: (p?.preferred_lang as "en" | "fr" | undefined) ?? null,
+        org_name: p?.org_name ?? null,
+      };
+    });
+    rows.sort((a, b) => (a.email ?? "").localeCompare(b.email ?? ""));
+    return { users: rows, truncated };
+  });
+
+export const setUserAdminRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ userId: z.string().uuid(), admin: z.boolean() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    if (data.userId === context.userId && !data.admin) {
+      throw new Error("You cannot remove your own admin role.");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.admin) {
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: data.userId, role: "admin" }, { onConflict: "user_id,role" });
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", data.userId)
+        .eq("role", "admin");
+      if (error) throw new Error(error.message);
+    }
+    await audit({
+      user_id: context.userId,
+      action: data.admin ? "role.grant_admin" : "role.revoke_admin",
+      resource_type: "user",
+      resource_id: data.userId,
+    });
+    return { ok: true };
+  });
+
+export const inviteAdminUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({ email: z.string().email(), asAdmin: z.boolean().default(false) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: invited, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email);
+    if (error) throw new Error(error.message);
+    if (data.asAdmin && invited.user) {
+      // Real bug, confirmed live: unlike the sibling setAdminRole above (same
+      // upsert, same table), this never checked the error — a failed grant
+      // (RLS, transient DB error) silently left the invited user without
+      // the admin role while the audit log below still recorded
+      // `as_admin: true`, as if it had succeeded.
+      const { error: roleError } = await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: invited.user.id, role: "admin" }, { onConflict: "user_id,role" });
+      if (roleError) throw new Error(roleError.message);
+    }
+    await audit({
+      user_id: context.userId,
+      action: "user.invite",
+      resource_type: "user",
+      resource_id: invited.user?.id ?? null,
+      metadata: { email: data.email, as_admin: data.asAdmin },
+    });
+    return { ok: true, userId: invited.user?.id ?? null };
+  });
+
+export const sendUserRecovery = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ email: z.string().email() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.resetPasswordForEmail(data.email);
+    if (error) throw new Error(error.message);
+    await audit({
+      user_id: context.userId,
+      action: "user.recovery_sent",
+      resource_type: "user",
+      metadata: { email: data.email },
+    });
+    return { ok: true };
+  });
+
+export const setUserBanned = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ userId: z.string().uuid(), banned: z.boolean() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    if (data.userId === context.userId) throw new Error("You cannot ban yourself.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const ban_duration = data.banned ? "876000h" : "none";
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      ban_duration,
+    } as { ban_duration: string });
+    if (error) throw new Error(error.message);
+    await audit({
+      user_id: context.userId,
+      action: data.banned ? "user.ban" : "user.unban",
+      resource_type: "user",
+      resource_id: data.userId,
+    });
+    return { ok: true };
+  });
+
+export const deleteUserHard = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ userId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    if (data.userId === context.userId) throw new Error("You cannot delete yourself.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
+    if (error) throw new Error(error.message);
+    await audit({
+      user_id: context.userId,
+      action: "user.delete",
+      resource_type: "user",
+      resource_id: data.userId,
+    });
+    return { ok: true };
+  });

@@ -1,0 +1,91 @@
+// Shared grant shape used across the grants board and detail views.
+//
+// The former dense "row" UI (GrantRow component), its inline FitChip, and the
+// sortByFit comparator were removed as dead code — the board renders the
+// Kanban card (GrantKanban.tsx) and sorting now lives in GrantFilters
+// (sortGrants). Only the data shape is still shared, kept here so existing
+// `import type { GrantRowData } from "./GrantRow"` paths keep working.
+
+export type GrantRowData = {
+  id: string;
+  title: string;
+  title_fr: string | null;
+  summary: string | null;
+  summary_fr: string | null;
+  amount_cad_min: number | null;
+  amount_cad_max: number | null;
+  deadline: string | null;
+  sectors?: string[] | null;
+  status: string;
+  url: string;
+  discovered_at: string | null;
+  enriched_at: string | null;
+  scored_at: string | null;
+  fit_score: number | null;
+  funder:
+    | { name: string; name_fr: string | null; jurisdiction: string | null }
+    | { name: string; name_fr: string | null; jurisdiction: string | null }[]
+    | null;
+  evaluation: {
+    fit_score: number;
+    eligibility_pass: boolean;
+    rationale_en: string;
+    rationale_fr: string;
+    created_at: string;
+  } | null;
+  /** Present only for server-ranked text searches; score is ranking evidence, not confidence. */
+  searchMatch?: {
+    relevance: number;
+    matched_on: string;
+    lexical_score: number;
+    semantic_score: number;
+    retrieval_mode: "hybrid" | "lexical-fallback" | "lexical-only" | "shadow";
+    query_concepts: string[];
+  } | null;
+  profileMatch?: {
+    score: number;
+    hardBlocked: boolean;
+    matched: string[];
+    missing: string[];
+  } | null;
+  feedbackAction?: "saved" | "hidden" | "rejected" | "restored" | "pursued" | null;
+  combinedRelevance?: number;
+  facets?: Record<
+    "applicant_types" | "populations_served" | "funding_uses" | "funder_type" | "deadline_kind",
+    {
+      state: "known" | "unknown" | "conflicting";
+      values: string[];
+      excludedValues: string[];
+      confidence: number | null;
+      evidence: Array<{ id: string; source_url: string; snippet: string }>;
+    }
+  >;
+  facetEvidenceState?: "known" | "unknown" | "conflicting";
+  historyMatch?: { boost: number; factors: string[] };
+  qualityMatch?: {
+    evidence: number;
+    freshness: number;
+    sourceConfidence: number;
+    deadline: number;
+    total: number;
+    factors: string[];
+  };
+  rankingBreakdown?: {
+    retrieval: number;
+    profile: number;
+    feedback: number;
+    history: number;
+    quality: number;
+    country: number;
+    jurisdiction: number;
+    final: number;
+    version: string;
+  };
+  hardBlocked?: boolean;
+  isNewSinceLastReview?: boolean;
+  changedSinceFeedback?: boolean;
+  // >1 means other active grants share this funder + a near-identical title —
+  // a real, recurring data-quality issue (contaminated test-seed rows, or
+  // genuine re-discovery not yet deduped). UI-only signal, never merges data.
+  duplicateGroupSize?: number;
+};

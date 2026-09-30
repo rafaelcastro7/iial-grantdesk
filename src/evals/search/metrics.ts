@@ -1,0 +1,116 @@
+export type RelevanceJudgment = Record<string, number>;
+
+export type SearchBenchmarkCase = {
+  id: string;
+  query: string;
+  language: "en" | "fr";
+  relevance: RelevanceJudgment;
+  hardBlocked?: string[];
+  tags?: string[];
+};
+
+export type SearchCaseMetrics = {
+  id: string;
+  precisionAtK: number;
+  recallAtK: number;
+  reciprocalRank: number;
+  ndcgAtK: number;
+  hardFailLeakage: number;
+};
+
+export type SearchBenchmarkCoverage = {
+  totalCases: number;
+  executableCases: number;
+  executableHardBlockCases: number;
+  executablePositiveCases: number;
+  staleCases: number;
+  executableRatio: number;
+  sufficient: boolean;
+};
+
+export const MIN_EXECUTABLE_CASE_RATIO = 0.7;
+
+const relevant = (grade: number | undefined) => (grade ?? 0) > 0;
+
+export function evaluateSearchCase(
+  testCase: SearchBenchmarkCase,
+  rankedGrantIds: string[],
+  k = 10,
+): SearchCaseMetrics {
+  const top = rankedGrantIds.slice(0, k);
+  const relevantTotal = Object.values(testCase.relevance).filter(relevant).length;
+  const relevantRetrieved = top.filter((id) => relevant(testCase.relevance[id])).length;
+  const firstRelevantIndex = rankedGrantIds.findIndex((id) => relevant(testCase.relevance[id]));
+  const dcg = top.reduce((sum, id, index) => {
+    const grade = testCase.relevance[id] ?? 0;
+    return sum + (2 ** grade - 1) / Math.log2(index + 2);
+  }, 0);
+  const idealGrades = Object.values(testCase.relevance)
+    .sort((a, b) => b - a)
+    .slice(0, k);
+  const idealDcg = idealGrades.reduce(
+    (sum, grade, index) => sum + (2 ** grade - 1) / Math.log2(index + 2),
+    0,
+  );
+  const blocked = new Set(testCase.hardBlocked ?? []);
+  const blockedInTop = top.filter((id) => blocked.has(id)).length;
+
+  return {
+    id: testCase.id,
+    precisionAtK:
+      relevantTotal === 0
+        ? top.length === 0
+          ? 1
+          : 0
+        : top.length === 0
+          ? 0
+          : relevantRetrieved / top.length,
+    recallAtK: relevantTotal === 0 ? 1 : relevantRetrieved / relevantTotal,
+    reciprocalRank: firstRelevantIndex < 0 ? 0 : 1 / (firstRelevantIndex + 1),
+    ndcgAtK: idealDcg === 0 ? 1 : dcg / idealDcg,
+    hardFailLeakage: blockedInTop,
+  };
+}
+
+export function summarizeSearchBenchmark(rows: SearchCaseMetrics[]) {
+  const mean = (key: keyof Omit<SearchCaseMetrics, "id">) =>
+    rows.length === 0 ? 0 : rows.reduce((sum, row) => sum + row[key], 0) / rows.length;
+  return {
+    cases: rows.length,
+    precisionAtK: mean("precisionAtK"),
+    recallAtK: mean("recallAtK"),
+    mrr: mean("reciprocalRank"),
+    ndcgAtK: mean("ndcgAtK"),
+    hardFailLeakage: rows.reduce((sum, row) => sum + row.hardFailLeakage, 0),
+  };
+}
+
+export function evaluateSearchBenchmarkCoverage(
+  cases: SearchBenchmarkCase[],
+  staleCaseIds: Iterable<string>,
+  minimumExecutableRatio = MIN_EXECUTABLE_CASE_RATIO,
+): SearchBenchmarkCoverage {
+  const stale = new Set(staleCaseIds);
+  const executable = cases.filter((testCase) => !stale.has(testCase.id));
+  const totalCases = cases.length;
+  const executableRatio = totalCases === 0 ? 0 : executable.length / totalCases;
+  const executablePositiveCases = executable.filter((testCase) =>
+    Object.values(testCase.relevance).some(relevant),
+  ).length;
+  const executableHardBlockCases = executable.filter(
+    (testCase) => (testCase.hardBlocked?.length ?? 0) > 0,
+  ).length;
+
+  return {
+    totalCases,
+    executableCases: executable.length,
+    executableHardBlockCases,
+    executablePositiveCases,
+    staleCases: stale.size,
+    executableRatio,
+    sufficient:
+      executableRatio >= minimumExecutableRatio &&
+      executablePositiveCases > 0 &&
+      executableHardBlockCases > 0,
+  };
+}

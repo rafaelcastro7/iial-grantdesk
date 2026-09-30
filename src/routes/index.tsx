@@ -1,202 +1,52 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { Landing } from "@/components/Landing";
-import { meta } from "@/lib/head";
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import "@/i18n";
+import { syncClientLocale } from "@/i18n/sync";
 
 export const Route = createFileRoute("/")({
-  component: Home,
-  head: () => meta(
-    "Grant Desk — funding matches your clients can actually win",
-    "A consultant's desk for grant work: real calls from public sources, eligibility decided by rules you can read, and drafts grounded in the client's own profile.",
-  ),
+  head: () => ({
+    meta: [
+      { title: "IIAL — AI Grant Intelligence" },
+      {
+        name: "description",
+        content: "Discover, evaluate, and win Canadian grants with AI agents. Bilingual EN/FR..",
+      },
+      { property: "og:title", content: "IIAL — AI Grant Intelligence" },
+      {
+        property: "og:description",
+        content: "Discover, evaluate, and win Canadian grants with AI agents.",
+      },
+    ],
+  }),
+  component: Index,
 });
 
-type Row = {
-  id: string;
-  client_id: string;
-  grant_id: string;
-  clients: { name: string } | null;
-  grants: { title: string; deadline: string | null } | null;
-  submissions: Array<{ submitted_at: string; outcome: string | null }>;
-};
-
-/**
- * The first of the five questions in docs/SPEC.md: what is due across all my
- * clients?
- *
- * This is the screen the whole product is shaped around. A consultant with
- * eight clients does not think in clients — they think in "what has to go out
- * this week", and every incumbent makes them open eight dashboards to find out.
- *
- * Sorted by what closes soonest, because that is the only ordering that
- * survives a Monday morning. Submitted applications drop to their own list
- * rather than disappearing: "did we send that?" is asked far more often than
- * it should have to be.
- */
-function Home() {
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
-
-  const load = useCallback(async () => {
-    const { data: session } = await supabase().auth.getSession();
-    if (!session.session) {
-      setSignedIn(false);
-      return;
-    }
-    setSignedIn(true);
-
-    const { data, error: readError } = await supabase()
-      .from("proposals")
-      .select(
-        "id, client_id, grant_id, clients(name), grants(title, deadline), submissions(submitted_at, outcome)",
-      );
-    if (readError) {
-      setError(readError.message);
-      return;
-    }
-    setRows((data ?? []) as unknown as Row[]);
-  }, []);
-
+function Index() {
+  const { t } = useTranslation();
   useEffect(() => {
-    void load();
-  }, [load]);
-
-  const open = (rows ?? [])
-    .filter((r) => r.submissions.length === 0)
-    .sort((a, b) => {
-      // A call with no published closing date is genuinely less urgent than one
-      // that closes on Friday, so it sorts last rather than first.
-      const left = a.grants?.deadline ?? "9999-12-31";
-      const right = b.grants?.deadline ?? "9999-12-31";
-      return left.localeCompare(right);
-    });
-  const sent = (rows ?? []).filter((r) => r.submissions.length > 0);
-
-  // One route, two audiences. A visitor gets the case for the product; a
-  // signed-in consultant gets the first of the five questions in docs/SPEC.md.
-  // Splitting them into two routes would add a screen to the budget in
-  // ADR-0002 for what is one address with two states.
-  //
-  // The landing is the default, not the else-branch. Reading the session is a
-  // client-side call, so `signedIn` is null on the server — and asking for the
-  // desk first meant this address served an empty document to every visitor
-  // until JavaScript had run and answered. A landing page that arrives blank
-  // is the first impression it exists to make.
-  if (signedIn !== true) return <Landing />;
-
+    syncClientLocale();
+  }, []);
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">What is due</h1>
-      <p className="mt-2 max-w-prose text-sm text-[var(--color-ink-soft)]">
-        Every application in progress, across every client, soonest first.
-      </p>
-
-      {error && (
-        <p role="alert" className="mt-4 text-sm text-[var(--color-ineligible)]">
-          {error}
-        </p>
-      )}
-
-      {signedIn && rows !== null && open.length === 0 && sent.length === 0 && (
-        <p className="mt-8 text-sm text-[var(--color-ink-soft)]">
-          Nothing in progress yet.{" "}
-          <Link to="/clients" className="text-[var(--color-accent)]">
-            Add a client
-          </Link>{" "}
-          and find what they can apply for.
-        </p>
-      )}
-
-      {open.length > 0 && (
-        <ul
-          data-testid="due-list"
-          className="mt-6 flex flex-col gap-px overflow-hidden rounded-md border border-[var(--color-rule)] bg-[var(--color-rule)]"
-        >
-          {open.map((row) => (
-            <li key={row.id} className="bg-[var(--color-surface)] px-4 py-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <Link
-                  to="/clients/$clientId/proposals/$grantId"
-                  params={{ clientId: row.client_id, grantId: row.grant_id }}
-                  className="font-medium text-[var(--color-accent)]"
-                >
-                  {row.grants?.title ?? "Application"}
-                </Link>
-                <Deadline date={row.grants?.deadline ?? null} />
-              </div>
-              <p className="mt-1 text-xs text-[var(--color-ink-soft)]">{row.clients?.name}</p>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {sent.length > 0 && (
-        <section className="mt-10" data-testid="sent-list">
-          <h2 className="text-sm font-semibold">Sent</h2>
-          {/* A win rate over "everything ever sent" answers a different
-              question than a consultant actually asks — "awaiting" is not
-              yet a result, and folding it in permanently understates a
-              track record right after a busy month of submissions. Counted
-              only over outcomes that have actually landed. */}
-          {(() => {
-            const decided = sent.filter(
-              (r) =>
-                r.submissions[0]?.outcome === "awarded" || r.submissions[0]?.outcome === "declined",
-            );
-            const awarded = decided.filter((r) => r.submissions[0]?.outcome === "awarded").length;
-            const awaiting = sent.filter((r) => r.submissions[0]?.outcome === "awaiting").length;
-            if (decided.length === 0) return null;
-            return (
-              <p data-testid="win-rate" className="mt-1 text-sm text-[var(--color-ink-soft)]">
-                {awarded} of {decided.length} decided applications awarded (
-                {Math.round((awarded / decided.length) * 100)}%)
-                {awaiting > 0 ? ` · ${awaiting} still awaiting` : ""}.
-              </p>
-            );
-          })()}
-          <ul className="mt-3 flex flex-col gap-px overflow-hidden rounded-md border border-[var(--color-rule)] bg-[var(--color-rule)]">
-            {sent.map((row) => (
-              <li
-                key={row.id}
-                className="flex items-baseline justify-between gap-3 bg-[var(--color-surface)] px-4 py-3"
-              >
-                <span className="text-sm">
-                  {row.grants?.title}
-                  <span className="text-[var(--color-ink-soft)]"> · {row.clients?.name}</span>
-                </span>
-                <span className="shrink-0 text-xs text-[var(--color-ink-soft)]">
-                  {row.submissions[0]?.outcome ?? "awaiting"} ·{" "}
-                  {new Date(row.submissions[0]!.submitted_at).toLocaleDateString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+    <main className="min-h-screen bg-background text-foreground">
+      <header className="flex items-center justify-between p-4 border-b">
+        <span className="font-semibold">{t("app.name")}</span>
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher />
+          <Link to="/auth">
+            <Button size="sm">{t("auth.signIn")}</Button>
+          </Link>
+        </div>
+      </header>
+      <section className="max-w-3xl mx-auto px-4 py-20 text-center space-y-6">
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight">{t("home.title")}</h1>
+        <p className="text-lg text-muted-foreground">{t("home.subtitle")}</p>
+        <Link to="/auth">
+          <Button size="lg">{t("home.cta")}</Button>
+        </Link>
+      </section>
     </main>
-  );
-}
-
-/**
- * Days, not dates. "Closes 2026-09-02" makes a consultant do arithmetic; "6
- * days left" is the thing they were going to work out anyway.
- */
-function Deadline({ date }: { date: string | null }) {
-  if (!date) {
-    return <span className="shrink-0 text-xs text-[var(--color-ink-soft)]">no closing date</span>;
-  }
-  const days = Math.ceil((new Date(`${date}T23:59:59Z`).getTime() - Date.now()) / 86_400_000);
-  const tone =
-    days < 0
-      ? "text-[var(--color-ineligible)]"
-      : days <= 14
-        ? "text-[var(--color-needs-input)]"
-        : "text-[var(--color-ink-soft)]";
-  return (
-    <span className={`shrink-0 text-xs font-medium tabular-nums ${tone}`}>
-      {days < 0 ? `closed ${date}` : days === 0 ? "closes today" : `${days} days left`}
-    </span>
   );
 }

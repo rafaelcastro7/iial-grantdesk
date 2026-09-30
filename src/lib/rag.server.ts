@@ -1,0 +1,106 @@
+// Hybrid retrieval: BM25 (full-text) ∪ vector similarity, RRF-fused.
+// Server-only. Caller passes the per-user supabase client (RLS-scoped).
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+import { getEmbeddingCached } from "@/lib/embeddings-cache.server";
+
+export type RagHit = {
+  id: string;
+  content: string;
+  source: string;
+  language: "en" | "fr";
+  score: number;
+};
+
+type Sb = SupabaseClient<Database>;
+
+// Reciprocal Rank Fusion (k=60 standard).
+function rrf(lists: string[][], k = 60): Map<string, number> {
+  const scores = new Map<string, number>();
+  for (const list of lists) {
+    list.forEach((id, idx) => {
+      scores.set(id, (scores.get(id) ?? 0) + 1 / (k + idx + 1));
+    });
+  }
+  return scores;
+}
+
+export async function ragRetrieve(
+  supabase: Sb,
+  userId: string,
+  query: string,
+  topK = 6,
+): Promise<RagHit[]> {
+  const { data: member } = await supabase
+    .from("profiles")
+    .select("org_id")
+    .eq("id", userId)
+    .maybeSingle();
+  const ownershipFilter = member?.org_id
+    ? `user_id.eq.${userId},org_id.eq.${member.org_id}`
+    : `user_id.eq.${userId}`;
+  // 1) BM25 via Postgres FTS (simple config covers EN + FR ok for MVP).
+  const tsQuery = query
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2)
+    .slice(0, 12)
+    .join(" | ");
+
+  const [{ data: ftsRows }, queryEmbedding] = await Promise.all([
+    tsQuery
+      ? supabase
+          .from("knowledge_chunks")
+          .select("id, content, source, language")
+          .or(ownershipFilter)
+          .textSearch("content", tsQuery, { type: "websearch", config: "simple" })
+          .limit(topK * 2)
+      : Promise.resolve({
+          data: [] as Array<{ id: string; content: string; source: string; language: "en" | "fr" }>,
+        }),
+    // Cached: the same section-drafting query is often re-issued within a
+    // session (retry, re-open the same section) — this is also the only
+    // real call site the Monitoring page's "Embedding Cache" card can now
+    // reflect, since it was previously wired to nothing.
+    getEmbeddingCached(query),
+  ]);
+
+  const { data: vecRows, error: vecErr } = await supabase.rpc("match_knowledge_chunks", {
+    query_embedding: queryEmbedding as unknown as string,
+    match_user_id: userId,
+    match_count: topK * 2,
+  });
+  if (vecErr) console.warn("[rag] vector search failed, falling back to FTS only:", vecErr.message);
+
+  const fts = (ftsRows ?? []) as Array<{
+    id: string;
+    content: string;
+    source: string;
+    language: "en" | "fr";
+  }>;
+  const vec = (vecRows ?? []) as Array<{
+    id: string;
+    content: string;
+    source: string;
+    language: "en" | "fr";
+    similarity: number;
+  }>;
+
+  const fused = rrf([fts.map((r) => r.id), vec.map((r) => r.id)]);
+  const byId = new Map<
+    string,
+    { id: string; content: string; source: string; language: "en" | "fr" }
+  >();
+  for (const r of [...fts, ...vec]) byId.set(r.id, r);
+
+  return [...fused.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topK)
+    .map(([id, score]) => {
+      const r = byId.get(id);
+      if (!r) return null;
+      return { id: r.id, content: r.content, source: r.source, language: r.language, score };
+    })
+    .filter((x): x is RagHit => x !== null);
+}

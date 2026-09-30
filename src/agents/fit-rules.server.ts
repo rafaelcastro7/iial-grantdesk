@@ -1,0 +1,700 @@
+// Deterministic fit-rules engine - IIAL SOP edition.
+// Pure functions - no IO. Used by evaluator and by the rules preview UI.
+// Implements the auto-evaluable filters from the IIAL Grant Finding SOP v2:
+//   Filter 1 - Legal eligibility (applicant types)
+//   Filter 3 - Money math (amount range + cost-share cap)
+//   Filter 4 - Strategic fit (IIAL capabilities <-> grant sectors/eligibility)
+//   Filter 5 - Runway (minimum weeks before deadline, by role)
+// Filter 2 (role triage) and Filter 6 (effort vs win) are surfaced for human
+// review in the Opportunity Brief - not auto-gated.
+
+export type { FitRules, OrgProfileLite, AxisKey, AxisScore } from "@/agents/fit-rules.shared";
+export {
+  DEFAULT_RULES,
+  deriveRulesFromOrg,
+  computeAxisBreakdown,
+  assessBudgetCapacity,
+} from "@/agents/fit-rules.shared";
+
+import type { FitRules } from "@/agents/fit-rules.shared";
+
+export type GrantForRules = {
+  amount_cad_min?: number | null;
+  amount_cad_max?: number | null;
+  deadline?: string | null;
+  eligibility?: unknown;
+  sectors?: string[] | null;
+  country?: string | null;
+  summary?: string | null;
+  title?: string | null;
+};
+
+export type RuleCheck = {
+  id: string;
+  label: string;
+  status: "pass" | "fail" | "warn" | "skip";
+  hard: boolean;
+  detail: string;
+};
+
+export type Verdict = "eligible" | "ineligible" | "needs_input";
+
+export type RulesResult = {
+  checks: RuleCheck[];
+  hard_fail: boolean;
+  verdict: Verdict;
+  rule_score: number;
+  combined_score: (llmScore: number) => number;
+  pass: (llmScore: number) => boolean;
+  detected_role: "lead" | "partner" | "unknown";
+  // Only meaningful when detected_role === "partner" — which KIND of partner
+  // the eligibility text implies, so the brief can say "you'll need a
+  // municipal co-applicant" instead of just "partner".
+  detected_partner_type: "municipality" | "first_nation" | "co_applicant" | "other" | null;
+  cost_share_pct: number | null;
+  rolling_intake: boolean;
+};
+
+const norm = (s: string) => s.trim().toLowerCase();
+const SECTOR_ALIASES: Record<string, string> = {
+  tech: "technology",
+  technology: "technology",
+  "information technology": "technology",
+  ai: "ai",
+  "artificial intelligence": "ai",
+  "machine learning": "ai",
+  "ai ml": "ai",
+  cleantech: "clean technology",
+  "clean tech": "clean technology",
+  "clean technology": "clean technology",
+  "r d": "research",
+  research: "research",
+  "research and development": "research",
+  "workforce training": "workforce development",
+  "skills training": "workforce development",
+  "professional development": "workforce development",
+};
+const normalizeSector = (value: string) => {
+  const cleaned = norm(value)
+    .replace(/[{}_[\]/&-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return SECTOR_ALIASES[cleaned] ?? cleaned;
+};
+const overlap = (a: string[], b: string[]) => {
+  const set = new Set(a.map(normalizeSector));
+  return b.some((x) => set.has(normalizeSector(x)));
+};
+// Word-boundary matching to avoid false positives (e.g. "art" in "chart", "start").
+const containsAny = (hay: string, kws: string[]) =>
+  kws.some((k) =>
+    new RegExp(
+      `(?:^|[^\\p{L}\\p{N}])${norm(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^\\p{L}\\p{N}])`,
+      "u",
+    ).test(hay),
+  );
+const containsAll = (hay: string, kws: string[]) =>
+  kws.every((k) =>
+    new RegExp(
+      `(?:^|[^\\p{L}\\p{N}])${norm(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^\\p{L}\\p{N}])`,
+      "u",
+    ).test(hay),
+  );
+
+// Normalize jurisdiction variants to ISO-2 codes for matching.
+const JURISDICTION_ALIASES: Record<string, string> = {
+  canada: "ca",
+  canadian: "ca",
+  ca: "ca",
+  ontario: "on",
+  on: "on",
+  quebec: "qc",
+  québec: "qc",
+  qc: "qc",
+  "british columbia": "bc",
+  bc: "bc",
+  alberta: "ab",
+  ab: "ab",
+  manitoba: "mb",
+  mb: "mb",
+  saskatchewan: "sk",
+  sk: "sk",
+  "nova scotia": "ns",
+  ns: "ns",
+  "new brunswick": "nb",
+  nb: "nb",
+  newfoundland: "nl",
+  "newfoundland and labrador": "nl",
+  nl: "nl",
+  "prince edward island": "pe",
+  pei: "pe",
+  pe: "pe",
+  territories: "yt",
+  yukon: "yt",
+  nwt: "nt",
+  nunavut: "nu",
+  national: "ca",
+  federal: "ca",
+  "pan-canadian": "ca",
+  "all provinces": "ca",
+  nationwide: "ca",
+};
+function normalizeJurisdiction(raw: string): string {
+  const n = norm(raw);
+  return JURISDICTION_ALIASES[n] ?? n;
+}
+
+const CANADIAN_SUBJURISDICTIONS = new Set([
+  "on",
+  "qc",
+  "bc",
+  "ab",
+  "mb",
+  "sk",
+  "ns",
+  "nb",
+  "nl",
+  "pe",
+  "yt",
+  "nt",
+  "nu",
+]);
+
+function jurisdictionMatches(requiredRaw: string, grantRaw: string): boolean {
+  const required = normalizeJurisdiction(requiredRaw);
+  const grant = normalizeJurisdiction(grantRaw);
+  if (required === grant) return true;
+  // A national opportunity is available to a province-based organization;
+  // an organization operating Canada-wide can also pursue a provincial call.
+  if (grant === "ca" && CANADIAN_SUBJURISDICTIONS.has(required)) return true;
+  if (required === "ca" && CANADIAN_SUBJURISDICTIONS.has(grant)) return true;
+  return false;
+}
+
+function buildHaystack(g: GrantForRules): string {
+  return norm(
+    [
+      typeof g.eligibility === "string"
+        ? g.eligibility
+        : g.eligibility
+          ? JSON.stringify(g.eligibility)
+          : "",
+      g.summary ?? "",
+      g.title ?? "",
+    ].join(" "),
+    // Underscore-stripping matters here: JS's native \b treats "_" as a word
+    // character, so "in_the_middle" would never get a boundary around
+    // "the" without this. "/" must NOT be stripped the same way — it broke
+    // detectCostShare()'s ratio pattern (e.g. "50/50", "70/30") by turning
+    // "50/50" into "50 50" before the regex ever saw it, silently making
+    // that entire detection path dead code. containsAny/overlap's
+    // Unicode-boundary regex already treats "/" as a boundary on its own
+    // (it isn't \p{L} or \p{N}), so nothing downstream needed the slash
+    // replaced with a space in the first place.
+  ).replace(/_+/g, " ");
+}
+
+function detectRole(hay: string): "lead" | "partner" | "unknown" {
+  const partner =
+    /\b(municipal(ity|ities)?|city of|town of|first nation|partner|co-?applicant|lead applicant must be)\b/.test(
+      hay,
+    );
+  const lead = /\b(non[- ]?profit|charity|organization|business|smes?|enterprise)\b/.test(hay);
+  if (partner && !lead) return "partner";
+  if (lead && !partner) return "lead";
+  if (partner && lead) return "lead"; // prefer lead when both signals (IIAL is an org)
+  return "unknown";
+}
+
+// Which kind of partner the eligibility text implies — thrown away previously
+// (detectRole collapsed everything to a bare "partner" enum), but this is the
+// difference between "find a municipality" and "find a First Nation" as the
+// next concrete step, so it's worth a second, more specific pass.
+export function detectPartnerType(
+  hay: string,
+): "municipality" | "first_nation" | "co_applicant" | "other" {
+  if (/\b(first nation|indigenous|premi[eè]re nation|autochtone)\b/.test(hay))
+    return "first_nation";
+  if (/\b(municipal(ity|ities)?|city of|town of|municipalit[ée]s?)\b/.test(hay))
+    return "municipality";
+  if (/\b(co-?applicant|joint application|consortium)\b/.test(hay)) return "co_applicant";
+  return "other";
+}
+
+/**
+ * "Foreign entities are eligible to apply" — read from the funder's own text,
+ * never guessed from the absence of a restriction.
+ *
+ * The country field stored is the funder's country, not a nationality
+ * restriction. US federal calls (Grants.gov) are stored as `country: "US"`
+ * whether or not its actual synopsis restricts applicants to US entities.
+ * Many explicitly do not restrict to US applicants.
+ *
+ * If the synopsis explicitly affirms foreign entity eligibility, we downgrade
+ * what would have been a hard jurisdiction fail into a "warn" check
+ * requiring human/consultant confirmation ("needs_input").
+ */
+export function statesForeignEligibility(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const hay = text.toLowerCase();
+
+  const subject =
+    "(foreign|international|non-u\\.s\\.|non-united states|outside the united states)";
+  const negated = new RegExp(
+    `\\b(not eligible|ineligible|except|excluding|only|restricted to)\\b.{0,40}${subject}` +
+      `|${subject}.{0,40}\\b(not eligible|ineligible|are not|is not|may not)\\b`,
+  ).test(hay);
+  if (negated) return false;
+
+  const affirms = new RegExp(
+    `${subject}.{0,60}\\b(are eligible|is eligible|may apply|entities are eligible|` +
+      `organizations are eligible|institutions are eligible|applicants are eligible)\\b` +
+      `|\\b(eligible applicants include|open to)[^.]{0,60}${subject}`,
+  ).test(hay);
+  return affirms;
+}
+
+/**
+ * Estimate the percentage the ORGANIZATION carries out of pocket. Two
+ * semantically opposite phrasings appear in grant text, and they must NOT be
+ * handled the same way:
+ *  - "funder covers/funds up to N%" or "N% funding/grant" -> N% is the
+ *    FUNDER's share, so the org carries the remainder: 100 - N.
+ *  - "requires N% cost-share/match/contribution" -> N% is already the ORG's
+ *    own share (previously this was also inverted to 100-N, silently
+ *    reporting e.g. a real 20% requirement as 80%).
+ */
+function detectCostShare(hay: string): number | null {
+  const funderCoverage =
+    hay.match(/\b(?:cover|covers|funds|funded at|up to|reimburses)\s+(\d{1,3})\s*%/) ||
+    hay.match(/\b(\d{1,3})\s*%\s*(?:funding|grant)\b/);
+  if (funderCoverage) {
+    const n = Number(funderCoverage[1]);
+    if (n >= 0 && n <= 100) return 100 - n;
+  }
+
+  const orgShare = hay.match(/\b(\d{1,3})\s*%\s*(?:cost[- ]?share|match|contribution)\b/);
+  if (orgShare) {
+    const n = Number(orgShare[1]);
+    if (n >= 0 && n <= 100) return n;
+  }
+
+  const ratio = hay.match(/\b(\d{1,2})\s*\/\s*(\d{1,2})\b/);
+  if (ratio) {
+    const a = Number(ratio[1]),
+      b = Number(ratio[2]);
+    if (a + b === 100) return 100 - a;
+    if (a + b > 0) return Math.round((b / (a + b)) * 100);
+  }
+
+  return null;
+}
+
+function isRollingIntake(hay: string, deadline?: string | null): boolean {
+  // Detect rolling intake regardless of deadline — text explicitly saying
+  // "rolling intake" or "continuous" overrides any deadline presence.
+  return (
+    /\b(rolling\s+intake|rolling\s+application|continuous\s+intake|ongoing|open\s+intake|accepting\s+applications\s+on\s+an?\s+ongoing)\b/.test(
+      hay,
+    ) ||
+    (!deadline && /\b(rolling|no deadline|anytime)\b/.test(hay))
+  );
+}
+
+function detectExcludedApplicantTypes(hay: string): string[] {
+  const out: string[] = [];
+  if (/\b(?:only|must be|restricted to)[^.]{0,80}\b(registered )?charit(y|ies)\b/.test(hay)) {
+    out.push("charity_only");
+  }
+  if (
+    /\b(?:only|must be|restricted to)[^.]{0,80}\b(municipalit(y|ies)|local government)\b/.test(hay)
+  ) {
+    out.push("municipality_only");
+  }
+  if (
+    /\b(?:only|must be|restricted to)[^.]{0,80}\b(universit(y|ies)|colleges?|post[- ]secondary)\b/.test(
+      hay,
+    )
+  ) {
+    out.push("university_only");
+  }
+  if (/\b(?:only|must be)[^.]{0,80}\b(individuals?|private citizens?)\b/.test(hay)) {
+    out.push("individual_only");
+  }
+  if (/\b(?:only|must be|restricted to)[^.]{0,80}\b(for[- ]profit|commercial)\b/.test(hay)) {
+    out.push("for_profit_only");
+  }
+  return out;
+}
+
+type ApplicantCategory =
+  | "nonprofit"
+  | "charity"
+  | "municipality"
+  | "university"
+  | "individual"
+  | "for_profit"
+  | "indigenous"
+  | "government";
+
+function applicantCategories(text: string): ApplicantCategory[] {
+  text = text.replace(/[_/]+/g, " ");
+  const categories = new Set<ApplicantCategory>();
+  if (/\b(non[- ]?profit|not[- ]for[- ]profit|npo)\b/.test(text)) categories.add("nonprofit");
+  if (/\b(charit(?:y|ies)|charitable organization)\b/.test(text)) categories.add("charity");
+  if (/\b(municipalit(?:y|ies)|local government|cities|towns)\b/.test(text)) {
+    categories.add("municipality");
+  }
+  if (/\b(universit(?:y|ies)|colleges?|post[- ]secondary)\b/.test(text)) {
+    categories.add("university");
+  }
+  if (/\b(individuals?|private citizens?)\b/.test(text)) categories.add("individual");
+  if (/(?:^|[\s,;(])(for[- ]profit|commercial|business(?:es)?|smes?|enterprises?)\b/.test(text)) {
+    categories.add("for_profit");
+  }
+  if (/\b(indigenous|first nations?|m[ée]tis|inuit)\b/.test(text)) {
+    categories.add("indigenous");
+  }
+  if (/\b(provincial government|federal government|government agenc(?:y|ies))\b/.test(text)) {
+    categories.add("government");
+  }
+  return [...categories];
+}
+
+function configuredApplicantCategories(values: string[]): ApplicantCategory[] {
+  return [...new Set(values.flatMap((value) => applicantCategories(norm(value))))];
+}
+
+function detectExplicitEligibleApplicantTypes(g: GrantForRules): ApplicantCategory[] {
+  const eligibility = g.eligibility;
+  const structured: ApplicantCategory[] = [];
+  if (eligibility && typeof eligibility === "object" && !Array.isArray(eligibility)) {
+    for (const [key, value] of Object.entries(eligibility as Record<string, unknown>)) {
+      if (value === true || (typeof value === "string" && /^(true|yes|eligible)$/i.test(value))) {
+        structured.push(...applicantCategories(norm(key)));
+      }
+    }
+  }
+  const text = typeof eligibility === "string" ? norm(eligibility) : "";
+  const clauses =
+    text.match(
+      /(?:eligible applicants?(?: are| include)?|open to|who can apply|applicants? must be)[^.\n]{0,240}/g,
+    ) ?? [];
+  return [...new Set([...structured, ...clauses.flatMap(applicantCategories)])];
+}
+
+export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date()): RulesResult {
+  const checks: RuleCheck[] = [];
+  const grantSectors = (g.sectors ?? []).filter(Boolean);
+  const grantCountry = (g.country ?? "").trim();
+  const hay = buildHaystack(g);
+  const detected_role = detectRole(hay);
+  const detected_partner_type = detected_role === "partner" ? detectPartnerType(hay) : null;
+  const cost_share_pct = detectCostShare(hay);
+  const rolling_intake = isRollingIntake(hay, g.deadline);
+
+  if (rules.applicant_types_excluded.length > 0 || rules.applicant_types_allowed.length > 0) {
+    const restrictions = detectExcludedApplicantTypes(hay);
+    const excluded = restrictions.filter((value) => rules.applicant_types_excluded.includes(value));
+    const eligible = detectExplicitEligibleApplicantTypes(g);
+    const allowed = configuredApplicantCategories(rules.applicant_types_allowed);
+    const eligibleMatch = eligible.filter((value) => allowed.includes(value));
+    const restrictionCategories = restrictions.map((value) =>
+      value.replace(/_only$/, ""),
+    ) as ApplicantCategory[];
+    const restrictionMatchesAllowed = restrictionCategories.some((value) =>
+      allowed.includes(value),
+    );
+    const failedRestriction =
+      restrictions.length > 0 && (excluded.length > 0 || !restrictionMatchesAllowed);
+    const hasExplicitEligibility = eligible.length > 0;
+    const status: RuleCheck["status"] = failedRestriction
+      ? "fail"
+      : restrictions.length > 0
+        ? "pass"
+        : hasExplicitEligibility
+          ? eligibleMatch.length > 0
+            ? "pass"
+            : "fail"
+          : "skip";
+    checks.push({
+      id: "sop_filter_1_legal",
+      label: "SOP F1 - Legal eligibility",
+      status,
+      hard: rules.hard_fail_on_applicant_type,
+      detail: failedRestriction
+        ? `Program is restricted to ${restrictions.join(", ")}; allowed profile: ${allowed.join(", ") || "none"}`
+        : restrictions.length > 0
+          ? `Exclusive applicant restriction matches allowed profile: ${restrictionCategories.join(", ")}`
+          : hasExplicitEligibility
+            ? eligibleMatch.length > 0
+              ? `Eligible applicant types include: ${eligibleMatch.join(", ")}`
+              : `Detected eligible types (${eligible.join(", ")}) do not include allowed profile (${allowed.join(", ") || "none"})`
+            : "Applicant type not stated clearly enough to evaluate",
+    });
+  }
+
+  if (rules.required_jurisdictions.length > 0) {
+    const normGrant = grantCountry ? normalizeJurisdiction(grantCountry) : "";
+    const ok = normGrant
+      ? rules.required_jurisdictions.some((required) => jurisdictionMatches(required, grantCountry))
+      : false;
+    const foreignAllowed = !ok && statesForeignEligibility(hay);
+    checks.push({
+      id: "jurisdiction_required",
+      label: "Required jurisdiction",
+      status: !normGrant ? "skip" : ok ? "pass" : foreignAllowed ? "warn" : "fail",
+      hard: foreignAllowed ? false : rules.hard_fail_on_jurisdiction,
+      detail: ok
+        ? `${grantCountry} is in {${rules.required_jurisdictions.join(", ")}}`
+        : !normGrant
+          ? "Grant jurisdiction is unknown"
+          : foreignAllowed
+            ? "US federal program synopsis explicitly affirms foreign/international entities may apply; verify specific conditions."
+            : `${grantCountry} is incompatible with {${rules.required_jurisdictions.join(", ")}}`,
+    });
+  }
+
+  if (rules.excluded_jurisdictions.length > 0 && grantCountry) {
+    const normGrant = normalizeJurisdiction(grantCountry);
+    const bad = rules.excluded_jurisdictions.map(normalizeJurisdiction).includes(normGrant);
+    checks.push({
+      id: "jurisdiction_excluded",
+      label: "Excluded jurisdiction",
+      status: bad ? "fail" : "pass",
+      hard: rules.hard_fail_on_jurisdiction,
+      detail: bad ? `${grantCountry} is excluded` : `${grantCountry} is not excluded`,
+    });
+  }
+
+  if (rules.required_sectors.length > 0) {
+    const ok = overlap(rules.required_sectors, grantSectors);
+    checks.push({
+      id: "sectors_required",
+      label: "Required sectors",
+      status: ok ? "pass" : "fail",
+      hard: false,
+      detail: ok
+        ? `Overlap found with {${rules.required_sectors.join(", ")}}`
+        : `Grant sectors [${grantSectors.join(", ") || "none"}] do not overlap with [${rules.required_sectors.join(", ")}]`,
+    });
+  }
+
+  if (rules.excluded_sectors.length > 0 && grantSectors.length > 0) {
+    const bad = overlap(rules.excluded_sectors, grantSectors);
+    checks.push({
+      id: "sectors_excluded",
+      label: "Excluded sectors",
+      status: bad ? "fail" : "pass",
+      hard: false,
+      detail: bad ? "Grant includes an excluded sector" : "No excluded sector detected",
+    });
+  }
+
+  if (rules.iial_capabilities.length > 0) {
+    const hits = rules.iial_capabilities.filter((capability) => containsAny(hay, [capability]));
+    const ok = hits.length > 0;
+    const hasStrategicEvidence = Boolean(
+      (g.summary ?? "").trim() ||
+      (typeof g.eligibility === "string"
+        ? g.eligibility.trim()
+        : g.eligibility && Object.keys(g.eligibility as object).length > 0),
+    );
+    checks.push({
+      id: "sop_filter_4_strategic",
+      label: "SOP F4 - Strategic fit (IIAL capabilities)",
+      status: !hasStrategicEvidence ? "skip" : ok ? "pass" : "fail",
+      hard: rules.hard_fail_on_capability,
+      detail: !hasStrategicEvidence
+        ? "No summary or eligibility evidence available"
+        : ok
+          ? `Matched capabilities: ${hits.join(", ")}`
+          : "No IIAL capability detected in eligibility or summary",
+    });
+  }
+
+  if (rules.min_amount_cad !== null) {
+    const max = g.amount_cad_max ?? g.amount_cad_min ?? null;
+    if (max === null) {
+      checks.push({
+        id: "amount_min",
+        label: `Amount >= $${rules.min_amount_cad.toLocaleString()}`,
+        status: "skip",
+        hard: rules.hard_fail_on_amount,
+        detail: "Grant amount is unknown",
+      });
+    } else {
+      const ok = max >= rules.min_amount_cad;
+      checks.push({
+        id: "amount_min",
+        label: `Amount >= $${rules.min_amount_cad.toLocaleString()}`,
+        status: ok ? "pass" : "fail",
+        hard: rules.hard_fail_on_amount,
+        detail: `Grant max = $${max.toLocaleString()}`,
+      });
+    }
+  }
+
+  if (rules.max_amount_cad !== null) {
+    const min = g.amount_cad_min ?? g.amount_cad_max ?? null;
+    if (min === null) {
+      checks.push({
+        id: "amount_max",
+        label: `Amount <= $${rules.max_amount_cad.toLocaleString()}`,
+        status: "skip",
+        hard: rules.hard_fail_on_amount,
+        detail: "Grant amount is unknown",
+      });
+    } else {
+      const ok = min <= rules.max_amount_cad;
+      checks.push({
+        id: "amount_max",
+        label: `Amount <= $${rules.max_amount_cad.toLocaleString()}`,
+        status: ok ? "pass" : "fail",
+        hard: rules.hard_fail_on_amount,
+        detail: `Grant min = $${min.toLocaleString()}`,
+      });
+    }
+  }
+
+  if (rules.max_cost_share_pct_org_carries !== null && cost_share_pct !== null) {
+    const ok = cost_share_pct <= rules.max_cost_share_pct_org_carries;
+    checks.push({
+      id: "sop_filter_3_costshare",
+      label: `SOP F3 - Org cost share <= ${rules.max_cost_share_pct_org_carries}%`,
+      status: ok ? "pass" : "fail",
+      hard: rules.hard_fail_on_amount,
+      detail: `Organization carries about ${cost_share_pct}%`,
+    });
+  }
+
+  if (rules.require_match_verification && cost_share_pct !== null && cost_share_pct > 0) {
+    checks.push({
+      id: "sop_filter_3_match_verify",
+      label: "SOP F3 - Verify cash-match availability",
+      status: "warn",
+      hard: false,
+      detail: `Requires about ${cost_share_pct}% contribution - confirm with leadership`,
+    });
+  }
+
+  const wantWeeks =
+    detected_role === "partner"
+      ? rules.partner_min_weeks
+      : detected_role === "lead"
+        ? rules.lead_min_weeks
+        : (rules.partner_min_weeks ?? rules.lead_min_weeks);
+
+  if (wantWeeks !== null && wantWeeks !== undefined) {
+    if (rolling_intake && rules.rolling_intake_passes_runway) {
+      checks.push({
+        id: "sop_filter_5_runway",
+        label: `SOP F5 - Runway >= ${wantWeeks}w`,
+        status: "pass",
+        hard: rules.hard_fail_on_runway,
+        detail: "Rolling intake - automatic pass",
+      });
+    } else if (!g.deadline || Number.isNaN(new Date(g.deadline).getTime())) {
+      checks.push({
+        id: "sop_filter_5_runway",
+        label: `SOP F5 - Runway >= ${wantWeeks}w`,
+        status: "skip",
+        hard: rules.hard_fail_on_runway,
+        detail: "No deadline available",
+      });
+    } else {
+      const days = Math.floor((new Date(g.deadline).getTime() - now.getTime()) / 86400000);
+      const weeks = Math.floor(days / 7);
+      const ok = weeks >= wantWeeks;
+      checks.push({
+        id: "sop_filter_5_runway",
+        label: `SOP F5 - Runway >= ${wantWeeks}w (role: ${detected_role})`,
+        status: ok ? "pass" : "fail",
+        hard: rules.hard_fail_on_runway,
+        detail: `${weeks} week(s) remaining (${days} day(s))`,
+      });
+    }
+  }
+
+  // F5 is the authoritative runway rule. The generic deadline rule is only a
+  // fallback when lead/partner runway is not configured.
+  if (rules.min_days_to_deadline !== null && (wantWeeks === null || wantWeeks === undefined)) {
+    if (!g.deadline || Number.isNaN(new Date(g.deadline).getTime())) {
+      checks.push({
+        id: "deadline",
+        label: `>= ${rules.min_days_to_deadline} days until deadline`,
+        status: "skip",
+        hard: rules.hard_fail_on_deadline,
+        detail: "No deadline available",
+      });
+    } else {
+      const days = Math.floor((new Date(g.deadline).getTime() - now.getTime()) / 86400000);
+      const ok = days >= rules.min_days_to_deadline;
+      checks.push({
+        id: "deadline",
+        label: `>= ${rules.min_days_to_deadline} days until deadline`,
+        status: ok ? "pass" : "fail",
+        hard: rules.hard_fail_on_deadline,
+        detail: `${days} day(s) remaining`,
+      });
+    }
+  }
+
+  if (rules.required_keywords.length > 0) {
+    const ok = containsAll(hay, rules.required_keywords);
+    checks.push({
+      id: "keywords_required",
+      label: "Required keywords",
+      status: ok ? "pass" : "fail",
+      hard: false,
+      detail: ok
+        ? `All present: ${rules.required_keywords.join(", ")}`
+        : `Missing at least one of: ${rules.required_keywords.join(", ")}`,
+    });
+  }
+
+  if (rules.excluded_keywords.length > 0) {
+    const bad = containsAny(hay, rules.excluded_keywords);
+    checks.push({
+      id: "keywords_excluded",
+      label: "Excluded keywords",
+      status: bad ? "fail" : "pass",
+      hard: rules.hard_fail_on_excluded_keyword,
+      detail: bad
+        ? `Contains at least one of: ${rules.excluded_keywords.join(", ")}`
+        : "No excluded keywords detected",
+    });
+  }
+
+  const hard_fail = checks.some((c) => c.status === "fail" && c.hard);
+  const evaluable = checks.filter((c) => c.status === "pass" || c.status === "fail");
+  const passed = evaluable.filter((c) => c.status === "pass").length;
+  const rule_score = evaluable.length === 0 ? 50 : Math.round((passed / evaluable.length) * 100);
+
+  const hasIncompleteHardGates = checks.some(
+    (c) =>
+      (c.hard || c.id === "jurisdiction_required") && (c.status === "warn" || c.status === "skip"),
+  );
+  const verdict: Verdict = hard_fail
+    ? "ineligible"
+    : hasIncompleteHardGates
+      ? "needs_input"
+      : "eligible";
+
+  const w = rules.weight_llm;
+  const combined_score = (llm: number) => Math.round(w * llm * 100 + (1 - w) * rule_score);
+  const pass = (llm: number) => !hard_fail && combined_score(llm) >= rules.threshold_fit_pass;
+
+  return {
+    checks,
+    hard_fail,
+    verdict,
+    rule_score,
+    combined_score,
+    pass,
+    detected_role,
+    detected_partner_type,
+    cost_share_pct,
+    rolling_intake,
+  };
+}

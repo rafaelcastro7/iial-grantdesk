@@ -1,0 +1,227 @@
+"use server";
+
+import { createSupabaseAdmin } from "./supabase-admin";
+
+/**
+ * Compliance Matrix System
+ *
+ * Validates proposals against funder requirements.
+ */
+
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
+import { assertEntityInUserOrg } from "./tenant-access.server";
+
+const REQUIREMENT_TEMPLATES: Record<string, Array<{ category: string; requirement: string }>> = {
+  nrc_irap: [
+    { category: "eligibility", requirement: "Canadian incorporated entity" },
+    { category: "eligibility", requirement: "Less than 500 employees" },
+    { category: "eligibility", requirement: "R&D focus (not commercialization)" },
+    { category: "mandatory_sections", requirement: "Technical uncertainty demonstration" },
+    { category: "mandatory_sections", requirement: "Project methodology" },
+    { category: "mandatory_sections", requirement: "Budget justification" },
+    { category: "financial", requirement: "Contribution Agreement before costs incurred" },
+    { category: "financial", requirement: "Monthly claims with timesheets" },
+    { category: "policy", requirement: "7-year document retention" },
+  ],
+  sshrc_insight: [
+    { category: "mandatory_sections", requirement: "Research proposal (max 8 pages)" },
+    { category: "mandatory_sections", requirement: "Budget justification (max 2 pages)" },
+    { category: "mandatory_sections", requirement: "Team biographies (max 2 pages each)" },
+    { category: "mandatory_sections", requirement: "Knowledge mobilization plan" },
+    { category: "format", requirement: "Convergence Portal sections" },
+    { category: "policy", requirement: "EDI in research design" },
+    { category: "policy", requirement: "Open access policy compliance" },
+    { category: "policy", requirement: "Tri-Agency data management plan" },
+  ],
+  general: [
+    { category: "mandatory_sections", requirement: "Executive summary" },
+    { category: "mandatory_sections", requirement: "Statement of need" },
+    { category: "mandatory_sections", requirement: "Project methodology" },
+    { category: "mandatory_sections", requirement: "Budget and justification" },
+    { category: "mandatory_sections", requirement: "Organizational capacity" },
+    { category: "mandatory_sections", requirement: "Evaluation plan" },
+    { category: "format", requirement: "Page limits respected" },
+    { category: "format", requirement: "Required attachments included" },
+    { category: "eligibility", requirement: "Organization eligible" },
+    { category: "policy", requirement: "EDI considerations addressed" },
+  ],
+};
+
+const REQUIREMENT_STOPWORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "of",
+  "in",
+  "on",
+  "at",
+  "to",
+  "for",
+  "and",
+  "or",
+  "with",
+  "before",
+  "after",
+  "not",
+  "than",
+  "less",
+  "each",
+  "max",
+]);
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripParenthetical(requirement: string): string {
+  return requirement.replace(/\([^)]*\)/g, "").trim();
+}
+
+function significantWords(requirement: string): string[] {
+  return requirement
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 3 && !REQUIREMENT_STOPWORDS.has(word));
+}
+
+function includesWholeWord(haystack: string, word: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(haystack);
+}
+
+/**
+ * Matching is whole-word/phrase based (not first-word substring) so short terms like "EDI"
+ * don't false-positive against unrelated words such as "immediate" or "expedite".
+ */
+function matchRatio(haystack: string, requirement: string): number {
+  const normalized = stripParenthetical(requirement);
+  const phraseRegex = new RegExp(`\\b${escapeRegExp(normalized)}\\b`, "i");
+  if (phraseRegex.test(haystack)) return 1;
+
+  const words = significantWords(normalized);
+  if (words.length === 0) return 0;
+
+  const matched = words.filter((word) => includesWholeWord(haystack, word)).length;
+  return matched / words.length;
+}
+
+export const generateComplianceMatrix = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      proposalId: z.string().uuid(),
+      funderType: z.string().default("general"),
+      sections: z.array(
+        z.object({
+          title: z.string(),
+          content: z.string(),
+          wordCount: z.number(),
+        }),
+      ),
+      attachments: z.array(z.string()).optional(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      const supabase = await createSupabaseAdmin();
+      await assertEntityInUserOrg(supabase, context.userId, "proposal", data.proposalId);
+
+      const template = REQUIREMENT_TEMPLATES[data.funderType] || REQUIREMENT_TEMPLATES.general;
+      const fullContent = data.sections
+        .map((s) => s.content)
+        .join(" ")
+        .toLowerCase();
+
+      const checks = template.map((req, i) => {
+        let status: "met" | "partial" | "not_met" | "not_applicable" = "not_met";
+        let details = "";
+
+        const relevantSection = data.sections.find(
+          (s) =>
+            matchRatio(s.title.toLowerCase(), req.requirement) === 1 ||
+            matchRatio(s.content.toLowerCase(), req.requirement) === 1,
+        );
+
+        if (relevantSection) {
+          status = "met";
+          details = `Found in section: ${relevantSection.title}`;
+        } else if (matchRatio(fullContent, req.requirement) >= 0.5) {
+          status = "partial";
+          details = "Referenced but not in a dedicated section";
+        } else {
+          details = "Not found in proposal content";
+        }
+
+        return {
+          id: `check-${i}`,
+          category: req.category,
+          requirement: req.requirement,
+          status,
+          details,
+          sectionRef: relevantSection?.title,
+        };
+      });
+
+      const mandatoryChecks = checks.filter((c) => c.category === "mandatory_sections");
+      const mandatoryMet = mandatoryChecks.filter((c) => c.status === "met").length;
+
+      const overallScore = Math.round(
+        (checks.filter((c) => c.status === "met").length / checks.length) * 100,
+      );
+
+      const matrix = {
+        proposalId: data.proposalId,
+        overallScore,
+        checks,
+        mandatoryMet,
+        mandatoryTotal: mandatoryChecks.length,
+        policyAlignment: {
+          edi:
+            fullContent.includes("equity") ||
+            fullContent.includes("diversity") ||
+            fullContent.includes("inclusion"),
+          openAccess:
+            fullContent.includes("open access") || fullContent.includes("publicly available"),
+          dataManagement:
+            fullContent.includes("data management") || fullContent.includes("data plan"),
+          conflictOfInterest:
+            fullContent.includes("conflict of interest") || fullContent.includes("disclosure"),
+        },
+      };
+
+      const { error } = await supabase.from("compliance_matrices").upsert(
+        {
+          proposal_id: data.proposalId,
+          overall_score: overallScore,
+          mandatory_met: mandatoryMet,
+          mandatory_total: mandatoryChecks.length,
+          checks,
+          policy_alignment: matrix.policyAlignment,
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: "proposal_id" },
+      );
+
+      if (error) throw new Error("Failed to store matrix: " + error.message);
+
+      return matrix;
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : String(e));
+    }
+  });
+
+export const getRequirementTemplates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({}))
+  .handler(async () => {
+    try {
+      return Object.keys(REQUIREMENT_TEMPLATES).map((key) => ({
+        id: key,
+        name: key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        requirementCount: REQUIREMENT_TEMPLATES[key].length,
+      }));
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : String(e));
+    }
+  });

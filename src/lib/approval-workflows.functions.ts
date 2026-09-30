@@ -1,0 +1,216 @@
+"use server";
+
+/**
+ * Approval Workflows — Multi-step grant/proposal approvals
+ *
+ * Configurable approval chains with status tracking.
+ */
+
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
+import { createSupabaseAdmin } from "./supabase-admin";
+import { assertAdmin } from "./admin-guard";
+
+export const getApprovalWorkflows = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      entityType: z.enum(["grant", "proposal"]).optional(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      await assertAdmin(context.userId);
+      const supabase = await createSupabaseAdmin();
+
+      // Embed steps + instances — the workflows.tsx admin page reads
+      // wf.instances to render the Active Instances / Approve-Reject panel,
+      // which was always empty because this query never fetched them.
+      let query = supabase
+        .from("approval_workflows")
+        .select("*, steps:approval_steps(*), instances:approval_instances(*)")
+        .order("created_at", { ascending: false });
+
+      if (data.entityType) query = query.eq("entity_type", data.entityType);
+
+      const { data: workflows, error } = await query;
+      if (error) throw new Error(`Failed to fetch workflows: ${error.message}`);
+      return workflows || [];
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : String(e));
+    }
+  });
+
+export const getApprovalSteps = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ workflowId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    try {
+      await assertAdmin(context.userId);
+      const supabase = await createSupabaseAdmin();
+
+      const { data: steps, error } = await supabase
+        .from("approval_steps")
+        .select("*")
+        .eq("workflow_id", data.workflowId)
+        .order("step_order", { ascending: true });
+
+      if (error) throw new Error(`Failed to fetch steps: ${error.message}`);
+      return steps || [];
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : String(e));
+    }
+  });
+
+export const createApprovalWorkflow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      name: z.string().min(1),
+      entityType: z.enum(["grant", "proposal"]),
+      steps: z.array(
+        z.object({
+          name: z.string().min(1),
+          approverRole: z.string().min(1),
+          stepOrder: z.number().min(1),
+        }),
+      ),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      await assertAdmin(context.userId);
+      const supabase = await createSupabaseAdmin();
+
+      const { data: workflow, error: wfError } = await supabase
+        .from("approval_workflows")
+        .insert({ name: data.name, entity_type: data.entityType })
+        .select()
+        .single();
+
+      if (wfError) throw new Error(`Failed to create workflow: ${wfError.message}`);
+
+      const steps = data.steps.map((s) => ({
+        workflow_id: workflow.id,
+        name: s.name,
+        approver_role: s.approverRole,
+        step_order: s.stepOrder,
+        status: "pending",
+      }));
+
+      const { error: stepsError } = await supabase.from("approval_steps").insert(steps);
+      if (stepsError) throw new Error(`Failed to create steps: ${stepsError.message}`);
+
+      return workflow;
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : String(e));
+    }
+  });
+
+export const submitForApproval = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      entityType: z.enum(["grant", "proposal"]),
+      entityId: z.string().uuid(),
+      workflowId: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      await assertAdmin(context.userId);
+      const supabase = await createSupabaseAdmin();
+
+      const { data: instance, error } = await supabase
+        .from("approval_instances")
+        .insert({
+          entity_type: data.entityType,
+          entity_id: data.entityId,
+          workflow_id: data.workflowId,
+          status: "pending",
+          current_step: 1,
+        })
+        .select()
+        .single();
+
+      if (error) throw new Error(`Failed to submit: ${error.message}`);
+      return instance;
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : String(e));
+    }
+  });
+
+export const approveStep = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      instanceId: z.string().uuid(),
+      stepId: z.string().uuid(),
+      decision: z.enum(["approved", "rejected"]),
+      comments: z.string().optional(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      await assertAdmin(context.userId);
+      const supabase = await createSupabaseAdmin();
+
+      const { error: stepError } = await supabase
+        .from("approval_steps")
+        .update({
+          status: data.decision,
+          decided_at: new Date().toISOString(),
+          comments: data.comments,
+        })
+        .eq("id", data.stepId);
+
+      if (stepError) throw new Error(`Failed to update step: ${stepError.message}`);
+
+      if (data.decision === "rejected") {
+        const { error: rejectError } = await supabase
+          .from("approval_instances")
+          .update({ status: "rejected" })
+          .eq("id", data.instanceId);
+        if (rejectError) throw new Error(`Failed to reject instance: ${rejectError.message}`);
+        return { status: "rejected" };
+      }
+
+      const { data: instance } = await supabase
+        .from("approval_instances")
+        .select("current_step, workflow_id")
+        .eq("id", data.instanceId)
+        .single();
+
+      if (!instance) throw new Error("Instance not found");
+      if (!instance.workflow_id) throw new Error("Instance has no workflow");
+
+      const { data: nextStep } = await supabase
+        .from("approval_steps")
+        .select("id")
+        .eq("workflow_id", instance.workflow_id)
+        .gt("step_order", instance.current_step)
+        .order("step_order", { ascending: true })
+        .limit(1)
+        .single();
+
+      if (!nextStep) {
+        const { error: approveError } = await supabase
+          .from("approval_instances")
+          .update({ status: "approved", current_step: instance.current_step + 1 })
+          .eq("id", data.instanceId);
+        if (approveError) throw new Error(`Failed to approve instance: ${approveError.message}`);
+        return { status: "approved" };
+      }
+
+      const { error: advanceError } = await supabase
+        .from("approval_instances")
+        .update({ current_step: instance.current_step + 1 })
+        .eq("id", data.instanceId);
+      if (advanceError) throw new Error(`Failed to advance instance: ${advanceError.message}`);
+
+      return { status: "pending", nextStepId: nextStep.id };
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : String(e));
+    }
+  });

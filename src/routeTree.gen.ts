@@ -10,17 +10,69 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as CatalogRouteImport } from './routes/catalog'
-import { Route as ClientsIndexRouteImport } from './routes/clients.index'
-import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
-import { Route as ClientsClientIdGrantsRouteImport } from './routes/clients_.$clientId.grants'
-import { Route as ClientsClientIdMatchesRouteImport } from './routes/clients_.$clientId.matches'
-import { Route as ClientsClientIdProposalsGrantIdRouteImport } from './routes/clients_.$clientId.proposals.$grantId'
+import { Route as ComplianceRouteImport } from './routes/compliance'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
+import { Route as AuthenticatedAnswersRouteImport } from './routes/_authenticated.answers'
+import { Route as AuthenticatedAutonomyRouteImport } from './routes/_authenticated.autonomy'
+import { Route as AuthenticatedComplianceCalendarRouteImport } from './routes/_authenticated.compliance-calendar'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
+import { Route as AuthenticatedFinancialRouteImport } from './routes/_authenticated.financial'
+import { Route as AuthenticatedFitRulesRouteImport } from './routes/_authenticated.fit-rules'
+import { Route as AuthenticatedImpactRouteImport } from './routes/_authenticated.impact'
+import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated.manual'
+import { Route as AuthenticatedOpsRouteImport } from './routes/_authenticated.ops'
+import { Route as AuthenticatedOrgRouteImport } from './routes/_authenticated.org'
+import { Route as AuthenticatedPostAwardRouteImport } from './routes/_authenticated.post-award'
+import { Route as AuthenticatedPrivacyRouteImport } from './routes/_authenticated.privacy'
+import { Route as AuthenticatedQualityRouteImport } from './routes/_authenticated.quality'
+import { Route as AuthenticatedRenewalRouteImport } from './routes/_authenticated.renewal'
+import { Route as AuthenticatedSubmissionsRouteImport } from './routes/_authenticated.submissions'
+import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated.tasks'
+import { Route as ReportTokenRouteImport } from './routes/report.$token'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated.admin.index'
+import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated.admin.agents'
+import { Route as AuthenticatedAdminAuditTrailRouteImport } from './routes/_authenticated.admin.audit-trail'
+import { Route as AuthenticatedAdminCandidatesRouteImport } from './routes/_authenticated.admin.candidates'
+import { Route as AuthenticatedAdminDiscoveryConfigRouteImport } from './routes/_authenticated.admin.discovery-config'
+import { Route as AuthenticatedAdminHistoryRouteImport } from './routes/_authenticated.admin.history'
+import { Route as AuthenticatedAdminModulesRouteImport } from './routes/_authenticated.admin.modules'
+import { Route as AuthenticatedAdminMonitoringRouteImport } from './routes/_authenticated.admin.monitoring'
+import { Route as AuthenticatedAdminSourcesRouteImport } from './routes/_authenticated.admin.sources'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated.admin.users'
+import { Route as AuthenticatedAdminWorkflowsRouteImport } from './routes/_authenticated.admin.workflows'
+import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authenticated.clients.index'
+import { Route as AuthenticatedClientsOrgIdRouteImport } from './routes/_authenticated.clients.$orgId'
+import { Route as AuthenticatedCompetitiveIndexRouteImport } from './routes/_authenticated.competitive.index'
+import { Route as AuthenticatedCompetitiveProgramsRouteImport } from './routes/_authenticated.competitive.programs'
+import { Route as AuthenticatedCompetitiveRecipientsRouteImport } from './routes/_authenticated.competitive.recipients'
+import { Route as AuthenticatedFundersIndexRouteImport } from './routes/_authenticated.funders.index'
+import { Route as AuthenticatedFundersFunderIdRouteImport } from './routes/_authenticated.funders.$funderId'
+import { Route as AuthenticatedGrantsIndexRouteImport } from './routes/_authenticated.grants.index'
+import { Route as AuthenticatedGrantsIdRouteImport } from './routes/_authenticated.grants.$id'
+import { Route as AuthenticatedProposalsIndexRouteImport } from './routes/_authenticated.proposals.index'
+import { Route as AuthenticatedProposalsIdRouteImport } from './routes/_authenticated.proposals.$id'
+import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
+import { Route as AuthenticatedClientsOrgIdGrantsRouteImport } from './routes/_authenticated.clients.$orgId.grants'
+import { Route as AuthenticatedClientsOrgIdInfoRouteImport } from './routes/_authenticated.clients.$orgId.info'
+import { Route as AuthenticatedGrantsIdAuditRouteImport } from './routes/_authenticated.grants.$id.audit'
+import { Route as AuthenticatedProposalsProposalIdRevisionRouteImport } from './routes/_authenticated.proposals.$proposalId.revision'
+import { Route as ApiPublicHooksDeadlinesRouteImport } from './routes/api/public/hooks/deadlines'
+import { Route as ApiPublicHooksDiscoverRouteImport } from './routes/api/public/hooks/discover'
+import { Route as ApiPublicHooksEnrichRouteImport } from './routes/api/public/hooks/enrich'
+import { Route as ApiPublicHooksRssPollRouteImport } from './routes/api/public/hooks/rss-poll'
+import { Route as ApiPublicHooksSourceCuratorRouteImport } from './routes/api/public/hooks/source-curator'
+import { Route as ApiPublicHooksSourceTierARouteImport } from './routes/api/public/hooks/source-tier-a'
+import { Route as ApiPublicHooksSourceTierBRouteImport } from './routes/api/public/hooks/source-tier-b'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -28,111 +80,660 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CatalogRoute = CatalogRouteImport.update({
-  id: '/catalog',
-  path: '/catalog',
+const ComplianceRoute = ComplianceRouteImport.update({
+  id: '/compliance',
+  path: '/compliance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClientsIndexRoute = ClientsIndexRouteImport.update({
-  id: '/clients/',
-  path: '/clients/',
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAnswersRoute = AuthenticatedAnswersRouteImport.update({
+  id: '/answers',
+  path: '/answers',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAutonomyRoute = AuthenticatedAutonomyRouteImport.update({
+  id: '/autonomy',
+  path: '/autonomy',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedComplianceCalendarRoute =
+  AuthenticatedComplianceCalendarRouteImport.update({
+    id: '/compliance-calendar',
+    path: '/compliance-calendar',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedFinancialRoute = AuthenticatedFinancialRouteImport.update({
+  id: '/financial',
+  path: '/financial',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedFitRulesRoute = AuthenticatedFitRulesRouteImport.update({
+  id: '/fit-rules',
+  path: '/fit-rules',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedImpactRoute = AuthenticatedImpactRouteImport.update({
+  id: '/impact',
+  path: '/impact',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedManualRoute = AuthenticatedManualRouteImport.update({
+  id: '/manual',
+  path: '/manual',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOpsRoute = AuthenticatedOpsRouteImport.update({
+  id: '/ops',
+  path: '/ops',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOrgRoute = AuthenticatedOrgRouteImport.update({
+  id: '/org',
+  path: '/org',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPostAwardRoute = AuthenticatedPostAwardRouteImport.update({
+  id: '/post-award',
+  path: '/post-award',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPrivacyRoute = AuthenticatedPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedQualityRoute = AuthenticatedQualityRouteImport.update({
+  id: '/quality',
+  path: '/quality',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRenewalRoute = AuthenticatedRenewalRouteImport.update({
+  id: '/renewal',
+  path: '/renewal',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSubmissionsRoute =
+  AuthenticatedSubmissionsRouteImport.update({
+    id: '/submissions',
+    path: '/submissions',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ReportTokenRoute = ReportTokenRouteImport.update({
+  id: '/report/$token',
+  path: '/report/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClientsClientIdRoute = ClientsClientIdRouteImport.update({
-  id: '/clients/$clientId',
-  path: '/clients/$clientId',
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminAgentsRoute =
+  AuthenticatedAdminAgentsRouteImport.update({
+    id: '/agents',
+    path: '/agents',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminAuditTrailRoute =
+  AuthenticatedAdminAuditTrailRouteImport.update({
+    id: '/audit-trail',
+    path: '/audit-trail',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminCandidatesRoute =
+  AuthenticatedAdminCandidatesRouteImport.update({
+    id: '/candidates',
+    path: '/candidates',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminDiscoveryConfigRoute =
+  AuthenticatedAdminDiscoveryConfigRouteImport.update({
+    id: '/discovery-config',
+    path: '/discovery-config',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminHistoryRoute =
+  AuthenticatedAdminHistoryRouteImport.update({
+    id: '/history',
+    path: '/history',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminModulesRoute =
+  AuthenticatedAdminModulesRouteImport.update({
+    id: '/modules',
+    path: '/modules',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminMonitoringRoute =
+  AuthenticatedAdminMonitoringRouteImport.update({
+    id: '/monitoring',
+    path: '/monitoring',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminSourcesRoute =
+  AuthenticatedAdminSourcesRouteImport.update({
+    id: '/sources',
+    path: '/sources',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminWorkflowsRoute =
+  AuthenticatedAdminWorkflowsRouteImport.update({
+    id: '/workflows',
+    path: '/workflows',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedClientsIndexRoute =
+  AuthenticatedClientsIndexRouteImport.update({
+    id: '/clients/',
+    path: '/clients/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedClientsOrgIdRoute =
+  AuthenticatedClientsOrgIdRouteImport.update({
+    id: '/clients/$orgId',
+    path: '/clients/$orgId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedCompetitiveIndexRoute =
+  AuthenticatedCompetitiveIndexRouteImport.update({
+    id: '/competitive/',
+    path: '/competitive/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedCompetitiveProgramsRoute =
+  AuthenticatedCompetitiveProgramsRouteImport.update({
+    id: '/competitive/programs',
+    path: '/competitive/programs',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedCompetitiveRecipientsRoute =
+  AuthenticatedCompetitiveRecipientsRouteImport.update({
+    id: '/competitive/recipients',
+    path: '/competitive/recipients',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedFundersIndexRoute =
+  AuthenticatedFundersIndexRouteImport.update({
+    id: '/funders/',
+    path: '/funders/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedFundersFunderIdRoute =
+  AuthenticatedFundersFunderIdRouteImport.update({
+    id: '/funders/$funderId',
+    path: '/funders/$funderId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedGrantsIndexRoute =
+  AuthenticatedGrantsIndexRouteImport.update({
+    id: '/grants/',
+    path: '/grants/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedGrantsIdRoute = AuthenticatedGrantsIdRouteImport.update({
+  id: '/grants/$id',
+  path: '/grants/$id',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedProposalsIndexRoute =
+  AuthenticatedProposalsIndexRouteImport.update({
+    id: '/proposals/',
+    path: '/proposals/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedProposalsIdRoute =
+  AuthenticatedProposalsIdRouteImport.update({
+    id: '/proposals/$id',
+    path: '/proposals/$id',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
+  id: '/api/public/health',
+  path: '/api/public/health',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClientsClientIdGrantsRoute = ClientsClientIdGrantsRouteImport.update({
-  id: '/clients_/$clientId/grants',
-  path: '/clients/$clientId/grants',
+const AuthenticatedClientsOrgIdGrantsRoute =
+  AuthenticatedClientsOrgIdGrantsRouteImport.update({
+    id: '/grants',
+    path: '/grants',
+    getParentRoute: () => AuthenticatedClientsOrgIdRoute,
+  } as any)
+const AuthenticatedClientsOrgIdInfoRoute =
+  AuthenticatedClientsOrgIdInfoRouteImport.update({
+    id: '/info',
+    path: '/info',
+    getParentRoute: () => AuthenticatedClientsOrgIdRoute,
+  } as any)
+const AuthenticatedGrantsIdAuditRoute =
+  AuthenticatedGrantsIdAuditRouteImport.update({
+    id: '/audit',
+    path: '/audit',
+    getParentRoute: () => AuthenticatedGrantsIdRoute,
+  } as any)
+const AuthenticatedProposalsProposalIdRevisionRoute =
+  AuthenticatedProposalsProposalIdRevisionRouteImport.update({
+    id: '/proposals/$proposalId/revision',
+    path: '/proposals/$proposalId/revision',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const ApiPublicHooksDeadlinesRoute = ApiPublicHooksDeadlinesRouteImport.update({
+  id: '/api/public/hooks/deadlines',
+  path: '/api/public/hooks/deadlines',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClientsClientIdMatchesRoute = ClientsClientIdMatchesRouteImport.update({
-  id: '/clients_/$clientId/matches',
-  path: '/clients/$clientId/matches',
+const ApiPublicHooksDiscoverRoute = ApiPublicHooksDiscoverRouteImport.update({
+  id: '/api/public/hooks/discover',
+  path: '/api/public/hooks/discover',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClientsClientIdProposalsGrantIdRoute =
-  ClientsClientIdProposalsGrantIdRouteImport.update({
-    id: '/clients_/$clientId/proposals/$grantId',
-    path: '/clients/$clientId/proposals/$grantId',
+const ApiPublicHooksEnrichRoute = ApiPublicHooksEnrichRouteImport.update({
+  id: '/api/public/hooks/enrich',
+  path: '/api/public/hooks/enrich',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksRssPollRoute = ApiPublicHooksRssPollRouteImport.update({
+  id: '/api/public/hooks/rss-poll',
+  path: '/api/public/hooks/rss-poll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksSourceCuratorRoute =
+  ApiPublicHooksSourceCuratorRouteImport.update({
+    id: '/api/public/hooks/source-curator',
+    path: '/api/public/hooks/source-curator',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksSourceTierARoute =
+  ApiPublicHooksSourceTierARouteImport.update({
+    id: '/api/public/hooks/source-tier-a',
+    path: '/api/public/hooks/source-tier-a',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksSourceTierBRoute =
+  ApiPublicHooksSourceTierBRouteImport.update({
+    id: '/api/public/hooks/source-tier-b',
+    path: '/api/public/hooks/source-tier-b',
     getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/catalog': typeof CatalogRoute
-  '/clients/$clientId': typeof ClientsClientIdRoute
-  '/clients/': typeof ClientsIndexRoute
-  '/clients/$clientId/grants': typeof ClientsClientIdGrantsRoute
-  '/clients/$clientId/matches': typeof ClientsClientIdMatchesRoute
-  '/clients/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
+  '/compliance': typeof ComplianceRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/answers': typeof AuthenticatedAnswersRoute
+  '/autonomy': typeof AuthenticatedAutonomyRoute
+  '/compliance-calendar': typeof AuthenticatedComplianceCalendarRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/financial': typeof AuthenticatedFinancialRoute
+  '/fit-rules': typeof AuthenticatedFitRulesRoute
+  '/impact': typeof AuthenticatedImpactRoute
+  '/manual': typeof AuthenticatedManualRoute
+  '/ops': typeof AuthenticatedOpsRoute
+  '/org': typeof AuthenticatedOrgRoute
+  '/post-award': typeof AuthenticatedPostAwardRoute
+  '/privacy': typeof AuthenticatedPrivacyRoute
+  '/quality': typeof AuthenticatedQualityRoute
+  '/renewal': typeof AuthenticatedRenewalRoute
+  '/submissions': typeof AuthenticatedSubmissionsRoute
+  '/tasks': typeof AuthenticatedTasksRoute
+  '/report/$token': typeof ReportTokenRoute
+  '/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
+  '/admin/candidates': typeof AuthenticatedAdminCandidatesRoute
+  '/admin/discovery-config': typeof AuthenticatedAdminDiscoveryConfigRoute
+  '/admin/history': typeof AuthenticatedAdminHistoryRoute
+  '/admin/modules': typeof AuthenticatedAdminModulesRoute
+  '/admin/monitoring': typeof AuthenticatedAdminMonitoringRoute
+  '/admin/sources': typeof AuthenticatedAdminSourcesRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/admin/workflows': typeof AuthenticatedAdminWorkflowsRoute
+  '/clients/$orgId': typeof AuthenticatedClientsOrgIdRouteWithChildren
+  '/competitive/programs': typeof AuthenticatedCompetitiveProgramsRoute
+  '/competitive/recipients': typeof AuthenticatedCompetitiveRecipientsRoute
+  '/funders/$funderId': typeof AuthenticatedFundersFunderIdRoute
+  '/grants/$id': typeof AuthenticatedGrantsIdRouteWithChildren
+  '/proposals/$id': typeof AuthenticatedProposalsIdRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/clients/': typeof AuthenticatedClientsIndexRoute
+  '/competitive/': typeof AuthenticatedCompetitiveIndexRoute
+  '/funders/': typeof AuthenticatedFundersIndexRoute
+  '/grants/': typeof AuthenticatedGrantsIndexRoute
+  '/proposals/': typeof AuthenticatedProposalsIndexRoute
+  '/clients/$orgId/grants': typeof AuthenticatedClientsOrgIdGrantsRoute
+  '/clients/$orgId/info': typeof AuthenticatedClientsOrgIdInfoRoute
+  '/grants/$id/audit': typeof AuthenticatedGrantsIdAuditRoute
+  '/proposals/$proposalId/revision': typeof AuthenticatedProposalsProposalIdRevisionRoute
+  '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
+  '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
+  '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
+  '/api/public/hooks/rss-poll': typeof ApiPublicHooksRssPollRoute
+  '/api/public/hooks/source-curator': typeof ApiPublicHooksSourceCuratorRoute
+  '/api/public/hooks/source-tier-a': typeof ApiPublicHooksSourceTierARoute
+  '/api/public/hooks/source-tier-b': typeof ApiPublicHooksSourceTierBRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/catalog': typeof CatalogRoute
-  '/clients/$clientId': typeof ClientsClientIdRoute
-  '/clients': typeof ClientsIndexRoute
-  '/clients/$clientId/grants': typeof ClientsClientIdGrantsRoute
-  '/clients/$clientId/matches': typeof ClientsClientIdMatchesRoute
-  '/clients/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
+  '/compliance': typeof ComplianceRoute
+  '/answers': typeof AuthenticatedAnswersRoute
+  '/autonomy': typeof AuthenticatedAutonomyRoute
+  '/compliance-calendar': typeof AuthenticatedComplianceCalendarRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/financial': typeof AuthenticatedFinancialRoute
+  '/fit-rules': typeof AuthenticatedFitRulesRoute
+  '/impact': typeof AuthenticatedImpactRoute
+  '/manual': typeof AuthenticatedManualRoute
+  '/ops': typeof AuthenticatedOpsRoute
+  '/org': typeof AuthenticatedOrgRoute
+  '/post-award': typeof AuthenticatedPostAwardRoute
+  '/privacy': typeof AuthenticatedPrivacyRoute
+  '/quality': typeof AuthenticatedQualityRoute
+  '/renewal': typeof AuthenticatedRenewalRoute
+  '/submissions': typeof AuthenticatedSubmissionsRoute
+  '/tasks': typeof AuthenticatedTasksRoute
+  '/report/$token': typeof ReportTokenRoute
+  '/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
+  '/admin/candidates': typeof AuthenticatedAdminCandidatesRoute
+  '/admin/discovery-config': typeof AuthenticatedAdminDiscoveryConfigRoute
+  '/admin/history': typeof AuthenticatedAdminHistoryRoute
+  '/admin/modules': typeof AuthenticatedAdminModulesRoute
+  '/admin/monitoring': typeof AuthenticatedAdminMonitoringRoute
+  '/admin/sources': typeof AuthenticatedAdminSourcesRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/admin/workflows': typeof AuthenticatedAdminWorkflowsRoute
+  '/clients/$orgId': typeof AuthenticatedClientsOrgIdRouteWithChildren
+  '/competitive/programs': typeof AuthenticatedCompetitiveProgramsRoute
+  '/competitive/recipients': typeof AuthenticatedCompetitiveRecipientsRoute
+  '/funders/$funderId': typeof AuthenticatedFundersFunderIdRoute
+  '/grants/$id': typeof AuthenticatedGrantsIdRouteWithChildren
+  '/proposals/$id': typeof AuthenticatedProposalsIdRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
+  '/clients': typeof AuthenticatedClientsIndexRoute
+  '/competitive': typeof AuthenticatedCompetitiveIndexRoute
+  '/funders': typeof AuthenticatedFundersIndexRoute
+  '/grants': typeof AuthenticatedGrantsIndexRoute
+  '/proposals': typeof AuthenticatedProposalsIndexRoute
+  '/clients/$orgId/grants': typeof AuthenticatedClientsOrgIdGrantsRoute
+  '/clients/$orgId/info': typeof AuthenticatedClientsOrgIdInfoRoute
+  '/grants/$id/audit': typeof AuthenticatedGrantsIdAuditRoute
+  '/proposals/$proposalId/revision': typeof AuthenticatedProposalsProposalIdRevisionRoute
+  '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
+  '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
+  '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
+  '/api/public/hooks/rss-poll': typeof ApiPublicHooksRssPollRoute
+  '/api/public/hooks/source-curator': typeof ApiPublicHooksSourceCuratorRoute
+  '/api/public/hooks/source-tier-a': typeof ApiPublicHooksSourceTierARoute
+  '/api/public/hooks/source-tier-b': typeof ApiPublicHooksSourceTierBRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
-  '/catalog': typeof CatalogRoute
-  '/clients/$clientId': typeof ClientsClientIdRoute
-  '/clients/': typeof ClientsIndexRoute
-  '/clients_/$clientId/grants': typeof ClientsClientIdGrantsRoute
-  '/clients_/$clientId/matches': typeof ClientsClientIdMatchesRoute
-  '/clients_/$clientId/proposals/$grantId': typeof ClientsClientIdProposalsGrantIdRoute
+  '/compliance': typeof ComplianceRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/answers': typeof AuthenticatedAnswersRoute
+  '/_authenticated/autonomy': typeof AuthenticatedAutonomyRoute
+  '/_authenticated/compliance-calendar': typeof AuthenticatedComplianceCalendarRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/financial': typeof AuthenticatedFinancialRoute
+  '/_authenticated/fit-rules': typeof AuthenticatedFitRulesRoute
+  '/_authenticated/impact': typeof AuthenticatedImpactRoute
+  '/_authenticated/manual': typeof AuthenticatedManualRoute
+  '/_authenticated/ops': typeof AuthenticatedOpsRoute
+  '/_authenticated/org': typeof AuthenticatedOrgRoute
+  '/_authenticated/post-award': typeof AuthenticatedPostAwardRoute
+  '/_authenticated/privacy': typeof AuthenticatedPrivacyRoute
+  '/_authenticated/quality': typeof AuthenticatedQualityRoute
+  '/_authenticated/renewal': typeof AuthenticatedRenewalRoute
+  '/_authenticated/submissions': typeof AuthenticatedSubmissionsRoute
+  '/_authenticated/tasks': typeof AuthenticatedTasksRoute
+  '/report/$token': typeof ReportTokenRoute
+  '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/_authenticated/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
+  '/_authenticated/admin/candidates': typeof AuthenticatedAdminCandidatesRoute
+  '/_authenticated/admin/discovery-config': typeof AuthenticatedAdminDiscoveryConfigRoute
+  '/_authenticated/admin/history': typeof AuthenticatedAdminHistoryRoute
+  '/_authenticated/admin/modules': typeof AuthenticatedAdminModulesRoute
+  '/_authenticated/admin/monitoring': typeof AuthenticatedAdminMonitoringRoute
+  '/_authenticated/admin/sources': typeof AuthenticatedAdminSourcesRoute
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/_authenticated/admin/workflows': typeof AuthenticatedAdminWorkflowsRoute
+  '/_authenticated/clients/$orgId': typeof AuthenticatedClientsOrgIdRouteWithChildren
+  '/_authenticated/competitive/programs': typeof AuthenticatedCompetitiveProgramsRoute
+  '/_authenticated/competitive/recipients': typeof AuthenticatedCompetitiveRecipientsRoute
+  '/_authenticated/funders/$funderId': typeof AuthenticatedFundersFunderIdRoute
+  '/_authenticated/grants/$id': typeof AuthenticatedGrantsIdRouteWithChildren
+  '/_authenticated/proposals/$id': typeof AuthenticatedProposalsIdRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/clients/': typeof AuthenticatedClientsIndexRoute
+  '/_authenticated/competitive/': typeof AuthenticatedCompetitiveIndexRoute
+  '/_authenticated/funders/': typeof AuthenticatedFundersIndexRoute
+  '/_authenticated/grants/': typeof AuthenticatedGrantsIndexRoute
+  '/_authenticated/proposals/': typeof AuthenticatedProposalsIndexRoute
+  '/_authenticated/clients/$orgId/grants': typeof AuthenticatedClientsOrgIdGrantsRoute
+  '/_authenticated/clients/$orgId/info': typeof AuthenticatedClientsOrgIdInfoRoute
+  '/_authenticated/grants/$id/audit': typeof AuthenticatedGrantsIdAuditRoute
+  '/_authenticated/proposals/$proposalId/revision': typeof AuthenticatedProposalsProposalIdRevisionRoute
+  '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
+  '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
+  '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
+  '/api/public/hooks/rss-poll': typeof ApiPublicHooksRssPollRoute
+  '/api/public/hooks/source-curator': typeof ApiPublicHooksSourceCuratorRoute
+  '/api/public/hooks/source-tier-a': typeof ApiPublicHooksSourceTierARoute
+  '/api/public/hooks/source-tier-b': typeof ApiPublicHooksSourceTierBRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/auth'
-    | '/catalog'
-    | '/clients/$clientId'
+    | '/compliance'
+    | '/admin'
+    | '/answers'
+    | '/autonomy'
+    | '/compliance-calendar'
+    | '/dashboard'
+    | '/financial'
+    | '/fit-rules'
+    | '/impact'
+    | '/manual'
+    | '/ops'
+    | '/org'
+    | '/post-award'
+    | '/privacy'
+    | '/quality'
+    | '/renewal'
+    | '/submissions'
+    | '/tasks'
+    | '/report/$token'
+    | '/admin/agents'
+    | '/admin/audit-trail'
+    | '/admin/candidates'
+    | '/admin/discovery-config'
+    | '/admin/history'
+    | '/admin/modules'
+    | '/admin/monitoring'
+    | '/admin/sources'
+    | '/admin/users'
+    | '/admin/workflows'
+    | '/clients/$orgId'
+    | '/competitive/programs'
+    | '/competitive/recipients'
+    | '/funders/$funderId'
+    | '/grants/$id'
+    | '/proposals/$id'
+    | '/api/public/health'
+    | '/admin/'
     | '/clients/'
-    | '/clients/$clientId/grants'
-    | '/clients/$clientId/matches'
-    | '/clients/$clientId/proposals/$grantId'
+    | '/competitive/'
+    | '/funders/'
+    | '/grants/'
+    | '/proposals/'
+    | '/clients/$orgId/grants'
+    | '/clients/$orgId/info'
+    | '/grants/$id/audit'
+    | '/proposals/$proposalId/revision'
+    | '/api/public/hooks/deadlines'
+    | '/api/public/hooks/discover'
+    | '/api/public/hooks/enrich'
+    | '/api/public/hooks/rss-poll'
+    | '/api/public/hooks/source-curator'
+    | '/api/public/hooks/source-tier-a'
+    | '/api/public/hooks/source-tier-b'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
-    | '/catalog'
-    | '/clients/$clientId'
+    | '/compliance'
+    | '/answers'
+    | '/autonomy'
+    | '/compliance-calendar'
+    | '/dashboard'
+    | '/financial'
+    | '/fit-rules'
+    | '/impact'
+    | '/manual'
+    | '/ops'
+    | '/org'
+    | '/post-award'
+    | '/privacy'
+    | '/quality'
+    | '/renewal'
+    | '/submissions'
+    | '/tasks'
+    | '/report/$token'
+    | '/admin/agents'
+    | '/admin/audit-trail'
+    | '/admin/candidates'
+    | '/admin/discovery-config'
+    | '/admin/history'
+    | '/admin/modules'
+    | '/admin/monitoring'
+    | '/admin/sources'
+    | '/admin/users'
+    | '/admin/workflows'
+    | '/clients/$orgId'
+    | '/competitive/programs'
+    | '/competitive/recipients'
+    | '/funders/$funderId'
+    | '/grants/$id'
+    | '/proposals/$id'
+    | '/api/public/health'
+    | '/admin'
     | '/clients'
-    | '/clients/$clientId/grants'
-    | '/clients/$clientId/matches'
-    | '/clients/$clientId/proposals/$grantId'
+    | '/competitive'
+    | '/funders'
+    | '/grants'
+    | '/proposals'
+    | '/clients/$orgId/grants'
+    | '/clients/$orgId/info'
+    | '/grants/$id/audit'
+    | '/proposals/$proposalId/revision'
+    | '/api/public/hooks/deadlines'
+    | '/api/public/hooks/discover'
+    | '/api/public/hooks/enrich'
+    | '/api/public/hooks/rss-poll'
+    | '/api/public/hooks/source-curator'
+    | '/api/public/hooks/source-tier-a'
+    | '/api/public/hooks/source-tier-b'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/auth'
-    | '/catalog'
-    | '/clients/$clientId'
-    | '/clients/'
-    | '/clients_/$clientId/grants'
-    | '/clients_/$clientId/matches'
-    | '/clients_/$clientId/proposals/$grantId'
+    | '/compliance'
+    | '/_authenticated/admin'
+    | '/_authenticated/answers'
+    | '/_authenticated/autonomy'
+    | '/_authenticated/compliance-calendar'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/financial'
+    | '/_authenticated/fit-rules'
+    | '/_authenticated/impact'
+    | '/_authenticated/manual'
+    | '/_authenticated/ops'
+    | '/_authenticated/org'
+    | '/_authenticated/post-award'
+    | '/_authenticated/privacy'
+    | '/_authenticated/quality'
+    | '/_authenticated/renewal'
+    | '/_authenticated/submissions'
+    | '/_authenticated/tasks'
+    | '/report/$token'
+    | '/_authenticated/admin/agents'
+    | '/_authenticated/admin/audit-trail'
+    | '/_authenticated/admin/candidates'
+    | '/_authenticated/admin/discovery-config'
+    | '/_authenticated/admin/history'
+    | '/_authenticated/admin/modules'
+    | '/_authenticated/admin/monitoring'
+    | '/_authenticated/admin/sources'
+    | '/_authenticated/admin/users'
+    | '/_authenticated/admin/workflows'
+    | '/_authenticated/clients/$orgId'
+    | '/_authenticated/competitive/programs'
+    | '/_authenticated/competitive/recipients'
+    | '/_authenticated/funders/$funderId'
+    | '/_authenticated/grants/$id'
+    | '/_authenticated/proposals/$id'
+    | '/api/public/health'
+    | '/_authenticated/admin/'
+    | '/_authenticated/clients/'
+    | '/_authenticated/competitive/'
+    | '/_authenticated/funders/'
+    | '/_authenticated/grants/'
+    | '/_authenticated/proposals/'
+    | '/_authenticated/clients/$orgId/grants'
+    | '/_authenticated/clients/$orgId/info'
+    | '/_authenticated/grants/$id/audit'
+    | '/_authenticated/proposals/$proposalId/revision'
+    | '/api/public/hooks/deadlines'
+    | '/api/public/hooks/discover'
+    | '/api/public/hooks/enrich'
+    | '/api/public/hooks/rss-poll'
+    | '/api/public/hooks/source-curator'
+    | '/api/public/hooks/source-tier-a'
+    | '/api/public/hooks/source-tier-b'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
-  CatalogRoute: typeof CatalogRoute
-  ClientsClientIdRoute: typeof ClientsClientIdRoute
-  ClientsIndexRoute: typeof ClientsIndexRoute
-  ClientsClientIdGrantsRoute: typeof ClientsClientIdGrantsRoute
-  ClientsClientIdMatchesRoute: typeof ClientsClientIdMatchesRoute
-  ClientsClientIdProposalsGrantIdRoute: typeof ClientsClientIdProposalsGrantIdRoute
+  ComplianceRoute: typeof ComplianceRoute
+  ReportTokenRoute: typeof ReportTokenRoute
+  ApiPublicHealthRoute: typeof ApiPublicHealthRoute
+  ApiPublicHooksDeadlinesRoute: typeof ApiPublicHooksDeadlinesRoute
+  ApiPublicHooksDiscoverRoute: typeof ApiPublicHooksDiscoverRoute
+  ApiPublicHooksEnrichRoute: typeof ApiPublicHooksEnrichRoute
+  ApiPublicHooksRssPollRoute: typeof ApiPublicHooksRssPollRoute
+  ApiPublicHooksSourceCuratorRoute: typeof ApiPublicHooksSourceCuratorRoute
+  ApiPublicHooksSourceTierARoute: typeof ApiPublicHooksSourceTierARoute
+  ApiPublicHooksSourceTierBRoute: typeof ApiPublicHooksSourceTierBRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -144,6 +745,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -151,60 +759,525 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/catalog': {
-      id: '/catalog'
-      path: '/catalog'
-      fullPath: '/catalog'
-      preLoaderRoute: typeof CatalogRouteImport
+    '/compliance': {
+      id: '/compliance'
+      path: '/compliance'
+      fullPath: '/compliance'
+      preLoaderRoute: typeof ComplianceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clients/': {
-      id: '/clients/'
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/answers': {
+      id: '/_authenticated/answers'
+      path: '/answers'
+      fullPath: '/answers'
+      preLoaderRoute: typeof AuthenticatedAnswersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/autonomy': {
+      id: '/_authenticated/autonomy'
+      path: '/autonomy'
+      fullPath: '/autonomy'
+      preLoaderRoute: typeof AuthenticatedAutonomyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/compliance-calendar': {
+      id: '/_authenticated/compliance-calendar'
+      path: '/compliance-calendar'
+      fullPath: '/compliance-calendar'
+      preLoaderRoute: typeof AuthenticatedComplianceCalendarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/financial': {
+      id: '/_authenticated/financial'
+      path: '/financial'
+      fullPath: '/financial'
+      preLoaderRoute: typeof AuthenticatedFinancialRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/fit-rules': {
+      id: '/_authenticated/fit-rules'
+      path: '/fit-rules'
+      fullPath: '/fit-rules'
+      preLoaderRoute: typeof AuthenticatedFitRulesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/impact': {
+      id: '/_authenticated/impact'
+      path: '/impact'
+      fullPath: '/impact'
+      preLoaderRoute: typeof AuthenticatedImpactRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/manual': {
+      id: '/_authenticated/manual'
+      path: '/manual'
+      fullPath: '/manual'
+      preLoaderRoute: typeof AuthenticatedManualRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ops': {
+      id: '/_authenticated/ops'
+      path: '/ops'
+      fullPath: '/ops'
+      preLoaderRoute: typeof AuthenticatedOpsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/org': {
+      id: '/_authenticated/org'
+      path: '/org'
+      fullPath: '/org'
+      preLoaderRoute: typeof AuthenticatedOrgRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/post-award': {
+      id: '/_authenticated/post-award'
+      path: '/post-award'
+      fullPath: '/post-award'
+      preLoaderRoute: typeof AuthenticatedPostAwardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/privacy': {
+      id: '/_authenticated/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof AuthenticatedPrivacyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/quality': {
+      id: '/_authenticated/quality'
+      path: '/quality'
+      fullPath: '/quality'
+      preLoaderRoute: typeof AuthenticatedQualityRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/renewal': {
+      id: '/_authenticated/renewal'
+      path: '/renewal'
+      fullPath: '/renewal'
+      preLoaderRoute: typeof AuthenticatedRenewalRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/submissions': {
+      id: '/_authenticated/submissions'
+      path: '/submissions'
+      fullPath: '/submissions'
+      preLoaderRoute: typeof AuthenticatedSubmissionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/tasks': {
+      id: '/_authenticated/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof AuthenticatedTasksRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/report/$token': {
+      id: '/report/$token'
+      path: '/report/$token'
+      fullPath: '/report/$token'
+      preLoaderRoute: typeof ReportTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/agents': {
+      id: '/_authenticated/admin/agents'
+      path: '/agents'
+      fullPath: '/admin/agents'
+      preLoaderRoute: typeof AuthenticatedAdminAgentsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/audit-trail': {
+      id: '/_authenticated/admin/audit-trail'
+      path: '/audit-trail'
+      fullPath: '/admin/audit-trail'
+      preLoaderRoute: typeof AuthenticatedAdminAuditTrailRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/candidates': {
+      id: '/_authenticated/admin/candidates'
+      path: '/candidates'
+      fullPath: '/admin/candidates'
+      preLoaderRoute: typeof AuthenticatedAdminCandidatesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/discovery-config': {
+      id: '/_authenticated/admin/discovery-config'
+      path: '/discovery-config'
+      fullPath: '/admin/discovery-config'
+      preLoaderRoute: typeof AuthenticatedAdminDiscoveryConfigRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/history': {
+      id: '/_authenticated/admin/history'
+      path: '/history'
+      fullPath: '/admin/history'
+      preLoaderRoute: typeof AuthenticatedAdminHistoryRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/modules': {
+      id: '/_authenticated/admin/modules'
+      path: '/modules'
+      fullPath: '/admin/modules'
+      preLoaderRoute: typeof AuthenticatedAdminModulesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/monitoring': {
+      id: '/_authenticated/admin/monitoring'
+      path: '/monitoring'
+      fullPath: '/admin/monitoring'
+      preLoaderRoute: typeof AuthenticatedAdminMonitoringRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/sources': {
+      id: '/_authenticated/admin/sources'
+      path: '/sources'
+      fullPath: '/admin/sources'
+      preLoaderRoute: typeof AuthenticatedAdminSourcesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/workflows': {
+      id: '/_authenticated/admin/workflows'
+      path: '/workflows'
+      fullPath: '/admin/workflows'
+      preLoaderRoute: typeof AuthenticatedAdminWorkflowsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/clients/': {
+      id: '/_authenticated/clients/'
       path: '/clients'
       fullPath: '/clients/'
-      preLoaderRoute: typeof ClientsIndexRouteImport
+      preLoaderRoute: typeof AuthenticatedClientsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/clients/$orgId': {
+      id: '/_authenticated/clients/$orgId'
+      path: '/clients/$orgId'
+      fullPath: '/clients/$orgId'
+      preLoaderRoute: typeof AuthenticatedClientsOrgIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/competitive/': {
+      id: '/_authenticated/competitive/'
+      path: '/competitive'
+      fullPath: '/competitive/'
+      preLoaderRoute: typeof AuthenticatedCompetitiveIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/competitive/programs': {
+      id: '/_authenticated/competitive/programs'
+      path: '/competitive/programs'
+      fullPath: '/competitive/programs'
+      preLoaderRoute: typeof AuthenticatedCompetitiveProgramsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/competitive/recipients': {
+      id: '/_authenticated/competitive/recipients'
+      path: '/competitive/recipients'
+      fullPath: '/competitive/recipients'
+      preLoaderRoute: typeof AuthenticatedCompetitiveRecipientsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/funders/': {
+      id: '/_authenticated/funders/'
+      path: '/funders'
+      fullPath: '/funders/'
+      preLoaderRoute: typeof AuthenticatedFundersIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/funders/$funderId': {
+      id: '/_authenticated/funders/$funderId'
+      path: '/funders/$funderId'
+      fullPath: '/funders/$funderId'
+      preLoaderRoute: typeof AuthenticatedFundersFunderIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/grants/': {
+      id: '/_authenticated/grants/'
+      path: '/grants'
+      fullPath: '/grants/'
+      preLoaderRoute: typeof AuthenticatedGrantsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/grants/$id': {
+      id: '/_authenticated/grants/$id'
+      path: '/grants/$id'
+      fullPath: '/grants/$id'
+      preLoaderRoute: typeof AuthenticatedGrantsIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/proposals/': {
+      id: '/_authenticated/proposals/'
+      path: '/proposals'
+      fullPath: '/proposals/'
+      preLoaderRoute: typeof AuthenticatedProposalsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/proposals/$id': {
+      id: '/_authenticated/proposals/$id'
+      path: '/proposals/$id'
+      fullPath: '/proposals/$id'
+      preLoaderRoute: typeof AuthenticatedProposalsIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/public/health': {
+      id: '/api/public/health'
+      path: '/api/public/health'
+      fullPath: '/api/public/health'
+      preLoaderRoute: typeof ApiPublicHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clients/$clientId': {
-      id: '/clients/$clientId'
-      path: '/clients/$clientId'
-      fullPath: '/clients/$clientId'
-      preLoaderRoute: typeof ClientsClientIdRouteImport
+    '/_authenticated/clients/$orgId/grants': {
+      id: '/_authenticated/clients/$orgId/grants'
+      path: '/grants'
+      fullPath: '/clients/$orgId/grants'
+      preLoaderRoute: typeof AuthenticatedClientsOrgIdGrantsRouteImport
+      parentRoute: typeof AuthenticatedClientsOrgIdRoute
+    }
+    '/_authenticated/clients/$orgId/info': {
+      id: '/_authenticated/clients/$orgId/info'
+      path: '/info'
+      fullPath: '/clients/$orgId/info'
+      preLoaderRoute: typeof AuthenticatedClientsOrgIdInfoRouteImport
+      parentRoute: typeof AuthenticatedClientsOrgIdRoute
+    }
+    '/_authenticated/grants/$id/audit': {
+      id: '/_authenticated/grants/$id/audit'
+      path: '/audit'
+      fullPath: '/grants/$id/audit'
+      preLoaderRoute: typeof AuthenticatedGrantsIdAuditRouteImport
+      parentRoute: typeof AuthenticatedGrantsIdRoute
+    }
+    '/_authenticated/proposals/$proposalId/revision': {
+      id: '/_authenticated/proposals/$proposalId/revision'
+      path: '/proposals/$proposalId/revision'
+      fullPath: '/proposals/$proposalId/revision'
+      preLoaderRoute: typeof AuthenticatedProposalsProposalIdRevisionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/public/hooks/deadlines': {
+      id: '/api/public/hooks/deadlines'
+      path: '/api/public/hooks/deadlines'
+      fullPath: '/api/public/hooks/deadlines'
+      preLoaderRoute: typeof ApiPublicHooksDeadlinesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clients_/$clientId/grants': {
-      id: '/clients_/$clientId/grants'
-      path: '/clients/$clientId/grants'
-      fullPath: '/clients/$clientId/grants'
-      preLoaderRoute: typeof ClientsClientIdGrantsRouteImport
+    '/api/public/hooks/discover': {
+      id: '/api/public/hooks/discover'
+      path: '/api/public/hooks/discover'
+      fullPath: '/api/public/hooks/discover'
+      preLoaderRoute: typeof ApiPublicHooksDiscoverRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clients_/$clientId/matches': {
-      id: '/clients_/$clientId/matches'
-      path: '/clients/$clientId/matches'
-      fullPath: '/clients/$clientId/matches'
-      preLoaderRoute: typeof ClientsClientIdMatchesRouteImport
+    '/api/public/hooks/enrich': {
+      id: '/api/public/hooks/enrich'
+      path: '/api/public/hooks/enrich'
+      fullPath: '/api/public/hooks/enrich'
+      preLoaderRoute: typeof ApiPublicHooksEnrichRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clients_/$clientId/proposals/$grantId': {
-      id: '/clients_/$clientId/proposals/$grantId'
-      path: '/clients/$clientId/proposals/$grantId'
-      fullPath: '/clients/$clientId/proposals/$grantId'
-      preLoaderRoute: typeof ClientsClientIdProposalsGrantIdRouteImport
+    '/api/public/hooks/rss-poll': {
+      id: '/api/public/hooks/rss-poll'
+      path: '/api/public/hooks/rss-poll'
+      fullPath: '/api/public/hooks/rss-poll'
+      preLoaderRoute: typeof ApiPublicHooksRssPollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/source-curator': {
+      id: '/api/public/hooks/source-curator'
+      path: '/api/public/hooks/source-curator'
+      fullPath: '/api/public/hooks/source-curator'
+      preLoaderRoute: typeof ApiPublicHooksSourceCuratorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/source-tier-a': {
+      id: '/api/public/hooks/source-tier-a'
+      path: '/api/public/hooks/source-tier-a'
+      fullPath: '/api/public/hooks/source-tier-a'
+      preLoaderRoute: typeof ApiPublicHooksSourceTierARouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/source-tier-b': {
+      id: '/api/public/hooks/source-tier-b'
+      path: '/api/public/hooks/source-tier-b'
+      fullPath: '/api/public/hooks/source-tier-b'
+      preLoaderRoute: typeof ApiPublicHooksSourceTierBRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAgentsRoute: typeof AuthenticatedAdminAgentsRoute
+  AuthenticatedAdminAuditTrailRoute: typeof AuthenticatedAdminAuditTrailRoute
+  AuthenticatedAdminCandidatesRoute: typeof AuthenticatedAdminCandidatesRoute
+  AuthenticatedAdminDiscoveryConfigRoute: typeof AuthenticatedAdminDiscoveryConfigRoute
+  AuthenticatedAdminHistoryRoute: typeof AuthenticatedAdminHistoryRoute
+  AuthenticatedAdminModulesRoute: typeof AuthenticatedAdminModulesRoute
+  AuthenticatedAdminMonitoringRoute: typeof AuthenticatedAdminMonitoringRoute
+  AuthenticatedAdminSourcesRoute: typeof AuthenticatedAdminSourcesRoute
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
+  AuthenticatedAdminWorkflowsRoute: typeof AuthenticatedAdminWorkflowsRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAgentsRoute: AuthenticatedAdminAgentsRoute,
+  AuthenticatedAdminAuditTrailRoute: AuthenticatedAdminAuditTrailRoute,
+  AuthenticatedAdminCandidatesRoute: AuthenticatedAdminCandidatesRoute,
+  AuthenticatedAdminDiscoveryConfigRoute:
+    AuthenticatedAdminDiscoveryConfigRoute,
+  AuthenticatedAdminHistoryRoute: AuthenticatedAdminHistoryRoute,
+  AuthenticatedAdminModulesRoute: AuthenticatedAdminModulesRoute,
+  AuthenticatedAdminMonitoringRoute: AuthenticatedAdminMonitoringRoute,
+  AuthenticatedAdminSourcesRoute: AuthenticatedAdminSourcesRoute,
+  AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
+  AuthenticatedAdminWorkflowsRoute: AuthenticatedAdminWorkflowsRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
+interface AuthenticatedClientsOrgIdRouteChildren {
+  AuthenticatedClientsOrgIdGrantsRoute: typeof AuthenticatedClientsOrgIdGrantsRoute
+  AuthenticatedClientsOrgIdInfoRoute: typeof AuthenticatedClientsOrgIdInfoRoute
+}
+
+const AuthenticatedClientsOrgIdRouteChildren: AuthenticatedClientsOrgIdRouteChildren =
+  {
+    AuthenticatedClientsOrgIdGrantsRoute: AuthenticatedClientsOrgIdGrantsRoute,
+    AuthenticatedClientsOrgIdInfoRoute: AuthenticatedClientsOrgIdInfoRoute,
+  }
+
+const AuthenticatedClientsOrgIdRouteWithChildren =
+  AuthenticatedClientsOrgIdRoute._addFileChildren(
+    AuthenticatedClientsOrgIdRouteChildren,
+  )
+
+interface AuthenticatedGrantsIdRouteChildren {
+  AuthenticatedGrantsIdAuditRoute: typeof AuthenticatedGrantsIdAuditRoute
+}
+
+const AuthenticatedGrantsIdRouteChildren: AuthenticatedGrantsIdRouteChildren = {
+  AuthenticatedGrantsIdAuditRoute: AuthenticatedGrantsIdAuditRoute,
+}
+
+const AuthenticatedGrantsIdRouteWithChildren =
+  AuthenticatedGrantsIdRoute._addFileChildren(
+    AuthenticatedGrantsIdRouteChildren,
+  )
+
+interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedAnswersRoute: typeof AuthenticatedAnswersRoute
+  AuthenticatedAutonomyRoute: typeof AuthenticatedAutonomyRoute
+  AuthenticatedComplianceCalendarRoute: typeof AuthenticatedComplianceCalendarRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFinancialRoute: typeof AuthenticatedFinancialRoute
+  AuthenticatedFitRulesRoute: typeof AuthenticatedFitRulesRoute
+  AuthenticatedImpactRoute: typeof AuthenticatedImpactRoute
+  AuthenticatedManualRoute: typeof AuthenticatedManualRoute
+  AuthenticatedOpsRoute: typeof AuthenticatedOpsRoute
+  AuthenticatedOrgRoute: typeof AuthenticatedOrgRoute
+  AuthenticatedPostAwardRoute: typeof AuthenticatedPostAwardRoute
+  AuthenticatedPrivacyRoute: typeof AuthenticatedPrivacyRoute
+  AuthenticatedQualityRoute: typeof AuthenticatedQualityRoute
+  AuthenticatedRenewalRoute: typeof AuthenticatedRenewalRoute
+  AuthenticatedSubmissionsRoute: typeof AuthenticatedSubmissionsRoute
+  AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
+  AuthenticatedClientsOrgIdRoute: typeof AuthenticatedClientsOrgIdRouteWithChildren
+  AuthenticatedCompetitiveProgramsRoute: typeof AuthenticatedCompetitiveProgramsRoute
+  AuthenticatedCompetitiveRecipientsRoute: typeof AuthenticatedCompetitiveRecipientsRoute
+  AuthenticatedFundersFunderIdRoute: typeof AuthenticatedFundersFunderIdRoute
+  AuthenticatedGrantsIdRoute: typeof AuthenticatedGrantsIdRouteWithChildren
+  AuthenticatedProposalsIdRoute: typeof AuthenticatedProposalsIdRoute
+  AuthenticatedClientsIndexRoute: typeof AuthenticatedClientsIndexRoute
+  AuthenticatedCompetitiveIndexRoute: typeof AuthenticatedCompetitiveIndexRoute
+  AuthenticatedFundersIndexRoute: typeof AuthenticatedFundersIndexRoute
+  AuthenticatedGrantsIndexRoute: typeof AuthenticatedGrantsIndexRoute
+  AuthenticatedProposalsIndexRoute: typeof AuthenticatedProposalsIndexRoute
+  AuthenticatedProposalsProposalIdRevisionRoute: typeof AuthenticatedProposalsProposalIdRevisionRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedAnswersRoute: AuthenticatedAnswersRoute,
+  AuthenticatedAutonomyRoute: AuthenticatedAutonomyRoute,
+  AuthenticatedComplianceCalendarRoute: AuthenticatedComplianceCalendarRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFinancialRoute: AuthenticatedFinancialRoute,
+  AuthenticatedFitRulesRoute: AuthenticatedFitRulesRoute,
+  AuthenticatedImpactRoute: AuthenticatedImpactRoute,
+  AuthenticatedManualRoute: AuthenticatedManualRoute,
+  AuthenticatedOpsRoute: AuthenticatedOpsRoute,
+  AuthenticatedOrgRoute: AuthenticatedOrgRoute,
+  AuthenticatedPostAwardRoute: AuthenticatedPostAwardRoute,
+  AuthenticatedPrivacyRoute: AuthenticatedPrivacyRoute,
+  AuthenticatedQualityRoute: AuthenticatedQualityRoute,
+  AuthenticatedRenewalRoute: AuthenticatedRenewalRoute,
+  AuthenticatedSubmissionsRoute: AuthenticatedSubmissionsRoute,
+  AuthenticatedTasksRoute: AuthenticatedTasksRoute,
+  AuthenticatedClientsOrgIdRoute: AuthenticatedClientsOrgIdRouteWithChildren,
+  AuthenticatedCompetitiveProgramsRoute: AuthenticatedCompetitiveProgramsRoute,
+  AuthenticatedCompetitiveRecipientsRoute:
+    AuthenticatedCompetitiveRecipientsRoute,
+  AuthenticatedFundersFunderIdRoute: AuthenticatedFundersFunderIdRoute,
+  AuthenticatedGrantsIdRoute: AuthenticatedGrantsIdRouteWithChildren,
+  AuthenticatedProposalsIdRoute: AuthenticatedProposalsIdRoute,
+  AuthenticatedClientsIndexRoute: AuthenticatedClientsIndexRoute,
+  AuthenticatedCompetitiveIndexRoute: AuthenticatedCompetitiveIndexRoute,
+  AuthenticatedFundersIndexRoute: AuthenticatedFundersIndexRoute,
+  AuthenticatedGrantsIndexRoute: AuthenticatedGrantsIndexRoute,
+  AuthenticatedProposalsIndexRoute: AuthenticatedProposalsIndexRoute,
+  AuthenticatedProposalsProposalIdRevisionRoute:
+    AuthenticatedProposalsProposalIdRevisionRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
-  CatalogRoute: CatalogRoute,
-  ClientsClientIdRoute: ClientsClientIdRoute,
-  ClientsIndexRoute: ClientsIndexRoute,
-  ClientsClientIdGrantsRoute: ClientsClientIdGrantsRoute,
-  ClientsClientIdMatchesRoute: ClientsClientIdMatchesRoute,
-  ClientsClientIdProposalsGrantIdRoute: ClientsClientIdProposalsGrantIdRoute,
+  ComplianceRoute: ComplianceRoute,
+  ReportTokenRoute: ReportTokenRoute,
+  ApiPublicHealthRoute: ApiPublicHealthRoute,
+  ApiPublicHooksDeadlinesRoute: ApiPublicHooksDeadlinesRoute,
+  ApiPublicHooksDiscoverRoute: ApiPublicHooksDiscoverRoute,
+  ApiPublicHooksEnrichRoute: ApiPublicHooksEnrichRoute,
+  ApiPublicHooksRssPollRoute: ApiPublicHooksRssPollRoute,
+  ApiPublicHooksSourceCuratorRoute: ApiPublicHooksSourceCuratorRoute,
+  ApiPublicHooksSourceTierARoute: ApiPublicHooksSourceTierARoute,
+  ApiPublicHooksSourceTierBRoute: ApiPublicHooksSourceTierBRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
