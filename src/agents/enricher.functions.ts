@@ -35,6 +35,8 @@ export async function enrichGrantImpl(
   const { extractEligibility } = await import("@/agents/extractors/eligibility.server");
   const { extractSectors } = await import("@/agents/extractors/sectors.server");
   const { extractGrantFacets } = await import("@/agents/extractors/facets.server");
+  const { stripBoilerplate, looksLikeErrorPage } =
+    await import("@/agents/extractors/boilerplate.shared");
   const { recordEvidence, snippetIsGrounded } = await import("@/agents/evidence.server");
   const { traceStep } = await import("@/agents/trace.server");
   const db = opts?.db ?? supabaseAdmin;
@@ -150,7 +152,13 @@ export async function enrichGrantImpl(
 
   await trace("scrape", `Fetching ${g.url}`, "start");
   const tScrape = Date.now();
-  const scraped = await scrapeWithFallback(g.url);
+  const rawScrape = await scrapeWithFallback(g.url);
+  // A soft-404 (HTTP 200 + "page not found" body) is a failed scrape: its site
+  // menus were being read as grant facts. Fall back to the stored text instead.
+  const scraped =
+    rawScrape.ok && looksLikeErrorPage(rawScrape.markdown)
+      ? { ...rawScrape, ok: false as const, error: "soft_404_error_page", markdown: "" }
+      : rawScrape;
   const fetchAttempts = scraped.attempts ?? [];
 
   let sourceMarkdown = scraped.ok ? scraped.markdown : "";
@@ -211,18 +219,28 @@ export async function enrichGrantImpl(
   ];
   if (/^https?:\/\/(?:www\.)?grants\.gov\/search-results-detail\//i.test(g.url)) {
     try {
-      const { fetchGrantsGovOpportunitySource } = await import("@/agents/sources/grants-gov-opportunity.server");
+      const { fetchGrantsGovOpportunitySource } =
+        await import("@/agents/sources/grants-gov-opportunity.server");
       const official = await fetchGrantsGovOpportunitySource(g.url);
       if (official?.markdown) {
-        pages.unshift({ url: g.url, markdown: official.markdown });
+        // The Grants.gov HTML page is a JS shell (session modal, no data);
+        // reading it produced same-day "deadlines" from "expire in 3 minutes".
+        pages[0] = { url: g.url, markdown: official.markdown };
         if (official.detailUrl && !pages.some((page) => page.url === official.detailUrl)) {
           const detail = await scrapeWithFallback(official.detailUrl);
           if (detail.ok) pages.push({ url: official.detailUrl, markdown: detail.markdown });
         }
-        await trace("official_api", "Loaded structured Grants.gov opportunity details", "done", { chars: official.markdown.length, detail_url: official.detailUrl });
+        await trace("official_api", "Loaded structured Grants.gov opportunity details", "done", {
+          chars: official.markdown.length,
+          detail_url: official.detailUrl,
+        });
       }
     } catch (apiError) {
-      await trace("official_api", `Structured Grants.gov details unavailable: ${apiError instanceof Error ? apiError.message : String(apiError)}`, "warn");
+      await trace(
+        "official_api",
+        `Structured Grants.gov details unavailable: ${apiError instanceof Error ? apiError.message : String(apiError)}`,
+        "warn",
+      );
     }
   }
   const missingFields = () => {
@@ -238,7 +256,7 @@ export async function enrichGrantImpl(
     pages.find((page) => snippetIsGrounded(quote, page.markdown)) ?? null;
   const titleTokens = grantTitleTokens(g.title);
   const isRelevantPage = (page: { url: string; markdown: string }) =>
-    pageLooksRelevantToGrant(page, titleTokens);
+    !looksLikeErrorPage(page.markdown) && pageLooksRelevantToGrant(page, titleTokens);
   const supportedFacetValues = new Map<string, Set<string>>();
 
   await trace("scrape", `Scraped ${sourceMarkdown.length} chars via ${sourceVia}`, "done", {
@@ -254,6 +272,9 @@ export async function enrichGrantImpl(
     page: { url: string; markdown: string },
     stage: "main" | "deep",
   ) => {
+    // Mutates the shared page so evidence grounding and the LLM stage see the
+    // same chrome-free text the extractors read.
+    page.markdown = stripBoilerplate(page.markdown);
     const facetMatches = extractGrantFacets(page.markdown);
     for (const match of facetMatches) {
       methodCounts.rule++;
@@ -515,9 +536,9 @@ export async function enrichGrantImpl(
   const isRolling = patch.deadline_kind === "rolling" || g.deadline_kind === "rolling";
   const isPastDeadline = Boolean(
     confirmedDeadline &&
-      !isRolling &&
-      !Number.isNaN(new Date(confirmedDeadline).getTime()) &&
-      new Date(confirmedDeadline).getTime() < Date.now() - 30 * 86_400_000,
+    !isRolling &&
+    !Number.isNaN(new Date(confirmedDeadline).getTime()) &&
+    new Date(confirmedDeadline).getTime() < Date.now() - 30 * 86_400_000,
   );
 
   if (isPastDeadline && missingAfterMain.length > 0 && !opts?.force) {
@@ -622,8 +643,7 @@ export async function enrichGrantImpl(
   // Security: sanitize markdown + enforce size limit
   const { sanitizeMarkdown, validateTotalMarkdownSize } =
     await import("@/lib/prompt-safety.server");
-  const { extractTargetedMarkdown } =
-    await import("@/agents/extractors/targeted-chunks.server");
+  const { extractTargetedMarkdown } = await import("@/agents/extractors/targeted-chunks.server");
   const sanitizedPages = pages.map((p) => ({ ...p, markdown: sanitizeMarkdown(p.markdown) }));
   // Global budget across ALL pages, with semantic windowing per page:
   // Instead of dumping raw top-of-page text, targeted chunks prioritize paragraphs
@@ -995,15 +1015,16 @@ export async function enrichGrantImpl(
     parsedPatch.amount_cad_max != null &&
     parsedPatch.amount_cad_min > parsedPatch.amount_cad_max
   ) {
-    await trace("schema", "amount_cad_min > amount_cad_max (halting enrichment)", "error");
-    await db
-      .from("grants")
-      .update({
-        enrich_last_error: "schema_validation: amount_cad_min must be <= amount_cad_max",
-        enrich_last_attempt_at: new Date().toISOString(),
-      })
-      .eq("id", g.id);
-    return { ok: false, runId, error: "schema_validation" };
+    // Min and max usually come from different sentences (a per-intern stipend
+    // vs a per-project cap). Halting threw away every other field; drop the
+    // floor instead and keep the rest.
+    await trace(
+      "schema",
+      `amount_cad_min (${parsedPatch.amount_cad_min}) > amount_cad_max (${parsedPatch.amount_cad_max}); dropping min`,
+      "warn",
+    );
+    delete patch.amount_cad_min;
+    delete (parsedPatch as { amount_cad_min?: number | null }).amount_cad_min;
   }
 
   const extractedKeys = Object.keys(patch);

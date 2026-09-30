@@ -37,6 +37,10 @@ const ROLLING_HINTS = [
   "en continu",
 ];
 
+// A month name or a numeric calendar date must appear in the matched text.
+const EXPLICIT_DATE =
+  /(?:^|[^a-z])(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|janv|févr|fevr|mars|avr|mai|juin|juil|août|aout|déc)[a-zéû]*\.?\s*\d|\d\s*(?:er|st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|janv|févr|fevr|mars|avr|mai|juin|juil|août|aout|déc)|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[/.]\d{1,2}[/.]\d{2,4}\b/i;
+
 export type DeadlineMatch = {
   iso: string; // YYYY-MM-DD
   snippet: string;
@@ -76,6 +80,9 @@ export function extractDeadline(text: string, locale: "en" | "fr" = "en"): Deadl
           ? chrono.fr.parse(window, new Date(), { forwardDate: true })
           : chrono.parse(window, new Date(), { forwardDate: true });
       for (const p of parsed) {
+        // Only explicit calendar dates count. Relative phrases ("in 3 minutes",
+        // "7 days after completion") resolved to today and became fake deadlines.
+        if (!EXPLICIT_DATE.test(p.text)) continue;
         const d = p.date();
         // Allow recent past dates (programs often leave last year's deadline up while preparing the next)
         if (d && d > oneYearAgo && d < twoYearsFuture) {
@@ -99,7 +106,9 @@ export function extractDeadline(text: string, locale: "en" | "fr" = "en"): Deadl
     .filter((c) => c.date < startOfToday)
     .sort((a, b) => b.date.getTime() - a.date.getTime());
   const pick = future.length > 0 ? future[0] : past[0];
-  const iso = pick.date.toISOString().slice(0, 10);
+  // Local calendar date: toISOString() shifted "Oct 17 at 11:59 pm" to Oct 18 UTC.
+  const d = pick.date;
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   return {
     iso,
     snippet: windowAround(text, pick.offset, 40, 180),

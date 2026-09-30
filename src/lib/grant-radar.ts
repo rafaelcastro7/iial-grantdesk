@@ -42,7 +42,12 @@ export type RadarGrant = {
   currency?: string | null;
   eligible_applicant_types?: string[] | null;
   eligibility_note?: string | null;
-  requirements?: Array<{ category?: string; requirement?: string; value?: string; isCritical?: boolean }> | null;
+  requirements?: Array<{
+    category?: string;
+    requirement?: string;
+    value?: string;
+    isCritical?: boolean;
+  }> | null;
 };
 
 /** The client the radar checks every grant against. */
@@ -147,8 +152,7 @@ export function ruleDecision(
       country: grantCountry(g),
       deadline: g.deadline ?? null,
       // Pipeline stages are not call availability; only "expired" means closed.
-      status:
-        g.status === "expired" || (daysUntil(g.deadline, now) ?? 0) < 0 ? "closed" : "open",
+      status: g.status === "expired" || (daysUntil(g.deadline, now) ?? 0) < 0 ? "closed" : "open",
       eligibleApplicantTypes: g.eligible_applicant_types ?? null,
       amountMin: g.amount_min ?? g.amount_cad_min ?? null,
       amountMax: g.amount_max ?? g.amount_cad_max ?? null,
@@ -240,7 +244,7 @@ export function toRadarItem<T extends RadarGrant>(
 
   if (g.evaluation) {
     verdict = g.evaluation.eligibility_pass ? "eligible" : "not_eligible";
-    reason = (g.evaluation as { rationale_en?: string }).rationale_en ?? (ruled?.reason ?? null);
+    reason = (g.evaluation as { rationale_en?: string }).rationale_en ?? ruled?.reason ?? null;
     isRuled = true;
   } else if (g.hardBlocked) {
     verdict = "not_eligible";
@@ -332,7 +336,13 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
       searching: opts.searching,
       rules: opts.rules,
     });
-    if (!opts.searching && hideIneligible && item.ruled && item.verdict === "not_eligible" && opts.verdict !== "not_eligible") {
+    if (
+      !opts.searching &&
+      hideIneligible &&
+      item.ruled &&
+      item.verdict === "not_eligible" &&
+      opts.verdict !== "not_eligible"
+    ) {
       hiddenByRules++;
       continue;
     }
@@ -355,7 +365,12 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
         continue;
       }
     }
-    if (!opts.searching && opts.minAmount > 0 && item.amount != null && item.amount < opts.minAmount) {
+    if (
+      !opts.searching &&
+      opts.minAmount > 0 &&
+      item.amount != null &&
+      item.amount < opts.minAmount
+    ) {
       hiddenByAmount++;
       continue;
     }
@@ -448,3 +463,55 @@ export const NEXT_ACTION_LABELS: Record<RadarNextAction, string> = {
   draft: "Start the draft",
   open: "Open",
 };
+
+// ---- Lexical fallback scoring (used when hybrid search returns few hits) ----
+
+const FALLBACK_STOP_WORDS = new Set([
+  "and",
+  "the",
+  "for",
+  "with",
+  "from",
+  "into",
+  "des",
+  "les",
+  "pour",
+  "and/or",
+  "grant",
+  "grants",
+  "funding",
+  "fund",
+  "program",
+  "programs",
+]);
+
+/** Search tokens safe for a PostgREST .or() filter: no , ( ) % * and no stop words. */
+export function lexicalFallbackTokens(query: string): string[] {
+  const tokens = query
+    .toLowerCase()
+    .replace(/[,()%*]/g, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && !FALLBACK_STOP_WORDS.has(t));
+  return Array.from(new Set(tokens)).slice(0, 8);
+}
+
+/**
+ * Relevance in 0.4..0.8 by the share of query tokens a grant contains; a
+ * title hit counts double. Grants matching under half the tokens of a
+ * multi-word query are dropped (they matched on one generic word).
+ */
+export function scoreLexicalFallback(
+  grant: { title?: string | null; summary?: string | null; eligibility_note?: string | null },
+  tokens: string[],
+): { relevance: number; matched: string[] } | null {
+  if (tokens.length === 0) return null;
+  const title = (grant.title ?? "").toLowerCase();
+  const body = `${grant.summary ?? ""} ${grant.eligibility_note ?? ""}`.toLowerCase();
+  const matched = tokens.filter((t) => title.includes(t) || body.includes(t));
+  if (matched.length === 0) return null;
+  if (tokens.length > 1 && matched.length / tokens.length < 0.5) return null;
+  const titleHits = matched.filter((t) => title.includes(t)).length;
+  const weight = (matched.length + titleHits) / (tokens.length * 2);
+  return { relevance: Math.round((0.4 + 0.4 * weight) * 1000) / 1000, matched };
+}

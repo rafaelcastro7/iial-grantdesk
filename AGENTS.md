@@ -12,7 +12,7 @@
 # GrantDesk — project rules
 
 - Server functions live in `src/lib/*.functions.ts`; import `src/server/` modules dynamically inside handlers (client bundle safety).
-- Text AI: Lovable AI Gateway first, then Gemini → Groq → Cerebras fallback; embeddings Lovable `google/gemini-embedding-2` @768. User chose Lovable as primary.
+- Text AI: configured free-tier providers first (Gemini → Groq → Cerebras, only when their key is set), Lovable AI Gateway as the paid floor; embeddings Lovable `google/gemini-embedding-2` @768. User chose cost-first ordering (Sep 30 2026); with no external secrets in Lovable Cloud, Lovable AI is effectively the only provider.
 - No client deadlines on AI calls (aborted generations still bill); live AI tests only with `LIVE_CLOUD=1`.
 - Eligibility is deterministic in `src/lib/eligibility.ts`; `unknown` is valid; soft-check failures are surfaced without changing verdicts.
 - Evaluator never aborts batches: on LLM failure fall back to `rules-engine-deterministic`; normalize `fit_score` to [0,1]; persisted `grant_evaluations` override heuristics in `toRadarItem`; short-circuit hard fails with deterministic rules (0 tokens) before calling LLM.

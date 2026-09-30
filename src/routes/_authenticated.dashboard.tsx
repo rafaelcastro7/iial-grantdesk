@@ -475,14 +475,15 @@ function DashboardV2({
               </div>
               <p className="mt-3 text-sm leading-6 text-sidebar-foreground/70">
                 Eligibility is decided by auditable rules. Drafting and analysis use the configured
-                provider chain: Lovable AI first, with Gemini, Groq and Cerebras as fallbacks.
+                provider chain: free-tier providers first when configured, Lovable AI as the paid
+                floor.
               </p>
               <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
                 {[
-                  ["AI", "Lovable AI first"],
+                  ["AI", "Free tier first"],
                   ["Database", "Lovable Cloud"],
                   ["Security", "RLS"],
-                  ["Fallback", "Gemini / Groq / Cerebras"],
+                  ["Fallback", "Lovable AI"],
                 ].map(([label, value]) => (
                   <div
                     key={label}

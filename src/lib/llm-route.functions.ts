@@ -25,9 +25,10 @@ export const getLlmRouteStatus = createServerFn({ method: "GET" })
   .inputValidator(z.object({}))
   .handler(async (): Promise<LlmRouteStatus> => {
     const providers: string[] = [];
-    providers.push(process.env.LOVABLE_API_KEY ? "Lovable AI (principal)" : "Lovable AI (key missing)");
+    // Same order as callLlm in src/server/llm.ts: free tier first, Lovable last.
     if (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_KEY) providers.push("Gemini");
     if (process.env.GROQ_API_KEY) providers.push("Groq");
     if (process.env.CEREBRAS_API_KEY) providers.push("Cerebras");
+    providers.push(process.env.LOVABLE_API_KEY ? "Lovable AI" : "Lovable AI (key missing)");
     return { cloudProviders: providers, localOnly: false };
   });

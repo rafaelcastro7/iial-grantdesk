@@ -34,9 +34,13 @@ const UP_TO = new RegExp(
 );
 // Keywords that anchor an amount to grant context.
 const FUNDING_ANCHOR =
-  /\b(?:fund(?:ing|ed)?|grant|award|subvention|contribut(?:ion|e)|financ(?:ement|ing)|amount|montant|total\s+value|up\s+to|maximum|max|min(?:imum)?|eligible|approved|exceed|project|projet|per\s+project)\b/i;
+  /\b(?:fund(?:ing|ed)?|grant|award|subvention|contribut(?:ion|e)|financ(?:ement|ing)|amount|montant|loans?|pr[eê]ts?|total\s+value|up\s+to|maximum|max|min(?:imum)?|eligible|approved|exceed|project|projet|per\s+project)\b/i;
 const NON_AWARD_CONTEXT =
-  /\b(?:budget|fy\d{2}|fy\s*\d{2}|fiscal|expenditure|spending|spent|pandemic\s+response|program'?s\s+contribution|annual\s+contribution\s+funding|firms\s+receiving|operating\s+costs?|annual\s+report)\b/i;
+  /\b(?:budget|fy\d{2}|fy\s*\d{2}|fiscal|expenditure|spending|spent|pandemic\s+response|program'?s\s+contribution|annual\s+contribution\s+funding|firms\s+receiving|operating\s+costs?|annual\s+report|invest(?:s|ed|ing|ment)?|billion|g&a|was\s+awarded|were\s+awarded|has\s+awarded|represented|allocated\s+to|approximate\s+funding)\b/i;
+// Above this, an amount is a program envelope unless the text ties it to one applicant.
+const PROGRAM_ENVELOPE_CAD = 20_000_000;
+const PER_APPLICANT =
+  /\b(?:per\s+(?:project|applicant|recipient|award|organization)|par\s+projet|each\s+(?:project|award)|maximum|up\s+to|jusqu)/i;
 const SINGLE = new RegExp(AMOUNT, "gi");
 
 function parseOne(raw: string): number | null {
@@ -84,6 +88,11 @@ export function extractAmounts(text: string): AmountMatch | null {
     );
     return FUNDING_ANCHOR.test(context) && !NON_AWARD_CONTEXT.test(context);
   };
+  const plausibleSize = (value: number, index: number, length: number) => {
+    if (value < PROGRAM_ENVELOPE_CAD) return true;
+    const near = text.slice(Math.max(0, index - 120), Math.min(text.length, index + length + 60));
+    return PER_APPLICANT.test(near);
+  };
 
   // 1. Range form is highest priority. Handles: "between X and Y", "de X à Y", "$50K–$250K".
   RANGE.lastIndex = 0;
@@ -94,9 +103,11 @@ export function extractAmounts(text: string): AmountMatch | null {
     const rawMin = rm[1] ?? rm[3];
     const rawMax = rm[2] ?? rm[4];
     if (!rawMin || !rawMax) continue;
-    const min = parseOne(rawMin);
+    const parsedMin = parseOne(rawMin);
     const max = parseOne(rawMax);
-    if (min != null && max != null && max >= min) {
+    // "from $1 to $1.15 million" is a cap change, not a $1 floor.
+    const min = parsedMin != null && parsedMin < 1000 ? null : parsedMin;
+    if (max != null && (min == null || max >= min) && plausibleSize(max, rm.index, rm[0].length)) {
       return {
         min,
         max,
@@ -112,7 +123,7 @@ export function extractAmounts(text: string): AmountMatch | null {
   const um = UP_TO.exec(text);
   if (um && isPlausibleAwardContext(um.index, um[0].length)) {
     const max = parseOne(um[1]);
-    if (max != null) {
+    if (max != null && plausibleSize(max, um.index, um[0].length)) {
       return {
         min: null,
         max,
@@ -138,7 +149,11 @@ export function extractAmounts(text: string): AmountMatch | null {
       Math.max(0, m.index - 120),
       Math.min(head.length, m.index + m[0].length + 120),
     );
-    if (FUNDING_ANCHOR.test(window) && !NON_AWARD_CONTEXT.test(window)) {
+    if (
+      FUNDING_ANCHOR.test(window) &&
+      !NON_AWARD_CONTEXT.test(window) &&
+      plausibleSize(v, m.index, m[0].length)
+    ) {
       anchoredAmounts.push({ value: v, index: m.index, raw: m[0] });
     }
   }

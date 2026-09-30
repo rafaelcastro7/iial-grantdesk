@@ -44,6 +44,19 @@ const KEYWORDS = [
 
 export type DeepPage = { url: string; markdown: string };
 
+// Pages that are never about applying: internal evaluations, news, staff
+// profiles, careers, legal/accessibility. Confirmed live they were being read
+// as program facts (an NRC evaluation report fed "women" and "Indigenous").
+const OFF_TOPIC_URL =
+  /(?:evaluation|audit|planning-reporting|transparency|archived|\/stories\/|\/news|spotlight|media-kit|careers?|\/jobs?\b|employee|values-ethics|accessibility|privacy|terms|contact-us|sitemap|login|sign-?in|\.(?:jpg|png|svg|zip)$)/i;
+
+function isOffTopic(url: string, baseUrl: string): boolean {
+  if (OFF_TOPIC_URL.test(url)) return true;
+  // Same program in the other official language is a duplicate, not new facts.
+  const lang = (u: string) => (/\/fr(?:\/|$)|[?&]lang=fra?\b/i.test(u) ? "fr" : "en");
+  return lang(url) !== lang(baseUrl);
+}
+
 function normalizeUrl(url: string): string {
   return url.replace(/#.*$/, "").replace(/\/+$/, "").toLowerCase();
 }
@@ -72,6 +85,7 @@ function rankUrls(
 
   for (const candidate of candidates) {
     if (!candidate.url || !isSameHost(candidate.url, baseUrl)) continue;
+    if (isOffTopic(candidate.url, baseUrl)) continue;
     const key = normalizeUrl(candidate.url);
     if (seen.has(key)) continue;
     const score = scoreCandidate(candidate.text);
@@ -118,9 +132,15 @@ export function pickSearchHits(
   );
 }
 
-async function scrapeCandidateUrls(urls: string[], max: number): Promise<DeepPage[]> {
+async function scrapeCandidateUrls(
+  urls: string[],
+  max: number,
+  baseUrl: string,
+): Promise<DeepPage[]> {
   const pages: DeepPage[] = [];
-  for (const url of urls) {
+  // Every discovery path (inline, HTML, sitemap, search, pinned) lands here,
+  // so the off-topic filter applies to all of them.
+  for (const url of urls.filter((candidate) => !isOffTopic(candidate, baseUrl))) {
     if (pages.length >= max) break;
     try {
       const result = await scrapeWithFallback(url, {
@@ -156,10 +176,10 @@ export async function gatherDeepMarkdown(
 ): Promise<DeepPage[]> {
   const max = opts.max ?? 3;
   if (opts.pinnedUrls && opts.pinnedUrls.length > 0) {
-    return scrapeCandidateUrls(opts.pinnedUrls.slice(0, max), max);
+    return scrapeCandidateUrls(opts.pinnedUrls.slice(0, max), max, baseUrl);
   }
   const inlineUrls = pickDeepLinks(mainMarkdown, baseUrl, max);
-  const inlinePages = await scrapeCandidateUrls(inlineUrls, max);
+  const inlinePages = await scrapeCandidateUrls(inlineUrls, max, baseUrl);
   if (inlinePages.length >= max) return inlinePages;
 
   const seenUrls = [...inlineUrls, ...inlinePages.map((page) => page.url)];
@@ -172,6 +192,7 @@ export async function gatherDeepMarkdown(
   const htmlPages = await scrapeCandidateUrls(
     htmlSeeded.map((candidate) => candidate.url),
     max - inlinePages.length,
+    baseUrl,
   );
   if (inlinePages.length + htmlPages.length >= max) {
     return [...inlinePages, ...htmlPages].slice(0, max);
@@ -190,6 +211,7 @@ export async function gatherDeepMarkdown(
   const sitemapPages = await scrapeCandidateUrls(
     sitemapSeeded.map((candidate) => candidate.url),
     max - inlinePages.length - htmlPages.length,
+    baseUrl,
   );
   if (inlinePages.length + htmlPages.length + sitemapPages.length >= max) {
     return [...inlinePages, ...htmlPages, ...sitemapPages].slice(0, max);
@@ -230,6 +252,7 @@ export async function gatherDeepMarkdown(
   const searchPages = await scrapeCandidateUrls(
     searchUrls,
     max - inlinePages.length - htmlPages.length - sitemapPages.length,
+    baseUrl,
   );
   return [...inlinePages, ...htmlPages, ...sitemapPages, ...searchPages].slice(0, max);
 }

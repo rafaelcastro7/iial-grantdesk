@@ -3,8 +3,8 @@ import { serverEnv } from "@/lib/env.server";
 /**
  * Language model access.
  *
- * Provider chain: Lovable AI Gateway first (primary), then Gemini, Groq and
- * Cerebras as fallbacks when the gateway fails. What survives from the
+ * Provider chain: configured free-tier providers (Gemini, Groq, Cerebras)
+ * first, then the Lovable AI Gateway as the paid floor. What survives from the
  * original design is the part that mattered —
  * a caller asks for a *role*, gets back the text plus a record of what was
  * attempted, and a failure is reported rather than silently degraded.
@@ -208,7 +208,9 @@ async function callGemini(request: LlmRequest, apiKey: string): Promise<string> 
   return text;
 }
 
-const EXTERNAL_PROVIDERS: (ExternalProvider & { envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GEMINI_API_KEY" })[] = [
+const EXTERNAL_PROVIDERS: (ExternalProvider & {
+  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GEMINI_API_KEY";
+})[] = [
   { name: "gemini", model: "gemini-2.5-flash", envKey: "GEMINI_API_KEY", call: callGemini },
   {
     name: "groq",
@@ -282,27 +284,9 @@ export async function callLlm(
   const attempts: string[] = [];
   const env = serverEnv();
 
-  // Lovable AI Gateway first (primary). External providers are the fallback.
-  if (env.LOVABLE_API_KEY) {
-    const maxTries = request.noWait ? 1 : 3;
-
-    for (let attempt = 0; attempt < maxTries; attempt++) {
-      try {
-        const result = await callGateway(request);
-        if (request.validate && !request.validate(result.text)) {
-          attempts.push("lovable-ai: failed caller validation");
-          continue;
-        }
-        return { ...result, attempts };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        attempts.push(`lovable-ai: ${message}`);
-        if (!retryable(message) || attempt === maxTries - 1) break;
-        await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** attempt + Math.random() * 400));
-      }
-    }
-  }
-
+  // Free-tier external providers first (only those with a key configured),
+  // then the paid Lovable AI Gateway as the floor. With no external keys set
+  // (the default in Lovable Cloud) this is simply Lovable AI.
   for (const provider of EXTERNAL_PROVIDERS) {
     const apiKey = env[provider.envKey];
     if (!apiKey) continue;
@@ -333,6 +317,27 @@ export async function callLlm(
     }
   }
 
+  if (env.LOVABLE_API_KEY) {
+    const maxTries = request.noWait ? 1 : 3;
+
+    for (let attempt = 0; attempt < maxTries; attempt++) {
+      try {
+        const result = await callGateway(request);
+        if (request.validate && !request.validate(result.text)) {
+          attempts.push("lovable-ai: failed caller validation");
+          continue;
+        }
+        return { ...result, attempts };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        attempts.push(`lovable-ai: ${message}`);
+        if (!retryable(message) || attempt === maxTries - 1) break;
+        await new Promise((resolve) =>
+          setTimeout(resolve, 800 * 2 ** attempt + Math.random() * 400),
+        );
+      }
+    }
+  }
 
   throw new LlmUnavailableError(attempts);
 }

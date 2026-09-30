@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildRadar, nextActionOf, priorityOf, timingOf, verdictOf } from "./grant-radar";
+import {
+  buildRadar,
+  lexicalFallbackTokens,
+  nextActionOf,
+  priorityOf,
+  scoreLexicalFallback,
+  timingOf,
+  verdictOf,
+} from "./grant-radar";
 
 const NOW = Date.UTC(2026, 8, 30);
 const inDays = (d: number) => new Date(NOW + d * 86_400_000).toISOString();
@@ -17,8 +25,12 @@ const opts = {
 
 describe("grant radar", () => {
   it("reads the verdict from the deterministic evaluation only", () => {
-    expect(verdictOf({ id: "a", status: "scored", evaluation: { eligibility_pass: true } })).toBe("eligible");
-    expect(verdictOf({ id: "a", status: "scored", evaluation: { eligibility_pass: false } })).toBe("not_eligible");
+    expect(verdictOf({ id: "a", status: "scored", evaluation: { eligibility_pass: true } })).toBe(
+      "eligible",
+    );
+    expect(verdictOf({ id: "a", status: "scored", evaluation: { eligibility_pass: false } })).toBe(
+      "not_eligible",
+    );
     expect(verdictOf({ id: "a", status: "scored" })).toBe("needs_input");
     expect(verdictOf({ id: "a", status: "scored", hardBlocked: true })).toBe("not_eligible");
   });
@@ -48,7 +60,14 @@ describe("grant radar", () => {
   it("parks closed / too-soon / not-eligible grants and groups by country", () => {
     const grants = [
       { id: "late", ...base, country: "CA", deadline: inDays(10), amount_cad_max: 200_000 },
-      { id: "good", ...base, country: "CA", deadline: inDays(40), amount_cad_max: 200_000, evaluation: { eligibility_pass: true, fit_score: 80 } },
+      {
+        id: "good",
+        ...base,
+        country: "CA",
+        deadline: inDays(40),
+        amount_cad_max: 200_000,
+        evaluation: { eligibility_pass: true, fit_score: 80 },
+      },
       { id: "us", ...base, country: "US", deadline: inDays(60), amount_cad_max: 90_000 },
       { id: "small", ...base, country: "US", amount_cad_max: 10_000 },
       { id: "unknownAmt", ...base, country: "MX" },
@@ -74,7 +93,13 @@ describe("grant radar", () => {
 });
 
 describe("grant radar eligibility pre-check", () => {
-  const rules = { jurisdictions: ["CA", "ON"], stage: "nonprofit", annualBudget: null, currency: "CAD", leadTimeWeeks: 4 };
+  const rules = {
+    jurisdictions: ["CA", "ON"],
+    stage: "nonprofit",
+    annualBudget: null,
+    currency: "CAD",
+    leadTimeWeeks: 4,
+  };
   it("runs the deterministic rules first and pre-filters ruled-out grants", () => {
     const grants = [
       { id: "ca", ...base, country: "CA", deadline: inDays(90), amount_cad_max: 100_000 },
@@ -92,13 +117,17 @@ describe("grant radar eligibility pre-check", () => {
 
   it("keeps a grant in needs-input when a critical requirement is unresolved", () => {
     const [item] = buildRadar(
-      [{
-        id: "partner",
-        ...base,
-        country: "CA",
-        deadline: inDays(90).slice(0, 10),
-        requirements: [{ category: "partnership", requirement: "Name a university partner", isCritical: true }],
-      }],
+      [
+        {
+          id: "partner",
+          ...base,
+          country: "CA",
+          deadline: inDays(90).slice(0, 10),
+          requirements: [
+            { category: "partnership", requirement: "Name a university partner", isCritical: true },
+          ],
+        },
+      ],
       { ...opts, rules },
     ).items;
     expect(item?.verdict).toBe("needs_input");
@@ -133,3 +162,18 @@ describe("grant radar eligibility pre-check", () => {
   });
 });
 
+describe("lexical fallback search", () => {
+  it("strips PostgREST-breaking characters and stop words", () => {
+    expect(lexicalFallbackTokens("R&D, (health) grant")).toEqual(["r&d", "health"]);
+  });
+  it("ranks grants matching more tokens higher and drops one-word coincidences", () => {
+    const tokens = lexicalFallbackTokens("community health disparities");
+    const strong = scoreLexicalFallback(
+      { title: "Addressing health disparities", summary: "community-focused approaches" },
+      tokens,
+    );
+    const weak = scoreLexicalFallback({ title: "NRC IRAP", summary: "community partners" }, tokens);
+    expect(strong?.relevance).toBeGreaterThan(0.6);
+    expect(weak).toBeNull();
+  });
+});

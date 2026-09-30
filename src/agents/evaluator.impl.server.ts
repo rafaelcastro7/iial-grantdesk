@@ -2,6 +2,7 @@
 // can be invoked directly from orchestrators (auto-evaluate, discoverAll)
 // without going through the TanStack server-fn resolver.
 
+import { createHash } from "node:crypto";
 import { EvaluatorOutput, PROMPTS, normalizeEvaluatorRaw } from "@/agents/schemas";
 import { canTransition, type GrantStatus } from "@/agents/pipeline-stages.shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -57,24 +58,13 @@ export async function evaluateGrantImpl(opts: {
     throw new Error("grant_not_found");
   }
   if (oerr) throw new Error(oerr.message);
-  const effectiveOrg = (org as Record<string, unknown> | null) ?? {
-    user_id: userId,
-    org_name: "IIAL - Instituto de Investigación Aplicada",
-    legal_name: "Instituto de Investigación Aplicada Limitada",
-    jurisdictions: ["CA", "US"],
-    sectors: ["Science & Technology", "Clean Technology", "Health", "Social Innovation", "Education"],
-    applicant_types: ["nonprofit", "research_institution", "business_sme"],
-    annual_budget_cad: 1_500_000,
-    funding_min_cad: 25_000,
-    funding_max_cad: 5_000_000,
-    stage: "research",
-    activities: ["Applied Research", "Technology Development", "Capacity Building"],
-    populations_served: ["Researchers", "Industry Partners", "Underrepresented Communities"],
-    operating_regions: ["Canada", "United States"],
-    languages: ["en", "fr", "es"],
-    capabilities: ["Artificial Intelligence", "Grant Writing", "Scientific Research"],
-    focus_areas: "Applied AI, software engineering, climate tech, medical intelligence.",
-  };
+  // No invented profile: scoring against placeholder facts produced numbers
+  // that looked real but described no organization.
+  if (!org) {
+    await trace("load", "Organization profile missing - complete /org first", "error");
+    throw new Error("org_profile_missing");
+  }
+  const effectiveOrg = org as Record<string, unknown>;
   await trace(
     "load",
     `Loaded grant "${g.title?.slice(0, 60)}" and org "${(effectiveOrg as { org_name?: string }).org_name ?? "(unnamed)"}"`,
@@ -161,6 +151,41 @@ export async function evaluateGrantImpl(opts: {
   let parsed: ReturnType<typeof EvaluatorOutput.parse>;
   let llmInputTokens: number | undefined = 0;
   let llmOutputTokens: number | undefined = 0;
+
+  // Evaluation cache: same grant facts + same org profile + same rules and
+  // prompt version give the same verdict, so skip the model call entirely.
+  // status/scored_at are excluded because scoring itself changes them.
+  const { status: _status, scored_at: _scoredAt, ...stableGrant } = g as Record<string, unknown>;
+  const inputHash = createHash("sha256")
+    .update(
+      JSON.stringify({
+        grant: stableGrant,
+        org: effectiveOrg,
+        rules,
+        v: PROMPTS.evaluator.version,
+      }),
+    )
+    .digest("hex");
+  const { data: prior } = await userSupabase
+    .from("grant_evaluations")
+    .select("fit_score, eligibility_pass, run_id, rule_snapshot")
+    .eq("user_id", userId)
+    .eq("grant_id", g.id)
+    .maybeSingle();
+  if (prior && (prior.rule_snapshot as { input_hash?: string } | null)?.input_hash === inputHash) {
+    await trace(
+      "cache",
+      "Inputs unchanged since last evaluation - reusing verdict (0 tokens)",
+      "done",
+    );
+    return {
+      ok: true,
+      runId: (prior.run_id as string | null) ?? runId,
+      fit_score: prior.fit_score as number,
+      eligibility_pass: prior.eligibility_pass as boolean,
+      cached: true,
+    };
+  }
 
   if (rulesResult.hard_fail) {
     const failedChecks = rulesResult.checks.filter((c) => c.status === "fail");
@@ -282,6 +307,7 @@ export async function evaluateGrantImpl(opts: {
       prompt_version: PROMPTS.evaluator.version,
       run_id: runId,
       rule_snapshot: {
+        input_hash: inputHash,
         checks: rulesResult.checks,
         hard_fail: rulesResult.hard_fail,
         rule_score: rulesResult.rule_score,
@@ -296,7 +322,8 @@ export async function evaluateGrantImpl(opts: {
           enrichment: "complete",
           deterministic_rules: "complete",
           expert_fit_review: "complete",
-          pre_application_compliance: (g.requirements ?? []).length > 0 ? "complete" : "needs_source_detail",
+          pre_application_compliance:
+            (g.requirements ?? []).length > 0 ? "complete" : "needs_source_detail",
         },
         threshold_fit_pass: rules.threshold_fit_pass,
         weight_llm: rules.weight_llm,

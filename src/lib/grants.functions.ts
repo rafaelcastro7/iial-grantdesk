@@ -226,27 +226,35 @@ export const listGrants = createServerFn({ method: "GET" })
       // search directly in grants table (title, summary, eligibility) and funders table.
       if (rankById.size < 20) {
         const cleanQuery = data.search.trim();
-        const searchTokens = cleanQuery.split(/\s+/).filter((t) => t.length >= 2);
-        const queryVariants = [cleanQuery, ...searchTokens];
-
-        for (const token of queryVariants) {
+        const { lexicalFallbackTokens, scoreLexicalFallback } = await import("@/lib/grant-radar");
+        const tokens = lexicalFallbackTokens(cleanQuery);
+        if (tokens.length > 0) {
+          // One query for all tokens; PostgREST .or() breaks on , ( ) so the
+          // tokens are already stripped of them.
+          const orFilter = tokens
+            .flatMap((t) => [
+              `title.ilike.%${t}%`,
+              `summary.ilike.%${t}%`,
+              `eligibility_note.ilike.%${t}%`,
+            ])
+            .join(",");
           const { data: directGrants } = await context.supabase
             .from("grants")
-            .select("id")
-            .or(`title.ilike.%${token}%,summary.ilike.%${token}%,eligibility_note.ilike.%${token}%`)
-            .limit(30);
-
+            .select("id, title, summary, eligibility_note")
+            .or(orFilter)
+            .limit(60);
           for (const dg of directGrants ?? []) {
-            if (!rankById.has(dg.id)) {
-              rankById.set(dg.id, {
-                relevance: 0.75,
-                matched_on: "text_fallback",
-                lexical_score: 0.75,
-                semantic_score: 0,
-                retrieval_mode: "lexical-fallback",
-                query_concepts: [token],
-              });
-            }
+            if (rankById.has(dg.id)) continue;
+            const scored = scoreLexicalFallback(dg, tokens);
+            if (!scored) continue;
+            rankById.set(dg.id, {
+              relevance: scored.relevance,
+              matched_on: "text_fallback",
+              lexical_score: scored.relevance,
+              semantic_score: 0,
+              retrieval_mode: "lexical-fallback",
+              query_concepts: scored.matched,
+            });
           }
         }
 
@@ -507,24 +515,29 @@ export const listGrants = createServerFn({ method: "GET" })
       .sort(
         (a, b) =>
           b.combinedRelevance - a.combinedRelevance ||
-          ((b.evaluation?.fit_score ?? b.grant.fit_score ?? 0) -
-            (a.evaluation?.fit_score ?? a.grant.fit_score ?? 0)),
+          (b.evaluation?.fit_score ?? b.grant.fit_score ?? 0) -
+            (a.evaluation?.fit_score ?? a.grant.fit_score ?? 0),
       )
       .slice(0, data.limit);
     const grants = grantsWithProfile.map(({ grant }) => grant);
-    const reviewByGrant = new Map<string, {
-      status: string;
-      coverage_pct: number;
-      missing_fields: Json;
-      critical_issues: Json;
-      next_action: string | null;
-      evaluated_at: string | null;
-    }>();
+    const reviewByGrant = new Map<
+      string,
+      {
+        status: string;
+        coverage_pct: number;
+        missing_fields: Json;
+        critical_issues: Json;
+        next_action: string | null;
+        evaluated_at: string | null;
+      }
+    >();
     if (principal?.org_id && grants.length > 0) {
       for (const ids of chunkIds(grants.map((grant) => grant.id))) {
         const { data: reviewStates, error: reviewError } = await context.supabase
           .from("grant_review_states")
-          .select("grant_id,status,coverage_pct,missing_fields,critical_issues,next_action,evaluated_at")
+          .select(
+            "grant_id,status,coverage_pct,missing_fields,critical_issues,next_action,evaluated_at",
+          )
           .eq("org_id", principal.org_id)
           .in("grant_id", ids);
         if (reviewError) throw new Error(`grant_review_states: ${reviewError.message}`);
@@ -1014,6 +1027,10 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
     z.object({ limit: z.number().int().min(1).max(100).default(50) }).parse(i ?? {}),
   )
   .handler(async ({ data, context }) => {
+    // Without an org profile every evaluation throws org_profile_missing.
+    const { data: org } = await getOrgProfileForUser(context.supabase, context.userId);
+    if (!org) return { ok: true, evaluated: 0, skipped: 0, reason: "org_profile_missing" as const };
+
     const { assertAgentEnabled } = await import("@/lib/admin-agents.functions");
     try {
       await assertAgentEnabled("evaluator", context.supabase as never);
@@ -1536,4 +1553,3 @@ export const refreshCatalog = createServerFn({ method: "POST" })
       evaluated,
     };
   });
-
