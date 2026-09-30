@@ -157,68 +157,89 @@ export async function evaluateGrantImpl(opts: {
     { axes: axisBreakdown },
   );
 
-  await trace("llm_call", "Calling model for fit verdict", "start");
-  const tLlm = Date.now();
   let usedModel = "deterministic-rules";
   let parsed: ReturnType<typeof EvaluatorOutput.parse>;
-  let llmInputTokens: number | undefined;
-  let llmOutputTokens: number | undefined;
+  let llmInputTokens: number | undefined = 0;
+  let llmOutputTokens: number | undefined = 0;
 
-  try {
-    const llm = await callLlm({
-      agent: "evaluator",
-      runId,
-      temperature: 0.1,
-      maxOutputTokens: 256,
-      responseFormat: "json",
-      validate: (text) => {
-        try {
-          const raw = JSON.parse(text);
-          if (raw && typeof raw === "object" && raw.eligibility_pass === undefined) {
-            raw.eligibility_pass = !rulesResult.hard_fail;
-          }
-          return EvaluatorOutput.safeParse(raw).success;
-        } catch {
-          return false;
-        }
-      },
-      messages: [
-        {
-          role: "system",
-          content: `${PROMPTS.evaluator.system}\nPrompt version: ${PROMPTS.evaluator.version}`,
-        },
-        { role: "user", content: JSON.stringify({ grant: g, organization: effectiveOrg }) },
-      ],
-    });
+  if (rulesResult.hard_fail) {
+    const failedChecks = rulesResult.checks.filter((c) => c.status === "fail");
+    const reasonText =
+      failedChecks.length > 0
+        ? failedChecks.map((c) => `${c.label}: FAIL`).join("; ")
+        : "Incompatible with institutional requirements";
     await trace(
       "llm_call",
-      `Verdict received (${llm.outputTokens ?? "?"} tokens, ${Date.now() - tLlm}ms)`,
-      "done",
-      { in: llm.inputTokens, out: llm.outputTokens },
-    );
-    usedModel = llm.model ?? "unknown";
-    llmInputTokens = llm.inputTokens;
-    llmOutputTokens = llm.outputTokens;
-    const raw = JSON.parse(llm.text);
-    if (raw && typeof raw === "object" && raw.eligibility_pass === undefined) {
-      raw.eligibility_pass = !rulesResult.hard_fail;
-    }
-    parsed = EvaluatorOutput.parse(raw);
-  } catch (llmErr) {
-    const errMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);
-    await trace(
-      "llm_call",
-      `Model rate-limited or busy (${errMsg.slice(0, 100)}). Falling back to deterministic rules engine.`,
-      "warn",
+      `Deterministic hard fail detected (${reasonText}). Skipping LLM call (0 tokens used).`,
+      "ok",
     );
     usedModel = "rules-engine-deterministic";
-    const ruleUnit = Math.max(0, Math.min(1, rulesResult.rule_score / 100));
     parsed = {
-      fit_score: ruleUnit,
-      eligibility_pass: !rulesResult.hard_fail,
-      rationale_en: `Evaluated using IIAL deterministic screening rules (score: ${rulesResult.rule_score}/100, hard_fail: ${rulesResult.hard_fail}). Criteria checks: ${rulesResult.checks.map((c) => `${c.label}: ${c.status.toUpperCase()}`).join("; ")}.`,
+      fit_score: Math.max(0, Math.min(1, rulesResult.rule_score / 100)),
+      eligibility_pass: false,
+      rationale_en: `Evaluated using deterministic screening rules (score: ${rulesResult.rule_score}/100, hard_fail: true). Disqualifying criteria: ${reasonText}.`,
       rationale_fr: null,
     };
+  } else {
+    await trace("llm_call", "Calling model for fit verdict", "start");
+    const tLlm = Date.now();
+
+    try {
+      const llm = await callLlm({
+        agent: "evaluator",
+        runId,
+        temperature: 0.1,
+        maxOutputTokens: 256,
+        responseFormat: "json",
+        validate: (text) => {
+          try {
+            const raw = JSON.parse(text);
+            if (raw && typeof raw === "object" && raw.eligibility_pass === undefined) {
+              raw.eligibility_pass = !rulesResult.hard_fail;
+            }
+            return EvaluatorOutput.safeParse(raw).success;
+          } catch {
+            return false;
+          }
+        },
+        messages: [
+          {
+            role: "system",
+            content: `${PROMPTS.evaluator.system}\nPrompt version: ${PROMPTS.evaluator.version}`,
+          },
+          { role: "user", content: JSON.stringify({ grant: g, organization: effectiveOrg }) },
+        ],
+      });
+      await trace(
+        "llm_call",
+        `Verdict received (${llm.outputTokens ?? "?"} tokens, ${Date.now() - tLlm}ms)`,
+        "done",
+        { in: llm.inputTokens, out: llm.outputTokens },
+      );
+      usedModel = llm.model ?? "unknown";
+      llmInputTokens = llm.inputTokens;
+      llmOutputTokens = llm.outputTokens;
+      const raw = JSON.parse(llm.text);
+      if (raw && typeof raw === "object" && raw.eligibility_pass === undefined) {
+        raw.eligibility_pass = !rulesResult.hard_fail;
+      }
+      parsed = EvaluatorOutput.parse(raw);
+    } catch (llmErr) {
+      const errMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);
+      await trace(
+        "llm_call",
+        `Model rate-limited or busy (${errMsg.slice(0, 100)}). Falling back to deterministic rules engine.`,
+        "warn",
+      );
+      usedModel = "rules-engine-deterministic";
+      const ruleUnit = Math.max(0, Math.min(1, rulesResult.rule_score / 100));
+      parsed = {
+        fit_score: ruleUnit,
+        eligibility_pass: !rulesResult.hard_fail,
+        rationale_en: `Evaluated using IIAL deterministic screening rules (score: ${rulesResult.rule_score}/100, hard_fail: ${rulesResult.hard_fail}). Criteria checks: ${rulesResult.checks.map((c) => `${c.label}: ${c.status.toUpperCase()}`).join("; ")}.`,
+        rationale_fr: null,
+      };
+    }
   }
 
   // Persist normalized 0..1 scores even though the combined trace is 0..100.
