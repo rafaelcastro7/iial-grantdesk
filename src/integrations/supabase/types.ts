@@ -1989,6 +1989,266 @@ export type Database = {
           },
         ]
       }
+      grant_review_jobs: {
+        Row: {
+          blocked_items: number
+          completed_at: string | null
+          completed_items: number
+          created_at: string
+          criteria_version: string
+          failed_items: number
+          id: string
+          lock_token: string | null
+          locked_until: string | null
+          org_id: string
+          pause_reason: string | null
+          requested_by: string
+          started_at: string | null
+          status: string
+          total_items: number
+          updated_at: string
+        }
+        Insert: {
+          blocked_items?: number
+          completed_at?: string | null
+          completed_items?: number
+          created_at?: string
+          criteria_version?: string
+          failed_items?: number
+          id?: string
+          lock_token?: string | null
+          locked_until?: string | null
+          org_id: string
+          pause_reason?: string | null
+          requested_by: string
+          started_at?: string | null
+          status?: string
+          total_items?: number
+          updated_at?: string
+        }
+        Update: {
+          blocked_items?: number
+          completed_at?: string | null
+          completed_items?: number
+          created_at?: string
+          criteria_version?: string
+          failed_items?: number
+          id?: string
+          lock_token?: string | null
+          locked_until?: string | null
+          org_id?: string
+          pause_reason?: string | null
+          requested_by?: string
+          started_at?: string | null
+          status?: string
+          total_items?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_review_jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grant_review_overrides: {
+        Row: {
+          action: string
+          created_at: string
+          created_by: string
+          evidence_url: string | null
+          grant_id: string
+          id: string
+          issue_key: string
+          justification: string
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          created_by: string
+          evidence_url?: string | null
+          grant_id: string
+          id?: string
+          issue_key: string
+          justification: string
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          created_by?: string
+          evidence_url?: string | null
+          grant_id?: string
+          id?: string
+          issue_key?: string
+          justification?: string
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_review_overrides_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_review_overrides_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grant_review_queue: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          grant_id: string
+          id: string
+          job_id: string
+          last_error: string | null
+          lock_token: string | null
+          locked_until: string | null
+          next_attempt_at: string
+          priority: number
+          stage: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          grant_id: string
+          id?: string
+          job_id: string
+          last_error?: string | null
+          lock_token?: string | null
+          locked_until?: string | null
+          next_attempt_at?: string
+          priority?: number
+          stage?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          grant_id?: string
+          id?: string
+          job_id?: string
+          last_error?: string | null
+          lock_token?: string | null
+          locked_until?: string | null
+          next_attempt_at?: string
+          priority?: number
+          stage?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_review_queue_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_review_queue_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "grant_review_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grant_review_states: {
+        Row: {
+          coverage_pct: number
+          created_at: string
+          criteria_version: string
+          critical_issues: Json
+          evaluated_at: string | null
+          evidence_count: number
+          grant_id: string
+          id: string
+          last_error: string | null
+          missing_fields: Json
+          next_action: string | null
+          org_id: string
+          requirement_count: number
+          source_checked_at: string | null
+          stages: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          coverage_pct?: number
+          created_at?: string
+          criteria_version?: string
+          critical_issues?: Json
+          evaluated_at?: string | null
+          evidence_count?: number
+          grant_id: string
+          id?: string
+          last_error?: string | null
+          missing_fields?: Json
+          next_action?: string | null
+          org_id: string
+          requirement_count?: number
+          source_checked_at?: string | null
+          stages?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          coverage_pct?: number
+          created_at?: string
+          criteria_version?: string
+          critical_issues?: Json
+          evaluated_at?: string | null
+          evidence_count?: number
+          grant_id?: string
+          id?: string
+          last_error?: string | null
+          missing_fields?: Json
+          next_action?: string | null
+          org_id?: string
+          requirement_count?: number
+          source_checked_at?: string | null
+          stages?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_review_states_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_review_states_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grant_search_benchmark_runs: {
         Row: {
           coverage: Json
@@ -4125,6 +4385,31 @@ export type Database = {
       can_access_tenant_entity: {
         Args: { p_entity_id: string; p_entity_type: string }
         Returns: boolean
+      }
+      claim_grant_review_batch: {
+        Args: { p_job_id: string; p_lease_seconds?: number; p_limit?: number }
+        Returns: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          grant_id: string
+          id: string
+          job_id: string
+          last_error: string | null
+          lock_token: string | null
+          locked_until: string | null
+          next_attempt_at: string
+          priority: number
+          stage: string
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "grant_review_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       ensure_consultant: { Args: never; Returns: undefined }
       ensure_current_user: { Args: never; Returns: undefined }
