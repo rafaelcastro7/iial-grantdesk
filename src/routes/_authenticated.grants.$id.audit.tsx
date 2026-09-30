@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/grants/$id/audit")({
     meta: [{ title: `Scoring details · Grant ${params.id.slice(0, 8)} — IIAL` }],
   }),
   loader: ({ context, params }) => context.queryClient.ensureQueryData(auditQuery(params.id)),
-  errorComponent: ({ error }) => <div className="p-6 text-destructive">{error.message}</div>,
+  errorComponent: ({ error }) => <div className="p-6 text-destructive">{(error as Error).message}</div>,
   notFoundComponent: () => <div className="p-6">Not found</div>,
   component: AuditPage,
 });

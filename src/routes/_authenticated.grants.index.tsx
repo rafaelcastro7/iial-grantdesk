@@ -94,7 +94,7 @@ export const Route = createFileRoute("/_authenticated/grants/")({
     ],
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(grantsQueryOptions()),
-  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error} reset={reset} />,
+  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,
   pendingComponent: GrantsListSkeleton,
   component: GrantsPage,
 });

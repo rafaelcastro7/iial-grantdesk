@@ -70,7 +70,7 @@ export const Route = createFileRoute("/_authenticated/grants/$id")({
       throw e;
     }
   },
-  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error} reset={reset} />,
+  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,
   notFoundComponent: () => (
     <div className="mx-auto max-w-lg space-y-3 p-8 text-center">
       <h1 className="text-xl font-semibold">This grant is no longer available</h1>

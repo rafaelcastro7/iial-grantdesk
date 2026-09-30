@@ -3,10 +3,9 @@ import { serverEnv } from "@/lib/env.server";
 /**
  * Language model access.
  *
- * Provider chain, in order: Cerebras, Groq, Gemini, and finally the Lovable
- * AI Gateway as the floor. The external providers carry the volume so the
- * gateway's credits are spent only when every external key is missing or
- * failing. What survives from the original design is the part that mattered —
+ * Provider chain: Lovable AI Gateway first (primary), then Gemini, Groq and
+ * Cerebras as fallbacks when the gateway fails. What survives from the
+ * original design is the part that mattered —
  * a caller asks for a *role*, gets back the text plus a record of what was
  * attempted, and a failure is reported rather than silently degraded.
  */
@@ -283,8 +282,27 @@ export async function callLlm(
   const attempts: string[] = [];
   const env = serverEnv();
 
-  // External providers first: each gets one shot, then we move on. Their
-  // free tiers carry the volume; the gateway below is the paid floor.
+  // Lovable AI Gateway first (primary). External providers are the fallback.
+  if (env.LOVABLE_API_KEY) {
+    const maxTries = request.noWait ? 1 : 3;
+
+    for (let attempt = 0; attempt < maxTries; attempt++) {
+      try {
+        const result = await callGateway(request);
+        if (request.validate && !request.validate(result.text)) {
+          attempts.push("lovable-ai: failed caller validation");
+          continue;
+        }
+        return { ...result, attempts };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        attempts.push(`lovable-ai: ${message}`);
+        if (!retryable(message) || attempt === maxTries - 1) break;
+        await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** attempt + Math.random() * 400));
+      }
+    }
+  }
+
   for (const provider of EXTERNAL_PROVIDERS) {
     const apiKey = env[provider.envKey];
     if (!apiKey) continue;
@@ -315,25 +333,6 @@ export async function callLlm(
     }
   }
 
-  if (env.LOVABLE_API_KEY) {
-    const maxTries = request.noWait ? 1 : 3;
-
-    for (let attempt = 0; attempt < maxTries; attempt++) {
-      try {
-        const result = await callGateway(request);
-        if (request.validate && !request.validate(result.text)) {
-          attempts.push("lovable-ai: failed caller validation");
-          continue;
-        }
-        return { ...result, attempts };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        attempts.push(`lovable-ai: ${message}`);
-        if (!retryable(message) || attempt === maxTries - 1) break;
-        await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** attempt + Math.random() * 400));
-      }
-    }
-  }
 
   throw new LlmUnavailableError(attempts);
 }
