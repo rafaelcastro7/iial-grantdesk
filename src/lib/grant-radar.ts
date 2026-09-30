@@ -5,8 +5,6 @@
 // The verdict is read from the stored deterministic evaluation; nothing here
 // asks a model or guesses. "needs_input" is a real answer, not a failure.
 
-import { isActiveGrantStatus } from "@/agents/pipeline-stages.shared";
-
 export type RadarVerdict = "eligible" | "needs_input" | "not_eligible";
 export type RadarTiming = "closed" | "too_soon" | "urgent" | "comfortable" | "open_ended";
 export type RadarNextAction = "enrich" | "evaluate" | "draft" | "open";
@@ -85,6 +83,8 @@ export type RadarResult<T extends RadarGrant> = {
 const DAY_MS = 86_400_000;
 const NEW_STATUSES = new Set(["discovered", "enriched", "scored"]);
 const PURSUING_STATUSES = new Set(["shortlisted", "in_proposal", "submitted"]);
+/** Outcomes the radar no longer needs to act on. */
+const FINISHED_STATUSES = new Set(["won", "lost", "expired", "archived"]);
 
 function funderOf(g: RadarGrant) {
   return Array.isArray(g.funder) ? (g.funder[0] ?? null) : (g.funder ?? null);
@@ -203,10 +203,10 @@ function matchesStatus(status: string, filter: RadarStatusFilter): boolean {
     case "pursuing":
       return PURSUING_STATUSES.has(status);
     case "closed":
-      return !isActiveGrantStatus(status as never);
+      return FINISHED_STATUSES.has(status);
     case "active":
     default:
-      return isActiveGrantStatus(status as never);
+      return !FINISHED_STATUSES.has(status);
   }
 }
 
