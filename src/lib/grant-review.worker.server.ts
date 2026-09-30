@@ -8,7 +8,7 @@ export async function reviewClaimedGrant(opts: {
   orgId: string;
   userId: string;
   db: SupabaseClient;
-}) {
+}): Promise<{ pauseReason?: string }> {
   const { item, orgId, userId, db } = opts;
   try {
     const { data: before, error: beforeError } = await db.from("grants").select("status").eq("id", item.grant_id).single();
@@ -75,8 +75,10 @@ export async function reviewClaimedGrant(opts: {
     }, { onConflict: "org_id,grant_id" });
     if (stateError) throw stateError;
     await db.from("grant_review_queue").update({ status: finalStatus, stage: "complete", completed_at: new Date().toISOString(), locked_until: null, lock_token: null, last_error: null }).eq("id", item.id);
+    return {};
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const shouldPause = /HTTP (402|403)|insufficient|credit.limit|provider.not.available|not registered/i.test(message);
     const retry = item.attempts < 3;
     await db.from("grant_review_queue").update({
       status: retry ? "queued" : "failed",
@@ -86,5 +88,6 @@ export async function reviewClaimedGrant(opts: {
       lock_token: null,
       completed_at: retry ? null : new Date().toISOString(),
     }).eq("id", item.id);
+    return shouldPause ? { pauseReason: message.slice(0, 500) } : {};
   }
 }

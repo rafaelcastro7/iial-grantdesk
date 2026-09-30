@@ -6,7 +6,6 @@ import {
   listGrants,
   discoverAllFunders,
   enrichGrant,
-  autoEvaluatePending,
 } from "@/lib/grants.functions";
 import { runEvaluator } from "@/agents/evaluator.functions";
 import { runStrategist } from "@/agents/strategist.functions";
@@ -109,7 +108,6 @@ function GrantsPage() {
   const strategize = useServerFn(runStrategist);
   const discoverAll = useServerFn(discoverAllFunders);
   const enrichOne = useServerFn(enrichGrant);
-  const autoEvaluate = useServerFn(autoEvaluatePending);
   const startStrictReview = useServerFn(startStrictGrantReview);
   const processStrictReview = useServerFn(processStrictGrantReview);
   const getStrictReview = useServerFn(getStrictGrantReview);
@@ -266,28 +264,6 @@ function GrantsPage() {
     onError: fail,
   });
 
-  // Evaluate pending grants once per visit (deterministic checks + fit notes).
-  const autoRan = useRef(false);
-  useEffect(() => {
-    if (autoRan.current) return;
-    autoRan.current = true;
-    const ids = grants
-      .filter((g) => !g.evaluation && ["discovered", "enriched", "scored", "shortlisted"].includes(g.status))
-      .map((g) => g.id);
-    if (ids.length === 0) return;
-    setEvaluatingIds(new Set(ids.slice(0, 10)));
-    autoEvaluate({ data: { limit: 10 } })
-      .then(async (r) => {
-        if (r.evaluated > 0) setInfo(`${r.evaluated} grant(s) checked automatically.`);
-        else if ("reason" in r && r.reason === "org_profile_missing")
-          setInfo("Complete your organization profile to enable eligibility checks.");
-        await refresh();
-      })
-      .catch(fail)
-      .finally(() => setEvaluatingIds(new Set()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grants]);
-
   async function run(key: string, work: () => Promise<void>) {
     setPending(key);
     setError(null);
@@ -347,7 +323,6 @@ function GrantsPage() {
           `Checked ${r.queued} funder(s): ${r.totalInserted ?? 0} new opportunities, ${r.totalSeenAgain ?? 0} already tracked.`,
         );
       }
-      autoRan.current = false;
     });
 
   const onStartStrictReview = async () => {

@@ -107,8 +107,13 @@ export const processStrictGrantReview = createServerFn({ method: "POST" })
     });
     if (claimError) throw new Error(claimError.message);
     const { reviewClaimedGrant } = await import("@/lib/grant-review.worker.server");
+    let pauseReason: string | null = null;
     for (const item of claimed ?? []) {
-      await reviewClaimedGrant({ item, orgId, userId: context.userId, db });
+      const result = await reviewClaimedGrant({ item, orgId, userId: context.userId, db });
+      if (result.pauseReason) {
+        pauseReason = result.pauseReason;
+        break;
+      }
     }
 
     const { data: queue } = await db.from("grant_review_queue").select("status").eq("job_id", job.id);
@@ -121,7 +126,8 @@ export const processStrictGrantReview = createServerFn({ method: "POST" })
       completed_items: completed,
       blocked_items: blocked,
       failed_items: failed,
-      status: pending === 0 ? "completed" : "running",
+      status: pauseReason ? "paused" : pending === 0 ? "completed" : "running",
+      pause_reason: pauseReason,
       completed_at: pending === 0 ? new Date().toISOString() : null,
     }).eq("id", job.id);
     return { processed: claimed?.length ?? 0, pending, completed, blocked, failed };

@@ -119,6 +119,25 @@ export function RadarCard({
               </p>
             </div>
           )}
+          {g.reviewState && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border bg-secondary px-2 py-0.5 font-medium text-secondary-foreground">
+                Evidence {g.reviewState.coverage_pct}%
+              </span>
+              {g.reviewState.status === "applicable" ? (
+                <span className="text-eligible">Strict review passed</span>
+              ) : g.reviewState.status === "remediable" ? (
+                <span className="text-needs-input">Can be remediated</span>
+              ) : g.reviewState.status === "ineligible" ? (
+                <span className="text-ineligible">Rule-based exclusion</span>
+              ) : (
+                <span className="text-muted-foreground">Needs source verification</span>
+              )}
+              {g.reviewState.next_action && (
+                <span className="line-clamp-1 text-muted-foreground">Next: {g.reviewState.next_action}</span>
+              )}
+            </div>
+          )}
           <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <span className={cn("inline-flex items-center gap-1", timingTone)}>
               <CalendarClock className="h-3.5 w-3.5" />
