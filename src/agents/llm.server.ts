@@ -81,6 +81,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult> {
       "gen_ai.request.model": "openai/gpt-6-astra",
       "gen_ai.operation.name": "chat",
       latency_ms: Date.now() - t0,
+      ok,
       agent: opts.agent,
       run_id: runId,
       ...(errMsg ? { error: errMsg } : {}),
