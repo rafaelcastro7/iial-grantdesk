@@ -12,7 +12,7 @@
 # GrantDesk — project rules
 
 - Keep server functions in `src/lib/*.functions.ts`; dynamically import server-only `src/server/` modules inside handlers to protect the client bundle.
-- Text AI priority is Cerebras → Groq → Gemini → Lovable; embeddings use Lovable `google/gemini-embedding-2` at 768 dimensions. This minimizes paid traffic without losing fallback reliability.
+- Text AI priority is Lovable AI Gateway first, then Gemini → Groq → Cerebras as fallback; embeddings use Lovable `google/gemini-embedding-2` at 768 dimensions. User requested Lovable Cloud AI as the primary resource.
 - Never impose client deadlines on AI calls because aborted generation still completes and bills.
 - Keep eligibility deterministic in `src/lib/eligibility.ts`; models never decide verdicts and `unknown` is valid.
 - Run catalog ingest and embedding through signed-in `refreshCatalog`; there is no cron.
