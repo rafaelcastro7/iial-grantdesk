@@ -452,9 +452,14 @@ export function decideEligibility(input: EligibilityInput): EligibilityDecision 
   // Eligible, but say what we could not verify rather than implying we checked
   // everything. A consultant who is told "eligible" and later finds an
   // unpublished restriction stops trusting every other verdict too.
+  // A failed soft check (e.g. too little runway) never flips the verdict, but
+  // it must not be hidden behind "meets every requirement" either.
+  const warning = checks.find((c) => !c.isHardGate && c.status === "fail");
   const unverified = checks.find((c) => !c.isHardGate && c.status === "unknown");
-  const headline = unverified
-    ? `Meets every published requirement we can check. ${unverified.detail}`
-    : "Meets every published requirement.";
+  const headline = warning
+    ? `Meets the published requirements, but: ${warning.detail}`
+    : unverified
+      ? `Meets every published requirement we can check. ${unverified.detail}`
+      : "Meets every published requirement.";
   return { verdict: "eligible", checks, headline };
 }

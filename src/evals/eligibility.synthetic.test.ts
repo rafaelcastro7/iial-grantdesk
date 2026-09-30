@@ -26,9 +26,10 @@ describe("synthetic eligibility (deterministic)", () => {
     expect(d.verdict).toBe("ineligible");
   });
 
-  it("rejects a deadline inside the 4-week lead time", () => {
-    const d = decideEligibility(base({ deadline: "2026-10-07" }));
-    expect(d.verdict).not.toBe("eligible");
+  it("warns (soft) when the deadline is inside the 4-week lead time", () => {
+    const d = decideEligibility(base({ deadline: "2026-10-07", eligibleApplicantTypes: ["nonprofit"] }));
+    expect(d.checks.find((c) => c.key === "runway")?.status).toBe("fail");
+    if (d.verdict === "eligible") expect(d.headline).toMatch(/days left/);
   });
 
   it("does not reject a country outside jurisdictions without evidence — never guesses a pass either", () => {
