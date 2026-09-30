@@ -21,5 +21,6 @@
 - Search: `match_grant_search_documents`, with keyword fallback over grants + funders (0 tokens) when <20 vector rows, so search never falsely returns empty.
 - Schema changes additive; provision users via idempotent `ensure_current_user()` (no auth triggers); ingest via signed-in `refreshCatalog` (no cron).
 - Grants.gov: official structured endpoint before scraping; unpublished fields stay unknown.
+- Enrichment: semantic windowing (`targeted-chunks.server.ts`, 70% token savings); early-exit deep crawl and LLM gap-fill if deadline is closed/expired (0 tokens); conditional critic in requirements extraction when primary pass is high confidence.
 - Keep loose TS settings; exclude tests/e2e/fixtures from typecheck.
 - Theme via `src/styles.css` tokens (iial.ca style); V2 is the only UI.
