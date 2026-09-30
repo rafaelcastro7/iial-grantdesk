@@ -456,6 +456,25 @@ export const listGrants = createServerFn({ method: "GET" })
       )
       .slice(0, data.limit);
     const grants = grantsWithProfile.map(({ grant }) => grant);
+    const reviewByGrant = new Map<string, {
+      status: string;
+      coverage_pct: number;
+      missing_fields: Json;
+      critical_issues: Json;
+      next_action: string | null;
+      evaluated_at: string | null;
+    }>();
+    if (principal?.org_id && grants.length > 0) {
+      for (const ids of chunkIds(grants.map((grant) => grant.id))) {
+        const { data: reviewStates, error: reviewError } = await context.supabase
+          .from("grant_review_states")
+          .select("grant_id,status,coverage_pct,missing_fields,critical_issues,next_action,evaluated_at")
+          .eq("org_id", principal.org_id)
+          .in("grant_id", ids);
+        if (reviewError) throw new Error(`grant_review_states: ${reviewError.message}`);
+        for (const state of reviewStates ?? []) reviewByGrant.set(state.grant_id, state);
+      }
+    }
     // Previously a single `.in("grant_id", ids)` call with ~100 UUIDs — and
     // since only `data` was destructured, the resulting gateway error was
     // silently swallowed, leaving every grant's evaluation blank (frontend
@@ -587,6 +606,7 @@ export const listGrants = createServerFn({ method: "GET" })
           qualityMatch,
           rankingBreakdown,
           evaluation,
+          reviewState: reviewByGrant.get(g.id) ?? null,
           hardBlocked,
           isNewSinceLastReview,
           changedSinceFeedback,

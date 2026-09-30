@@ -89,4 +89,12 @@ export type GrantRowData = {
   // a real, recurring data-quality issue (contaminated test-seed rows, or
   // genuine re-discovery not yet deduped). UI-only signal, never merges data.
   duplicateGroupSize?: number;
+  reviewState?: {
+    status: string;
+    coverage_pct: number;
+    missing_fields: unknown;
+    critical_issues: unknown;
+    next_action: string | null;
+    evaluated_at: string | null;
+  } | null;
 };
