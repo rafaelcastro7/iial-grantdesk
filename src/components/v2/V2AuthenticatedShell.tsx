@@ -302,7 +302,7 @@ function V2DesktopNav({
           </div>
           <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-white/62">
             <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">Lovable AI</span>
-            <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">Supabase</span>
+            <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">Lovable Cloud</span>
             <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">RLS</span>
             <Tooltip>
               <TooltipTrigger asChild>
