@@ -147,8 +147,14 @@ function TasksPage() {
                     className="space-y-4"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (!form.title.trim()) return toast.error("Title is required");
-                      if (!form.entityId.trim()) return toast.error("Entity ID is required");
+                      if (!form.title.trim()) {
+                      toast.error("Title is required");
+                      return;
+                    }
+                      if (!form.entityId.trim()) {
+                      toast.error("Entity ID is required");
+                      return;
+                    }
                       createMutation.mutate(form);
                     }}
                   >
@@ -415,8 +421,14 @@ function TasksPageV2({
                   className="space-y-4"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (!form.title.trim()) return toast.error("Title is required");
-                    if (!form.entityId.trim()) return toast.error("Entity ID is required");
+                    if (!form.title.trim()) {
+                      toast.error("Title is required");
+                      return;
+                    }
+                    if (!form.entityId.trim()) {
+                      toast.error("Entity ID is required");
+                      return;
+                    }
                     createMutation.mutate(form);
                   }}
                 >

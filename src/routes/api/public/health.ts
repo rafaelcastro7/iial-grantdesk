@@ -5,7 +5,7 @@ export const Route = createFileRoute("/api/public/health")({
   server: {
     handlers: {
       GET: async () => {
-        const result = await healthCheck({});
+        const result = await healthCheck({ data: {} });
         return Response.json(result);
       },
     },

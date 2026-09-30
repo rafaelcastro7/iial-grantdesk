@@ -147,6 +147,7 @@ function FunderProfilePage() {
     mutationFn: async () => {
       const insert: GrantInsert = {
         funder_id: funderId,
+        country: funder?.country ?? "CA",
         title: grantForm.title,
         summary: grantForm.description || null,
         amount_cad_min: grantForm.amount_min ? Number(grantForm.amount_min) : null,
