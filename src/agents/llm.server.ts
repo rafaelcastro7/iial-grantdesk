@@ -77,14 +77,13 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult> {
     throw error;
   } finally {
     logGenAI({
-      runId,
+      "gen_ai.system": "lovable",
+      "gen_ai.request.model": "openai/gpt-6-astra",
+      "gen_ai.operation.name": "chat",
+      latency_ms: Date.now() - t0,
       agent: opts.agent,
-      provider: "lovable-ai",
-      model: "openai/gpt-6-astra",
-      latencyMs: Date.now() - t0,
-      ok,
-      error: errMsg,
-      outputChars: text.length,
+      run_id: runId,
+      ...(errMsg ? { error: errMsg } : {}),
     });
   }
 }
