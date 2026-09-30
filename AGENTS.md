@@ -25,3 +25,4 @@
 - New users get their profile + default role from the idempotent `ensure_current_user()` RPC called in the `_authenticated` layout, because triggers on the auth schema are not allowed here.
 - Eligibility headline surfaces a failed soft check (e.g. short runway) instead of "meets every requirement"; soft checks still never flip the verdict.
 - Live synthetic tests (`src/evals/grant-search.live.test.ts`) hit the real cloud database and AI gateway and run only with `LIVE_CLOUD=1`; the default unit run spends no credits.
+- Grant Radar ranking, filtering and country grouping live only in the pure `src/lib/grant-radar.ts` (tested); UI in `src/components/grants/radar/`. Keeps one source of truth instead of sort logic scattered across route and components.
