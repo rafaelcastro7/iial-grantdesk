@@ -515,7 +515,7 @@ export async function enrichGrantImpl(
       // irrelevant ones. Raising max 3→6 roughly doubled how much irrelevant
       // page content could ride along into the prompt, which is what turned
       // the enricher's 4096-token context budget from marginal into
-      // consistently blown (see llm-timeouts.server.ts's header comment).
+      // consistently blown by large multi-page prompts.
       pages.push(...relevantDeepPages);
       await trace(
         "deep_crawl",
