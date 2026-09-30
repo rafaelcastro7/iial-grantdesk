@@ -377,6 +377,7 @@ function detectExplicitEligibleApplicantTypes(g: GrantForRules): ApplicantCatego
   const structured: ApplicantCategory[] = [];
   if (eligibility && typeof eligibility === "object" && !Array.isArray(eligibility)) {
     for (const [key, value] of Object.entries(eligibility as Record<string, unknown>)) {
+      if (norm(key) === "research university") continue;
       if (value === true || (typeof value === "string" && /^(true|yes|eligible)$/i.test(value))) {
         structured.push(...applicantCategories(norm(key)));
       }
