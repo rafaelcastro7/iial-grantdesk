@@ -1,12 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSuspenseQuery, useQuery, queryOptions, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   listGrants,
   discoverAllFunders,
   enrichGrant,
-  autoEvaluatePending,
 } from "@/lib/grants.functions";
 import { runEvaluator } from "@/agents/evaluator.functions";
 import { runStrategist } from "@/agents/strategist.functions";
@@ -33,6 +32,12 @@ import {
 import { buildRadar } from "@/lib/grant-radar";
 import { listRadarProfiles } from "@/lib/radar.functions";
 import { EligibilityCheckBar } from "@/components/grants/radar/EligibilityCheckBar";
+import { StrictReviewProgress } from "@/components/grants/StrictReviewProgress";
+import {
+  getStrictGrantReview,
+  processStrictGrantReview,
+  startStrictGrantReview,
+} from "@/lib/grant-review.functions";
 import "@/i18n";
 
 const grantsQueryOptions = (search = "", profileId?: string) =>
@@ -103,7 +108,9 @@ function GrantsPage() {
   const strategize = useServerFn(runStrategist);
   const discoverAll = useServerFn(discoverAllFunders);
   const enrichOne = useServerFn(enrichGrant);
-  const autoEvaluate = useServerFn(autoEvaluatePending);
+  const startStrictReview = useServerFn(startStrictGrantReview);
+  const processStrictReview = useServerFn(processStrictGrantReview);
+  const getStrictReview = useServerFn(getStrictGrantReview);
   const recordSearchFeedback = useServerFn(recordGrantSearchFeedback);
   const markProfileReviewed = useServerFn(markGrantSearchProfileReviewed);
 
@@ -123,6 +130,7 @@ function GrantsPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [activeJob, setActiveJob] = useState<{ jobId: string; queued: number } | null>(null);
   const [selectedFunders, setSelectedFunders] = useState<Set<string>>(new Set());
+  const [strictReviewBusy, setStrictReviewBusy] = useState(false);
 
   useEffect(() => ss.set(FILTERS_KEY, JSON.stringify(filters)), [filters]);
   useEffect(() => ss.set(FACETS_KEY, JSON.stringify(facets)), [facets]);
@@ -162,6 +170,12 @@ function GrantsPage() {
     queryKey: ["radar", "profiles"],
     queryFn: () => listRadarProfiles(),
     staleTime: 60_000,
+  });
+  const { data: strictReview, refetch: refetchStrictReview } = useQuery({
+    queryKey: ["grant-review", "latest"],
+    queryFn: () => getStrictReview({ data: {} }),
+    enabled: isAdmin,
+    refetchInterval: 15_000,
   });
   const [checkClientId, setCheckClientIdState] = useState<string | null>(null);
   useEffect(() => {
@@ -250,28 +264,6 @@ function GrantsPage() {
     onError: fail,
   });
 
-  // Evaluate pending grants once per visit (deterministic checks + fit notes).
-  const autoRan = useRef(false);
-  useEffect(() => {
-    if (autoRan.current) return;
-    autoRan.current = true;
-    const ids = grants
-      .filter((g) => !g.evaluation && ["discovered", "enriched", "scored", "shortlisted"].includes(g.status))
-      .map((g) => g.id);
-    if (ids.length === 0) return;
-    setEvaluatingIds(new Set(ids.slice(0, 10)));
-    autoEvaluate({ data: { limit: 10 } })
-      .then(async (r) => {
-        if (r.evaluated > 0) setInfo(`${r.evaluated} grant(s) checked automatically.`);
-        else if ("reason" in r && r.reason === "org_profile_missing")
-          setInfo("Complete your organization profile to enable eligibility checks.");
-        await refresh();
-      })
-      .catch(fail)
-      .finally(() => setEvaluatingIds(new Set()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grants]);
-
   async function run(key: string, work: () => Promise<void>) {
     setPending(key);
     setError(null);
@@ -331,8 +323,41 @@ function GrantsPage() {
           `Checked ${r.queued} funder(s): ${r.totalInserted ?? 0} new opportunities, ${r.totalSeenAgain ?? 0} already tracked.`,
         );
       }
-      autoRan.current = false;
     });
+
+  const onStartStrictReview = async () => {
+    setStrictReviewBusy(true);
+    setError(null);
+    try {
+      const started = await startStrictReview({ data: { includeTerminal: false } });
+      setInfo(`${started.queued} grants queued for strict, source-backed review.`);
+      await refetchStrictReview();
+    } catch (e) {
+      fail(e);
+    } finally {
+      setStrictReviewBusy(false);
+    }
+  };
+
+  const onContinueStrictReview = async () => {
+    const jobId = strictReview?.job?.id;
+    if (!jobId) return;
+    setStrictReviewBusy(true);
+    setError(null);
+    try {
+      const result = await processStrictReview({ data: { jobId, limit: 2 } });
+      setInfo(
+        result.pending > 0
+          ? `${result.processed} reviewed; ${result.pending} remain in the controlled queue.`
+          : "Strict catalog review completed.",
+      );
+      await Promise.all([refetchStrictReview(), refresh()]);
+    } catch (e) {
+      fail(e);
+    } finally {
+      setStrictReviewBusy(false);
+    }
+  };
 
   const notices = [
     error && { tone: "error" as const, text: error, onClose: () => setError(null) },
@@ -380,6 +405,15 @@ function GrantsPage() {
             <OrgRulesDriftBanner />
             <GrantSearchProfileBar selectedProfileId={searchProfileId} onSelect={setSearchProfileId} />
           </>
+        }
+        reviewProgress={
+          <StrictReviewProgress
+            job={strictReview?.job ?? null}
+            busy={strictReviewBusy}
+            isAdmin={isAdmin}
+            onStart={onStartStrictReview}
+            onContinue={onContinueStrictReview}
+          />
         }
         moreFilters={
           <div className="space-y-3 rounded-lg border bg-card p-3 text-sm">

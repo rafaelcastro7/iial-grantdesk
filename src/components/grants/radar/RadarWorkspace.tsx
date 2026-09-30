@@ -31,6 +31,7 @@ export function RadarWorkspace({
   isAdmin,
   admin,
   searchMode,
+  reviewProgress,
 }: {
   radar: RadarResult<GrantRowData>;
   totalLoaded: number;
@@ -44,6 +45,7 @@ export function RadarWorkspace({
   moreFilters?: ReactNode;
   /** Retrieval mode of a server search, when one is active. */
   searchMode?: string | null;
+  reviewProgress?: ReactNode;
   isAdmin: boolean;
   admin: {
     activeJob: { jobId: string; queued: number } | null;
@@ -125,6 +127,8 @@ export function RadarWorkspace({
       ))}
 
       {profileBar}
+
+      {reviewProgress}
 
       <div className="grid grid-cols-2 border-b md:grid-cols-4 md:divide-x">
         <Stat label="You can apply" value={counts.eligible} tone="text-eligible" />
