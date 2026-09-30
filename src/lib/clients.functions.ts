@@ -423,7 +423,10 @@ export const listGrantsForOrganization = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     // Filter by min fit score if provided
-    let filtered = grants ?? [];
+    let filtered = (grants ?? []).map((g) => ({
+      ...g,
+      evaluation: Array.isArray(g.evaluation) ? (g.evaluation[0] ?? null) : g.evaluation,
+    }));
     if (data.minFitScore !== undefined) {
       filtered = filtered.filter((g) => (g.evaluation?.fit_score ?? 0) >= data.minFitScore!);
     }

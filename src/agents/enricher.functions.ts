@@ -1013,7 +1013,7 @@ export async function enrichGrantImpl(
   patch.status = "enriched";
   patch.enriched_at = new Date().toISOString();
   patch.source_freshness_at = new Date().toISOString();
-  patch.source_confidence = scraped.via === "direct" ? 0.95 : 0.85;
+  patch.source_confidence = (scraped.via as string) === "direct" ? 0.95 : 0.85;
   patch.enrich_last_error = null;
   patch.enrich_last_attempt_at = new Date().toISOString();
   const { error: updateError } = await db

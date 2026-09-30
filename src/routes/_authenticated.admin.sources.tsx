@@ -147,7 +147,9 @@ function SourcesPage() {
   const sources: SourceRow[] = q.data?.sources ?? [];
   const health: HealthRow[] = q.data?.health ?? [];
   const healthMap = new Map(health.map((h) => [h.dataset ?? "", h]));
-  const accountability: AccountabilityRow[] = q.data?.accountability ?? [];
+  const accountability = (q.data?.accountability ?? []).filter(
+    (row) => row.dataset_key !== null,
+  ) as AccountabilityRow[];
   const accountabilityMap = new Map(accountability.map((row) => [row.dataset_key, row]));
   const openGaps = accountability.filter((row) =>
     ["overdue", "failed", "never_run"].includes(row.accountable_state),

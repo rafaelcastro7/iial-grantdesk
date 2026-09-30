@@ -129,7 +129,7 @@ function ProposalDetailPage() {
     mutationFn: async () => {
       const sections = data.sections.map((s) => ({
         id: s.id,
-        title: fr && s.heading_fr ? s.heading_fr : s.heading_en,
+        title: fr && s.heading_fr ? s.heading_fr : (s.heading_en ?? ""),
         content: fr && s.content_fr ? s.content_fr : s.content_en || "",
         wordCount: (fr && s.content_fr ? s.content_fr : s.content_en || "")
           .split(/\s+/)
@@ -148,7 +148,7 @@ function ProposalDetailPage() {
     mutationFn: async () => {
       const sections = data.sections.map((s) => ({
         id: s.id,
-        title: fr && s.heading_fr ? s.heading_fr : s.heading_en,
+        title: fr && s.heading_fr ? s.heading_fr : (s.heading_en ?? ""),
         content: fr && s.content_fr ? s.content_fr : s.content_en || "",
       }));
       return extractCitations({ data: { proposalId: id, sections } });
@@ -163,7 +163,7 @@ function ProposalDetailPage() {
   const complianceMutation = useMutation({
     mutationFn: async () => {
       const sections = data.sections.map((s) => ({
-        title: fr && s.heading_fr ? s.heading_fr : s.heading_en,
+        title: fr && s.heading_fr ? s.heading_fr : (s.heading_en ?? ""),
         content: fr && s.content_fr ? s.content_fr : s.content_en || "",
         wordCount: (fr && s.content_fr ? s.content_fr : s.content_en || "")
           .split(/\s+/)
@@ -322,7 +322,11 @@ function ProposalDetailPage() {
   const proposal = data.proposal;
   const grant = Array.isArray(proposal.grant) ? proposal.grant[0] : proposal.grant;
   const readiness = computeProposalReadiness({
-    sections: data.sections,
+    sections: data.sections.map((s) => ({
+      ...s,
+      kind: s.kind ?? "other",
+      heading_en: s.heading_en ?? "",
+    })),
     requirements: (grant?.requirements ?? []) as ProposalRequirement[],
   });
   // Same definition submitProposal's server-side gate uses (submissions.functions.ts).
@@ -385,7 +389,7 @@ function ProposalDetailPage() {
 
         {viewMode === "express" && (
           <ProposalDetailExpress
-            title={proposal.title}
+            title={proposal.title ?? ""}
             readiness={readiness}
             criticScore={proposal.critic_score != null ? Number(proposal.critic_score) : null}
             draftedSections={draftedSections}

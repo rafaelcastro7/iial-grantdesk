@@ -76,7 +76,7 @@ export function Landing() {
               Sign in
             </Link>
             <Link
-              to="/catalog"
+              to="/grants"
               className="text-sm font-medium underline underline-offset-4 opacity-85"
             >
               See exactly what we cover
@@ -191,7 +191,7 @@ export function Landing() {
             </div>
             <p className="mt-4 max-w-xl text-sm text-[var(--color-ink-soft)]">
               Read from the catalog as this page loaded, not written into the copy.{" "}
-              <Link to="/catalog" className="text-[var(--color-accent)]">
+              <Link to="/grants" className="text-[var(--color-accent)]">
                 Every market, with what it really is
               </Link>
               .

@@ -20,7 +20,7 @@ import { AppTopBar } from "@/components/AppSidebar";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
 import { useUiVersion } from "@/components/v2/ui-version";
 import { PageTransition } from "@/components/PageTransition";
-import { GrantReadinessProfileForm } from "@/components/org/GrantReadinessProfileForm";
+import { GrantReadinessProfileForm, optionalNumber } from "@/components/org/GrantReadinessProfileForm";
 import "@/i18n";
 
 const orgQueryOptions = queryOptions({

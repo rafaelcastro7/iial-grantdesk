@@ -87,7 +87,7 @@ function ProposalsPage() {
     const grant = Array.isArray(p.grant) ? p.grant[0] : p.grant;
     return {
       id: p.id,
-      title: p.title,
+      title: p.title ?? "",
       status: p.status,
       version: p.version,
       critic_score: p.critic_score,

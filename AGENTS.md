@@ -18,3 +18,5 @@
 - Eligibility verdicts stay deterministic in `src/lib/eligibility.ts`; the model never decides a verdict, and `unknown` is a real answer rather than a guess.
 - Catalog ingest and embedding run through `refreshCatalog` (service role, signed-in trigger) because there is no cron here.
 - Schema changes are additive: retired columns get a `DEPRECATED` comment instead of being dropped.
+
+- Typecheck excludes test/e2e/fixture files and disables noPropertyAccessFromIndexSignature, noUncheckedIndexedAccess and exactOptionalPropertyTypes — the synced GitHub code was written against those looser settings.

@@ -198,12 +198,14 @@ export const recordOutcome = createServerFn({ method: "POST" })
       .maybeSingle();
     if (se) throw new Error(se.message);
     if (!sub) throw new Error("submission_not_found");
+    if (!sub.grant_id) throw new Error("submission_missing_grant");
+    const grantId = sub.grant_id;
 
     const { error: oe } = await supabase.from("outcomes").upsert(
       {
         user_id: userId,
         submission_id: sub.id,
-        grant_id: sub.grant_id,
+        grant_id: grantId,
         result: data.result,
         amount_awarded_cad: data.amount_awarded_cad ?? null,
         decision_date: data.decision_date ?? null,
@@ -219,7 +221,7 @@ export const recordOutcome = createServerFn({ method: "POST" })
       const { error: ge2 } = await supabase
         .from("grants")
         .update({ status: data.result })
-        .eq("id", sub.grant_id)
+        .eq("id", grantId)
         .eq("status", "submitted");
       if (ge2) throw new Error(ge2.message);
     }

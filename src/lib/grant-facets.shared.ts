@@ -1,3 +1,4 @@
+import type { Json } from "@/integrations/supabase/types";
 export const GRANT_FACET_FIELDS = [
   "applicant_types",
   "populations_served",
@@ -11,7 +12,7 @@ export type GrantFacetState = "known" | "unknown" | "conflicting";
 export type GrantFacetEvidence = {
   id: string;
   field: string;
-  value: unknown;
+  value: Json;
   confidence: number;
   source_url: string;
   snippet: string;

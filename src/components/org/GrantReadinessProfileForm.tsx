@@ -46,6 +46,8 @@ export function GrantReadinessProfileForm({ form, mut, onSubmit }: Props) {
     funding_min_cad: optionalNumber(values.funding_min_cad),
     funding_max_cad: optionalNumber(values.funding_max_cad),
     cost_share_max_pct: optionalNumber(values.cost_share_max_pct),
+    years_operating: optionalNumber(values.years_operating),
+    employee_count: optionalNumber(values.employee_count),
   });
 
   // Auto-sync capabilities with sectors + focus_areas on change
@@ -453,7 +455,7 @@ function ProgressRing({ ready, value }: { ready: boolean; value: number }) {
   );
 }
 
-function optionalNumber(value: string | undefined) {
+export function optionalNumber(value: string | undefined) {
   if (!value?.trim()) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;

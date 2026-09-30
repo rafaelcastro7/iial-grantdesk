@@ -63,6 +63,7 @@ function ClientsPage() {
   const { t } = useTranslation();
   const { data } = useSuspenseQuery(orgsQueryOptions);
   const createOrg = useServerFn(createOrganization);
+  const [creating, setCreating] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const form = useForm<CreateOrgForm>({
@@ -71,13 +72,15 @@ function ClientsPage() {
   });
 
   const onSubmit = (values: CreateOrgForm) => {
+    setCreating(true);
     createOrg({ data: values })
       .then(() => {
         toast.success(t("clients.created"));
         setIsCreateOpen(false);
         form.reset();
       })
-      .catch((e) => toast.error(e.message));
+      .catch((e) => toast.error(e.message))
+      .finally(() => setCreating(false));
   };
 
   const organizations = data.organizations ?? [];
@@ -124,8 +127,8 @@ function ClientsPage() {
                       )}
                     </div>
                     <DialogFooter>
-                      <Button type="submit" disabled={createOrg.isPending}>
-                        {createOrg.isPending ? t("app.loading") : t("clients.create")}
+                      <Button type="submit" disabled={creating}>
+                        {creating ? t("app.loading") : t("clients.create")}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -175,7 +178,7 @@ function ClientCard({ org, userRole }: ClientCardProps) {
   const { t } = useTranslation();
 
   return (
-    <Link to={`/clients/${org.id}`} className="block">
+    <Link to="/clients/$orgId" params={{ orgId: org.id }} className="block">
       <Card className="h-full transition-shadow hover:shadow-lg">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
