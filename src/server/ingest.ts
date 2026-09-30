@@ -104,6 +104,18 @@ export async function runSource(
         currency: grant.currency ?? null,
         amount_min: grant.amountMin ?? null,
         amount_max: grant.amountMax ?? null,
+        amount_cad_min:
+          grant.country === "CA" || grant.currency === "CAD"
+            ? (grant.amountMin ?? null)
+            : grant.amountMin
+              ? Math.round(grant.amountMin * 1.38)
+              : null,
+        amount_cad_max:
+          grant.country === "CA" || grant.currency === "CAD"
+            ? (grant.amountMax ?? null)
+            : grant.amountMax
+              ? Math.round(grant.amountMax * 1.38)
+              : null,
         deadline: grant.deadline ?? null,
         language: grant.language ?? "en",
         eligible_applicant_types: grant.eligibleApplicantTypes ?? [],
@@ -111,6 +123,7 @@ export async function runSource(
         assistance_listings: grant.assistanceListings ?? [],
         source_key: adapter.key,
         source_hash: sourceHash(adapter.key, grant.externalId),
+        status: "active",
         last_seen_at: new Date().toISOString(),
       });
     }

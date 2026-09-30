@@ -221,6 +221,36 @@ export const listGrants = createServerFn({ method: "GET" })
           query_concepts: row.queryConcepts,
         });
       }
+
+      // Funder name fallback: if the search didn't match many grants, check if any
+      // funders match the search term directly and include their grants.
+      if (rankById.size < 10) {
+        const { data: matchingFunders } = await context.supabase
+          .from("funders")
+          .select("id, name")
+          .ilike("name", `%${data.search}%`)
+          .limit(10);
+        if (matchingFunders && matchingFunders.length > 0) {
+          const funderIds = matchingFunders.map((f) => f.id);
+          const { data: funderGrants } = await context.supabase
+            .from("grants")
+            .select("id")
+            .in("funder_id", funderIds)
+            .limit(30);
+          for (const fg of funderGrants ?? []) {
+            if (!rankById.has(fg.id)) {
+              rankById.set(fg.id, {
+                relevance: 0.65,
+                matched_on: "funder",
+                lexical_score: 0.65,
+                semantic_score: 0,
+                retrieval_mode: "lexical-fallback",
+                query_concepts: [data.search],
+              });
+            }
+          }
+        }
+      }
     }
 
     const GRANT_COLUMNS =
@@ -970,7 +1000,7 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
       // "discovered" is deliberately excluded: evaluateGrantImpl rejects it
       // with grant_not_enriched_yet, so including it here only wastes a
       // round-trip that always gets counted as skipped.
-      .in("status", ["enriched", "scored", "shortlisted"])
+      .in("status", ["active", "enriched", "scored", "shortlisted"])
       .limit(data.limit * 3);
 
     const ids = (candidates ?? []).map((g) => g.id);
@@ -1419,3 +1449,62 @@ export const getPipelineAnalytics = createServerFn({ method: "GET" })
       events: (events ?? []) as Parameters<typeof computePipelineAnalytics>[0]["events"],
     });
   });
+
+// Signed-in catalog refresh (per AGENTS.md: "Run catalog ingest and embedding through signed-in refreshCatalog; there is no cron.")
+// Pulls live opportunities from official structured sources (Innovation Canada / Business Benefits Finder and Grants.gov)
+// and evaluates eligibility immediately.
+export const refreshCatalog = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z
+      .object({
+        limit: z.number().int().min(1).max(500).optional(),
+      })
+      .optional()
+      .parse(i ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { runSource } = await import("@/server/ingest");
+    const { businessBenefitsFinder, grantsGov } = await import("@/server/sources");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const limit = data?.limit;
+    const bbf = await runSource(businessBenefitsFinder, { client: supabaseAdmin, limit });
+    const gg = await runSource(grantsGov, { client: supabaseAdmin, limit: limit ?? 100 });
+
+    // Auto-evaluate unscored grants with summaries against the user's organization profile
+    const { data: pending } = await supabaseAdmin
+      .from("grants")
+      .select("id")
+      .is("fit_score", null)
+      .not("summary", "is", null)
+      .order("created_at", { ascending: false, nullsFirst: false })
+      .limit(30);
+
+    let evaluated = 0;
+    if (pending && pending.length > 0) {
+      const { evaluateGrantImpl } = await import("@/agents/evaluator.impl.server");
+      for (const g of pending) {
+        try {
+          await evaluateGrantImpl({
+            grantId: g.id,
+            userId: context.userId,
+            userSupabase: supabaseAdmin,
+          });
+          evaluated++;
+        } catch {
+          // best-effort
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      sources: [bbf, gg],
+      grantsUpserted: bbf.grantsUpserted + gg.grantsUpserted,
+      fundersUpserted: bbf.fundersUpserted + gg.fundersUpserted,
+      evaluated,
+    };
+  });
+

@@ -263,14 +263,19 @@ function EmptyState({
           ? "Try another country, lower the minimum amount, or clear the search."
           : "Check the official funder sources to bring in open calls."}
       </p>
-      <div className="mt-4">
-        {hasAny ? (
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+        {hasAny && (
           <Button variant="outline" onClick={onReset}>
             Clear filters
           </Button>
-        ) : isAdmin ? (
-          <Button onClick={onDiscover}>Check all funders</Button>
-        ) : (
+        )}
+        {isAdmin && (
+          <Button onClick={onDiscover}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            {hasAny ? "Search live sources & funders" : "Check all funders & live sources"}
+          </Button>
+        )}
+        {!hasAny && !isAdmin && (
           <p className="text-xs text-muted-foreground">Ask an admin to update the sources.</p>
         )}
       </div>

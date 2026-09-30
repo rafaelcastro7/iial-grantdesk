@@ -162,6 +162,36 @@ export async function runDiscoveryJob(
   let totalFailed = 0;
   const perFunder: DiscoveryJobResult["perFunder"] = [];
 
+  // Harvest live structured opportunities from official open data endpoints
+  // (Innovation Canada / Business Benefits Finder and Grants.gov) when doing
+  // a general discovery run. This guarantees real, fresh calls land in the catalog.
+  if (!funderIds || funderIds.length === 0) {
+    try {
+      const { runSource } = await import("@/server/ingest");
+      const { businessBenefitsFinder, grantsGov } = await import("@/server/sources");
+
+      const bbfRes = await runSource(businessBenefitsFinder, { client: supabaseAdmin });
+      totalInserted += bbfRes.grantsUpserted;
+      totalProcessed += 1;
+      perFunder.push({
+        funder: "Innovation Canada (open.canada.ca)",
+        inserted: bbfRes.grantsUpserted,
+        engine: "open_data_ckan",
+      });
+
+      const ggRes = await runSource(grantsGov, { client: supabaseAdmin, limit: 100 });
+      totalInserted += ggRes.grantsUpserted;
+      totalProcessed += 1;
+      perFunder.push({
+        funder: "Grants.gov (Search2 API)",
+        inserted: ggRes.grantsUpserted,
+        engine: "grants_gov_api",
+      });
+    } catch (sourceErr) {
+      console.warn("[runDiscoveryJob] Structured source harvest warning:", sourceErr);
+    }
+  }
+
   async function runOne(f: { id: string; name: string }) {
     let success = false;
     let lastError: string | undefined;
@@ -234,11 +264,9 @@ export async function runDiscoveryJob(
     }
   });
 
-  // Auto-evaluate fit for the triggering user (best effort). Grants this same
-  // job just discovered are still "discovered" (no enrichment step runs in
-  // this job) and evaluateGrantImpl unconditionally rejects that status —
-  // this instead clears any of the user's backlog that's already enriched
-  // but never got scored, so a discovery run also nudges that queue forward.
+  // Auto-evaluate fit for the triggering user. Grants discovered with a summary
+  // (e.g. from Business Benefits Finder or Grants.gov) or enriched are scored
+  // immediately so the UI surfaces deterministic eligibility verdicts right away.
   let evaluated = 0;
   const evalErrors: Array<{ grantId: string; error: string }> = [];
   try {
@@ -248,8 +276,10 @@ export async function runDiscoveryJob(
       const { data: pending } = await supabaseAdmin
         .from("grants")
         .select("id")
-        .eq("status", "enriched")
-        .limit(15);
+        .is("fit_score", null)
+        .not("summary", "is", null)
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(20);
       // evaluateGrantImpl takes a `userSupabase` param because its normal
       // caller (the runEvaluator serverFn) has the browser's session and can
       // pass a real RLS-scoped client. This background job only has
