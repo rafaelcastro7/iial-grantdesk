@@ -42,6 +42,7 @@ export type RadarGrant = {
   currency?: string | null;
   eligible_applicant_types?: string[] | null;
   eligibility_note?: string | null;
+  requirements?: Array<{ category?: string; requirement?: string; value?: string; isCritical?: boolean }> | null;
 };
 
 /** The client the radar checks every grant against. */
@@ -154,6 +155,9 @@ export function ruleDecision(
       currency: g.currency ?? (g.amount_min == null && g.amount_cad_min != null ? "CAD" : null),
       eligibilityNote: g.eligibility_note ?? null,
       summary: g.summary ?? null,
+      criticalRequirements: (g.requirements ?? [])
+        .filter((requirement) => requirement.isCritical)
+        .map((requirement) => requirement.requirement ?? "Critical requirement"),
     },
     client: rules,
     today: new Date(now),
