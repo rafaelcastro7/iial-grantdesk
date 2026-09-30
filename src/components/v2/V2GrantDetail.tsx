@@ -1,11 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Activity,
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BarChart3,
-  Bot,
   Building2,
   CalendarClock,
   CheckCircle2,
@@ -14,12 +12,10 @@ import {
   DollarSign,
   FileCheck2,
   FileText,
-  Fingerprint,
   Gauge,
   Globe2,
   History,
   Landmark,
-  Layers3,
   Link2,
   ListChecks,
   Loader2,
@@ -291,7 +287,7 @@ export function V2GrantDetail({
         </div>
       </div>
 
-      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="rounded-md border bg-card shadow-sm">
           <div className="grid min-h-[360px] lg:grid-cols-[minmax(0,1.2fr)_330px]">
             <div className="p-5 sm:p-6">
@@ -454,31 +450,30 @@ export function V2GrantDetail({
           </div>
         </div>
 
-        <aside className="rounded-md border border-white/12 bg-[oklch(0.2_0.026_218)] p-5 text-white shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Bot className="h-4 w-4 text-teal-200" />
-            Local decision record
+        <aside className="rounded-md border bg-card p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Clock3 className="h-4 w-4 text-primary" />
+            History
           </div>
-          <p className="mt-3 text-sm leading-6 text-white/68">
-            Every action on this grant stays tied to cloud database records, row-level access rules, evidence spans,
-            and agent run traces.
-          </p>
-          <div className="mt-5 space-y-2 text-xs">
-            <DarkFact icon={Fingerprint} label="Grant ID" value={grant.id} mono />
-            <DarkFact
-              icon={Clock3}
-              label="Discovered"
-              value={formatDateTime(grant.discovered_at)}
-            />
-            <DarkFact icon={Layers3} label="Last seen" value={formatDateTime(grant.last_seen_at)} />
-            <DarkFact icon={Activity} label="Times seen" value={`${grant.times_seen ?? 1}`} />
-          </div>
+          <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-xs">
+            <div className="flex gap-2">
+              <dt className="text-muted-foreground">First found</dt>
+              <dd className="text-foreground">{formatDateTime(grant.discovered_at)}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-muted-foreground">Last checked</dt>
+              <dd className="text-foreground">{formatDateTime(grant.last_seen_at)}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-muted-foreground">Times seen</dt>
+              <dd className="text-foreground">{grant.times_seen ?? 1}</dd>
+            </div>
+          </dl>
           <div className="mt-5 flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="border-white/15 bg-white/[0.06] text-white hover:bg-white/10 hover:text-white"
               disabled={busy === "share"}
               onClick={onShare}
             >
@@ -866,32 +861,6 @@ function QualityMini({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border bg-card p-3">
       <div className="text-muted-foreground">{label}</div>
       <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function DarkFact({
-  icon: Icon,
-  label,
-  mono = false,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  mono?: boolean;
-  value: string;
-}) {
-  return (
-    <div className="rounded-md border border-white/10 bg-white/[0.06] p-3">
-      <div className="flex items-center gap-1.5 text-white/42">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div
-        className={cn("mt-1 truncate font-semibold text-white", mono && "font-mono text-[11px]")}
-      >
-        {value}
-      </div>
     </div>
   );
 }
