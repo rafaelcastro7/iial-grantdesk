@@ -135,6 +135,22 @@ export const EvaluatorOutput = z.object({
 });
 export type EvaluatorOutput = z.infer<typeof EvaluatorOutput>;
 
+/**
+ * Coerce common model deviations before the strict EvaluatorOutput parse:
+ * numeric strings ("0.8") and percentage scores (85 -> 0.85). Must run in
+ * both the provider `validate` hook and the final parse, otherwise a
+ * percentage answer is rejected as a provider failure before it can be fixed.
+ */
+export function normalizeEvaluatorRaw(raw: unknown, defaultEligibility: boolean): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const r = raw as Record<string, unknown>;
+  let score = typeof r.fit_score === "string" ? Number(r.fit_score.trim()) : r.fit_score;
+  if (typeof score === "number" && score > 1 && score <= 100) score = score / 100;
+  if (score !== undefined) r.fit_score = score;
+  if (r.eligibility_pass === undefined) r.eligibility_pass = defaultEligibility;
+  return r;
+}
+
 // Phase 3: Strategist plans which template sections to draft and produces
 // per-section angles informed by the org profile and grant.
 export const StrategistSectionPlan = z.object({

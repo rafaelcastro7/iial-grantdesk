@@ -2,7 +2,7 @@
 // can be invoked directly from orchestrators (auto-evaluate, discoverAll)
 // without going through the TanStack server-fn resolver.
 
-import { EvaluatorOutput, PROMPTS } from "@/agents/schemas";
+import { EvaluatorOutput, PROMPTS, normalizeEvaluatorRaw } from "@/agents/schemas";
 import { canTransition, type GrantStatus } from "@/agents/pipeline-stages.shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getOrgProfileForUser } from "@/lib/org-profile-query";
@@ -193,10 +193,7 @@ export async function evaluateGrantImpl(opts: {
         responseFormat: "json",
         validate: (text) => {
           try {
-            const raw = JSON.parse(text);
-            if (raw && typeof raw === "object" && raw.eligibility_pass === undefined) {
-              raw.eligibility_pass = !rulesResult.hard_fail;
-            }
+            const raw = normalizeEvaluatorRaw(JSON.parse(text), !rulesResult.hard_fail);
             return EvaluatorOutput.safeParse(raw).success;
           } catch {
             return false;
@@ -219,15 +216,7 @@ export async function evaluateGrantImpl(opts: {
       usedModel = llm.model ?? "unknown";
       llmInputTokens = llm.inputTokens;
       llmOutputTokens = llm.outputTokens;
-      const raw = JSON.parse(llm.text);
-      if (raw && typeof raw === "object") {
-        if (typeof raw.fit_score === "number" && raw.fit_score > 1 && raw.fit_score <= 100) {
-          raw.fit_score = raw.fit_score / 100;
-        }
-        if (raw.eligibility_pass === undefined) {
-          raw.eligibility_pass = !rulesResult.hard_fail;
-        }
-      }
+      const raw = normalizeEvaluatorRaw(JSON.parse(llm.text), !rulesResult.hard_fail);
       parsed = EvaluatorOutput.parse(raw);
     } catch (llmErr) {
       const errMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);

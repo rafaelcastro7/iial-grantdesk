@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { DiscovererOutput, EnricherOutput, EvaluatorOutput, PROMPTS } from "@/agents/schemas";
+import {
+  DiscovererOutput,
+  EnricherOutput,
+  EvaluatorOutput,
+  PROMPTS,
+  normalizeEvaluatorRaw,
+} from "@/agents/schemas";
 
 describe("agents/schemas", () => {
   it("accepts a valid discoverer output", () => {
@@ -53,6 +59,22 @@ describe("agents/schemas", () => {
         rationale_en: "long enough rationale text",
         rationale_fr: "justification suffisamment longue",
       }),
+    ).toThrow();
+  });
+
+  it("normalizes percentage and string evaluator scores before the strict parse", () => {
+    const base = { eligibility_pass: true, rationale_en: "long enough rationale text" };
+    const pct = EvaluatorOutput.parse(normalizeEvaluatorRaw({ ...base, fit_score: 85 }, true));
+    expect(pct.fit_score).toBeCloseTo(0.85);
+    const str = EvaluatorOutput.parse(normalizeEvaluatorRaw({ ...base, fit_score: "0.8" }, true));
+    expect(str.fit_score).toBeCloseTo(0.8);
+    const noElig = normalizeEvaluatorRaw(
+      { fit_score: 0.5, rationale_en: "long enough rationale text" },
+      false,
+    ) as { eligibility_pass: boolean };
+    expect(noElig.eligibility_pass).toBe(false);
+    expect(() =>
+      EvaluatorOutput.parse(normalizeEvaluatorRaw({ ...base, fit_score: 250 }, true)),
     ).toThrow();
   });
 
