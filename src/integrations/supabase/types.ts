@@ -4592,7 +4592,7 @@ export type Database = {
         | "critic"
       agent_status: "running" | "succeeded" | "failed" | "degraded"
       app_lang: "en" | "fr"
-      app_role: "admin" | "member" | "viewer"
+      app_role: "admin" | "member" | "viewer" | "consultant"
       consent_action: "granted" | "revoked"
       consent_type:
         | "terms_of_service"
@@ -4770,7 +4770,7 @@ export const Constants = {
       ],
       agent_status: ["running", "succeeded", "failed", "degraded"],
       app_lang: ["en", "fr"],
-      app_role: ["admin", "member", "viewer"],
+      app_role: ["admin", "member", "viewer", "consultant"],
       consent_action: ["granted", "revoked"],
       consent_type: [
         "terms_of_service",

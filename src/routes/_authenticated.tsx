@@ -1,5 +1,6 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchIsConsultant, isConsultantPath } from "@/lib/use-platform";
 import { CommandPalette } from "@/components/CommandPalette";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { V2AuthenticatedShell } from "@/components/v2/V2AuthenticatedShell";
@@ -20,6 +21,10 @@ export const Route = createFileRoute("/_authenticated")({
     if (!bootstrapped.has(key)) {
       const { error } = await supabase.rpc("ensure_current_user");
       if (!error) bootstrapped.add(key);
+    }
+    // Consultants may only open Home and Grant Radar.
+    if (!isConsultantPath(location.pathname) && (await fetchIsConsultant())) {
+      throw redirect({ to: "/grants" });
     }
   },
   errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error} reset={reset} />,
