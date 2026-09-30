@@ -14,18 +14,18 @@ export type ModelAssignment = {
 };
 
 const GATEWAY_MODEL = "openai/gpt-6-astra";
-const CHAIN = "cerebras/llama-3.3-70b → groq/llama-3.3-70b → gemini/2.0-flash → lovable";
+export const PROVIDER_CHAIN = "cerebras/llama-3.3-70b → groq/llama-3.3-70b → gemini/2.0-flash → lovable";
 
 export const AGENT_MODEL_MAP: Record<AgentName, ModelAssignment> = {
   discoverer: {
     primary: GATEWAY_MODEL,
     fallback: null,
-    reason: "Extracción estructurada de alto volumen, vía Lovable AI Gateway.",
+    reason: "Extracción estructurada de alto volumen, vía cadena externa con respaldo Lovable.",
   },
   enricher: {
     primary: GATEWAY_MODEL,
     fallback: null,
-    reason: "Relleno de campos en lote, modo JSON, vía Lovable AI Gateway.",
+    reason: "Relleno de campos en lote, modo JSON, vía cadena externa con respaldo Lovable.",
   },
   evaluator: {
     primary: GATEWAY_MODEL,
@@ -35,17 +35,17 @@ export const AGENT_MODEL_MAP: Record<AgentName, ModelAssignment> = {
   strategist: {
     primary: GATEWAY_MODEL,
     fallback: null,
-    reason: "Razonamiento para planificar la propuesta, vía Lovable AI Gateway.",
+    reason: "Razonamiento para planificar la propuesta, vía cadena externa con respaldo Lovable.",
   },
   writer: {
     primary: GATEWAY_MODEL,
     fallback: null,
-    reason: "Generación de prosa, vía Lovable AI Gateway.",
+    reason: "Generación de prosa, vía cadena externa con respaldo Lovable.",
   },
   critic: {
     primary: GATEWAY_MODEL,
     fallback: null,
-    reason: "Revisión crítica, vía Lovable AI Gateway.",
+    reason: "Revisión crítica, vía cadena externa con respaldo Lovable.",
   },
 };
 
