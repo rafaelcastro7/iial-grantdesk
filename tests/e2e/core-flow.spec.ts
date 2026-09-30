@@ -18,16 +18,16 @@ function trackErrors(page: Page) {
 
 async function signIn(page: Page) {
   await page.goto("/auth");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.locator("input[type=email]").fill(EMAIL);
+  await page.locator("input[type=password]").fill(PASSWORD);
   await page.locator("form").getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).not.toHaveURL(/\/auth/, { timeout: 30_000 });
 }
 
 test("sign-in rejects a wrong password", async ({ page }) => {
   await page.goto("/auth");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill("definitely-wrong-password");
+  await page.locator("input[type=email]").fill(EMAIL);
+  await page.locator("input[type=password]").fill("definitely-wrong-password");
   await page.locator("form").getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible({ timeout: 20_000 });
   await expect(page).toHaveURL(/\/auth/);
