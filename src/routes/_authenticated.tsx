@@ -8,12 +8,21 @@ import { V2AuthenticatedShell } from "@/components/v2/V2AuthenticatedShell";
 import { UiVersionProvider } from "@/components/v2/UiVersionProvider";
 import { useUiVersion } from "@/components/v2/ui-version";
 
+const bootstrapped = new Set<string>();
+
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
       throw redirect({ to: "/auth", search: { redirect: location.pathname } });
+    }
+    // Profile + default role are provisioned here (idempotent) because no
+    // trigger on the auth schema is allowed. Once per user per tab.
+    const key = `gd_bootstrap_${data.session.user.id}`;
+    if (!bootstrapped.has(key)) {
+      const { error } = await supabase.rpc("ensure_current_user");
+      if (!error) bootstrapped.add(key);
     }
   },
   errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error} reset={reset} />,
