@@ -88,7 +88,9 @@ export function RadarCard({
               {VERDICT_LABELS[item.verdict]}
             </span>
             {item.fit != null && !simple && (
-              <span className="text-xs text-muted-foreground">Fit {Math.round(item.fit)}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Fit {item.fit > 1 ? Math.round(item.fit) : Math.round(item.fit * 100)}%
+              </span>
             )}
             {g.isNewSinceLastReview && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">New</span>
@@ -105,10 +107,26 @@ export function RadarCard({
             <p className="mt-0.5 truncate text-sm text-muted-foreground">{funderName(g)}</p>
           )}
           {item.reason && (
-            <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground" title={item.reason}>
-              <span className="font-medium text-foreground">{simple ? "Why: " : "Rules: "}</span>
-              {item.reason}
-            </p>
+            <div
+              className={cn(
+                "mt-2 rounded-md border p-2 text-xs",
+                item.verdict === "not_eligible"
+                  ? "border-destructive/30 bg-destructive/5 text-destructive"
+                  : "border-border/60 bg-muted/40 text-muted-foreground",
+              )}
+              title={item.reason}
+            >
+              <p className="line-clamp-2">
+                <span className="font-semibold text-foreground">
+                  {item.verdict === "not_eligible"
+                    ? "Motivo de descarte: "
+                    : simple
+                      ? "Why: "
+                      : "Reglas: "}
+                </span>
+                {item.reason}
+              </p>
+            </div>
           )}
           {criticalRequirements.length > 0 && (
             <div className="mt-2 border-l-2 border-warning pl-3">

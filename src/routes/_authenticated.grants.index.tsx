@@ -119,7 +119,7 @@ function GrantsPage() {
     readJson(FILTERS_KEY, DEFAULT_RADAR_FILTERS),
   );
   const [facets, setFacets] = useState<GrantFacetSelection>(() => readJson(FACETS_KEY, DEFAULT_FACETS));
-  const [includeHardBlocked, setIncludeHardBlocked] = useState(false);
+  const [includeHardBlocked, setIncludeHardBlocked] = useState(true);
   const [includeDismissed, setIncludeDismissed] = useState(false);
   const [searchProfileId, setSearchProfileId] = useState<string | null>(
     () => ss.get("grants.searchProfileId") || null,
@@ -224,7 +224,9 @@ function GrantsPage() {
   }, [data.availableCountries, filters.country]);
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
-  const refresh = () => qc.invalidateQueries({ queryKey: ["grants"] });
+  const refresh = async () => {
+    await qc.invalidateQueries({ queryKey: ["grants"], refetchType: "all" });
+  };
 
   const feedbackMutation = useMutation({
     mutationFn: ({ grant, decision }: { grant: GrantRowData; decision: GrantFeedbackDecision }) => {

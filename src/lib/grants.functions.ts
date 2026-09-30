@@ -109,7 +109,7 @@ export const listGrants = createServerFn({ method: "GET" })
           .array(z.enum(["known", "unknown", "conflicting"]))
           .max(3)
           .optional(),
-        includeHardBlocked: z.boolean().default(false),
+        includeHardBlocked: z.boolean().default(true),
         includeDismissed: z.boolean().default(false),
         limit: z.number().int().min(1).max(100).default(50),
       })
@@ -507,7 +507,8 @@ export const listGrants = createServerFn({ method: "GET" })
       .sort(
         (a, b) =>
           b.combinedRelevance - a.combinedRelevance ||
-          (b.grant.fit_score ?? 0) - (a.grant.fit_score ?? 0),
+          ((b.evaluation?.fit_score ?? b.grant.fit_score ?? 0) -
+            (a.evaluation?.fit_score ?? a.grant.fit_score ?? 0)),
       )
       .slice(0, data.limit);
     const grants = grantsWithProfile.map(({ grant }) => grant);
@@ -664,25 +665,35 @@ export const listGrants = createServerFn({ method: "GET" })
           hardBlocked,
           isNewSinceLastReview,
           changedSinceFeedback,
-        }) => ({
-          ...g,
-          facets,
-          facetEvidenceState: grantFacetEvidenceState(facets),
-          historyMatch,
-          qualityMatch,
-          rankingBreakdown,
-          searchMatch: rankById.get(g.id) ?? null,
-          profileMatch,
-          feedbackAction,
-          hardBlocked,
-          isNewSinceLastReview,
-          changedSinceFeedback,
-          combinedRelevance,
-          evaluation,
-          reviewState: reviewByGrant.get(g.id) ?? null,
-          duplicateGroupSize:
-            groupCounts.get(`${g.funder_id ?? "none"}|${normalizeTitle(g.title)}`) ?? 1,
-        }),
+        }) => {
+          const evalScore = evaluation?.fit_score ?? g.fit_score;
+          const isEvaluated = evaluation != null;
+          return {
+            ...g,
+            fit_score: evalScore,
+            status:
+              isEvaluated && (g.status === "discovered" || g.status === "enriched")
+                ? "scored"
+                : g.status,
+            scored_at: evaluation?.created_at ?? g.scored_at,
+            facets,
+            facetEvidenceState: grantFacetEvidenceState(facets),
+            historyMatch,
+            qualityMatch,
+            rankingBreakdown,
+            searchMatch: rankById.get(g.id) ?? null,
+            profileMatch,
+            feedbackAction,
+            hardBlocked,
+            isNewSinceLastReview,
+            changedSinceFeedback,
+            combinedRelevance,
+            evaluation,
+            reviewState: reviewByGrant.get(g.id) ?? null,
+            duplicateGroupSize:
+              groupCounts.get(`${g.funder_id ?? "none"}|${normalizeTitle(g.title)}`) ?? 1,
+          };
+        },
       ),
     };
   });

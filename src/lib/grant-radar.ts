@@ -232,11 +232,35 @@ export function toRadarItem<T extends RadarGrant>(
   opts: Pick<RadarOptions, "leadTimeWeeks" | "searching" | "rules"> & { now: number },
 ): RadarItem<T> {
   const ruled = opts.rules ? ruleDecision(g, opts.rules, opts.now) : null;
-  const verdict = ruled?.verdict ?? verdictOf(g);
+
+  // Authoritative completed evaluation takes precedence over preliminary rules
+  let verdict: RadarVerdict;
+  let reason: string | null = null;
+  let isRuled = false;
+
+  if (g.evaluation) {
+    verdict = g.evaluation.eligibility_pass ? "eligible" : "not_eligible";
+    reason = (g.evaluation as { rationale_en?: string }).rationale_en ?? (ruled?.reason ?? null);
+    isRuled = true;
+  } else if (g.hardBlocked) {
+    verdict = "not_eligible";
+    reason = "Excluded by institutional eligibility rules.";
+    isRuled = true;
+  } else if (ruled) {
+    verdict = ruled.verdict;
+    reason = ruled.reason;
+    isRuled = true;
+  } else {
+    verdict = "needs_input";
+    reason = null;
+    isRuled = false;
+  }
+
   const daysLeft = daysUntil(g.deadline, opts.now);
   const timing = timingOf(daysLeft, opts.leadTimeWeeks);
   const amount = grantAmount(g);
-  const fit = g.evaluation?.fit_score ?? g.fit_score ?? null;
+  const fitRaw = g.evaluation?.fit_score ?? g.fit_score ?? null;
+  const fit = fitRaw != null ? (fitRaw <= 1 ? Math.round(fitRaw * 100) : Math.round(fitRaw)) : null;
   const parked = timing === "closed" || timing === "too_soon" || verdict === "not_eligible";
   return {
     grant: g,
@@ -246,8 +270,8 @@ export function toRadarItem<T extends RadarGrant>(
     amount,
     fit,
     country: grantCountry(g),
-    reason: ruled?.reason ?? null,
-    ruled: ruled != null,
+    reason,
+    ruled: isRuled,
     nextAction: nextActionOf(g, verdict),
     parked,
     priority: priorityOf({

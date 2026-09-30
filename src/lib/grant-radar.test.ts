@@ -104,4 +104,32 @@ describe("grant radar eligibility pre-check", () => {
     expect(item?.verdict).toBe("needs_input");
     expect(item?.reason).toContain("Resolve before drafting");
   });
+
+  it("updates results list when evaluated as not eligible even with rules profile active", () => {
+    const evaluatedGrant = {
+      id: "eval-fail",
+      ...base,
+      country: "CA",
+      deadline: inDays(90),
+      amount_cad_max: 100_000,
+      evaluation: {
+        eligibility_pass: false,
+        fit_score: 0.33,
+        rationale_en: "SOP F4 - Strategic fit: FAIL",
+      },
+    };
+    const rHidden = buildRadar([evaluatedGrant], { ...opts, rules, hideIneligible: true });
+    expect(rHidden.hiddenByRules).toBe(1);
+    expect(rHidden.items).toHaveLength(0);
+
+    const rShown = buildRadar([evaluatedGrant], { ...opts, rules, hideIneligible: false });
+    expect(rShown.items).toHaveLength(1);
+    const item = rShown.items[0];
+    expect(item.verdict).toBe("not_eligible");
+    expect(item.fit).toBe(33);
+    expect(item.reason).toBe("SOP F4 - Strategic fit: FAIL");
+    expect(item.nextAction).toBe("open");
+    expect(item.parked).toBe(true);
+  });
 });
+
