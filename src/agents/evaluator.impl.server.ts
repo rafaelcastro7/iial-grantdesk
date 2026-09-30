@@ -220,8 +220,13 @@ export async function evaluateGrantImpl(opts: {
       llmInputTokens = llm.inputTokens;
       llmOutputTokens = llm.outputTokens;
       const raw = JSON.parse(llm.text);
-      if (raw && typeof raw === "object" && raw.eligibility_pass === undefined) {
-        raw.eligibility_pass = !rulesResult.hard_fail;
+      if (raw && typeof raw === "object") {
+        if (typeof raw.fit_score === "number" && raw.fit_score > 1 && raw.fit_score <= 100) {
+          raw.fit_score = raw.fit_score / 100;
+        }
+        if (raw.eligibility_pass === undefined) {
+          raw.eligibility_pass = !rulesResult.hard_fail;
+        }
       }
       parsed = EvaluatorOutput.parse(raw);
     } catch (llmErr) {
