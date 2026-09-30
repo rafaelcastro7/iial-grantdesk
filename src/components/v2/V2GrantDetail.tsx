@@ -287,7 +287,7 @@ export function V2GrantDetail({
         </div>
       </div>
 
-      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="rounded-md border bg-card shadow-sm">
           <div className="grid min-h-[360px] lg:grid-cols-[minmax(0,1.2fr)_330px]">
             <div className="p-5 sm:p-6">
