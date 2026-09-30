@@ -1,11 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Activity,
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BarChart3,
-  Bot,
   Building2,
   CalendarClock,
   CheckCircle2,
@@ -14,12 +12,10 @@ import {
   DollarSign,
   FileCheck2,
   FileText,
-  Fingerprint,
   Gauge,
   Globe2,
   History,
   Landmark,
-  Layers3,
   Link2,
   ListChecks,
   Loader2,
@@ -865,32 +861,6 @@ function QualityMini({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border bg-card p-3">
       <div className="text-muted-foreground">{label}</div>
       <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function DarkFact({
-  icon: Icon,
-  label,
-  mono = false,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  mono?: boolean;
-  value: string;
-}) {
-  return (
-    <div className="rounded-md border border-white/10 bg-white/[0.06] p-3">
-      <div className="flex items-center gap-1.5 text-white/42">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div
-        className={cn("mt-1 truncate font-semibold text-white", mono && "font-mono text-[11px]")}
-      >
-        {value}
-      </div>
     </div>
   );
 }
