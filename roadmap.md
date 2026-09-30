@@ -10,6 +10,6 @@
 - [x] Ejecutar y consolidar revisión experta y matriz de cumplimiento durante la evaluación del grant.
 - [x] Auditar a fondo Alliance, corregir enriquecimiento/análisis y validar con otro grant sin evaluación previa.
 
-- [ ] Reprocesar cada grant con extracción, reglas, revisión experta y cumplimiento estrictos.
-- [ ] Registrar cobertura, bloqueos y calidad por grant sin inventar evidencia.
-- [ ] Iterar sobre los fallos encontrados hasta maximizar la evaluación verificable.
+- [x] Crear una cola reanudable para reprocesar cada grant con extracción, reglas y controles estrictos.
+- [x] Registrar cobertura, bloqueos y calidad por grant sin inventar evidencia.
+- [ ] Completar las 398 revisiones cloud e iterar sobre sus fallos hasta maximizar la evaluación verificable.
