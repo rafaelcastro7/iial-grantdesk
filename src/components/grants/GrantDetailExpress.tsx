@@ -26,6 +26,7 @@ import { MAX_ENRICH_ATTEMPTS, isTerminalGrantStatus } from "@/agents/pipeline-st
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
+import { explainEnrichmentResult } from "@/lib/enrichment-message";
 
 const DAY_MS = 86_400_000;
 
@@ -685,7 +686,7 @@ export function GrantDetailExpress({
                 </p>
                 {enrichLastError && (
                   <p className="mt-2 break-words rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">
-                    {enrichLastError}
+                    {explainEnrichmentResult(enrichLastError).detail}
                   </p>
                 )}
               </div>
