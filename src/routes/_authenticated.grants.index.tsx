@@ -31,6 +31,8 @@ import {
   type RadarFilterState,
 } from "@/components/grants/radar/RadarToolbar";
 import { buildRadar } from "@/lib/grant-radar";
+import { listRadarProfiles } from "@/lib/radar.functions";
+import { EligibilityCheckBar } from "@/components/grants/radar/EligibilityCheckBar";
 import "@/i18n";
 
 const grantsQueryOptions = (search = "", profileId?: string) =>
@@ -156,6 +158,28 @@ function GrantsPage() {
   });
 
   const grants = data.grants as GrantRowData[];
+  const { data: radarProfiles = [] } = useQuery({
+    queryKey: ["radar", "profiles"],
+    queryFn: () => listRadarProfiles(),
+    staleTime: 60_000,
+  });
+  const [checkClientId, setCheckClientIdState] = useState<string | null>(null);
+  useEffect(() => {
+    setCheckClientIdState(ss.get("grants.radar.client.v1"));
+  }, []);
+  const setCheckClientId = (id: string) => {
+    setCheckClientIdState(id);
+    ss.set("grants.radar.client.v1", id);
+  };
+  const [hideIneligible, setHideIneligible] = useState(true);
+  const checkProfile = useMemo(
+    () =>
+      radarProfiles.find((p) => p.clientId === checkClientId) ??
+      radarProfiles.find((p) => p.name.toUpperCase() === "IIAL") ??
+      radarProfiles[0] ??
+      null,
+    [radarProfiles, checkClientId],
+  );
   const radar = useMemo(
     () =>
       buildRadar(grants, {
@@ -168,8 +192,10 @@ function GrantsPage() {
         verdict: filters.verdict,
         text: filters.search,
         searching,
+        rules: checkProfile,
+        hideIneligible,
       }),
-    [grants, filters, searching],
+    [grants, filters, searching, checkProfile, hideIneligible],
   );
   const sectors = useMemo(() => collectSectors(grants), [grants]);
   const countries = useMemo(() => {
@@ -334,6 +360,15 @@ function GrantsPage() {
         }}
         profileBar={
           <>
+            <EligibilityCheckBar
+              profiles={radarProfiles}
+              selected={checkProfile}
+              onSelect={setCheckClientId}
+              counts={radar.counts}
+              hiddenByRules={radar.hiddenByRules}
+              hideIneligible={hideIneligible}
+              onToggleHide={() => setHideIneligible((v) => !v)}
+            />
             <OrgRulesDriftBanner />
             <GrantSearchProfileBar selectedProfileId={searchProfileId} onSelect={setSearchProfileId} />
           </>
