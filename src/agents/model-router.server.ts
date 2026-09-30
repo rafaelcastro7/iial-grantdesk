@@ -1,9 +1,9 @@
 // Model router — maps each agent to its model.
 //
-// Single provider: the Lovable AI Gateway. Every agent resolves to the one
-// served model; the per-agent assignment is kept as a record of each agent's
-// role (extraction vs judgement vs prose) so call sites and traces still
-// carry a meaningful name.
+// Provider chain: Cerebras -> Groq -> Gemini first, Lovable AI Gateway as the
+// paid floor (see src/server/llm.ts). The per-agent assignment is kept as a
+// record of each agent's role (extraction vs judgement vs prose) so call
+// sites and traces still carry a meaningful name.
 
 import type { AgentName } from "@/lib/agent-config.server";
 
@@ -14,6 +14,7 @@ export type ModelAssignment = {
 };
 
 const GATEWAY_MODEL = "openai/gpt-6-astra";
+const CHAIN = "cerebras/llama-3.3-70b → groq/llama-3.3-70b → gemini/2.0-flash → lovable";
 
 export const AGENT_MODEL_MAP: Record<AgentName, ModelAssignment> = {
   discoverer: {
