@@ -474,7 +474,7 @@ function DashboardV2({
               <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
                 {[
                   ["AI", "Ollama"],
-                  ["Database", "Supabase"],
+                  ["Database", "Lovable Cloud"],
                   ["Security", "RLS"],
                   ["Cost", "$0 tokens"],
                 ].map(([label, value]) => (
