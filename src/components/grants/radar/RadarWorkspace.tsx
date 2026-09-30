@@ -32,6 +32,7 @@ export function RadarWorkspace({
   admin,
   searchMode,
   reviewProgress,
+  simple = false,
 }: {
   radar: RadarResult<GrantRowData>;
   totalLoaded: number;
@@ -47,6 +48,8 @@ export function RadarWorkspace({
   searchMode?: string | null;
   reviewProgress?: ReactNode;
   isAdmin: boolean;
+  /** Consultant mode: only what is needed to spot and open good grants. */
+  simple?: boolean;
   admin: {
     activeJob: { jobId: string; queued: number } | null;
     discovering: boolean;
@@ -69,11 +72,13 @@ export function RadarWorkspace({
             Grant Radar
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Search, deterministic validation and critical requirements in one operational view.
+            {simple
+              ? "Every opportunity is already checked against IIAL's rules. Start with the green ones."
+              : "Search, deterministic validation and critical requirements in one operational view."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <NotebookLMBridge />
+          {!simple && <NotebookLMBridge />}
           {isAdmin && (
             <Button variant="outline" size="sm" onClick={() => setShowSources((v) => !v)}>
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
@@ -109,7 +114,7 @@ export function RadarWorkspace({
         />
       )}
 
-      {notices.map((n, i) => (
+      {notices.filter((n) => !simple || n.tone === "error").map((n, i) => (
         <div
           key={i}
           role="status"
@@ -126,15 +131,17 @@ export function RadarWorkspace({
         </div>
       ))}
 
-      {profileBar}
+      {!simple && profileBar}
 
-      {reviewProgress}
+      {!simple && reviewProgress}
 
-      <div className="grid grid-cols-2 border-b md:grid-cols-4 md:divide-x">
+      <div className={`grid border-b md:divide-x ${simple ? "grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}>
         <Stat label="You can apply" value={counts.eligible} tone="text-eligible" />
         <Stat label="Need a check" value={counts.needsInput} tone="text-needs-input" />
         <Stat label="Closing in your window" value={counts.closingSoon} tone="text-foreground" />
-        <Stat label="Actionable value" value={counts.pipelineValue > 0 ? formatMoney(counts.pipelineValue) : "—"} tone="text-foreground" />
+        {!simple && (
+          <Stat label="Actionable value" value={counts.pipelineValue > 0 ? formatMoney(counts.pipelineValue) : "—"} tone="text-foreground" />
+        )}
       </div>
 
       {next && (
@@ -144,7 +151,7 @@ export function RadarWorkspace({
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-primary">Do this next</p>
               <p className="font-medium text-foreground">
-                {NEXT_ACTION_LABELS[next.nextAction]}: {next.grant.title}
+                {simple ? "Best match right now" : NEXT_ACTION_LABELS[next.nextAction]}: {next.grant.title}
               </p>
             </div>
           </div>
@@ -166,7 +173,7 @@ export function RadarWorkspace({
               ` · ${radar.hiddenByAmount} below the minimum amount`}
             {radar.hiddenByFilters > 0 && ` · ${radar.hiddenByFilters} hidden by filters`}
           </span>
-          {moreFilters && (
+          {moreFilters && !simple && (
             <button
               type="button"
               onClick={() => setShowMore((v) => !v)}
@@ -177,7 +184,7 @@ export function RadarWorkspace({
             </button>
           )}
         </div>
-        {showMore && moreFilters}
+        {showMore && !simple && moreFilters}
       </div>
 
       {radar.items.length === 0 ? (
@@ -204,6 +211,7 @@ export function RadarWorkspace({
                     item={item}
                     actions={actions}
                     highlight={next?.grant.id === item.grant.id}
+                    simple={simple}
                   />
                 ))}
               </div>
@@ -213,7 +221,7 @@ export function RadarWorkspace({
       )}
       </section>
 
-      {isAdmin && (
+      {isAdmin && !simple && (
         <details className="rounded-lg border bg-card p-3 text-sm">
           <summary className="cursor-pointer text-muted-foreground">Activity log</summary>
           <div className="mt-3">

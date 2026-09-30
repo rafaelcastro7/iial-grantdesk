@@ -9,7 +9,7 @@ import {
 } from "@/lib/grants.functions";
 import { runEvaluator } from "@/agents/evaluator.functions";
 import { runStrategist } from "@/agents/strategist.functions";
-import { useIsAdmin } from "@/lib/use-platform";
+import { useIsAdmin, useIsConsultant } from "@/lib/use-platform";
 import { Button } from "@/components/ui/button";
 import { collectSectors } from "@/components/grants/grant-filters.utils";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
@@ -102,6 +102,7 @@ export const Route = createFileRoute("/_authenticated/grants/")({
 function GrantsPage() {
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
+  const isConsultant = useIsConsultant();
   const qc = useQueryClient();
   const fetchGrants = useServerFn(listGrants);
   const evaluate = useServerFn(runEvaluator);
@@ -379,6 +380,7 @@ function GrantsPage() {
         countries={countries}
         sectors={sectors}
         isAdmin={isAdmin}
+        simple={isConsultant}
         searchMode={searching ? (data.searchMode ?? null) : null}
         notices={notices}
         actions={{
