@@ -193,11 +193,14 @@ export const listGrants = createServerFn({ method: "GET" })
       latencyMs: 0,
     };
     const hasSearch = !!data.search && data.search.length >= 2;
-    const effectiveSearchMode: "hybrid" | "lexical-only" | "shadow" = !searchConfig?.hybrid_enabled
-      ? "lexical-only"
-      : searchConfig.shadow_mode
-        ? "shadow"
-        : "hybrid";
+    // No config row means "use the default": hybrid. Only an explicit
+    // hybrid_enabled=false turns semantic retrieval off.
+    const effectiveSearchMode: "hybrid" | "lexical-only" | "shadow" =
+      searchConfig?.hybrid_enabled === false
+        ? "lexical-only"
+        : searchConfig?.shadow_mode
+          ? "shadow"
+          : "hybrid";
     if (data.search && data.search.length >= 2) {
       const { searchGrantCatalogHybrid } = await import("@/lib/grant-search-hybrid.server");
       const hybrid = await searchGrantCatalogHybrid(

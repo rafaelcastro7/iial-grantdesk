@@ -63,8 +63,8 @@ function categorizeError(msg: string): { category: ErrorCategory; hint: string; 
   ) {
     return {
       category: "auth",
-      hint: "Auth failed. Check Firecrawl / local Supabase credentials.",
-      hintFr: "Échec d'authentification. Vérifiez les clés Firecrawl / Supabase local.",
+      hint: "Auth failed. Check the web-fetch and database connection.",
+      hintFr: "Échec d'authentification. Vérifiez la connexion web et base de données.",
     };
   }
   if (m.includes("404") || m.includes("not found")) {

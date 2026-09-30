@@ -460,7 +460,7 @@ export function V2GrantDetail({
             Local decision record
           </div>
           <p className="mt-3 text-sm leading-6 text-white/68">
-            Every action on this grant stays tied to local Supabase records, RLS, evidence spans,
+            Every action on this grant stays tied to cloud database records, row-level access rules, evidence spans,
             and agent run traces.
           </p>
           <div className="mt-5 space-y-2 text-xs">
