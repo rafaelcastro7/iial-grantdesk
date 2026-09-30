@@ -475,14 +475,14 @@ function DashboardV2({
               </div>
               <p className="mt-3 text-sm leading-6 text-sidebar-foreground/70">
                 Eligibility is decided by auditable rules. Drafting and analysis use the configured
-                provider chain, with Lovable AI as the final fallback.
+                provider chain: Lovable AI first, with Gemini, Groq and Cerebras as fallbacks.
               </p>
               <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
                 {[
-                  ["AI", "External first"],
+                  ["AI", "Lovable AI first"],
                   ["Database", "Lovable Cloud"],
                   ["Security", "RLS"],
-                  ["Fallback", "Lovable AI"],
+                  ["Fallback", "Gemini / Groq / Cerebras"],
                 ].map(([label, value]) => (
                   <div
                     key={label}
@@ -708,7 +708,7 @@ function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
               : "text-muted-foreground",
           )}
         >
-          {eligible ? "Eligible" : "Needs fit check"}
+          {eligible ? "Eligible" : grant.evaluation ? "Eligibility risk" : "Needs fit check"}
         </Badge>
       </div>
       <div className="flex items-center gap-2 md:justify-end">
@@ -805,7 +805,9 @@ function MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
           <CheckCircle2 className="h-3.5 w-3.5" /> Eligible
         </span>
       ) : (
-        <span className="hidden text-xs text-muted-foreground sm:inline">Check eligibility</span>
+        <span className="hidden text-xs text-muted-foreground sm:inline">
+          {grant.evaluation ? "Eligibility risk" : "Check eligibility"}
+        </span>
       )}
       {fit != null && (
         <div className="text-right">
