@@ -25,3 +25,4 @@
 - Keep Grant Radar ranking, filtering, country grouping, and deterministic prefiltering in `src/lib/grant-radar.ts`.
 - Theme through `src/styles.css` semantic tokens, following iial.ca's light institutional style.
 - Read Grants.gov detail data from its official structured endpoint before scraping; unpublished fields stay unknown and reduce coverage without failing enrichment.
+- V2 is the only user-facing interface; keep the version context fixed to V2 while legacy branches remain temporarily for reference. This prevents split UX while allowing safe, incremental cleanup.

@@ -12,6 +12,7 @@ import {
   Command,
   DollarSign,
   FileText,
+  GitBranch,
   Home,
   Landmark,
   Library,
@@ -29,6 +30,8 @@ import {
   Sparkles,
   Target,
   Trophy,
+  Users,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -41,7 +44,6 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { UiVersionToggle } from "@/components/v2/UiVersionToggle";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getLlmRouteStatus, type LlmRouteStatus } from "@/lib/llm-route.functions";
@@ -62,6 +64,18 @@ type NavGroup = {
 };
 
 const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Organizations",
+    accent: "amber",
+    items: [
+      {
+        to: "/clients",
+        label: "Clients",
+        description: "Profiles, readiness and matching grants",
+        icon: Users,
+      },
+    ],
+  },
   {
     label: "Every day",
     accent: "teal",
@@ -163,6 +177,20 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Admin console",
         description: "Users, agents, modules",
         icon: Settings,
+        adminOnly: true,
+      },
+      {
+        to: "/admin/audit-trail",
+        label: "Audit trail",
+        description: "Decisions and activity history",
+        icon: ClipboardList,
+        adminOnly: true,
+      },
+      {
+        to: "/admin/workflows",
+        label: "Workflows",
+        description: "Automation and processing rules",
+        icon: GitBranch,
         adminOnly: true,
       },
     ],
@@ -318,8 +346,7 @@ function V2DesktopNav({
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <UiVersionToggle className="border-white/10 bg-white/[0.06] text-white" compact />
+        <div className="mt-3 flex items-center justify-end gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -423,7 +450,6 @@ function V2TopBar({
             </TooltipContent>
           </Tooltip>
 
-          <UiVersionToggle className="hidden sm:inline-flex" compact />
           <ThemeToggle />
           <NotificationBell />
 
