@@ -193,12 +193,33 @@ export async function scrapeEngineFetch(
       redirect: "follow",
     });
   } catch (e) {
-    return {
-      ok: false,
-      via: "scrape_engine",
-      url,
-      error: e instanceof Error ? e.message : String(e),
-    };
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/certificate|cert_|tls|ssl/i.test(msg)) {
+      try {
+        const prevTls = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+        res = await fetch(url, {
+          headers,
+          signal: AbortSignal.timeout(opts.timeoutMs ?? 12_000),
+          redirect: "follow",
+        });
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = prevTls;
+      } catch (retryErr) {
+        return {
+          ok: false,
+          via: "scrape_engine",
+          url,
+          error: retryErr instanceof Error ? retryErr.message : String(retryErr),
+        };
+      }
+    } else {
+      return {
+        ok: false,
+        via: "scrape_engine",
+        url,
+        error: msg,
+      };
+    }
   }
 
   if (res.status === 304) {

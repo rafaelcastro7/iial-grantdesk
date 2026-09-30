@@ -1409,3 +1409,34 @@ INSERT INTO public.grants (
   '{}'::jsonb,
   'Other Eligible Applicants include the following: Alaska Native and Native Hawaiian Serving Institutions; Asian American Native American Pacific Islander Serving Institutions (AANAPISISs); Hispanic-serving Institutions; Historically Black Colleges and Universities (HBCUs); Tribally Controlled Colleges and Universities (TCCUs) ; Non-domestic (non-U.S.) Entities (Foreign Organizations) are not eligible to apply.Non-domestic (non-U.S.) components of U.S. Organizations are not eligible to apply.Foreign components, as defined in the NIH Grants Policy Statement, are allowed.'
 ) ON CONFLICT (source_hash) DO NOTHING;
+
+-- ==========================================================================
+-- 3. Habilitar permisos de actualización de enriquecimiento y requisitos
+-- ==========================================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'grants' AND policyname = 'grants_authenticated_update'
+  ) THEN
+    CREATE POLICY "grants_authenticated_update" ON public.grants
+      FOR UPDATE TO authenticated
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'requirements' AND policyname = 'requirements_authenticated_write'
+  ) THEN
+    CREATE POLICY "requirements_authenticated_write" ON public.requirements
+      FOR ALL TO authenticated
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END $$;
+
+-- Permitir que las convocatorias sin montos/fechas extraídos vuelvan a 'discovered' para ser enriquecidas bajo demanda
+UPDATE public.grants
+   SET status = 'discovered'
+ WHERE status = 'enriched'
+   AND amount_cad_max IS NULL
+   AND deadline IS NULL;

@@ -64,7 +64,7 @@ export async function enrichGrantImpl(
   const { data: g, error } = await db
     .from("grants")
     .select(
-      "id, title, summary, language, url, status, amount_cad_min, amount_cad_max, deadline, eligibility, sectors, applicant_types, populations_served, funding_uses, funder_type, deadline_kind, source_freshness_at, enrich_attempts, confirmed_source_urls",
+      "id, title, summary, eligibility_note, language, url, status, amount_cad_min, amount_cad_max, deadline, eligibility, sectors, applicant_types, populations_served, funding_uses, funder_type, deadline_kind, source_freshness_at, enrich_attempts, confirmed_source_urls",
     )
     .eq("id", data.grantId)
     .maybeSingle();
@@ -145,39 +145,62 @@ export async function enrichGrantImpl(
   const tScrape = Date.now();
   const scraped = await scrapeWithFallback(g.url);
   const fetchAttempts = scraped.attempts ?? [];
+
+  let sourceMarkdown = scraped.ok ? scraped.markdown : "";
+  let sourceVia = scraped.ok ? scraped.via : "none";
+
   if (!scraped.ok) {
-    const msg = `scrape_failed: ${scraped.error}`;
-    await trace("scrape", msg, "error", {
-      via: scraped.via,
-      duration_ms: Date.now() - tScrape,
-      attempts: fetchAttempts,
-    });
-    await db
-      .from("grants")
-      .update({
-        enrich_last_error: msg.slice(0, 500),
-        enrich_last_attempt_at: new Date().toISOString(),
-      })
-      .eq("id", g.id);
-    await db.from("agent_runs").insert({
-      run_id: runId,
-      agent: "enricher",
-      status: "failed",
-      model: "scrape",
-      latency_ms: Date.now() - t0,
-      user_id: actorUserId,
-      grant_id: g.id,
-      error: msg,
-      metadata: { via: scraped.via, fetch_attempts: fetchAttempts },
-    });
-    return { ok: false, runId, error: msg, attempts: fetchAttempts };
+    // If the live web fetch failed, check if we have stored summary or eligibility note
+    const held = [g.title, g.summary, (g as { eligibility_note?: string | null }).eligibility_note]
+      .filter(Boolean)
+      .join("\n\n");
+    if (held.trim().length >= 50) {
+      sourceMarkdown = held;
+      sourceVia = "stored_summary";
+      await trace(
+        "scrape",
+        `Live scrape unavailable (${scraped.error}), using stored grant text (${held.length} chars)`,
+        "warn",
+        {
+          via: sourceVia,
+          duration_ms: Date.now() - tScrape,
+          attempts: fetchAttempts,
+        },
+      );
+    } else {
+      const msg = `scrape_failed: ${scraped.error}`;
+      await trace("scrape", msg, "error", {
+        via: scraped.via,
+        duration_ms: Date.now() - tScrape,
+        attempts: fetchAttempts,
+      });
+      await db
+        .from("grants")
+        .update({
+          enrich_last_error: msg.slice(0, 500),
+          enrich_last_attempt_at: new Date().toISOString(),
+        })
+        .eq("id", g.id);
+      await db.from("agent_runs").insert({
+        run_id: runId,
+        agent: "enricher",
+        status: "failed",
+        model: "scrape",
+        latency_ms: Date.now() - t0,
+        user_id: actorUserId,
+        grant_id: g.id,
+        error: msg,
+        metadata: { via: scraped.via, fetch_attempts: fetchAttempts },
+      });
+      return { ok: false, runId, error: msg, attempts: fetchAttempts };
+    }
   }
 
   const language = (g.language as "en" | "fr") ?? "en";
   const patch: Record<string, unknown> = {};
   const methodCounts = { regex: 0, chrono: 0, rule: 0, llm: 0 };
   const pages: Array<{ url: string; markdown: string }> = [
-    { url: g.url, markdown: scraped.markdown },
+    { url: g.url, markdown: sourceMarkdown },
   ];
   if (/^https?:\/\/(?:www\.)?grants\.gov\/search-results-detail\//i.test(g.url)) {
     try {
@@ -211,9 +234,9 @@ export async function enrichGrantImpl(
     pageLooksRelevantToGrant(page, titleTokens);
   const supportedFacetValues = new Map<string, Set<string>>();
 
-  await trace("scrape", `Scraped ${scraped.markdown.length} chars via ${scraped.via}`, "done", {
-    via: scraped.via,
-    chars: scraped.markdown.length,
+  await trace("scrape", `Scraped ${sourceMarkdown.length} chars via ${sourceVia}`, "done", {
+    via: sourceVia,
+    chars: sourceMarkdown.length,
     duration_ms: Date.now() - tScrape,
     attempts: fetchAttempts,
   });
@@ -494,7 +517,7 @@ export async function enrichGrantImpl(
       : [];
     let deepPages: Awaited<ReturnType<typeof gatherDeepMarkdown>> = [];
     try {
-      deepPages = await gatherDeepMarkdown(g.url, scraped.markdown, {
+      deepPages = await gatherDeepMarkdown(g.url, sourceMarkdown, {
         // Was 3 — raised so a grant missing critical fields gets a genuinely
         // thorough look at the funder's site (inline links, then HTML-
         // discovered links, then sitemap.xml — gatherDeepMarkdown widens
@@ -1042,7 +1065,7 @@ export async function enrichGrantImpl(
   patch.status = ["archived", "expired", "lost"].includes(g.status) ? g.status : "enriched";
   patch.enriched_at = new Date().toISOString();
   patch.source_freshness_at = new Date().toISOString();
-  patch.source_confidence = (scraped.via as string) === "direct" ? 0.95 : 0.85;
+  patch.source_confidence = (sourceVia as string) === "direct" ? 0.95 : 0.85;
   patch.enrich_last_error = null;
   patch.enrich_last_attempt_at = new Date().toISOString();
   const { error: updateError } = await db
@@ -1073,7 +1096,7 @@ export async function enrichGrantImpl(
     user_id: actorUserId,
     grant_id: g.id,
     metadata: {
-      via: scraped.via,
+      via: sourceVia,
       provider: llmInfo?.provider ?? "none",
       deterministic_counts: methodCounts,
       still_missing_after: missingFields(),
@@ -1097,8 +1120,10 @@ export const runEnricher = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/admin-guard");
     await assertAdmin(context.userId, context.supabase as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     return enrichGrantImpl(data.grantId, {
-      db: context.supabase as never,
+      db: supabaseAdmin as never,
       userId: context.userId,
+      force: true,
     });
   });

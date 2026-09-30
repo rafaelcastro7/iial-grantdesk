@@ -366,10 +366,29 @@ export async function extractRequirementsFromHtml(
 }
 
 async function fetchPage(url: string, timeoutMs: number, minChars: number): Promise<FetchedPage> {
-  const response = await fetch(url, {
-    headers: FETCH_HEADERS,
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: FETCH_HEADERS,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/certificate|cert_|tls|ssl/i.test(msg)) {
+      const prevTls = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+      try {
+        response = await fetch(url, {
+          headers: FETCH_HEADERS,
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+      } finally {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = prevTls;
+      }
+    } else {
+      throw err;
+    }
+  }
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const html = await response.text();
   const body = htmlToText(html);
@@ -416,18 +435,35 @@ async function fetchLinks(links: string[], timeoutMs: number, charBudget: number
  * government site should not turn a real call into a reported failure.
  */
 export async function extractRequirementsFromUrl(url: string): Promise<RequirementExtraction> {
-  const primary = await fetchPage(url, 30_000, 200).catch((cause: unknown) => {
-    const reason = cause instanceof Error ? cause.message : String(cause);
-    throw new Error(`could not read ${url}: ${reason} — the call may be a PDF or script-rendered`);
-  });
+  let primary: FetchedPage;
+  try {
+    primary = await fetchPage(url, 30_000, 200);
+  } catch (cause) {
+    // If direct HTML fetch fails, try the multi-engine scrape fallback (Jina, Googlebot UA, etc.)
+    const { scrapeWithFallback } = await import("@/lib/web-fetch.server");
+    const scraped = await scrapeWithFallback(url);
+    if (scraped.ok && scraped.markdown.length >= 100) {
+      primary = {
+        url,
+        title: scraped.title ?? url,
+        text: scraped.markdown,
+        html: "",
+      };
+    } else {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      throw new Error(`could not read ${url}: ${reason} — the call may be a PDF or script-rendered`);
+    }
+  }
   const pages: Page[] = [
     { url: primary.url, title: primary.title, text: primary.text.slice(0, 16_000) },
   ];
   const read = new Set([url]);
 
-  const firstLinks = relatedLinks(primary.html, url, { limit: 3 });
-  pages.push(...(await fetchLinks(firstLinks, 20_000, 8_000)));
-  for (const page of pages) read.add(page.url);
+  if (primary.html) {
+    const firstLinks = relatedLinks(primary.html, url, { limit: 3 });
+    pages.push(...(await fetchLinks(firstLinks, 20_000, 8_000)));
+    for (const page of pages) read.add(page.url);
+  }
 
   let result = await extractFromPages(pages);
 

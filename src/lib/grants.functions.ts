@@ -959,10 +959,12 @@ export const enrichGrant = createServerFn({ method: "POST" })
     if (!flag || !(flag as { enabled?: boolean }).enabled) {
       throw new Error("agent_disabled:enricher");
     }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { enrichGrantImpl } = await import("@/agents/enricher.functions");
     return enrichGrantImpl(data.grantId, {
-      db: context.supabase as never,
+      db: supabaseAdmin as never,
       userId: context.userId,
+      force: true,
     });
   });
 

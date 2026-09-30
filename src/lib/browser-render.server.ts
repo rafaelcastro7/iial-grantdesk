@@ -38,7 +38,7 @@ let browserPromise: Promise<Browser> | null = null;
 // actually fails; a hang instead stalls enrichment for that grant forever.
 // Racing a bounded rejection turns a silent hang into the graceful failure
 // the rest of the code already expects.
-const LAUNCH_TIMEOUT_MS = 15_000;
+const LAUNCH_TIMEOUT_MS = 3_000;
 
 async function getBrowser(): Promise<Browser> {
   if (browserPromise) {

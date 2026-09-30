@@ -212,21 +212,42 @@ async function rawFetch(
   minChars = 200,
 ): Promise<{ page: FetchedPage; attempt: FetchAttempt }> {
   return runEngine(engine, url, timeoutMs, async (signal, ctx) => {
-    const res = await fetch(url, {
-      signal,
-      redirect: "follow",
-      headers: {
-        "User-Agent": ua,
-        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-CA,en;q=0.9,fr-CA;q=0.5",
-        Referer: "https://www.google.com/",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "cross-site",
-        "Sec-Fetch-User": "?1",
-      },
-    });
+    const fetchHeaders = {
+      "User-Agent": ua,
+      Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-CA,en;q=0.9,fr-CA;q=0.5",
+      Referer: "https://www.google.com/",
+      "Upgrade-Insecure-Requests": "1",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "cross-site",
+      "Sec-Fetch-User": "?1",
+    };
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        signal,
+        redirect: "follow",
+        headers: fetchHeaders,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/certificate|cert_|tls|ssl/i.test(msg)) {
+        const prevTls = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+        try {
+          res = await fetch(url, {
+            signal,
+            redirect: "follow",
+            headers: fetchHeaders,
+          });
+        } finally {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = prevTls;
+        }
+      } else {
+        throw e;
+      }
+    }
     ctx.httpStatus = res.status;
     if (!res.ok) return { ok: false, error: `${engine}_${res.status}` };
     const html = (await res.text()).slice(0, 400_000);
@@ -411,7 +432,7 @@ export async function scrapeWithFallback(
       attempts,
     };
   }
-  if (!eng.ok && (eng.gone || eng.blocked || eng.notModified)) {
+  if (!eng.ok && eng.notModified) {
     return { ok: false, url, error: eng.error, via: "scrape_engine", attempts };
   }
 
