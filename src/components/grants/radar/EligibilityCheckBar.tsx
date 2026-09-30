@@ -1,6 +1,6 @@
 import { ShieldCheck } from "lucide-react";
 import type { RadarClientProfile } from "@/lib/radar.functions";
-import type { RadarResult } from "@/lib/grant-radar";
+import type { RadarResult, RadarGrant } from "@/lib/grant-radar";
 
 /**
  * Shows who every grant is being checked against, and the outcome of that
@@ -18,7 +18,7 @@ export function EligibilityCheckBar({
   profiles: RadarClientProfile[];
   selected: RadarClientProfile | null;
   onSelect: (clientId: string) => void;
-  counts: RadarResult<unknown>["counts"];
+  counts: RadarResult<RadarGrant>["counts"];
   hiddenByRules: number;
   hideIneligible: boolean;
   onToggleHide: () => void;
