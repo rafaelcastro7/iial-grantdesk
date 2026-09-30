@@ -40,7 +40,7 @@ test("consultant signs in and walks the main screens", async ({ page }) => {
   for (const path of ["/dashboard", "/clients", "/grants", "/proposals"]) {
     await page.goto(path);
     await expect(page).toHaveURL(new RegExp(path));
-    await expect(page.locator("main, [role=main], body").first()).toBeVisible();
+    await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/something went wrong|unexpected error/i)).toHaveCount(0);
     await page.screenshot({ path: `test-results/e2e${path.replace("/", "-")}.png` });
   }
