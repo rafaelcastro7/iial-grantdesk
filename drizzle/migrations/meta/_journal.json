@@ -29,6 +29,13 @@
       "when": 1790620360545,
       "tag": "0003_grantdesk_assessments_tenants_and_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790750221907,
+      "tag": "0004_github_app_schema_part1",
+      "breakpoints": true
     }
   ]
 }
