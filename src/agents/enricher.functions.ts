@@ -1037,7 +1037,9 @@ export async function enrichGrantImpl(
     );
   }
 
-  patch.status = "enriched";
+  // Rechecking an archived/expired/lost record may refresh its facts, but must
+  // not reopen it or violate the lifecycle transition enforced by the database.
+  patch.status = ["archived", "expired", "lost"].includes(g.status) ? g.status : "enriched";
   patch.enriched_at = new Date().toISOString();
   patch.source_freshness_at = new Date().toISOString();
   patch.source_confidence = (scraped.via as string) === "direct" ? 0.95 : 0.85;
