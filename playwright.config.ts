@@ -10,5 +10,9 @@ export default defineConfig({
     viewport: { width: 1280, height: 900 },
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
+    // Optional: point at a preinstalled Chromium instead of `playwright install`.
+    launchOptions: process.env.E2E_CHROMIUM_PATH
+      ? { executablePath: process.env.E2E_CHROMIUM_PATH }
+      : {},
   },
 });
