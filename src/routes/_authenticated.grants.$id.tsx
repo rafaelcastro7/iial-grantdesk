@@ -202,7 +202,9 @@ function GrantDetailPage() {
     try {
       const result = await fn();
       setTraceFromRun(result, agent, options?.openTrace ?? true);
-      await qc.invalidateQueries({ queryKey: ["grant-detail", id] });
+      // Refetch the active detail before clearing `busy`. Invalidating alone
+      // can leave the old eligibility CTA visible until a later navigation.
+      await qc.refetchQueries({ queryKey: ["grant-detail", id], type: "active" });
       await qc.invalidateQueries({ queryKey: ["grants"] });
     } catch (e) {
       setErr(toUserFacingActionError(e));
@@ -771,7 +773,7 @@ function toUserFacingActionError(error: unknown): string {
   const lower = raw.toLowerCase();
 
   if (lower.includes("ollama") || lower.includes("model") || lower.includes("llm")) {
-    return "The local AI model could not complete this step. Open the reasoning trace or Admin > Agents to confirm Ollama is running and the configured model is installed, then retry.";
+    return "The AI provider chain could not complete this step. Open the reasoning trace or Admin > Agents to review the failed provider attempts, then retry.";
   }
   if (raw.includes("grant_not_enriched_yet")) {
     return "Fetch details first. The evaluator needs the enriched grant facts before it can validate fit rules.";
@@ -787,6 +789,12 @@ function toUserFacingActionError(error: unknown): string {
   }
   if (raw.includes("agent_disabled")) {
     return "This agent is disabled in Admin > Agents. Enable it before running this action.";
+  }
+  if (raw.includes("module_disabled")) {
+    return "This workspace module is disabled in Admin > Modules. Enable it before continuing.";
+  }
+  if (raw.includes("template_not_found")) {
+    return "No proposal template is available. Ask an administrator to restore the default proposal template.";
   }
 
   return raw;

@@ -105,6 +105,16 @@ export function ProposalDetailExpress({
               </ul>
             </div>
           )}
+          {criticScore != null && !readyToSubmit && (
+            <div className="rounded-md border border-warning/30 bg-warning/5 p-3">
+              <p className="text-xs font-medium text-warning">
+                Quality review: {Math.round(criticScore * 100)}%
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Review the detailed findings and strengthen the proposal before submission.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -160,7 +170,11 @@ export function ProposalDetailExpress({
           </Button>
         ) : (
           <Button disabled={pending === "critic"} onClick={onCritic}>
-            {pending === "critic" ? "Reviewing…" : "Run quality review"}
+            {pending === "critic"
+              ? "Reviewing…"
+              : criticScore == null
+                ? "Run quality review"
+                : `Re-run quality review · ${Math.round(criticScore * 100)}%`}
           </Button>
         )}
         <button

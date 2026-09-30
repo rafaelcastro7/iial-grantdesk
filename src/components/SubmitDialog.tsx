@@ -119,9 +119,11 @@ export function SubmitDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading || !reviewed}>
-            {loading ? "Submitting..." : "Submit"}
-          </Button>
+          {!warningMessage && (
+            <Button onClick={handleSubmit} disabled={loading || !reviewed}>
+              {loading ? "Submitting..." : "Submit"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

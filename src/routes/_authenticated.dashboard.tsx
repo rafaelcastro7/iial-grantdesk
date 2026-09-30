@@ -20,7 +20,7 @@ import { useUiVersion } from "@/components/v2/ui-version";
 import {
   Activity,
   ArrowRight,
-  Bot,
+  BrainCircuit,
   CalendarClock,
   CheckCircle2,
   Clock3,
@@ -132,7 +132,13 @@ function Dashboard() {
   // "review your top match" should point at something still worth acting on,
   // not a grant that's already past the point topMatches is nudging toward.
   const topMatches = [...grants]
-    .filter((g) => g.evaluation && g.status !== "submitted" && g.status !== "won")
+    .filter(
+      (g) =>
+        g.evaluation &&
+        g.status !== "submitted" &&
+        g.status !== "won" &&
+        (!g.deadline || new Date(g.deadline).getTime() >= now),
+    )
     .sort(
       (a, b) =>
         (b.evaluation!.eligibility_pass ? 1 : 0) - (a.evaluation!.eligibility_pass ? 1 : 0) ||
@@ -462,33 +468,35 @@ function DashboardV2({
               </div>
             </section>
 
-            <aside className="rounded-md border border-white/12 bg-[oklch(0.2_0.026_218)] p-5 text-white shadow-sm">
+            <aside className="rounded-md border bg-sidebar p-5 text-sidebar-foreground shadow-sm">
               <div className="flex items-center gap-2 text-sm font-semibold">
-                <Bot className="h-4 w-4 text-teal-200" />
-                Local intelligence posture
+                <BrainCircuit className="h-4 w-4 text-brand-green" />
+                AI-assisted workflow
               </div>
-              <p className="mt-3 text-sm leading-6 text-white/68">
-                The workspace is designed around sovereign grant intelligence: local Supabase, local
-                Ollama, auditable rules, and no cloud LLM spend.
+              <p className="mt-3 text-sm leading-6 text-sidebar-foreground/70">
+                Eligibility is decided by auditable rules. Drafting and analysis use the configured
+                provider chain, with Lovable AI as the final fallback.
               </p>
               <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
                 {[
-                  ["AI", "Ollama"],
+                  ["AI", "External first"],
                   ["Database", "Lovable Cloud"],
                   ["Security", "RLS"],
-                  ["Cost", "$0 tokens"],
+                  ["Fallback", "Lovable AI"],
                 ].map(([label, value]) => (
                   <div
                     key={label}
-                    className="rounded-md border border-white/10 bg-white/[0.06] p-3"
+                    className="rounded-md border border-sidebar-border bg-sidebar-accent p-3"
                   >
-                    <div className="text-white/42">{label}</div>
+                    <div className="text-sidebar-foreground/55">{label}</div>
                     <div className="mt-1 font-semibold">{value}</div>
                   </div>
                 ))}
               </div>
               {email && (
-                <div className="mt-5 truncate text-xs text-white/42">Signed in as {email}</div>
+                <div className="mt-5 truncate text-xs text-sidebar-foreground/55">
+                  Signed in as {email}
+                </div>
               )}
             </aside>
           </div>

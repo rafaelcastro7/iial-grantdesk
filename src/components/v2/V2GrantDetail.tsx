@@ -217,7 +217,9 @@ export function V2GrantDetail({
     : verdict.enrichmentFailed
       ? "We couldn't read this grant's page, so there's nothing to assess yet. Open the official page to check it by hand."
       : "Fetch the details first so there's something to assess.";
-  const canDraft = ["scored", "shortlisted", "in_proposal"].includes(grant.status);
+  const canDraft =
+    ["scored", "shortlisted", "in_proposal"].includes(grant.status) ||
+    evaluation?.eligibility_pass === true;
   // Why drafting is unavailable, in the user's terms. The evaluator only
   // promotes a grant to "scored" when eligibility passes, so an honest
   // "not eligible" verdict leaves this button disabled forever.
@@ -226,7 +228,7 @@ export function V2GrantDetail({
     : evaluation && evaluation.eligibility_pass === false
       ? "Drafting is off: this grant was assessed as not eligible for your organization. Update your profile or re-evaluate if that looks wrong."
       : evaluation
-        ? "Drafting unlocks once this grant is scored."
+        ? "Drafting is unavailable until this grant passes the eligibility check."
         : "Check fit first - drafting unlocks once this grant has been evaluated.";
   const actionDisabled = busy != null;
   const hasBriefingTools = (isAdmin && grant.status === "scored") || !!traceRun;

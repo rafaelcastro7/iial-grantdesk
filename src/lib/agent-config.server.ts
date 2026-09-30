@@ -1,8 +1,7 @@
 // Resolves per-agent runtime config (model, prompt, generation params).
 // Called by callLlm and by the agent console. 30s in-memory cache to avoid
 // hammering the DB on every LLM call.
-// LOCAL-ONLY: default model is phi4-mini (fast, small, fits VRAM).
-// Agent-specific optimized models are in model-router.server.ts.
+// Agent-specific model routing is defined in model-router.server.ts.
 import { PROMPTS } from "@/agents/schemas";
 import { resolveModel, resolveFallback } from "@/agents/model-router.server";
 
