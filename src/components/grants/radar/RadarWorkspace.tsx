@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, ChevronDown, Loader2, RefreshCw, SearchCheck, ShieldCheck, Sparkles, X } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 import type { GrantRowData } from "@/components/grants/GrantRow";
 import { DiscoveryProgress } from "@/components/grants/DiscoveryProgress";
 import { EventLog } from "@/components/grants/EventLog";

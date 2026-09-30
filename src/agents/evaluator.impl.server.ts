@@ -367,7 +367,9 @@ export async function evaluateGrantImpl(opts: {
     // old hardcoded list) silently dropped the fresh score entirely, leaving
     // grants.fit_score stale while grant_evaluations already had the new one.
     const canArchive =
-      rules.auto_archive_on_fail && canTransition(g.status as GrantStatus, "archived");
+      rulesResult.verdict === "ineligible" &&
+      rules.auto_archive_on_fail &&
+      canTransition(g.status as GrantStatus, "archived");
     await trace(
       "gate",
       canArchive
