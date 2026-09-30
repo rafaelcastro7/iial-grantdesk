@@ -55,8 +55,8 @@ test("grant search returns relevant results and opens a grant", async ({ page })
   const box = page.getByRole("searchbox", { name: "Search grants" }).or(page.getByLabel("Search grants")).first();
   await expect(box).toBeVisible({ timeout: 30_000 });
   await box.fill("clean technology");
-  await expect(page.getByText(/mode hybrid/i)).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByText(/semantic search is degraded/i)).toHaveCount(0);
+  await expect(page.locator('[data-search-mode="hybrid"]')).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText(/meaning-based search is temporarily unavailable/i)).toHaveCount(0);
   const firstGrant = page.locator('a[href^="/grants/"]').first();
   await expect(firstGrant).toBeVisible({ timeout: 45_000 });
   await page.screenshot({ path: "test-results/e2e-grant-search.png" });

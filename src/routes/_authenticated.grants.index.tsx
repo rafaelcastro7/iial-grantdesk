@@ -320,6 +320,7 @@ function GrantsPage() {
         countries={countries}
         sectors={sectors}
         isAdmin={isAdmin}
+        searchMode={searching ? (data.searchMode ?? null) : null}
         notices={notices}
         actions={{
           pending,

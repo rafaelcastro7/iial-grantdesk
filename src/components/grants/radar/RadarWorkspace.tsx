@@ -30,6 +30,7 @@ export function RadarWorkspace({
   moreFilters,
   isAdmin,
   admin,
+  searchMode,
 }: {
   radar: RadarResult<GrantRowData>;
   totalLoaded: number;
@@ -41,6 +42,8 @@ export function RadarWorkspace({
   notices: Notice[];
   profileBar?: ReactNode;
   moreFilters?: ReactNode;
+  /** Retrieval mode of a server search, when one is active. */
+  searchMode?: string | null;
   isAdmin: boolean;
   admin: {
     activeJob: { jobId: string; queued: number } | null;
@@ -153,7 +156,8 @@ export function RadarWorkspace({
           sectors={sectors}
         />
         <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
-          <span>
+          <span data-search-mode={searchMode ?? undefined}>
+            {searchMode && (searchMode === "hybrid" ? "Smart search · " : "Keyword search · ")}
             Showing {radar.items.length} of {totalLoaded}
             {radar.hiddenByAmount > 0 &&
               ` · ${radar.hiddenByAmount} below the minimum amount`}
