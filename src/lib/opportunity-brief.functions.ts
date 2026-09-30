@@ -17,6 +17,7 @@ import {
 const PARTNER_TYPE_LABEL: Record<string, string> = {
   municipality: "a municipality (city or town)",
   first_nation: "a First Nation",
+  university: "an eligible university or postsecondary researcher",
   co_applicant: "a co-applicant partner",
   other: "a partner organization",
 };
@@ -37,7 +38,7 @@ export type Brief = {
   // leaving the reader to interpret a bare "partner" badge themselves.
   partner: {
     needed: boolean;
-    type: "municipality" | "first_nation" | "co_applicant" | "other" | null;
+    type: "municipality" | "first_nation" | "university" | "co_applicant" | "other" | null;
     note: string;
   };
   strategic_angle: string;

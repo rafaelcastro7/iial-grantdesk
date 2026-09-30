@@ -96,7 +96,7 @@ describe("grant radar eligibility pre-check", () => {
         id: "partner",
         ...base,
         country: "CA",
-        deadline: inDays(90),
+        deadline: inDays(90).slice(0, 10),
         requirements: [{ category: "partnership", requirement: "Name a university partner", isCritical: true }],
       }],
       { ...opts, rules },
