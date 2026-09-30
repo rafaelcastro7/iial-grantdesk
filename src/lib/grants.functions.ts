@@ -606,7 +606,6 @@ export const listGrants = createServerFn({ method: "GET" })
           qualityMatch,
           rankingBreakdown,
           evaluation,
-          reviewState: reviewByGrant.get(g.id) ?? null,
           hardBlocked,
           isNewSinceLastReview,
           changedSinceFeedback,
@@ -625,6 +624,7 @@ export const listGrants = createServerFn({ method: "GET" })
           changedSinceFeedback,
           combinedRelevance,
           evaluation,
+          reviewState: reviewByGrant.get(g.id) ?? null,
           duplicateGroupSize:
             groupCounts.get(`${g.funder_id ?? "none"}|${normalizeTitle(g.title)}`) ?? 1,
         }),
