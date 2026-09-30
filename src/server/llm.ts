@@ -278,6 +278,33 @@ export async function callLlm(
   _options: { timeoutMs?: number } = {},
 ): Promise<LlmResponse> {
   const attempts: string[] = [];
+  const env = serverEnv();
+
+  // External providers first: each gets one shot, then we move on. Their
+  // free tiers carry the volume; the gateway below is the paid floor.
+  for (const provider of EXTERNAL_PROVIDERS) {
+    const apiKey = env[provider.envKey];
+    if (!apiKey) continue;
+    const started = Date.now();
+    try {
+      const text = await provider.call(request, apiKey);
+      if (request.validate && !request.validate(text)) {
+        attempts.push(`${provider.name}: failed caller validation`);
+        continue;
+      }
+      return {
+        text,
+        provider: provider.name,
+        model: provider.model,
+        latencyMs: Date.now() - started,
+        attempts,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      attempts.push(`${provider.name}: ${message}`);
+    }
+  }
+
   const maxTries = request.noWait ? 1 : 3;
 
   for (let attempt = 0; attempt < maxTries; attempt++) {
