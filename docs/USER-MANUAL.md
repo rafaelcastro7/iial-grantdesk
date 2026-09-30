@@ -300,12 +300,13 @@ The grant workspace groups opportunities by business stage:
 
 Use filters to reduce noise:
 
-- Search by grant title, funder, or keywords.
+- Search by grant title, funder, or keywords (with automatic fallback to keyword matching across titles, summaries, and funder names if embeddings are pending).
 - Filter by jurisdiction.
 - Select one or more funders.
 - Show only eligible opportunities.
 - Show only grants with known deadlines.
 - Sort by highest-value or most urgent opportunities.
+- Run **Auto-evaluar listadas** from the Radar toolbar to evaluate all visible grants sequentially against the organization profile with live real-time progress indicators.
 
 ### Detailed Grant Search Process
 

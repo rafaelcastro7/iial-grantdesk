@@ -18,11 +18,13 @@
 - Run catalog ingest and embedding through signed-in `refreshCatalog`; there is no cron.
 - Make schema changes additive; deprecate rather than drop columns.
 - Keep the intentionally loose synced-code TypeScript settings and exclude tests/e2e/fixtures from typecheck.
-- Search `grant_embeddings` through `match_grant_search_documents`; missing runtime config means hybrid mode.
+- Search `grant_embeddings` through `match_grant_search_documents`; if vector results return fewer than 20 rows (or vectors are pending), always run tokenized keyword fallback across `grants` (title, summary, eligibility_note) and `funders.name` so search queries never falsely return empty.
 - Provision new users through idempotent `ensure_current_user()` in the authenticated layout because auth-schema triggers are unavailable.
 - Surface failed soft eligibility checks without changing their verdict effect.
+- Evaluator calls must never abort the batch pipeline: if cloud LLMs are rate-limited (429) or unavailable, evaluateGrant falls back to the deterministic rules engine (`rules-engine-deterministic`) ensuring continuous 100% completion.
+- Coerce and normalize `fit_score` to `[0, 1]` in evaluator schemas to absorb models returning 0-100 scales.
 - Run live cloud/AI tests only with `LIVE_CLOUD=1` to avoid accidental spend.
-- Keep Grant Radar ranking, filtering, country grouping, and deterministic prefiltering in `src/lib/grant-radar.ts`.
+- Keep Grant Radar ranking, filtering, country grouping, and deterministic prefiltering in `src/lib/grant-radar.ts`; default `minAmount` to 0 so unstated grant amounts are visible, and prioritize search text over secondary eligibility filters when actively searching.
 - Theme through `src/styles.css` semantic tokens, following iial.ca's light institutional style.
 - Read Grants.gov detail data from its official structured endpoint before scraping; unpublished fields stay unknown and reduce coverage without failing enrichment.
 - V2 is the only user-facing interface; keep the version context fixed to V2 while legacy branches remain temporarily for reference. This prevents split UX while allowing safe, incremental cleanup.
