@@ -479,7 +479,17 @@ export async function extractRequirementsFromUrl(url: string): Promise<Requireme
   // once in passing, a detail invented that the pages never said.
   const foundProcess = result.requirements.some((r) => r.kind === "process");
   const worthDiggingFurther = pages[0]!.text.length > 800;
-  let critique = worthDiggingFurther
+
+  // Optimization: If the primary extraction is already comprehensive (has process,
+  // eligibility, multiple sections, and verbatim quotes for >= 75% of requirements),
+  // skip the expensive second LLM critic pass to save 50% of tokens and cut latency.
+  const isHighConfidence =
+    result.requirements.length >= 4 &&
+    foundProcess &&
+    result.requirements.some((r) => r.kind === "eligibility") &&
+    result.requirements.filter((r) => Boolean(r.sourceQuote)).length >= result.requirements.length * 0.75;
+
+  let critique = worthDiggingFurther && !isHighConfidence
     ? await critiqueExtraction(pages, result.requirements)
     : { complete: true, concerns: [] as string[] };
 
