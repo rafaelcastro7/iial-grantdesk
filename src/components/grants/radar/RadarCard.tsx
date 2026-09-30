@@ -40,10 +40,12 @@ export function RadarCard({
   item,
   actions,
   highlight = false,
+  simple = false,
 }: {
   item: RadarItem<GrantRowData>;
   actions: RadarActions;
   highlight?: boolean;
+  simple?: boolean;
 }) {
   const g = item.grant;
   const criticalRequirements = (g.requirements ?? []).filter((requirement) => requirement.isCritical);
@@ -85,7 +87,7 @@ export function RadarCard({
             >
               {VERDICT_LABELS[item.verdict]}
             </span>
-            {item.fit != null && (
+            {item.fit != null && !simple && (
               <span className="text-xs text-muted-foreground">Fit {Math.round(item.fit)}</span>
             )}
             {g.isNewSinceLastReview && (
@@ -104,7 +106,7 @@ export function RadarCard({
           )}
           {item.reason && (
             <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground" title={item.reason}>
-              <span className="font-medium text-foreground">Rules: </span>
+              <span className="font-medium text-foreground">{simple ? "Why: " : "Rules: "}</span>
               {item.reason}
             </p>
           )}
@@ -119,7 +121,7 @@ export function RadarCard({
               </p>
             </div>
           )}
-          {g.reviewState && (
+          {g.reviewState && !simple && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-full border bg-secondary px-2 py-0.5 font-medium text-secondary-foreground">
                 Evidence {g.reviewState.coverage_pct}%
@@ -155,10 +157,10 @@ export function RadarCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 md:flex-col md:items-end">
-          {item.nextAction === "open" ? (
+          {simple || item.nextAction === "open" ? (
             <Button asChild size="sm" variant="outline">
               <Link to="/grants/$id" params={{ id: g.id }}>
-                Open <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                {simple ? "View details" : "Open"} <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </Link>
             </Button>
           ) : (
@@ -183,7 +185,7 @@ export function RadarCard({
           )}
         </div>
       </div>
-      {actions.onFeedback && (
+      {actions.onFeedback && !simple && (
         <div className="mt-3 border-t pt-3">
           <GrantFeedbackControls grant={g} onFeedback={actions.onFeedback} compact />
         </div>

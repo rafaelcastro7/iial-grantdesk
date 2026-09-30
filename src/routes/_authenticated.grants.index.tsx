@@ -379,6 +379,7 @@ function GrantsPage() {
         countries={countries}
         sectors={sectors}
         isAdmin={isAdmin}
+        simple={isConsultant}
         searchMode={searching ? (data.searchMode ?? null) : null}
         notices={notices}
         actions={{
