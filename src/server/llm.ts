@@ -1,14 +1,14 @@
 import { serverEnv } from "@/lib/env.server";
 
 /**
- * Language model access, through the Lovable AI Gateway.
+ * Language model access.
  *
- * The provider chain this replaced (Groq, Cerebras, Gemini, and a local Ollama
- * floor) existed because each account could disappear on its own. The gateway
- * removes that problem: one key, one endpoint, and a model that is served for
- * us. What survives from the old design is the part that mattered — a caller
- * asks for a *role*, gets back the text plus a record of what was attempted,
- * and a failure is reported rather than silently degraded.
+ * Provider chain, in order: Cerebras, Groq, Gemini, and finally the Lovable
+ * AI Gateway as the floor. The external providers carry the volume so the
+ * gateway's credits are spent only when every external key is missing or
+ * failing. What survives from the original design is the part that mattered —
+ * a caller asks for a *role*, gets back the text plus a record of what was
+ * attempted, and a failure is reported rather than silently degraded.
  */
 
 export type Role = "extract" | "judge" | "write";
