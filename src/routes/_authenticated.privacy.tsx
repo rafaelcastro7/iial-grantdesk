@@ -279,9 +279,9 @@ function ComplianceAndTrustCard() {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p>
-          All customer data is stored locally on self-hosted infrastructure (local PostgreSQL) — no
-          cross-border transfer occurs. AI model calls are processed locally via Ollama; no data is
-          sent to external APIs by default.
+          Customer data is stored in the app's managed cloud database with row-level access
+          controls. AI analysis and drafting run through the Lovable AI Gateway; eligibility
+          verdicts are computed by deterministic rules, never by the model.
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>
