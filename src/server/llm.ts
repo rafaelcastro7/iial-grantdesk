@@ -3,10 +3,9 @@ import { serverEnv } from "@/lib/env.server";
 /**
  * Language model access.
  *
- * Provider chain, in order: Cerebras, Groq, Gemini, and finally the Lovable
- * AI Gateway as the floor. The external providers carry the volume so the
- * gateway's credits are spent only when every external key is missing or
- * failing. What survives from the original design is the part that mattered —
+ * Provider chain: Lovable AI Gateway first (primary), then Gemini, Groq and
+ * Cerebras as fallbacks when the gateway fails. What survives from the
+ * original design is the part that mattered —
  * a caller asks for a *role*, gets back the text plus a record of what was
  * attempted, and a failure is reported rather than silently degraded.
  */
