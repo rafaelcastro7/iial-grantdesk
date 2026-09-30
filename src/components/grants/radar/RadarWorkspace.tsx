@@ -131,7 +131,7 @@ export function RadarWorkspace({
         <Stat label="You can apply" value={counts.eligible} tone="text-eligible" />
         <Stat label="Need a check" value={counts.needsInput} tone="text-needs-input" />
         <Stat label="Closing in your window" value={counts.closingSoon} tone="text-foreground" />
-        <Stat label="Actionable value" value={formatMoney(counts.pipelineValue || null)} tone="text-foreground" />
+        <Stat label="Actionable value" value={counts.pipelineValue > 0 ? formatMoney(counts.pipelineValue) : "—"} tone="text-foreground" />
       </section>
 
       {next && (
