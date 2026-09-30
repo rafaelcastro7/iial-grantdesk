@@ -50,3 +50,24 @@ describe.skipIf(!live)("live grant search (cloud)", () => {
     expect(Array.isArray(res.matches)).toBe(true);
   }, 60_000);
 });
+
+describe.skipIf(!live)("live grant analysis (Lovable AI Gateway)", () => {
+  it("analyses a real grant for IIAL and returns well-formed JSON", async () => {
+    const sb = await client();
+    const { data: g } = await sb.from("grants").select("title,summary").not("summary", "is", null).limit(1).single();
+    const { callLlm } = await import("@/server/llm");
+    const res = await callLlm({
+      role: "judge",
+      json: true,
+      maxTokens: 400,
+      messages: [
+        { role: "system", content: 'Return JSON {"fit": "high"|"medium"|"low", "reasons": string[]} only.' },
+        { role: "user", content: `Org: IIAL, Ontario nonprofit, applied research and training.\nGrant: ${g?.title}\n${g?.summary}` },
+      ],
+    });
+    const parsed = JSON.parse(res.text.replace(/^```json|```$/g, "").trim());
+    expect(["high", "medium", "low"]).toContain(parsed.fit);
+    expect(Array.isArray(parsed.reasons)).toBe(true);
+    expect(res.model).toBe("openai/gpt-6-astra");
+  }, 180_000);
+});
