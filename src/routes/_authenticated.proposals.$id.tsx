@@ -322,7 +322,11 @@ function ProposalDetailPage() {
   const proposal = data.proposal;
   const grant = Array.isArray(proposal.grant) ? proposal.grant[0] : proposal.grant;
   const readiness = computeProposalReadiness({
-    sections: data.sections.map((s) => ({ ...s, kind: s.kind ?? "other" })),
+    sections: data.sections.map((s) => ({
+      ...s,
+      kind: s.kind ?? "other",
+      heading_en: s.heading_en ?? "",
+    })),
     requirements: (grant?.requirements ?? []) as ProposalRequirement[],
   });
   // Same definition submitProposal's server-side gate uses (submissions.functions.ts).
