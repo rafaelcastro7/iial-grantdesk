@@ -454,31 +454,30 @@ export function V2GrantDetail({
           </div>
         </div>
 
-        <aside className="rounded-md border border-white/12 bg-[oklch(0.2_0.026_218)] p-5 text-white shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Bot className="h-4 w-4 text-teal-200" />
-            Local decision record
+        <aside className="rounded-md border bg-card p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Clock3 className="h-4 w-4 text-primary" />
+            History
           </div>
-          <p className="mt-3 text-sm leading-6 text-white/68">
-            Every action on this grant stays tied to cloud database records, row-level access rules, evidence spans,
-            and agent run traces.
-          </p>
-          <div className="mt-5 space-y-2 text-xs">
-            <DarkFact icon={Fingerprint} label="Grant ID" value={grant.id} mono />
-            <DarkFact
-              icon={Clock3}
-              label="Discovered"
-              value={formatDateTime(grant.discovered_at)}
-            />
-            <DarkFact icon={Layers3} label="Last seen" value={formatDateTime(grant.last_seen_at)} />
-            <DarkFact icon={Activity} label="Times seen" value={`${grant.times_seen ?? 1}`} />
-          </div>
+          <dl className="mt-4 space-y-2 text-xs">
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">First found</dt>
+              <dd className="text-foreground">{formatDateTime(grant.discovered_at)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Last checked</dt>
+              <dd className="text-foreground">{formatDateTime(grant.last_seen_at)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Times seen</dt>
+              <dd className="text-foreground">{grant.times_seen ?? 1}</dd>
+            </div>
+          </dl>
           <div className="mt-5 flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="border-white/15 bg-white/[0.06] text-white hover:bg-white/10 hover:text-white"
               disabled={busy === "share"}
               onClick={onShare}
             >

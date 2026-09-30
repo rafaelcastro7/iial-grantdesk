@@ -2,7 +2,7 @@
 //
 // The former dense "row" UI (GrantRow component), its inline FitChip, and the
 // sortByFit comparator were removed as dead code — the board renders the
-// Kanban card (GrantKanban.tsx) and sorting now lives in GrantFilters
+// Card and sorting now live in src/lib/grant-radar.ts and radar/
 // (sortGrants). Only the data shape is still shared, kept here so existing
 // `import type { GrantRowData } from "./GrantRow"` paths keep working.
 
