@@ -12,7 +12,7 @@
 # GrantDesk — project rules
 
 - Server functions live in `src/lib/*.functions.ts`; server-only modules stay in `src/server/` and are loaded with `await import(...)` inside handler bodies. The template's import protection blocks `src/server/` from the client bundle, and only handler bodies are stripped from it.
-- All AI goes through the Lovable AI Gateway: `openai/gpt-6-astra` on `/v1/responses` for text, `google/gemini-embedding-2` for embeddings. One provider so failures have one explanation.
+- All AI goes through the Lovable AI Gateway: `openai/gpt-6-astra` on `/v1/responses` for text, `google/gemini-embedding-2` for embeddings. One provider so failures have one explanation. The GitHub-synced Cerebras/Groq/Gemini/Ollama chain was removed: `src/agents/llm.server.ts`, `llm-free.server.ts`, `embeddings.server.ts` and `model-router.server.ts` are thin adapters over `src/server/llm.ts` and `src/server/embed.ts`, keeping their old exported signatures so callers stay unchanged.
 - Embeddings are 768 dimensions in both spaces (grants, answer library); the two spaces are never compared to each other.
 - No client-side deadlines on gateway calls — an aborted generation still finishes and still bills.
 - Eligibility verdicts stay deterministic in `src/lib/eligibility.ts`; the model never decides a verdict, and `unknown` is a real answer rather than a guess.
