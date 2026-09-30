@@ -132,6 +132,99 @@ async function readStream(response: Response): Promise<string> {
   return text.trim();
 }
 
+// ---- External providers (tried first, to save gateway credits) ----
+
+type ExternalProvider = {
+  name: string;
+  model: string;
+  call: (request: LlmRequest, apiKey: string) => Promise<string>;
+};
+
+/** OpenAI-compatible chat completions (Cerebras and Groq share the shape). */
+function openAiCompatible(url: string, model: string): ExternalProvider["call"] {
+  return async (request, apiKey) => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: request.messages,
+        temperature: request.temperature ?? 0.2,
+        ...(request.maxTokens ? { max_tokens: request.maxTokens } : {}),
+        ...(request.json ? { response_format: { type: "json_object" } } : {}),
+      }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`HTTP ${response.status}: ${detail.slice(0, 300)}`);
+    }
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const text = data.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error("the model returned an empty answer");
+    return text;
+  };
+}
+
+/** Gemini generateContent (non-streamed; these calls are short gap-fills). */
+async function callGemini(request: LlmRequest, apiKey: string): Promise<string> {
+  const model = "gemini-2.0-flash";
+  const system = request.messages.find((m) => m.role === "system")?.content;
+  const turns = request.messages.filter((m) => m.role !== "system");
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+        contents: turns.map((m) => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }],
+        })),
+        generationConfig: {
+          temperature: request.temperature ?? 0.2,
+          ...(request.maxTokens ? { maxOutputTokens: request.maxTokens } : {}),
+          ...(request.json ? { responseMimeType: "application/json" } : {}),
+        },
+      }),
+    },
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`HTTP ${response.status}: ${detail.slice(0, 300)}`);
+  }
+  const data = (await response.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = data.candidates?.[0]?.content?.parts
+    ?.map((p) => p.text ?? "")
+    .join("")
+    .trim();
+  if (!text) throw new Error("the model returned an empty answer");
+  return text;
+}
+
+const EXTERNAL_PROVIDERS: (ExternalProvider & { envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GEMINI_API_KEY" })[] = [
+  {
+    name: "cerebras",
+    model: "llama-3.3-70b",
+    envKey: "CEREBRAS_API_KEY",
+    call: openAiCompatible("https://api.cerebras.ai/v1/chat/completions", "llama-3.3-70b"),
+  },
+  {
+    name: "groq",
+    model: "llama-3.3-70b-versatile",
+    envKey: "GROQ_API_KEY",
+    call: openAiCompatible("https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile"),
+  },
+  { name: "gemini", model: "gemini-2.0-flash", envKey: "GEMINI_API_KEY", call: callGemini },
+];
+
 async function callGateway(request: LlmRequest): Promise<LlmResponse> {
   const env = serverEnv();
   const started = Date.now();
