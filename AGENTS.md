@@ -15,10 +15,10 @@
 - Text AI: Lovable AI Gateway first, then Gemini → Groq → Cerebras fallback; embeddings Lovable `google/gemini-embedding-2` @768. User chose Lovable as primary.
 - No client deadlines on AI calls (aborted generations still bill); live AI tests only with `LIVE_CLOUD=1`.
 - Eligibility is deterministic in `src/lib/eligibility.ts`; `unknown` is valid; soft-check failures are surfaced without changing verdicts.
-- Evaluator never aborts batches: on LLM failure fall back to `rules-engine-deterministic`; normalize `fit_score` to [0,1]; persisted `grant_evaluations` override heuristics in `toRadarItem`.
+- Evaluator never aborts batches: on LLM failure fall back to `rules-engine-deterministic`; normalize `fit_score` to [0,1]; persisted `grant_evaluations` override heuristics in `toRadarItem`; short-circuit hard fails with deterministic rules (0 tokens) before calling LLM.
 - `listGrants` defaults `includeHardBlocked` true and projects evaluation so Radar/Dashboard counts agree.
 - Radar logic lives in `src/lib/grant-radar.ts`; `minAmount` defaults 0; search text beats secondary filters.
-- Search: `match_grant_search_documents`, with keyword fallback over grants + funders when <20 vector rows, so search never falsely returns empty.
+- Search: `match_grant_search_documents`, with keyword fallback over grants + funders (0 tokens) when <20 vector rows, so search never falsely returns empty.
 - Schema changes additive; provision users via idempotent `ensure_current_user()` (no auth triggers); ingest via signed-in `refreshCatalog` (no cron).
 - Grants.gov: official structured endpoint before scraping; unpublished fields stay unknown.
 - Keep loose TS settings; exclude tests/e2e/fixtures from typecheck.
