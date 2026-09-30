@@ -6,6 +6,7 @@ import { getFetchTrail, type FetchAttemptRow } from "@/lib/grant-self-check.func
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { explainEnrichmentResult } from "@/lib/enrichment-message";
 
 const ENGINE_LABEL: Record<string, string> = {
   scrape_engine: "Local engine (Readability)",
@@ -41,12 +42,13 @@ export function FetchTrailPanel({
   const attempts: FetchAttemptRow[] = data?.attempts ?? [];
   const failed = data?.status === "failed";
   const lastTs = attempts[attempts.length - 1]?.ts;
+  const explainedError = errorMsg ? explainEnrichmentResult(errorMsg) : null;
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between gap-2 text-sm">
-          <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-left">
+          <Button variant="ghost" size="sm" onClick={() => setOpen(!open)} className="h-auto px-0 text-left">
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             Retrieval history
             {attempts.length > 0 && (
@@ -54,7 +56,7 @@ export function FetchTrailPanel({
                 {attempts.length} engine{attempts.length === 1 ? "" : "s"}
               </Badge>
             )}
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={() => refetch()} title="Refresh">
               <RefreshCw className="h-3.5 w-3.5" />
@@ -69,10 +71,10 @@ export function FetchTrailPanel({
       </CardHeader>
       {open && (
         <CardContent className="space-y-3">
-          {errorMsg && (
+          {explainedError && (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs">
-              <div className="mb-1 font-medium text-destructive">Last error</div>
-              <div className="font-mono text-[11px] break-all">{errorMsg}</div>
+              <div className="mb-1 font-medium text-destructive">{explainedError.title}</div>
+              <div className="text-muted-foreground">{explainedError.detail}</div>
               {data?.nextRetryAfter && (
                 <div className="mt-1.5 flex items-center gap-1 text-muted-foreground">
                   <Clock className="h-3 w-3" />

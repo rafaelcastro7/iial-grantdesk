@@ -11,20 +11,17 @@
 
 # GrantDesk — project rules
 
-- Server functions live in `src/lib/*.functions.ts`; server-only modules stay in `src/server/` and are loaded with `await import(...)` inside handler bodies. The template's import protection blocks `src/server/` from the client bundle, and only handler bodies are stripped from it.
-- Chat LLM chain (user requirement, 2026-09-30): external providers first to save Lovable AI credits — Cerebras (`qwen-3.8-27b`) → Groq (`qwen/qwen3.8-27b`) → Gemini (`gemini-3.1-flash-lite`) → Lovable AI Gateway (`openai/gpt-6-astra` on `/v1/responses`) as the paid floor. Keys: `CEREBRAS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY` (optional in `src/lib/env.server.ts`); a missing/failing provider is recorded in `attempts` and skipped. Embeddings stay on the gateway only: `google/gemini-embedding-2`. `src/agents/llm.server.ts`, `llm-free.server.ts`, `embeddings.server.ts` and `model-router.server.ts` are thin adapters over `src/server/llm.ts` and `src/server/embed.ts`, keeping their old exported signatures so callers stay unchanged.
-- Embeddings are 768 dimensions in both spaces (grants, answer library); the two spaces are never compared to each other.
-- No client-side deadlines on gateway calls — an aborted generation still finishes and still bills.
-- Eligibility verdicts stay deterministic in `src/lib/eligibility.ts`; the model never decides a verdict, and `unknown` is a real answer rather than a guess.
-- Catalog ingest and embedding run through `refreshCatalog` (service role, signed-in trigger) because there is no cron here.
-- Schema changes are additive: retired columns get a `DEPRECATED` comment instead of being dropped.
-
-- Typecheck excludes test/e2e/fixture files and disables noPropertyAccessFromIndexSignature, noUncheckedIndexedAccess and exactOptionalPropertyTypes — the synced GitHub code was written against those looser settings.
-
-- Semantic catalog search reads `grant_embeddings` (model `gemini-embedding-2/768`) through `match_grant_search_documents`; `grant_search_documents` is deprecated. A missing `grant_search_runtime_config` row means hybrid mode, not lexical-only — a silent default to lexical hid half the retrieval.
-- New users get their profile + default role from the idempotent `ensure_current_user()` RPC called in the `_authenticated` layout, because triggers on the auth schema are not allowed here.
-- Eligibility headline surfaces a failed soft check (e.g. short runway) instead of "meets every requirement"; soft checks still never flip the verdict.
-- Live synthetic tests (`src/evals/grant-search.live.test.ts`) hit the real cloud database and AI gateway and run only with `LIVE_CLOUD=1`; the default unit run spends no credits.
-- Grant Radar ranking, filtering and country grouping live only in the pure `src/lib/grant-radar.ts` (tested); UI in `src/components/grants/radar/`. Keeps one source of truth instead of sort logic scattered across route and components.
-- Grant Radar runs every grant through the deterministic `decideEligibility` rules for the selected client profile before listing; ruled-out grants are pre-filtered (counted, one toggle away) and the rules verdict overrides stored model evaluations. Why: the model never decides a verdict.
-- UI theme mirrors iial.ca: shadcn tokens in `src/styles.css` (white pages, #222831 charcoal sidebar, #0c4da2 primary, Montserrat/Roboto), light by default with `.dark` class variant. Why: previously no shadcn tokens were defined, so bg-card/bg-primary rendered transparent.
+- Keep server functions in `src/lib/*.functions.ts`; dynamically import server-only `src/server/` modules inside handlers to protect the client bundle.
+- Text AI priority is Cerebras → Groq → Gemini → Lovable; embeddings use Lovable `google/gemini-embedding-2` at 768 dimensions. This minimizes paid traffic without losing fallback reliability.
+- Never impose client deadlines on AI calls because aborted generation still completes and bills.
+- Keep eligibility deterministic in `src/lib/eligibility.ts`; models never decide verdicts and `unknown` is valid.
+- Run catalog ingest and embedding through signed-in `refreshCatalog`; there is no cron.
+- Make schema changes additive; deprecate rather than drop columns.
+- Keep the intentionally loose synced-code TypeScript settings and exclude tests/e2e/fixtures from typecheck.
+- Search `grant_embeddings` through `match_grant_search_documents`; missing runtime config means hybrid mode.
+- Provision new users through idempotent `ensure_current_user()` in the authenticated layout because auth-schema triggers are unavailable.
+- Surface failed soft eligibility checks without changing their verdict effect.
+- Run live cloud/AI tests only with `LIVE_CLOUD=1` to avoid accidental spend.
+- Keep Grant Radar ranking, filtering, country grouping, and deterministic prefiltering in `src/lib/grant-radar.ts`.
+- Theme through `src/styles.css` semantic tokens, following iial.ca's light institutional style.
+- Read Grants.gov detail data from its official structured endpoint before scraping; unpublished fields stay unknown and reduce coverage without failing enrichment.
