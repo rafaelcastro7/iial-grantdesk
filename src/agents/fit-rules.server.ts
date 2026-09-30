@@ -197,6 +197,9 @@ function buildHaystack(g: GrantForRules): string {
 }
 
 function detectRole(hay: string): "lead" | "partner" | "unknown" {
+  if (/\bpartner\s+with\s+(?:an?\s+)?(?:universit(?:y|ies)|university researcher|academic|college)\b/.test(hay)) {
+    return "partner";
+  }
   const partner =
     /\b(municipal(ity|ities)?|city of|town of|first nation|partner|co-?applicant|lead applicant must be)\b/.test(
       hay,
@@ -392,8 +395,19 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
   const grantSectors = (g.sectors ?? []).filter(Boolean);
   const grantCountry = (g.country ?? "").trim();
   const hay = buildHaystack(g);
-  const detected_role = detectRole(hay);
-  const detected_partner_type = detected_role === "partner" ? detectPartnerType(hay) : null;
+  const structuredEligibility =
+    g.eligibility && typeof g.eligibility === "object" && !Array.isArray(g.eligibility)
+      ? g.eligibility as Record<string, unknown>
+      : null;
+  const requiresResearchUniversity =
+    structuredEligibility?.research_university === true &&
+    /\bpartner|partnership|collaborat|researcher\b/.test(hay);
+  const detected_role = requiresResearchUniversity ? "partner" : detectRole(hay);
+  const detected_partner_type = requiresResearchUniversity
+    ? "university"
+    : detected_role === "partner"
+      ? detectPartnerType(hay)
+      : null;
   const cost_share_pct = detectCostShare(hay);
   const rolling_intake = isRollingIntake(hay, g.deadline);
 
@@ -402,13 +416,13 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
     const text = norm(`${requirement.requirement ?? ""} ${requirement.value ?? ""}`);
     return /\b(universit(?:y|ies)|post secondary|post-secondary|academic|college|researcher)\b/.test(text) && /\b(partner|co applicant|co-applicant|collaborat|commitment|eligible institution)\b/.test(text);
   });
-  if (universityPartnerRequirement) {
+  if (universityPartnerRequirement || requiresResearchUniversity) {
     checks.push({
       id: "required_university_partner",
       label: "Required university partnership",
       status: "warn",
       hard: true,
-      detail: `${universityPartnerRequirement.requirement ?? "A university partner is required"}. Name the eligible partner and attach evidence of commitment before drafting.`,
+      detail: `${universityPartnerRequirement?.requirement ?? "An eligible university research partner is required"}. Name the eligible partner and attach evidence of commitment before drafting.`,
     });
   }
 
