@@ -52,7 +52,7 @@ test("grant search returns relevant results and opens a grant", async ({ page })
   const errors = trackErrors(page);
   await signIn(page);
   await page.goto("/grants");
-  const box = page.getByPlaceholder("Search title or funder...");
+  const box = page.getByRole("searchbox", { name: "Search grants" }).or(page.getByLabel("Search grants")).first();
   await expect(box).toBeVisible({ timeout: 30_000 });
   await box.fill("clean technology");
   await expect(page.getByText(/semantic search is degraded/i)).toHaveCount(0);
