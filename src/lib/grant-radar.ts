@@ -145,7 +145,8 @@ export function ruleDecision(
     grant: {
       country: grantCountry(g),
       deadline: g.deadline ?? null,
-      status: g.status,
+      // Pipeline stages are not call availability; only "expired" means closed.
+      status: g.status === "expired" ? "closed" : "open",
       eligibleApplicantTypes: g.eligible_applicant_types ?? null,
       amountMin: g.amount_min ?? g.amount_cad_min ?? null,
       amountMax: g.amount_max ?? g.amount_cad_max ?? null,
