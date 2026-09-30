@@ -131,7 +131,7 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
       if (verdict === "go") verdict = "go_conditional";
     }
 
-    // Narrative parts via single cheap LLM call (Groq llama-3.3-70b — free)
+    // Narrative parts via a single LLM call through the Lovable AI Gateway.
     const { callLlm } = await import("@/agents/llm.server");
     const { newRunId } = await import("@/lib/otel");
     const orgName = org?.org_name?.trim() || "your organization";
@@ -141,12 +141,6 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
     let risks: string[] = [];
     try {
       const llm = await callLlm({
-        // A "groq/llama-3.3-70b-versatile" model override used to sit here,
-        // but callLlm's cloud path (the default, cloud-first) never forwards
-        // opts.model to callCloudLlm at all — it silently had zero effect and
-        // this call went through the normal Cerebras->Groq->Gemini chain
-        // regardless. Removed rather than wiring a new "pin to one provider"
-        // capability that no other call site uses or needs.
         agent: "strategist",
         runId,
         temperature: 0.2,

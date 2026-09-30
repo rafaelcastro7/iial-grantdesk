@@ -7,6 +7,7 @@
 
 export type GenAIEvent = {
   "gen_ai.system":
+    | "lovable"
     | "google.gemini"
     | "openai"
     | "ollama"
