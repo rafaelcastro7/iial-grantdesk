@@ -89,4 +89,19 @@ describe("grant radar eligibility pre-check", () => {
     const shown = buildRadar(grants, { ...opts, rules, hideIneligible: false });
     expect(shown.items.find((i) => i.grant.id === "closed")?.verdict).toBe("not_eligible");
   });
+
+  it("keeps a grant in needs-input when a critical requirement is unresolved", () => {
+    const [item] = buildRadar(
+      [{
+        id: "partner",
+        ...base,
+        country: "CA",
+        deadline: inDays(90).slice(0, 10),
+        requirements: [{ category: "partnership", requirement: "Name a university partner", isCritical: true }],
+      }],
+      { ...opts, rules },
+    ).items;
+    expect(item?.verdict).toBe("needs_input");
+    expect(item?.reason).toContain("Resolve before drafting");
+  });
 });

@@ -141,4 +141,22 @@ describe("deriveRulesFromOrg", () => {
     // The mismatched org must not score at least as high as the aligned org.
     expect(bcResult.rule_score).toBeLessThanOrEqual(onResult.rule_score);
   });
+
+  it("treats Alliance research-university eligibility as a required partner gate", () => {
+    const result = evaluateRules(
+      deriveRulesFromOrg({ stage: "nonprofit", jurisdictions: ["CA"], sectors: ["research"] }),
+      {
+        country: "CA",
+        title: "Alliance grants",
+        summary: "Support is available when you partner with a university researcher.",
+        eligibility: { research_university: true },
+        sectors: ["research"],
+      },
+    );
+
+    expect(result.detected_role).toBe("partner");
+    expect(result.detected_partner_type).toBe("university");
+    expect(result.verdict).toBe("needs_input");
+    expect(result.checks.find((check) => check.id === "required_university_partner")?.status).toBe("warn");
+  });
 });

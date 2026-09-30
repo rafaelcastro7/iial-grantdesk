@@ -39,6 +39,14 @@ describe("analyzeGrantRequirements - RFP documents & process", () => {
     expect(byReq("two-stage")?.isCritical).toBe(true);
   });
 
+  it("surfaces a mandatory university partner before proposal drafting", () => {
+    const result = analyzeGrantRequirements(
+      "Applicants must collaborate with an eligible university researcher and provide evidence of partner commitment.",
+    );
+    expect(result.requirements.some((r) => r.category === "partnership" && r.isCritical)).toBe(true);
+    expect(result.requirements.some((r) => r.requirement.includes("commitment"))).toBe(true);
+  });
+
   it("counts criticals in the summary", () => {
     expect(out.summary).toMatch(/\d+ requirement\(s\) identified \(\d+ critical\)/);
   });

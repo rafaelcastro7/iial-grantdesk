@@ -60,15 +60,14 @@ export function RadarWorkspace({
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-6 md:px-6">
-      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <section className="overflow-hidden rounded-lg border bg-card shadow-sm">
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b px-5 py-5 sm:flex sm:flex-wrap sm:items-end sm:justify-between md:px-7">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-primary">Grant radar</p>
           <h1 className="font-display text-2xl font-semibold text-foreground md:text-3xl">
-            What to work on today
+            Grant Radar
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Ordered by eligibility, time left against your {filters.leadTimeWeeks}-week preparation
-            window, fit and amount. Grouped by country.
+            Search, deterministic validation and critical requirements in one operational view.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -127,12 +126,12 @@ export function RadarWorkspace({
 
       {profileBar}
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 border-b md:grid-cols-4 md:divide-x">
         <Stat label="You can apply" value={counts.eligible} tone="text-eligible" />
         <Stat label="Need a check" value={counts.needsInput} tone="text-needs-input" />
         <Stat label="Closing in your window" value={counts.closingSoon} tone="text-foreground" />
         <Stat label="Actionable value" value={counts.pipelineValue > 0 ? formatMoney(counts.pipelineValue) : "—"} tone="text-foreground" />
-      </section>
+      </div>
 
       {next && (
         <section className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">
@@ -148,7 +147,7 @@ export function RadarWorkspace({
         </section>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 border-b px-4 py-4 md:px-7">
         <RadarToolbar
           value={filters}
           onChange={onFiltersChange}
@@ -185,7 +184,7 @@ export function RadarWorkspace({
           onDiscover={admin.onDiscover}
         />
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-8 px-4 py-5 md:px-7">
           {radar.groups.map((group) => (
             <section key={group.country} className="space-y-3">
               <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
@@ -208,6 +207,7 @@ export function RadarWorkspace({
           ))}
         </div>
       )}
+      </section>
 
       {isAdmin && (
         <details className="rounded-lg border bg-card p-3 text-sm">
@@ -223,7 +223,7 @@ export function RadarWorkspace({
 
 function Stat({ label, value, tone }: { label: string; value: ReactNode; tone: string }) {
   return (
-    <div className="rounded-lg border bg-card p-3">
+    <div className="min-w-0 px-5 py-4">
       <p className={`font-display text-2xl font-semibold ${tone}`}>{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>

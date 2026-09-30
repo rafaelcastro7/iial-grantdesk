@@ -45,6 +45,7 @@ export type EligibilityInput = {
     /** The funder's own prose, where a cost share is usually stated. */
     eligibilityNote?: string | null;
     summary?: string | null;
+    criticalRequirements?: readonly string[] | null;
   };
   client: {
     jurisdictions?: readonly string[] | null;
@@ -233,6 +234,24 @@ function applicantTypeRule(input: EligibilityInput): RuleResult {
     status: "fail",
     isHardGate: true,
     detail: `Open to ${listApplicantTypes(declared)} only; this client is ${listApplicantTypes(clientTypes)}.`,
+  };
+}
+
+function criticalRequirementRule(input: EligibilityInput): RuleResult {
+  const requirements = (input.grant.criticalRequirements ?? []).filter(Boolean);
+  if (requirements.length === 0) {
+    return {
+      key: "critical_requirements",
+      status: "pass",
+      isHardGate: false,
+      detail: "No critical pre-application requirement has been extracted.",
+    };
+  }
+  return {
+    key: "critical_requirements",
+    status: "unknown",
+    isHardGate: true,
+    detail: `Resolve before drafting: ${requirements.join("; ")}.`,
   };
 }
 
@@ -427,6 +446,7 @@ const RULES = [
   jurisdictionRule,
   deadlineRule,
   applicantTypeRule,
+  criticalRequirementRule,
   scaleRule,
   costShareRule,
   runwayRule,

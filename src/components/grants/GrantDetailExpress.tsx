@@ -467,9 +467,11 @@ export function GrantDetailExpress({
   const rows = eligibilityRows(eligibility);
   const fitScore = evaluation ? Math.round(evaluation.fit_score * 100) : null;
   const enrichmentFailed = status === "discovered" && (enrichAttempts ?? 0) >= MAX_ENRICH_ATTEMPTS;
+  const hasOpenCriticalRequirements = criticalReqs.length > 0;
   const canDraft =
-    ["scored", "shortlisted", "in_proposal"].includes(status) ||
-    evaluation?.eligibility_pass === true;
+    !hasOpenCriticalRequirements &&
+    (["scored", "shortlisted", "in_proposal"].includes(status) ||
+      evaluation?.eligibility_pass === true);
   const shouldEvaluate = status === "enriched" || status === "scored" || !!evaluation;
   const shouldFetch = status === "discovered" && !enrichmentFailed;
   const completeness = computeCompleteness({
@@ -515,6 +517,27 @@ export function GrantDetailExpress({
             against the official page before relying on this one.
           </p>
         </div>
+      )}
+      {criticalReqs.length > 0 && (
+        <section className="border-l-4 border-warning bg-card px-5 py-4 shadow-sm" aria-label="Critical requirements">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground">Resolve before proposal work</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The initial grant evaluation found {criticalReqs.length} blocking requirement{criticalReqs.length === 1 ? "" : "s"}.
+              </p>
+              <ul className="mt-3 space-y-2">
+                {criticalReqs.map((requirement, index) => (
+                  <li key={`${requirement.requirement}-${index}`} className="text-sm">
+                    <span className="font-medium text-foreground">{requirement.requirement}</span>
+                    {requirement.value && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{requirement.value}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
       )}
       <section className="rounded-lg border bg-card">
         <div className="border-b p-5">
