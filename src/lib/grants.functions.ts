@@ -684,7 +684,7 @@ export const discoverAllFunders = createServerFn({ method: "POST" })
       .from("funders")
       .select("id")
       .eq("active", true)
-      .not("source_url", "is", null);
+      .or("source_url.not.is.null,website.not.is.null");
     if (data.funderIds && data.funderIds.length > 0) fq = fq.in("id", data.funderIds);
     const { data: funders, error } = await fq;
     if (error) throw new Error(error.message);
@@ -733,7 +733,7 @@ export const listActiveFunders = createServerFn({ method: "GET" })
       .from("funders")
       .select("id, name, name_fr, jurisdiction")
       .eq("active", true)
-      .not("source_url", "is", null)
+      .or("source_url.not.is.null,website.not.is.null")
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
     return { funders: data ?? [] };

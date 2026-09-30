@@ -114,7 +114,7 @@ export async function runDiscoveryJob(
     .from("funders")
     .select("id, name")
     .eq("active", true)
-    .not("source_url", "is", null);
+    .or("source_url.not.is.null,website.not.is.null");
   if (funderIds && funderIds.length > 0) q = q.in("id", funderIds);
   const { data: funders, error } = await q;
   if (error) {

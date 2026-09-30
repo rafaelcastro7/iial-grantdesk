@@ -412,12 +412,16 @@ export async function discoverFunderImpl(
 
   const { data: funder, error: ferr } = await supabaseAdmin
     .from("funders")
-    .select("id, name, source_url, source_urls, source_type")
+    .select("id, name, source_url, source_urls, source_type, website")
     .eq("id", funderId)
     .maybeSingle();
   if (ferr) throw new Error(`funder_lookup_failed: ${ferr.message}`);
-  if (!funder?.source_url) throw new Error("funder_has_no_source_url");
-  const F = funder as {
+  const effectiveSourceUrl = funder?.source_url || (funder as { website?: string | null })?.website;
+  if (!effectiveSourceUrl) throw new Error("funder_has_no_source_url");
+  const F = {
+    ...funder,
+    source_url: effectiveSourceUrl,
+  } as {
     id: string;
     name: string;
     source_url: string;
