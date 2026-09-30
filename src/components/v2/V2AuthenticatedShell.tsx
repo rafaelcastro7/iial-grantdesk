@@ -415,7 +415,7 @@ function V2TopBar({
                     )}
                   />
                 </span>
-                {llmRoute.localOnly ? "Local Ollama" : "Cloud AI + Local"}
+                Lovable AI
               </Badge>
             </TooltipTrigger>
             <TooltipContent className="max-w-72 text-xs">
