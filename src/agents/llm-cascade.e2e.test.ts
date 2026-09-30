@@ -11,6 +11,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const OLLAMA_URL = "http://localhost:11434/api/chat";
 
+// Simple module cache for test isolation - manual approach for Vitest 5+
+const moduleCache = new Map<string, any>();
+
+async function importFresh<T>(modulePath: string): Promise<T> {
+  // Use a cache-busting query param to force fresh module load
+  const cacheBuster = `?v=${Date.now()}-${Math.random()}`;
+  return import(`${modulePath}${cacheBuster}`) as Promise<T>;
+}
+
 function mockFetch(impl: (url: string) => Response | Promise<Response>) {
   const spy = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -197,20 +206,19 @@ describe("local-only LLM cascade", () => {
     // The preceding case deliberately caches its /api/tags response. This
     // case verifies the separate failure-path contract where tags is
     // unavailable, so load the client without that prior cache.
-    vi.resetModules();
+    await importFresh<{ callLlm: any }>("@/agents/llm.server").then(async ({ callLlm }) => {
+      const r = await callLlm({
+        agent: "strategist",
+        model: "qwen3:14b",
+        messages: [{ role: "user", content: "hi" }],
+      });
 
-    const { callLlm } = await import("@/agents/llm.server");
-    const r = await callLlm({
-      agent: "strategist",
-      model: "qwen3:14b",
-      messages: [{ role: "user", content: "hi" }],
+      expect(r.text).toBe("from-last-resort");
+      expect(r.model).toBe("phi4-mini:latest");
+      expect(models).toContain("qwen3:14b");
+      expect(models).toContain("dolphin3:latest");
+      expect(models).toContain("phi4-mini:latest");
     });
-
-    expect(r.text).toBe("from-last-resort");
-    expect(r.model).toBe("phi4-mini:latest");
-    expect(models).toContain("qwen3:14b");
-    expect(models).toContain("dolphin3:latest");
-    expect(models).toContain("phi4-mini:latest");
   }, 15000);
 
   it("cloud is the initial source (Cerebras) when a key is present", async () => {

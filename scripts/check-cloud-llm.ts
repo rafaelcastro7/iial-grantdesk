@@ -1,0 +1,245 @@
+/**
+ * Probe the cloud LLM chain: are the keys valid, and do the models each agent
+ * role is mapped to actually exist on this account?
+ *
+ * Model IDs on these providers are account- and date-specific — Cerebras has
+ * already retired the llama* IDs this repo originally used, and Groq
+ * deprecates models on a rolling basis. A mapped-but-retired model fails at
+ * call time as a 404 buried inside an agent run, which is exactly the shape of
+ * the ollama_prewarm_404 problem that silently degraded the critic.
+ *
+ * Usage: bun run scripts/check-cloud-llm.ts [--json]
+ * Prints no key material.
+ */
+
+import {
+  CEREBRAS_MODEL_MAP,
+  GROQ_MODEL_MAP,
+  GEMINI_MODEL_MAP,
+} from "../src/agents/llm-cloud.server";
+
+const JSON_OUT = process.argv.includes("--json");
+
+type ProviderSpec = {
+  name: string;
+  baseUrl: string;
+  apiKey: string | undefined;
+  keyName: string;
+  models: Record<string, string>;
+};
+
+const PROVIDERS: ProviderSpec[] = [
+  {
+    name: "cerebras",
+    baseUrl: "https://api.cerebras.ai/v1",
+    apiKey: process.env.CEREBRAS_API_KEY,
+    keyName: "CEREBRAS_API_KEY",
+    models: CEREBRAS_MODEL_MAP,
+  },
+  {
+    name: "groq",
+    baseUrl: "https://api.groq.com/openai/v1",
+    apiKey: process.env.GROQ_API_KEY,
+    keyName: "GROQ_API_KEY",
+    models: GROQ_MODEL_MAP,
+  },
+  {
+    name: "gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    apiKey: process.env.GOOGLE_AI_STUDIO_KEY,
+    keyName: "GOOGLE_AI_STUDIO_KEY",
+    models: GEMINI_MODEL_MAP,
+  },
+];
+
+type ProviderReport = {
+  provider: string;
+  keyPresent: boolean;
+  keyValid: boolean | null;
+  detail: string;
+  available: string[];
+  mapped: string[];
+  missing: string[];
+  chat: Array<{ model: string; ok: boolean; ms: number; detail: string; requiredModes: string[] }>;
+};
+
+const JSON_MODE_AGENTS = new Set(["discoverer", "enricher", "evaluator", "critic"]);
+
+function requiredModesByModel(models: Record<string, string>): Map<string, Set<"plain" | "json">> {
+  const modes = new Map<string, Set<"plain" | "json">>();
+  for (const [agent, model] of Object.entries(models)) {
+    const required = JSON_MODE_AGENTS.has(agent) ? "json" : "plain";
+    if (!modes.has(model)) modes.set(model, new Set());
+    modes.get(model)?.add(required);
+  }
+  return modes;
+}
+
+// Google returns ids as "models/gemini-2.5-flash" from /models but expects
+// "gemini-2.5-flash" as the request model, so compare on the bare id.
+const bareId = (id: string) => id.replace(/^models\//, "");
+
+async function listModels(p: ProviderSpec): Promise<string[]> {
+  const res = await fetch(`${p.baseUrl}/models`, {
+    headers: { Authorization: `Bearer ${p.apiKey}` },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  const body = (await res.json()) as { data?: Array<{ id?: string }> };
+  return (body.data ?? []).map((m) => m.id ?? "").filter(Boolean);
+}
+
+/**
+ * One real round trip, so a valid key with a dead model still gets caught.
+ *
+ * Probed in both modes because they are not equivalent: Cerebras gpt-oss-120b
+ * answers correctly with response_format=json_object and returns HTTP 200 with
+ * empty content without it. Agents differ too — evaluator/critic/discoverer/
+ * enricher ask for JSON, writer/strategist do not — so a model is only safe
+ * for a role whose mode it actually supports.
+ */
+async function probeChat(p: ProviderSpec, model: string, jsonMode: boolean) {
+  const started = Date.now();
+  try {
+    const res = await fetch(`${p.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "user",
+            content: jsonMode
+              ? 'Reply with only this JSON object: {"status":"ready"}'
+              : "Reply with the single word: ready",
+          },
+        ],
+        max_tokens: 64,
+        temperature: 0,
+        ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    const ms = Date.now() - started;
+    if (!res.ok) {
+      return {
+        model,
+        ok: false,
+        ms,
+        detail: `HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`,
+      };
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = (data.choices?.[0]?.message?.content ?? "").trim();
+    if (!text) return { model, ok: false, ms, detail: "HTTP 200 but empty content" };
+    return { model, ok: true, ms, detail: text.slice(0, 40) };
+  } catch (error) {
+    return {
+      model,
+      ok: false,
+      ms: Date.now() - started,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+const reports: ProviderReport[] = [];
+
+for (const p of PROVIDERS) {
+  const mapped = [...new Set(Object.values(p.models))];
+  const report: ProviderReport = {
+    provider: p.name,
+    keyPresent: !!p.apiKey,
+    keyValid: null,
+    detail: "",
+    available: [],
+    mapped,
+    missing: [],
+    chat: [],
+  };
+
+  if (!p.apiKey) {
+    report.detail = `${p.keyName} is not set — provider skipped by the chain`;
+    reports.push(report);
+    continue;
+  }
+
+  try {
+    report.available = await listModels(p);
+    report.keyValid = true;
+    const bare = new Set(report.available.map(bareId));
+    report.missing = mapped.filter((m) => !bare.has(bareId(m)));
+    report.detail = `${report.available.length} models on this account`;
+  } catch (error) {
+    // Gemini's OpenAI-compat surface does not always expose /models; the chat
+    // probes below are the authoritative check either way.
+    report.detail = `model list unavailable (${error instanceof Error ? error.message : String(error)})`;
+  }
+
+  // Probe every distinct mapped model, not just the first: the maps assign
+  // different models per agent role, so a dead 70B model behind a healthy 8B
+  // one would otherwise pass unnoticed.
+  const requiredModes = requiredModesByModel(p.models);
+  for (const model of mapped) {
+    const plain = await probeChat(p, model, false);
+    const json = await probeChat(p, model, true);
+    const required = [...(requiredModes.get(model) ?? new Set<"plain" | "json">())];
+    const hasRequiredModes = required.every((mode) => (mode === "plain" ? plain.ok : json.ok));
+    const modes = [plain.ok ? "plain" : null, json.ok ? "json" : null].filter(Boolean).join("+");
+    report.chat.push({
+      model,
+      ok: hasRequiredModes,
+      ms: Math.max(plain.ms, json.ms),
+      detail: modes
+        ? `modes: ${modes}; required: ${required.join("+")}`
+        : `plain: ${plain.detail} | json: ${json.detail}; required: ${required.join("+")}`,
+      requiredModes: required,
+    });
+  }
+  if (report.keyValid === null) report.keyValid = report.chat.some((c) => c.ok);
+  reports.push(report);
+}
+
+if (JSON_OUT) {
+  console.log(JSON.stringify(reports, null, 2));
+} else {
+  console.log("\nCloud LLM chain — Cerebras -> Groq -> Gemini\n" + "=".repeat(64));
+  for (const r of reports) {
+    const providerUsable =
+      r.keyPresent && r.keyValid && !r.missing.length && r.chat.every((c) => c.ok);
+    const status = !r.keyPresent
+      ? "NO KEY"
+      : providerUsable
+        ? "OK"
+        : r.keyValid
+          ? "DEGRADED"
+          : "FAIL";
+    console.log(`\n[${status}] ${r.provider}`);
+    console.log(`  ${r.detail}`);
+    for (const c of r.chat) {
+      console.log(`  chat ${c.model}: ${c.ok ? "ok" : "FAILED"} (${c.ms}ms) ${c.detail}`);
+    }
+    if (r.missing.length) {
+      console.log(`  MAPPED BUT NOT ON ACCOUNT: ${r.missing.join(", ")}`);
+    }
+  }
+  const usable = reports.filter(
+    (r) => r.keyPresent && r.keyValid && !r.missing.length && r.chat.every((c) => c.ok),
+  );
+  console.log("\n" + "=".repeat(64));
+  console.log(
+    usable.length
+      ? `${usable.length}/${reports.length} providers usable: ${usable.map((r) => r.provider).join(", ")}`
+      : "NO usable cloud provider — every agent falls back to local Ollama",
+  );
+}
+
+// Exit non-zero when every keyed provider has a mapped model that cannot satisfy
+// the modes its assigned agents actually use. A single dead provider is still
+// survivable by design; a false-green mapped model is not.
+const anyUsable = reports.some(
+  (r) => r.keyPresent && r.keyValid && !r.missing.length && r.chat.every((c) => c.ok),
+);
+process.exit(anyUsable ? 0 : 1);
