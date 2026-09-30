@@ -419,9 +419,7 @@ function V2TopBar({
               </Badge>
             </TooltipTrigger>
             <TooltipContent className="max-w-72 text-xs">
-              {llmRoute.localOnly
-                ? "No cloud AI key is set, so prompts run via Ollama on this machine."
-                : `Judgement and drafting run on top-tier models (${llmRoute.cloudProviders.join(" → ")}), with local Ollama fallback.`}
+              {`Analysis and drafting run through ${llmRoute.cloudProviders.join(", ") || "Lovable AI"}. Eligibility verdicts stay rule-based.`}
             </TooltipContent>
           </Tooltip>
 
