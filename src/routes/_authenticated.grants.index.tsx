@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSuspenseQuery, queryOptions, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery, queryOptions, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   listGrants,
