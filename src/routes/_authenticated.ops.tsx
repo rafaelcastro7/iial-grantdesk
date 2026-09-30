@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_authenticated/ops")({
   component: OpsPage,
   errorComponent: ({ error }) => (
     <main className="p-8 text-sm">
-      <p className="font-medium text-destructive">{String(error?.message || error)}</p>
+      <p className="font-medium text-destructive">{String((error as Error)?.message || error)}</p>
       <Link to="/dashboard" className="underline">
         Back to dashboard
       </Link>

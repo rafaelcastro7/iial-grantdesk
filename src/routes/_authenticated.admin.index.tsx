@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/admin/")({
     ]);
   },
   errorComponent: ({ error }) => (
-    <p className="text-sm text-destructive">Failed to load overview: {error.message}</p>
+    <p className="text-sm text-destructive">Failed to load overview: {(error as Error).message}</p>
   ),
   component: AdminOverview,
 });

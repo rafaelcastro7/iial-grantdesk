@@ -995,7 +995,7 @@ export async function enrichGrantImpl(
         deterministic_counts: methodCounts,
         still_missing: stillMissing,
         fetch_attempts: fetchAttempts,
-        scraped_bytes: scraped.markdown.length,
+        scraped_bytes: scraped.ok ? scraped.markdown.length : 0,
         pages_consulted: pages.map((page) => page.url),
       },
     });

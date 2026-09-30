@@ -47,7 +47,7 @@ export const Route = createFileRoute("/_authenticated/autonomy")({
     <PageContainer size="wide">
       <PageHeader eyebrow="Autonomy" title="Mission control" />
       <p className="text-sm text-destructive">
-        Could not load autonomy intel: {error.message}. This view is admin-only and reads local
+        Could not load autonomy intel: {(error as Error).message}. This view is admin-only and reads local
         daemon output on the server.
       </p>
     </PageContainer>

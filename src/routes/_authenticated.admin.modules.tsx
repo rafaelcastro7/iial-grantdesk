@@ -14,7 +14,7 @@ const qo = queryOptions({ queryKey: ["admin", "modules"], queryFn: () => listMod
 export const Route = createFileRoute("/_authenticated/admin/modules")({
   loader: ({ context }) => context.queryClient.ensureQueryData(qo),
   errorComponent: ({ error }) => (
-    <p className="text-sm text-destructive">Failed: {error.message}</p>
+    <p className="text-sm text-destructive">Failed: {(error as Error).message}</p>
   ),
   component: ModulesPage,
 });

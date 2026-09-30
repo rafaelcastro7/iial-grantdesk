@@ -57,7 +57,7 @@ const qo = queryOptions({
 export const Route = createFileRoute("/_authenticated/admin/agents")({
   loader: ({ context }) => context.queryClient.ensureQueryData(qo),
   errorComponent: ({ error }) => (
-    <p className="text-sm text-destructive">Failed: {error.message}</p>
+    <p className="text-sm text-destructive">Failed: {(error as Error).message}</p>
   ),
   component: AgentsPage,
 });

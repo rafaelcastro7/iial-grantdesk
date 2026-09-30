@@ -13,7 +13,7 @@ const qo = queryOptions({ queryKey: ["admin", "history"], queryFn: () => listDis
 export const Route = createFileRoute("/_authenticated/admin/history")({
   loader: ({ context }) => context.queryClient.ensureQueryData(qo),
   errorComponent: ({ error }) => (
-    <p className="text-sm text-destructive">Failed: {error.message}</p>
+    <p className="text-sm text-destructive">Failed: {(error as Error).message}</p>
   ),
   component: HistoryPage,
 });

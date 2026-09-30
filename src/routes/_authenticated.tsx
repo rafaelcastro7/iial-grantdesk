@@ -27,7 +27,7 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({ to: "/grants" });
     }
   },
-  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error} reset={reset} />,
+  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,
   component: AuthenticatedLayout,
 });
 

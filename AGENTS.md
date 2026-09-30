@@ -11,22 +11,15 @@
 
 # GrantDesk — project rules
 
-- Keep server functions in `src/lib/*.functions.ts`; dynamically import server-only `src/server/` modules inside handlers to protect the client bundle.
-- Text AI priority is Lovable AI Gateway first, then Gemini → Groq → Cerebras as fallback; embeddings use Lovable `google/gemini-embedding-2` at 768 dimensions. User requested Lovable Cloud AI as the primary resource.
-- Never impose client deadlines on AI calls because aborted generation still completes and bills.
-- Keep eligibility deterministic in `src/lib/eligibility.ts`; models never decide verdicts and `unknown` is valid.
-- Run catalog ingest and embedding through signed-in `refreshCatalog`; there is no cron.
-- Make schema changes additive; deprecate rather than drop columns.
-- Keep the intentionally loose synced-code TypeScript settings and exclude tests/e2e/fixtures from typecheck.
-- Search `grant_embeddings` through `match_grant_search_documents`; if vector results return fewer than 20 rows (or vectors are pending), always run tokenized keyword fallback across `grants` (title, summary, eligibility_note) and `funders.name` so search queries never falsely return empty.
-- Provision new users through idempotent `ensure_current_user()` in the authenticated layout because auth-schema triggers are unavailable.
-- Surface failed soft eligibility checks without changing their verdict effect.
-- Evaluation precedence: A grant's persisted `grant_evaluations` record is authoritative. In `toRadarItem`, `g.evaluation` takes precedence over preliminary heuristics, ensuring that an evaluation verdict (`eligible` vs `not_eligible`) updates immediately in the UI with its detailed rationale, normalized fit percentage, and next action.
-- In `listGrants`, `includeHardBlocked` defaults to `true` and projects `evaluation` status/fit onto returned grants so Radar and Dashboard maintain coherent global counts.
-- Evaluator calls must never abort the batch pipeline: if cloud LLMs are rate-limited (429) or unavailable, evaluateGrant falls back to the deterministic rules engine (`rules-engine-deterministic`) ensuring continuous 100% completion.
-- Coerce and normalize `fit_score` to `[0, 1]` in evaluator schemas to absorb models returning 0-100 scales.
-- Run live cloud/AI tests only with `LIVE_CLOUD=1` to avoid accidental spend.
-- Keep Grant Radar ranking, filtering, country grouping, and deterministic prefiltering in `src/lib/grant-radar.ts`; default `minAmount` to 0 so unstated grant amounts are visible, and prioritize search text over secondary eligibility filters when actively searching.
-- Theme through `src/styles.css` semantic tokens, following iial.ca's light institutional style.
-- Read Grants.gov detail data from its official structured endpoint before scraping; unpublished fields stay unknown and reduce coverage without failing enrichment.
-- V2 is the only user-facing interface; keep the version context fixed to V2 while legacy branches remain temporarily for reference. This prevents split UX while allowing safe, incremental cleanup.
+- Server functions live in `src/lib/*.functions.ts`; import `src/server/` modules dynamically inside handlers (client bundle safety).
+- Text AI: Lovable AI Gateway first, then Gemini → Groq → Cerebras fallback; embeddings Lovable `google/gemini-embedding-2` @768. User chose Lovable as primary.
+- No client deadlines on AI calls (aborted generations still bill); live AI tests only with `LIVE_CLOUD=1`.
+- Eligibility is deterministic in `src/lib/eligibility.ts`; `unknown` is valid; soft-check failures are surfaced without changing verdicts.
+- Evaluator never aborts batches: on LLM failure fall back to `rules-engine-deterministic`; normalize `fit_score` to [0,1]; persisted `grant_evaluations` override heuristics in `toRadarItem`.
+- `listGrants` defaults `includeHardBlocked` true and projects evaluation so Radar/Dashboard counts agree.
+- Radar logic lives in `src/lib/grant-radar.ts`; `minAmount` defaults 0; search text beats secondary filters.
+- Search: `match_grant_search_documents`, with keyword fallback over grants + funders when <20 vector rows, so search never falsely returns empty.
+- Schema changes additive; provision users via idempotent `ensure_current_user()` (no auth triggers); ingest via signed-in `refreshCatalog` (no cron).
+- Grants.gov: official structured endpoint before scraping; unpublished fields stay unknown.
+- Keep loose TS settings; exclude tests/e2e/fixtures from typecheck.
+- Theme via `src/styles.css` tokens (iial.ca style); V2 is the only UI.

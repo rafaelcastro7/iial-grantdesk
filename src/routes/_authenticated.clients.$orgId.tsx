@@ -22,7 +22,7 @@ export const Route = createFileRoute("/_authenticated/clients/$orgId")({
   }),
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(clientQueryOptions(params.orgId)),
-  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error} reset={reset} />,
+  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,
   component: ClientLayout,
 });
 

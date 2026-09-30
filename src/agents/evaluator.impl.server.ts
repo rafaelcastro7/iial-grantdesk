@@ -217,6 +217,7 @@ export async function evaluateGrantImpl(opts: {
       fit_score: ruleUnit,
       eligibility_pass: !rulesResult.hard_fail,
       rationale_en: `Evaluated using IIAL deterministic screening rules (score: ${rulesResult.rule_score}/100, hard_fail: ${rulesResult.hard_fail}). Criteria checks: ${rulesResult.checks.map((c) => `${c.label}: ${c.status.toUpperCase()}`).join("; ")}.`,
+      rationale_fr: null,
     };
   }
 
