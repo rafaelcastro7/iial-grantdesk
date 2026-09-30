@@ -453,7 +453,7 @@ function ProgressRing({ ready, value }: { ready: boolean; value: number }) {
   );
 }
 
-function optionalNumber(value: string | undefined) {
+export function optionalNumber(value: string | undefined) {
   if (!value?.trim()) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;

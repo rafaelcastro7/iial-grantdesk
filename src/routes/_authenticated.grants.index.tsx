@@ -620,6 +620,26 @@ function GrantsPage() {
     );
   }
 
+  const filtersNode = (
+    <GrantFilters
+      grants={data.grants as GrantRowData[]}
+      search={search}
+      setSearch={setSearch}
+      jurisdiction={jurisdiction}
+      setJurisdiction={setJurisdiction}
+      sector={sector}
+      setSector={setSector}
+      amountPreset={amountPreset}
+      setAmountPreset={setAmountPreset}
+      sortKey={sortKey}
+      setSortKey={setSortKey}
+      eligibleOnly={eligibleOnly}
+      setEligibleOnly={setEligibleOnly}
+      onlyWithDeadline={onlyWithDeadline}
+      setOnlyWithDeadline={setOnlyWithDeadline}
+    />
+  );
+
   return (
     <PageTransition>
       <div className="min-h-screen text-foreground">
