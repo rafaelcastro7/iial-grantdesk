@@ -38,7 +38,7 @@ const grantsQueryOptions = (
 ) =>
   queryOptions({
     queryKey: ["clients", "grants", orgId, params],
-    queryFn: () => listGrantsForOrganization({ orgId, ...params }),
+    queryFn: () => listGrantsForOrganization({ data: { orgId, ...params } }),
     enabled: !!orgId,
   });
 
@@ -148,7 +148,7 @@ function ClientGrantsTab() {
               <SelectItem value="20">{t("clients.grants.fit20plus")}</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={sortKey} onValueChange={setSortKey}>
+          <Select value={sortKey} onValueChange={(v) => setSortKey(v as typeof sortKey)}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder={t("clients.grants.sortBy")} />
             </SelectTrigger>
@@ -363,7 +363,7 @@ function GrantTable({ grants }: { grants: GrantRow[] }) {
                   </td>
                   <td className="p-3 hidden md:table-cell">{grant.funder?.name}</td>
                   <td className="p-3 hidden lg:table-cell">
-                    {grant.evaluation?.fit_score !== null ? (
+                    {grant.evaluation && grant.evaluation.fit_score !== null ? (
                       <Badge
                         className={
                           grant.evaluation.fit_score >= 70

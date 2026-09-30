@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { clientQueryOptions } from "@/lib/client-queries";
 import { useServerFn } from "@tanstack/react-start";
 import { useTranslation } from "react-i18next";
-import { getClientOrganization, switchOrganizationContext } from "@/lib/clients.functions";
+import { switchOrganizationContext } from "@/lib/clients.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AppTopBar } from "@/components/AppSidebar";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
@@ -25,11 +26,6 @@ export const Route = createFileRoute("/_authenticated/clients/$orgId")({
   component: ClientLayout,
 });
 
-const clientQueryOptions = (orgId: string) =>
-  queryOptions({
-    queryKey: ["clients", "detail", orgId],
-    queryFn: () => getClientOrganization({ orgId }),
-  });
 
 function ClientLayout() {
   const { t } = useTranslation();
@@ -111,10 +107,10 @@ function ClientLayout() {
             </TabsList>
 
             <TabsContent value="info" className="mt-4">
-              <Outlet context={{ organization, profile, membership }} />
+              <Outlet />
             </TabsContent>
             <TabsContent value="grants" className="mt-4">
-              <Outlet context={{ organization, membership }} />
+              <Outlet />
             </TabsContent>
           </Tabs>
         </PageContainer>

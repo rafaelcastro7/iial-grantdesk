@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { clientQueryOptions } from "@/lib/client-queries";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +24,9 @@ export const Route = createFileRoute("/_authenticated/clients/$orgId/info")({
 
 function ClientInfoTab() {
   const { t } = useTranslation();
-  const { organization, profile, membership } = Route.useContext();
+  const { orgId } = Route.useParams();
+  const { data } = useSuspenseQuery(clientQueryOptions(orgId));
+  const { organization, profile, membership } = data;
 
   if (!profile) {
     return (
@@ -270,6 +274,7 @@ function DetailRow({
 }
 
 function CompletenessIndicator({ profile }: { profile: Record<string, unknown> }) {
+  const { t } = useTranslation();
   const fields = [
     { key: "org_name", label: "Name" },
     { key: "sectors", label: "Sectors" },
