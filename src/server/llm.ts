@@ -172,7 +172,7 @@ function openAiCompatible(url: string, model: string): ExternalProvider["call"] 
 
 /** Gemini generateContent (non-streamed; these calls are short gap-fills). */
 async function callGemini(request: LlmRequest, apiKey: string): Promise<string> {
-  const model = "gemini-3.8-flash";
+  const model = "gemini-3.1-flash-lite";
   const system = request.messages.find((m) => m.role === "system")?.content;
   const turns = request.messages.filter((m) => m.role !== "system");
   const response = await fetch(
@@ -222,7 +222,7 @@ const EXTERNAL_PROVIDERS: (ExternalProvider & { envKey: "CEREBRAS_API_KEY" | "GR
     envKey: "GROQ_API_KEY",
     call: openAiCompatible("https://api.groq.com/openai/v1/chat/completions", "qwen/qwen3.8-27b"),
   },
-  { name: "gemini", model: "gemini-3.8-flash", envKey: "GEMINI_API_KEY", call: callGemini },
+  { name: "gemini", model: "gemini-3.1-flash-lite", envKey: "GEMINI_API_KEY", call: callGemini },
 ];
 
 async function callGateway(request: LlmRequest): Promise<LlmResponse> {

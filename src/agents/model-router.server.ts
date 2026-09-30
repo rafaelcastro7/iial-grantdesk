@@ -14,7 +14,7 @@ export type ModelAssignment = {
 };
 
 const GATEWAY_MODEL = "openai/gpt-6-astra";
-export const PROVIDER_CHAIN = "cerebras/llama-3.3-70b → groq/llama-3.3-70b → gemini/2.0-flash → lovable";
+export const PROVIDER_CHAIN = "cerebras/qwen-3.8-27b → groq/qwen3.8-27b → gemini/3.1-flash-lite → lovable";
 
 export const AGENT_MODEL_MAP: Record<AgentName, ModelAssignment> = {
   discoverer: {
