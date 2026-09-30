@@ -14,3 +14,4 @@
 - [x] Registrar cobertura, bloqueos y calidad por grant sin inventar evidencia.
 - [ ] Completar las 398 revisiones cloud e iterar sobre sus fallos hasta maximizar la evaluación verificable.
 - [x] Corregir Grants.gov y tratar montos no publicados como desconocidos, no como fallos técnicos.
+- [x] Fijar V2 como experiencia única y rescatar accesos y funciones operativas útiles de V1.

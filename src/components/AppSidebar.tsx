@@ -59,7 +59,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UiVersionToggle } from "@/components/v2/UiVersionToggle";
 import "@/i18n";
 
 type NavItem = {
@@ -310,7 +309,6 @@ export function AppTopBar({ title }: { title?: string }) {
           </kbd>
         </Button>
         <NotificationBell />
-        <UiVersionToggle compact />
         {isAdmin && (
           <Link to="/admin">
             <Button variant="outline" size="sm" className="gap-1">

@@ -1,12 +1,9 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { V2AuthenticatedShell } from "@/components/v2/V2AuthenticatedShell";
 import { UiVersionProvider } from "@/components/v2/UiVersionProvider";
-import { useUiVersion } from "@/components/v2/ui-version";
 
 const bootstrapped = new Set<string>();
 
@@ -38,24 +35,10 @@ function AuthenticatedLayout() {
 }
 
 function AuthenticatedLayoutInner() {
-  const { version } = useUiVersion();
-
-  if (version === "v2") {
-    return (
-      <V2AuthenticatedShell>
-        <CommandPalette />
-        <Outlet />
-      </V2AuthenticatedShell>
-    );
-  }
-
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <CommandPalette />
-        <Outlet />
-      </SidebarInset>
-    </SidebarProvider>
+    <V2AuthenticatedShell>
+      <CommandPalette />
+      <Outlet />
+    </V2AuthenticatedShell>
   );
 }
