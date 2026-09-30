@@ -127,6 +127,7 @@ type CheckLite = {
 
 const AXIS_OF: Record<string, AxisKey> = {
   sop_filter_1_legal: "eligibility",
+  required_university_partner: "eligibility",
   jurisdiction_required: "geography",
   jurisdiction_excluded: "geography",
   sectors_required: "sector",

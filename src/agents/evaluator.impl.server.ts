@@ -45,7 +45,7 @@ export async function evaluateGrantImpl(opts: {
     userSupabase
       .from("grants")
       .select(
-        "id, title, summary, url, amount_cad_min, amount_cad_max, deadline, eligibility, sectors, country, status, scored_at, funder:funders(name, jurisdiction)",
+        "id, title, summary, url, amount_cad_min, amount_cad_max, deadline, eligibility, requirements, sectors, country, status, scored_at, funder:funders(name, jurisdiction)",
       )
       .eq("id", grantId)
       .maybeSingle(),
@@ -218,7 +218,9 @@ export async function evaluateGrantImpl(opts: {
   const combinedFit = rulesResult.combined_score(llmFit);
   const combinedFitUnit = Math.max(0, Math.min(1, combinedFit / 100));
   const eligibilityPass =
-    !rulesResult.hard_fail && parsed.eligibility_pass && combinedFit >= rules.threshold_fit_pass;
+    rulesResult.verdict === "eligible" &&
+    parsed.eligibility_pass &&
+    combinedFit >= rules.threshold_fit_pass;
   parsed.fit_score = combinedFitUnit;
   parsed.eligibility_pass = eligibilityPass;
   await trace(
@@ -264,6 +266,15 @@ export async function evaluateGrantImpl(opts: {
         detected_partner_type: rulesResult.detected_partner_type,
         cost_share_pct: rulesResult.cost_share_pct,
         rolling_intake: rulesResult.rolling_intake,
+        critical_requirements: (g.requirements ?? []).filter(
+          (requirement: { isCritical?: boolean }) => requirement.isCritical,
+        ),
+        review_stages: {
+          enrichment: "complete",
+          deterministic_rules: "complete",
+          expert_fit_review: "complete",
+          pre_application_compliance: (g.requirements ?? []).length > 0 ? "complete" : "needs_source_detail",
+        },
         threshold_fit_pass: rules.threshold_fit_pass,
         weight_llm: rules.weight_llm,
       },

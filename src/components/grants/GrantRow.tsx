@@ -16,6 +16,7 @@ export type GrantRowData = {
   amount_cad_max: number | null;
   deadline: string | null;
   sectors?: string[] | null;
+  requirements?: Array<{ category: string; requirement: string; value?: string; isCritical: boolean }> | null;
   status: string;
   url: string;
   discovered_at: string | null;

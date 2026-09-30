@@ -27,6 +27,7 @@ export type GrantForRules = {
   country?: string | null;
   summary?: string | null;
   title?: string | null;
+  requirements?: Array<{ category?: string; requirement?: string; value?: string; isCritical?: boolean }> | null;
 };
 
 export type RuleCheck = {
@@ -50,7 +51,7 @@ export type RulesResult = {
   // Only meaningful when detected_role === "partner" — which KIND of partner
   // the eligibility text implies, so the brief can say "you'll need a
   // municipal co-applicant" instead of just "partner".
-  detected_partner_type: "municipality" | "first_nation" | "co_applicant" | "other" | null;
+  detected_partner_type: "municipality" | "first_nation" | "university" | "co_applicant" | "other" | null;
   cost_share_pct: number | null;
   rolling_intake: boolean;
 };
@@ -181,6 +182,7 @@ function buildHaystack(g: GrantForRules): string {
           : "",
       g.summary ?? "",
       g.title ?? "",
+      g.requirements ? JSON.stringify(g.requirements) : "",
     ].join(" "),
     // Underscore-stripping matters here: JS's native \b treats "_" as a word
     // character, so "in_the_middle" would never get a boundary around
@@ -212,11 +214,13 @@ function detectRole(hay: string): "lead" | "partner" | "unknown" {
 // next concrete step, so it's worth a second, more specific pass.
 export function detectPartnerType(
   hay: string,
-): "municipality" | "first_nation" | "co_applicant" | "other" {
+): "municipality" | "first_nation" | "university" | "co_applicant" | "other" {
   if (/\b(first nation|indigenous|premi[eè]re nation|autochtone)\b/.test(hay))
     return "first_nation";
   if (/\b(municipal(ity|ities)?|city of|town of|municipalit[ée]s?)\b/.test(hay))
     return "municipality";
+  if (/\b(universit(?:y|ies)|post[- ]secondary|academic institution|college|university researcher)\b/.test(hay))
+    return "university";
   if (/\b(co-?applicant|joint application|consortium)\b/.test(hay)) return "co_applicant";
   return "other";
 }
@@ -392,6 +396,21 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
   const detected_partner_type = detected_role === "partner" ? detectPartnerType(hay) : null;
   const cost_share_pct = detectCostShare(hay);
   const rolling_intake = isRollingIntake(hay, g.deadline);
+
+  const universityPartnerRequirement = (g.requirements ?? []).find((requirement) => {
+    if (!requirement.isCritical) return false;
+    const text = norm(`${requirement.requirement ?? ""} ${requirement.value ?? ""}`);
+    return /\b(universit(?:y|ies)|post secondary|post-secondary|academic|college|researcher)\b/.test(text) && /\b(partner|co applicant|co-applicant|collaborat|commitment|eligible institution)\b/.test(text);
+  });
+  if (universityPartnerRequirement) {
+    checks.push({
+      id: "required_university_partner",
+      label: "Required university partnership",
+      status: "warn",
+      hard: true,
+      detail: `${universityPartnerRequirement.requirement ?? "A university partner is required"}. Name the eligible partner and attach evidence of commitment before drafting.`,
+    });
+  }
 
   if (rules.applicant_types_excluded.length > 0 || rules.applicant_types_allowed.length > 0) {
     const restrictions = detectExcludedApplicantTypes(hay);

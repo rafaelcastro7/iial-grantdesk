@@ -15,7 +15,7 @@
 import { detectStructuredData } from "@/lib/prompt-safety.server";
 
 export type GrantRequirement = {
-  category: "contact" | "credential" | "financial" | "legal" | "document" | "process" | "other";
+  category: "contact" | "credential" | "financial" | "legal" | "document" | "process" | "partnership" | "other";
   requirement: string;
   value?: string;
   isCritical: boolean;
@@ -97,6 +97,19 @@ const PROCESS_PATTERNS: RequirementPattern[] = [
     re: /\breporting\s+requirements?\b|\bprogress\s+reports?\b|\bfinal\s+report\b|\brapport\s+(?:d['’]etape|final)\b|\brapport\s+(?:d['’]étape|final)\b/i,
     requirement: "Post-award reporting obligations",
     isCritical: false,
+  },
+];
+
+const PARTNERSHIP_PATTERNS: RequirementPattern[] = [
+  {
+    re: /\b(?:must|required to|requires?)(?:[^.\n]{0,90})\b(?:partner|collaborat(?:e|ion)|co-?applicant)(?:[^.\n]{0,90})\b(?:universit(?:y|ies)|post[- ]secondary|academic|college|researcher|eligible institution)\b|\b(?:universit(?:y|ies)|post[- ]secondary|academic|college)\s+(?:researcher|institution|partner|co-?applicant)(?:[^.\n]{0,90})\b(?:required|must|commitment)\b/i,
+    requirement: "Eligible university or postsecondary partner must be named",
+    isCritical: true,
+  },
+  {
+    re: /\b(?:evidence|letter|proof|confirmation)(?:[^.\n]{0,70})\b(?:partner|collaborator|co-?applicant)(?:[^.\n]{0,70})\b(?:commitment|participation|support)\b/i,
+    requirement: "Evidence of partner commitment required",
+    isCritical: true,
   },
 ];
 
@@ -197,6 +210,18 @@ export function analyzeGrantRequirements(grantMarkdown: string): {
     if (m) {
       requirements.push({
         category: "process",
+        requirement: p.requirement,
+        value: snippetAround(grantMarkdown, m.index, m[0].length),
+        isCritical: p.isCritical,
+      });
+    }
+  }
+
+  for (const p of PARTNERSHIP_PATTERNS) {
+    const m = p.re.exec(grantMarkdown);
+    if (m) {
+      requirements.push({
+        category: "partnership",
         requirement: p.requirement,
         value: snippetAround(grantMarkdown, m.index, m[0].length),
         isCritical: p.isCritical,
