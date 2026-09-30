@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Sparkles, Loader2 } from "lucide-react";
 import type { RadarClientProfile } from "@/lib/radar.functions";
 import type { RadarResult, RadarGrant } from "@/lib/grant-radar";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,9 @@ export function EligibilityCheckBar({
   hiddenByRules,
   hideIneligible,
   onToggleHide,
+  onEvaluateAll,
+  isEvaluatingAll,
+  evalProgress,
 }: {
   profiles: RadarClientProfile[];
   selected: RadarClientProfile | null;
@@ -23,6 +26,9 @@ export function EligibilityCheckBar({
   hiddenByRules: number;
   hideIneligible: boolean;
   onToggleHide: () => void;
+  onEvaluateAll?: () => void;
+  isEvaluatingAll?: boolean;
+  evalProgress?: { current: number; total: number; lastTitle?: string } | null;
 }) {
   if (!selected) {
     return (
@@ -66,13 +72,39 @@ export function EligibilityCheckBar({
           <Stat label="Needs input" value={counts.needsInput} tone="text-needs-input" />
           <Stat label="Ruled out" value={ruledOut} tone="text-ineligible" />
         </dl>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onToggleHide}
-        >
-          {hideIneligible ? "Show ruled out" : "Hide ruled out"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onToggleHide}
+          >
+            {hideIneligible ? "Show ruled out" : "Hide ruled out"}
+          </Button>
+          {onEvaluateAll && (
+            <Button
+              variant="default"
+              size="sm"
+              disabled={isEvaluatingAll}
+              onClick={onEvaluateAll}
+              className="gap-1.5 font-medium"
+              title="Evalúa la compatibilidad de cada convocatoria usando el Evaluador con el perfil de la organización"
+            >
+              {isEvaluatingAll ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>
+                    {evalProgress ? `Evaluando ${evalProgress.current}/${evalProgress.total}...` : "Evaluando..."}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 text-amber-300" />
+                  <span>Auto-evaluar listadas</span>
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

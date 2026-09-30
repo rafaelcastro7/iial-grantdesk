@@ -186,7 +186,9 @@ function GrantsPage() {
     setCheckClientIdState(id);
     ss.set("grants.radar.client.v1", id);
   };
-  const [hideIneligible, setHideIneligible] = useState(true);
+  const [hideIneligible, setHideIneligible] = useState(false);
+  const [evaluatingAll, setEvaluatingAll] = useState(false);
+  const [evalProgress, setEvalProgress] = useState<{ current: number; total: number; lastTitle?: string } | null>(null);
   const checkProfile = useMemo(
     () =>
       radarProfiles.find((p) => p.clientId === checkClientId) ??
@@ -291,6 +293,46 @@ function GrantsPage() {
         });
       }
     });
+
+  const onEvaluateAllListed = async () => {
+    const candidateItems = radar.items.filter(
+      (item) => item.verdict === "needs_input" || item.fit == null,
+    );
+    if (candidateItems.length === 0) {
+      setInfo("Todas las convocatorias visibles ya están evaluadas.");
+      return;
+    }
+    setEvaluatingAll(true);
+    setError(null);
+    setInfo(`Iniciando evaluación completa de ${candidateItems.length} convocatorias...`);
+    let count = 0;
+    try {
+      for (const item of candidateItems) {
+        count++;
+        const g = item.grant;
+        setEvalProgress({ current: count, total: candidateItems.length, lastTitle: g.title });
+        setEvaluatingIds((s) => new Set(s).add(g.id));
+        try {
+          await evaluate({ data: { grantId: g.id } });
+        } catch (err) {
+          console.warn(`Error evaluando convocatoria "${g.title}":`, err);
+        } finally {
+          setEvaluatingIds((s) => {
+            const n = new Set(s);
+            n.delete(g.id);
+            return n;
+          });
+        }
+      }
+      await refresh();
+      setInfo(`Evaluación finalizada: ${count} convocatorias procesadas.`);
+    } catch (e) {
+      fail(e);
+    } finally {
+      setEvaluatingAll(false);
+      setEvalProgress(null);
+    }
+  };
 
   const onDraft = (grantId: string) =>
     run(`${grantId}:draft`, async () => {
@@ -403,6 +445,9 @@ function GrantsPage() {
               hiddenByRules={radar.hiddenByRules}
               hideIneligible={hideIneligible}
               onToggleHide={() => setHideIneligible((v) => !v)}
+              onEvaluateAll={onEvaluateAllListed}
+              isEvaluatingAll={evaluatingAll}
+              evalProgress={evalProgress}
             />
             <OrgRulesDriftBanner />
             <GrantSearchProfileBar selectedProfileId={searchProfileId} onSelect={setSearchProfileId} />

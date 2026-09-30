@@ -27,7 +27,7 @@ export const DEFAULT_RADAR_FILTERS: RadarFilterState = {
   search: "",
   country: "all",
   sector: "all",
-  minAmount: 50_000,
+  minAmount: 0,
   leadTimeWeeks: 4,
   status: "active",
   verdict: "all",

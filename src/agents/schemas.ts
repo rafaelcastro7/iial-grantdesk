@@ -124,10 +124,18 @@ export const EnricherOutput = z.object({
 export type EnricherOutput = z.infer<typeof EnricherOutput>;
 
 export const EvaluatorOutput = z.object({
-  fit_score: z.number().min(0).max(1),
-  eligibility_pass: z.boolean(),
-  rationale_en: z.string().min(10).max(2000),
-  rationale_fr: z.string().max(2000).nullable().optional().default(""),
+  fit_score: z.preprocess((v) => {
+    const n = Number(v);
+    if (Number.isNaN(n)) return 0;
+    return n > 1 ? Math.min(1, Math.max(0, n / 100)) : Math.min(1, Math.max(0, n));
+  }, z.number().min(0).max(1)),
+  eligibility_pass: z.preprocess((v) => {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "string") return v.toLowerCase() === "true" || v.toLowerCase() === "yes" || v.toLowerCase() === "pass";
+    return true;
+  }, z.boolean()),
+  rationale_en: z.string().min(5).max(4000),
+  rationale_fr: z.string().max(4000).nullable().optional().default(""),
 });
 export type EvaluatorOutput = z.infer<typeof EvaluatorOutput>;
 

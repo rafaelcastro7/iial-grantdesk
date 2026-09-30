@@ -75,19 +75,20 @@ function AuthPage() {
   }
 
   const DEMO_USERS = [
-    { label: "Admin", email: "demo-admin@iial.test" },
-    { label: "Member A", email: "demo-member-a@iial.test" },
-    { label: "Member B", email: "demo-member-b@iial.test" },
+    { label: "Rocio (IIAL Lead)", email: "rocio@iial.ca", password: "Rocio-IIAL-GrantDesk-2026!" },
+    { label: "Admin", email: "demo-admin@iial.test", password: "IIAL-Demo-2026!" },
+    { label: "Member A", email: "demo-member-a@iial.test", password: "IIAL-Demo-2026!" },
+    { label: "Member B", email: "demo-member-b@iial.test", password: "IIAL-Demo-2026!" },
   ] as const;
   const DEMO_PASSWORD = "IIAL-Demo-2026!";
 
-  async function demoLogin(demoEmail: string) {
+  async function demoLogin(demoEmail: string, customPassword?: string) {
     setError(null);
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: demoEmail,
-        password: DEMO_PASSWORD,
+        password: customPassword ?? DEMO_PASSWORD,
       });
       if (error) throw error;
       const session = await waitForSession();
@@ -147,7 +148,7 @@ function AuthPage() {
               <p className="mb-2 text-center text-xs uppercase tracking-wide text-muted-foreground">
                 Demo autologin
               </p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {DEMO_USERS.map((u) => (
                   <Button
                     key={u.email}
@@ -156,7 +157,7 @@ function AuthPage() {
                     size="sm"
                     className="w-full"
                     disabled={loading}
-                    onClick={() => demoLogin(u.email)}
+                    onClick={() => demoLogin(u.email, u.password)}
                   >
                     {u.label}
                   </Button>

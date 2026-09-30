@@ -308,7 +308,7 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
       searching: opts.searching,
       rules: opts.rules,
     });
-    if (hideIneligible && item.ruled && item.verdict === "not_eligible" && opts.verdict !== "not_eligible") {
+    if (!opts.searching && hideIneligible && item.ruled && item.verdict === "not_eligible" && opts.verdict !== "not_eligible") {
       hiddenByRules++;
       continue;
     }
@@ -331,7 +331,7 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
         continue;
       }
     }
-    if (opts.minAmount > 0 && item.amount != null && item.amount < opts.minAmount) {
+    if (!opts.searching && opts.minAmount > 0 && item.amount != null && item.amount < opts.minAmount) {
       hiddenByAmount++;
       continue;
     }

@@ -172,7 +172,7 @@ function openAiCompatible(url: string, model: string): ExternalProvider["call"] 
 
 /** Gemini generateContent (non-streamed; these calls are short gap-fills). */
 async function callGemini(request: LlmRequest, apiKey: string): Promise<string> {
-  const model = "gemini-3.1-flash-lite";
+  const model = "gemini-2.5-flash";
   const system = request.messages.find((m) => m.role === "system")?.content;
   const turns = request.messages.filter((m) => m.role !== "system");
   const response = await fetch(
@@ -210,23 +210,26 @@ async function callGemini(request: LlmRequest, apiKey: string): Promise<string> 
 }
 
 const EXTERNAL_PROVIDERS: (ExternalProvider & { envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GEMINI_API_KEY" })[] = [
-  {
-    name: "cerebras",
-    model: "qwen-3.8-27b",
-    envKey: "CEREBRAS_API_KEY",
-    call: openAiCompatible("https://api.cerebras.ai/v1/chat/completions", "qwen-3.8-27b"),
-  },
+  { name: "gemini", model: "gemini-2.5-flash", envKey: "GEMINI_API_KEY", call: callGemini },
   {
     name: "groq",
     model: "qwen/qwen3.8-27b",
     envKey: "GROQ_API_KEY",
     call: openAiCompatible("https://api.groq.com/openai/v1/chat/completions", "qwen/qwen3.8-27b"),
   },
-  { name: "gemini", model: "gemini-3.1-flash-lite", envKey: "GEMINI_API_KEY", call: callGemini },
+  {
+    name: "cerebras",
+    model: "qwen-3.8-27b",
+    envKey: "CEREBRAS_API_KEY",
+    call: openAiCompatible("https://api.cerebras.ai/v1/chat/completions", "qwen-3.8-27b"),
+  },
 ];
 
 async function callGateway(request: LlmRequest): Promise<LlmResponse> {
   const env = serverEnv();
+  if (!env.LOVABLE_API_KEY) {
+    throw new Error("LOVABLE_API_KEY not configured");
+  }
   const started = Date.now();
 
   const response = await fetch(GATEWAY_URL, {
@@ -285,41 +288,50 @@ export async function callLlm(
   for (const provider of EXTERNAL_PROVIDERS) {
     const apiKey = env[provider.envKey];
     if (!apiKey) continue;
-    const started = Date.now();
-    try {
-      const text = await provider.call(request, apiKey);
-      if (request.validate && !request.validate(text)) {
-        attempts.push(`${provider.name}: failed caller validation`);
-        continue;
+    for (let tryIdx = 0; tryIdx < 2; tryIdx++) {
+      const started = Date.now();
+      try {
+        const text = await provider.call(request, apiKey);
+        if (request.validate && !request.validate(text)) {
+          attempts.push(`${provider.name}: failed caller validation`);
+          break;
+        }
+        return {
+          text,
+          provider: provider.name,
+          model: provider.model,
+          latencyMs: Date.now() - started,
+          attempts,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        attempts.push(`${provider.name}: ${message}`);
+        if (tryIdx === 0 && (message.includes("429") || message.includes("rate limit"))) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+        break;
       }
-      return {
-        text,
-        provider: provider.name,
-        model: provider.model,
-        latencyMs: Date.now() - started,
-        attempts,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      attempts.push(`${provider.name}: ${message}`);
     }
   }
 
-  const maxTries = request.noWait ? 1 : 3;
+  if (env.LOVABLE_API_KEY) {
+    const maxTries = request.noWait ? 1 : 3;
 
-  for (let attempt = 0; attempt < maxTries; attempt++) {
-    try {
-      const result = await callGateway(request);
-      if (request.validate && !request.validate(result.text)) {
-        attempts.push("lovable-ai: failed caller validation");
-        continue;
+    for (let attempt = 0; attempt < maxTries; attempt++) {
+      try {
+        const result = await callGateway(request);
+        if (request.validate && !request.validate(result.text)) {
+          attempts.push("lovable-ai: failed caller validation");
+          continue;
+        }
+        return { ...result, attempts };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        attempts.push(`lovable-ai: ${message}`);
+        if (!retryable(message) || attempt === maxTries - 1) break;
+        await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** attempt + Math.random() * 400));
       }
-      return { ...result, attempts };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      attempts.push(`lovable-ai: ${message}`);
-      if (!retryable(message) || attempt === maxTries - 1) break;
-      await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** attempt + Math.random() * 400));
     }
   }
 

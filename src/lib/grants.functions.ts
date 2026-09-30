@@ -222,13 +222,38 @@ export const listGrants = createServerFn({ method: "GET" })
         });
       }
 
-      // Funder name fallback: if the search didn't match many grants, check if any
-      // funders match the search term directly and include their grants.
-      if (rankById.size < 10) {
+      // Text fallback: if hybrid/embedding search didn't match many grants,
+      // search directly in grants table (title, summary, eligibility) and funders table.
+      if (rankById.size < 20) {
+        const cleanQuery = data.search.trim();
+        const searchTokens = cleanQuery.split(/\s+/).filter((t) => t.length >= 2);
+        const queryVariants = [cleanQuery, ...searchTokens];
+
+        for (const token of queryVariants) {
+          const { data: directGrants } = await context.supabase
+            .from("grants")
+            .select("id")
+            .or(`title.ilike.%${token}%,summary.ilike.%${token}%,eligibility_note.ilike.%${token}%`)
+            .limit(30);
+
+          for (const dg of directGrants ?? []) {
+            if (!rankById.has(dg.id)) {
+              rankById.set(dg.id, {
+                relevance: 0.75,
+                matched_on: "text_fallback",
+                lexical_score: 0.75,
+                semantic_score: 0,
+                retrieval_mode: "lexical-fallback",
+                query_concepts: [token],
+              });
+            }
+          }
+        }
+
         const { data: matchingFunders } = await context.supabase
           .from("funders")
           .select("id, name")
-          .ilike("name", `%${data.search}%`)
+          .ilike("name", `%${cleanQuery}%`)
           .limit(10);
         if (matchingFunders && matchingFunders.length > 0) {
           const funderIds = matchingFunders.map((f) => f.id);
@@ -245,7 +270,7 @@ export const listGrants = createServerFn({ method: "GET" })
                 lexical_score: 0.65,
                 semantic_score: 0,
                 retrieval_mode: "lexical-fallback",
-                query_concepts: [data.search],
+                query_concepts: [cleanQuery],
               });
             }
           }
@@ -975,22 +1000,13 @@ export const enrichGrant = createServerFn({ method: "POST" })
 export const autoEvaluatePending = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    z.object({ limit: z.number().int().min(1).max(25).default(10) }).parse(i ?? {}),
+    z.object({ limit: z.number().int().min(1).max(100).default(50) }).parse(i ?? {}),
   )
   .handler(async ({ data, context }) => {
-    // Need an org profile, otherwise the evaluator would throw.
-    const { data: org } = await getOrgProfileForUser(context.supabase, context.userId);
-    if (!org) return { ok: true, evaluated: 0, skipped: 0, reason: "org_profile_missing" as const };
-
     const { assertAgentEnabled } = await import("@/lib/admin-agents.functions");
     try {
       await assertAgentEnabled("evaluator", context.supabase as never);
     } catch (e) {
-      // Real bug, confirmed live: assertAgentEnabled throws the same Error
-      // type whether the flag is genuinely off (message "agent_disabled:...")
-      // or the agent_flags query itself failed (DB down, RLS) — that second
-      // case was being silently reported as a normal "disabled" outcome
-      // instead of surfacing as the infrastructure failure it actually is.
       const msg = e instanceof Error ? e.message : String(e);
       if (!msg.startsWith("agent_disabled:")) throw e;
       return { ok: true, evaluated: 0, skipped: 0, reason: "evaluator_disabled" as const };
@@ -998,14 +1014,13 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
 
     const { data: candidates } = await context.supabase
       .from("grants")
-      .select("id, status")
-      // "discovered" is deliberately excluded: evaluateGrantImpl rejects it
-      // with grant_not_enriched_yet, so including it here only wastes a
-      // round-trip that always gets counted as skipped.
-      .in("status", ["active", "enriched", "scored", "shortlisted"])
+      .select("id, status, summary")
+      .or("status.in.(active,enriched,scored,shortlisted),summary.neq.''")
       .limit(data.limit * 3);
 
-    const ids = (candidates ?? []).map((g) => g.id);
+    const ids = (candidates ?? [])
+      .filter((g) => g.status !== "discovered" || Boolean((g.summary ?? "").trim()))
+      .map((g) => g.id);
     if (ids.length === 0) return { ok: true, evaluated: 0, skipped: 0 };
 
     const done = new Set<string>();
@@ -1033,7 +1048,8 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
           userSupabase: context.supabase,
         });
         evaluated++;
-      } catch {
+      } catch (err) {
+        console.warn(`[autoEvaluatePending] Error evaluating grant ${grantId}:`, err);
         skipped++;
       }
     }
