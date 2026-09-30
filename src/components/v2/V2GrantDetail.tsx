@@ -455,16 +455,16 @@ export function V2GrantDetail({
             <Clock3 className="h-4 w-4 text-primary" />
             History
           </div>
-          <dl className="mt-4 space-y-2 text-xs">
-            <div className="flex justify-between gap-3">
+          <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-xs">
+            <div className="flex gap-2">
               <dt className="text-muted-foreground">First found</dt>
               <dd className="text-foreground">{formatDateTime(grant.discovered_at)}</dd>
             </div>
-            <div className="flex justify-between gap-3">
+            <div className="flex gap-2">
               <dt className="text-muted-foreground">Last checked</dt>
               <dd className="text-foreground">{formatDateTime(grant.last_seen_at)}</dd>
             </div>
-            <div className="flex justify-between gap-3">
+            <div className="flex gap-2">
               <dt className="text-muted-foreground">Times seen</dt>
               <dd className="text-foreground">{grant.times_seen ?? 1}</dd>
             </div>
