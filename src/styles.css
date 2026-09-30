@@ -96,7 +96,6 @@
   --color-paper: #1a1f27;
   --color-surface: #222831;
   --color-rule: oklch(0.34 0.016 250);
-  --color-accent: #4a8ce0;
   --color-accent-soft: oklch(0.28 0.04 255);
 }
 
@@ -113,6 +112,7 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-bg);
   --color-accent-foreground: var(--accent-fg);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
