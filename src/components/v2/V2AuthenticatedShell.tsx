@@ -179,7 +179,7 @@ const LIFECYCLE = [
 ];
 
 const ACCENT_CLASS: Record<NavGroup["accent"], string> = {
-  teal: "bg-teal-400",
+  teal: "bg-brand-green",
   amber: "bg-amber-400",
   violet: "bg-violet-400",
   green: "bg-emerald-400",
@@ -212,7 +212,7 @@ export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
   return (
     <TooltipProvider delayDuration={150}>
       <div data-ui-version="v2" className="min-h-screen bg-background text-foreground">
-        <div className="fixed inset-y-0 left-0 z-40 hidden w-[292px] border-r border-white/10 bg-[oklch(0.2_0.026_218)] text-white lg:flex lg:flex-col">
+        <div className="fixed inset-y-0 left-0 z-40 hidden w-[292px] border-r border-white/10 bg-sidebar text-white lg:flex lg:flex-col">
           <V2DesktopNav
             activePath={currentPath}
             groups={visibleGroups}
@@ -252,7 +252,7 @@ function V2DesktopNav({
     <>
       <div className="border-b border-white/10 px-5 py-4">
         <Link to="/dashboard" className="group flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white text-sm font-black text-[oklch(0.2_0.026_218)] shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white text-sm font-black text-brand-deep shadow-sm">
             II
           </div>
           <div className="min-w-0">
@@ -267,7 +267,7 @@ function V2DesktopNav({
           className="mt-4 flex w-full items-center justify-between rounded-md border border-white/12 bg-white/[0.06] px-3 py-2 text-left text-sm text-white/86 transition-colors hover:bg-white/[0.1]"
         >
           <span className="flex min-w-0 items-center gap-2">
-            <Command className="h-4 w-4 shrink-0 text-teal-200" />
+            <Command className="h-4 w-4 shrink-0 text-brand-green" />
             <span className="truncate">Search grants, funders, proposals</span>
           </span>
           <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/56">
@@ -297,7 +297,7 @@ function V2DesktopNav({
       <div className="border-t border-white/10 p-3">
         <div className="rounded-md border border-white/10 bg-white/[0.055] p-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-white">
-            <Bot className="h-4 w-4 text-teal-200" />
+            <Bot className="h-4 w-4 text-brand-green" />
             AI stack
           </div>
           <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-white/62">
@@ -405,13 +405,13 @@ function V2TopBar({
                   <span
                     className={cn(
                       "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-                      llmRoute.localOnly ? "bg-emerald-400" : "bg-teal-400",
+                      llmRoute.localOnly ? "bg-emerald-400" : "bg-brand-green",
                     )}
                   />
                   <span
                     className={cn(
                       "relative inline-flex h-2 w-2 rounded-full",
-                      llmRoute.localOnly ? "bg-emerald-500" : "bg-teal-500",
+                      llmRoute.localOnly ? "bg-emerald-500" : "bg-brand-bright",
                     )}
                   />
                 </span>
@@ -486,7 +486,7 @@ function V2MobileNav({
       </SheetTrigger>
       <SheetContent
         side="left"
-        className="w-[320px] max-w-[86vw] border-white/10 bg-[oklch(0.2_0.026_218)] p-0 text-white"
+        className="w-[320px] max-w-[86vw] border-white/10 bg-sidebar p-0 text-white"
       >
         <SheetTitle className="sr-only">Navigation</SheetTitle>
         <V2DesktopNav
@@ -508,14 +508,14 @@ function V2NavLink({ item, active }: { item: NavItem; active: boolean }) {
       className={cn(
         "group flex min-h-12 items-center gap-3 rounded-md px-2.5 py-2 transition-colors",
         active
-          ? "bg-white text-[oklch(0.2_0.026_218)] shadow-sm"
+          ? "bg-white text-brand-deep shadow-sm"
           : "text-white/72 hover:bg-white/[0.08] hover:text-white",
       )}
     >
       <span
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
-          active ? "border-black/5 bg-[oklch(0.94_0.02_190)]" : "border-white/10 bg-white/[0.06]",
+          active ? "border-black/5 bg-brand-green" : "border-white/10 bg-white/[0.06]",
         )}
       >
         <Icon className="h-4 w-4" />

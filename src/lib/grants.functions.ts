@@ -224,7 +224,7 @@ export const listGrants = createServerFn({ method: "GET" })
     }
 
     const GRANT_COLUMNS =
-      "id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max, deadline, sectors, applicant_types, populations_served, funding_uses, funder_type, deadline_kind, deadline_confidence, next_expected_open, next_expected_deadline, next_expected_deadline_confidence, next_expected_deadline_basis, source_freshness_at, source_confidence, country, language, url, status, fit_score, discovered_at, enriched_at, scored_at, funder_id, funder:funders(name, name_fr, jurisdiction, country, giving_history)";
+      "id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max, amount_min, amount_max, currency, eligible_applicant_types, eligibility_note, deadline, sectors, applicant_types, populations_served, funding_uses, funder_type, deadline_kind, deadline_confidence, next_expected_open, next_expected_deadline, next_expected_deadline_confidence, next_expected_deadline_basis, source_freshness_at, source_confidence, country, language, url, status, fit_score, discovered_at, enriched_at, scored_at, funder_id, funder:funders(name, name_fr, jurisdiction, country, giving_history)";
     const buildQuery = () => {
       let q = context.supabase
         .from("grants")

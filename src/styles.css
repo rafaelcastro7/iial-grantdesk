@@ -44,23 +44,93 @@
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  /* shadcn semantic tokens, set to iial.ca: white pages, charcoal text,
+     brand blue for action, green as the secondary accent. */
+  --background: #ffffff;
+  --foreground: #222831;
+  --card: #ffffff;
+  --card-foreground: #222831;
+  --popover: #ffffff;
+  --popover-foreground: #222831;
+  --primary: #0c4da2;
+  --primary-foreground: #ffffff;
+  --secondary: #eef3fa;
+  --secondary-foreground: #0c4da2;
+  --muted: #f3f5f8;
+  --muted-foreground: #5d6573;
+  --accent-bg: #e8f0fb;
+  --accent-fg: #0c4da2;
+  --destructive: oklch(0.55 0.2 27);
+  --destructive-foreground: #ffffff;
+  --border: #e1e6ee;
+  --input: #d5dce6;
+  --ring: #195ec8;
+  --radius: 0.375rem;
+  --sidebar-bg: #222831;
+  --hero-gradient: linear-gradient(120deg, #0c4da2 0%, #195ec8 60%, #3487e1 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-ink: oklch(0.94 0.008 250);
-    --color-ink-soft: oklch(0.72 0.014 250);
-    --color-paper: #1a1f27;
-    --color-surface: #222831;
-    --color-rule: oklch(0.34 0.016 250);
-    /* The brand blue is too dark to read on the charcoal, so the brighter of
-       their two blues carries the accent here. Both are theirs. */
-    --color-accent: #4a8ce0;
-    --color-accent-soft: oklch(0.28 0.04 255);
-    --color-deep: #171b21;
-    --color-deep-ink: oklch(0.97 0.006 250);
-  }
+.dark {
+  color-scheme: dark;
+  --background: #1a1f27;
+  --foreground: oklch(0.94 0.008 250);
+  --card: #222831;
+  --card-foreground: oklch(0.94 0.008 250);
+  --popover: #222831;
+  --popover-foreground: oklch(0.94 0.008 250);
+  --primary: #4a8ce0;
+  --primary-foreground: #0f141a;
+  --secondary: #2a3240;
+  --secondary-foreground: oklch(0.94 0.008 250);
+  --muted: #2a3039;
+  --muted-foreground: oklch(0.72 0.014 250);
+  --accent-bg: #26344a;
+  --accent-fg: #9cc2f2;
+  --border: #353d4a;
+  --input: #3a4350;
+  --ring: #4a8ce0;
+  --sidebar-bg: #151a20;
+  --color-ink: oklch(0.94 0.008 250);
+  --color-ink-soft: oklch(0.72 0.014 250);
+  --color-paper: #1a1f27;
+  --color-surface: #222831;
+  --color-rule: oklch(0.34 0.016 250);
+  --color-accent-soft: oklch(0.28 0.04 255);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-bg);
+  --color-accent-foreground: var(--accent-fg);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar-bg);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+@utility bg-hero {
+  background-image: var(--hero-gradient);
+}
+
+* {
+  border-color: var(--border);
 }
 
 h1,
@@ -70,8 +140,8 @@ h3 {
 }
 
 body {
-  background: var(--color-paper);
-  color: var(--color-ink);
+  background: var(--background);
+  color: var(--foreground);
   font-family:
     "Roboto",
     system-ui,

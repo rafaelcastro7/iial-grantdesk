@@ -26,3 +26,5 @@
 - Eligibility headline surfaces a failed soft check (e.g. short runway) instead of "meets every requirement"; soft checks still never flip the verdict.
 - Live synthetic tests (`src/evals/grant-search.live.test.ts`) hit the real cloud database and AI gateway and run only with `LIVE_CLOUD=1`; the default unit run spends no credits.
 - Grant Radar ranking, filtering and country grouping live only in the pure `src/lib/grant-radar.ts` (tested); UI in `src/components/grants/radar/`. Keeps one source of truth instead of sort logic scattered across route and components.
+- Grant Radar runs every grant through the deterministic `decideEligibility` rules for the selected client profile before listing; ruled-out grants are pre-filtered (counted, one toggle away) and the rules verdict overrides stored model evaluations. Why: the model never decides a verdict.
+- UI theme mirrors iial.ca: shadcn tokens in `src/styles.css` (white pages, #222831 charcoal sidebar, #0c4da2 primary, Montserrat/Roboto), light by default with `.dark` class variant. Why: previously no shadcn tokens were defined, so bg-card/bg-primary rendered transparent.
