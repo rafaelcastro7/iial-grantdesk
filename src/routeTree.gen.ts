@@ -61,6 +61,7 @@ import { Route as AuthenticatedProposalsProposalIdRevisionRouteImport } from './
 import { Route as ApiPublicHooksDeadlinesRouteImport } from './routes/api/public/hooks/deadlines'
 import { Route as ApiPublicHooksDiscoverRouteImport } from './routes/api/public/hooks/discover'
 import { Route as ApiPublicHooksEnrichRouteImport } from './routes/api/public/hooks/enrich'
+import { Route as ApiPublicHooksGrantReviewRouteImport } from './routes/api/public/hooks/grant-review'
 import { Route as ApiPublicHooksRssPollRouteImport } from './routes/api/public/hooks/rss-poll'
 import { Route as ApiPublicHooksSourceCuratorRouteImport } from './routes/api/public/hooks/source-curator'
 import { Route as ApiPublicHooksSourceTierARouteImport } from './routes/api/public/hooks/source-tier-a'
@@ -350,6 +351,12 @@ const ApiPublicHooksEnrichRoute = ApiPublicHooksEnrichRouteImport.update({
   path: '/api/public/hooks/enrich',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksGrantReviewRoute =
+  ApiPublicHooksGrantReviewRouteImport.update({
+    id: '/api/public/hooks/grant-review',
+    path: '/api/public/hooks/grant-review',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksRssPollRoute = ApiPublicHooksRssPollRouteImport.update({
   id: '/api/public/hooks/rss-poll',
   path: '/api/public/hooks/rss-poll',
@@ -426,6 +433,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
   '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
   '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
+  '/api/public/hooks/grant-review': typeof ApiPublicHooksGrantReviewRoute
   '/api/public/hooks/rss-poll': typeof ApiPublicHooksRssPollRoute
   '/api/public/hooks/source-curator': typeof ApiPublicHooksSourceCuratorRoute
   '/api/public/hooks/source-tier-a': typeof ApiPublicHooksSourceTierARoute
@@ -482,6 +490,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
   '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
   '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
+  '/api/public/hooks/grant-review': typeof ApiPublicHooksGrantReviewRoute
   '/api/public/hooks/rss-poll': typeof ApiPublicHooksRssPollRoute
   '/api/public/hooks/source-curator': typeof ApiPublicHooksSourceCuratorRoute
   '/api/public/hooks/source-tier-a': typeof ApiPublicHooksSourceTierARoute
@@ -541,6 +550,7 @@ export interface FileRoutesById {
   '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
   '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
   '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
+  '/api/public/hooks/grant-review': typeof ApiPublicHooksGrantReviewRoute
   '/api/public/hooks/rss-poll': typeof ApiPublicHooksRssPollRoute
   '/api/public/hooks/source-curator': typeof ApiPublicHooksSourceCuratorRoute
   '/api/public/hooks/source-tier-a': typeof ApiPublicHooksSourceTierARoute
@@ -600,6 +610,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/deadlines'
     | '/api/public/hooks/discover'
     | '/api/public/hooks/enrich'
+    | '/api/public/hooks/grant-review'
     | '/api/public/hooks/rss-poll'
     | '/api/public/hooks/source-curator'
     | '/api/public/hooks/source-tier-a'
@@ -656,6 +667,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/deadlines'
     | '/api/public/hooks/discover'
     | '/api/public/hooks/enrich'
+    | '/api/public/hooks/grant-review'
     | '/api/public/hooks/rss-poll'
     | '/api/public/hooks/source-curator'
     | '/api/public/hooks/source-tier-a'
@@ -714,6 +726,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/deadlines'
     | '/api/public/hooks/discover'
     | '/api/public/hooks/enrich'
+    | '/api/public/hooks/grant-review'
     | '/api/public/hooks/rss-poll'
     | '/api/public/hooks/source-curator'
     | '/api/public/hooks/source-tier-a'
@@ -730,6 +743,7 @@ export interface RootRouteChildren {
   ApiPublicHooksDeadlinesRoute: typeof ApiPublicHooksDeadlinesRoute
   ApiPublicHooksDiscoverRoute: typeof ApiPublicHooksDiscoverRoute
   ApiPublicHooksEnrichRoute: typeof ApiPublicHooksEnrichRoute
+  ApiPublicHooksGrantReviewRoute: typeof ApiPublicHooksGrantReviewRoute
   ApiPublicHooksRssPollRoute: typeof ApiPublicHooksRssPollRoute
   ApiPublicHooksSourceCuratorRoute: typeof ApiPublicHooksSourceCuratorRoute
   ApiPublicHooksSourceTierARoute: typeof ApiPublicHooksSourceTierARoute
@@ -1102,6 +1116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksEnrichRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/grant-review': {
+      id: '/api/public/hooks/grant-review'
+      path: '/api/public/hooks/grant-review'
+      fullPath: '/api/public/hooks/grant-review'
+      preLoaderRoute: typeof ApiPublicHooksGrantReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/rss-poll': {
       id: '/api/public/hooks/rss-poll'
       path: '/api/public/hooks/rss-poll'
@@ -1274,6 +1295,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksDeadlinesRoute: ApiPublicHooksDeadlinesRoute,
   ApiPublicHooksDiscoverRoute: ApiPublicHooksDiscoverRoute,
   ApiPublicHooksEnrichRoute: ApiPublicHooksEnrichRoute,
+  ApiPublicHooksGrantReviewRoute: ApiPublicHooksGrantReviewRoute,
   ApiPublicHooksRssPollRoute: ApiPublicHooksRssPollRoute,
   ApiPublicHooksSourceCuratorRoute: ApiPublicHooksSourceCuratorRoute,
   ApiPublicHooksSourceTierARoute: ApiPublicHooksSourceTierARoute,
