@@ -72,3 +72,21 @@ describe("grant radar", () => {
     expect(buildRadar(grants, { ...opts, country: "US" }).items[0].grant.id).toBe("b");
   });
 });
+
+describe("grant radar eligibility pre-check", () => {
+  const rules = { jurisdictions: ["CA", "ON"], stage: "nonprofit", annualBudget: null, currency: "CAD", leadTimeWeeks: 4 };
+  it("runs the deterministic rules first and pre-filters ruled-out grants", () => {
+    const grants = [
+      { id: "ca", ...base, country: "CA", deadline: inDays(90), amount_cad_max: 100_000 },
+      { id: "closed", ...base, country: "CA", deadline: inDays(-5), amount_cad_max: 100_000 },
+    ];
+    const r = buildRadar(grants, { ...opts, rules });
+    const ids = r.items.map((i) => i.grant.id);
+    expect(ids).toContain("ca");
+    expect(r.items.every((i) => i.ruled && i.reason)).toBe(true);
+    expect(r.items.find((i) => i.grant.id === "closed")).toBeUndefined();
+    expect(r.hiddenByRules).toBe(1);
+    const shown = buildRadar(grants, { ...opts, rules, hideIneligible: false });
+    expect(shown.items.find((i) => i.grant.id === "closed")?.verdict).toBe("not_eligible");
+  });
+});

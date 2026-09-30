@@ -4,6 +4,13 @@
 //
 // The verdict is read from the stored deterministic evaluation; nothing here
 // asks a model or guesses. "needs_input" is a real answer, not a failure.
+//
+// When a client profile is supplied, every grant is first run through the
+// deterministic rules engine (src/lib/eligibility.ts) — that verdict wins
+// over any stored model evaluation, and ineligible grants are pre-filtered
+// out of the list (counted, and one toggle away).
+
+import { decideEligibility } from "@/lib/eligibility";
 
 export type RadarVerdict = "eligible" | "needs_input" | "not_eligible";
 export type RadarTiming = "closed" | "too_soon" | "urgent" | "comfortable" | "open_ended";
@@ -29,6 +36,21 @@ export type RadarGrant = {
     | Array<{ name?: string | null; country?: string | null }>
     | null;
   evaluation?: { eligibility_pass: boolean; fit_score?: number | null } | null;
+  summary?: string | null;
+  amount_min?: number | null;
+  amount_max?: number | null;
+  currency?: string | null;
+  eligible_applicant_types?: string[] | null;
+  eligibility_note?: string | null;
+};
+
+/** The client the radar checks every grant against. */
+export type RadarRulesProfile = {
+  jurisdictions: string[];
+  stage: string | null;
+  annualBudget: number | null;
+  currency: string | null;
+  leadTimeWeeks: number | null;
 };
 
 export type RadarItem<T extends RadarGrant> = {
@@ -39,6 +61,10 @@ export type RadarItem<T extends RadarGrant> = {
   amount: number | null;
   fit: number | null;
   country: string;
+  /** One sentence from the rules engine explaining the verdict. */
+  reason: string | null;
+  /** True when the verdict came from the deterministic rules engine. */
+  ruled: boolean;
   nextAction: RadarNextAction;
   /** Parked items are shown after everything actionable (closed, no time, not eligible). */
   parked: boolean;
@@ -58,6 +84,10 @@ export type RadarOptions = {
   text?: string;
   /** True when results come from a ranked server search. */
   searching?: boolean;
+  /** Client profile to check against. Omitted = use stored evaluations only. */
+  rules?: RadarRulesProfile | null;
+  /** Pre-filter grants the rules rule out (default true). */
+  hideIneligible?: boolean;
 };
 
 export type RadarGroup<T extends RadarGrant> = {
@@ -70,6 +100,8 @@ export type RadarResult<T extends RadarGrant> = {
   groups: RadarGroup<T>[];
   hiddenByAmount: number;
   hiddenByFilters: number;
+  /** Grants the eligibility rules ruled out and the pre-filter removed. */
+  hiddenByRules: number;
   counts: {
     eligible: number;
     needsInput: number;
@@ -102,6 +134,32 @@ export function verdictOf(g: RadarGrant): RadarVerdict {
   if (g.evaluation) return g.evaluation.eligibility_pass ? "eligible" : "not_eligible";
   if (g.hardBlocked) return "not_eligible";
   return "needs_input";
+}
+
+export function ruleDecision(
+  g: RadarGrant,
+  rules: RadarRulesProfile,
+  now: number,
+): { verdict: RadarVerdict; reason: string } {
+  const d = decideEligibility({
+    grant: {
+      country: grantCountry(g),
+      deadline: g.deadline ?? null,
+      status: g.status,
+      eligibleApplicantTypes: g.eligible_applicant_types ?? null,
+      amountMin: g.amount_min ?? g.amount_cad_min ?? null,
+      amountMax: g.amount_max ?? g.amount_cad_max ?? null,
+      currency: g.currency ?? (g.amount_min == null && g.amount_cad_min != null ? "CAD" : null),
+      eligibilityNote: g.eligibility_note ?? null,
+      summary: g.summary ?? null,
+    },
+    client: rules,
+    today: new Date(now),
+  });
+  return {
+    verdict: d.verdict === "ineligible" ? "not_eligible" : d.verdict,
+    reason: d.headline,
+  };
 }
 
 export function daysUntil(deadline: string | null | undefined, now: number): number | null {
@@ -165,9 +223,10 @@ export function priorityOf(input: {
 
 export function toRadarItem<T extends RadarGrant>(
   g: T,
-  opts: Pick<RadarOptions, "leadTimeWeeks" | "searching"> & { now: number },
+  opts: Pick<RadarOptions, "leadTimeWeeks" | "searching" | "rules"> & { now: number },
 ): RadarItem<T> {
-  const verdict = verdictOf(g);
+  const ruled = opts.rules ? ruleDecision(g, opts.rules, opts.now) : null;
+  const verdict = ruled?.verdict ?? verdictOf(g);
   const daysLeft = daysUntil(g.deadline, opts.now);
   const timing = timingOf(daysLeft, opts.leadTimeWeeks);
   const amount = grantAmount(g);
@@ -181,6 +240,8 @@ export function toRadarItem<T extends RadarGrant>(
     amount,
     fit,
     country: grantCountry(g),
+    reason: ruled?.reason ?? null,
+    ruled: ruled != null,
     nextAction: nextActionOf(g, verdict),
     parked,
     priority: priorityOf({
@@ -226,6 +287,8 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
 
   let hiddenByAmount = 0;
   let hiddenByFilters = 0;
+  let hiddenByRules = 0;
+  const hideIneligible = opts.hideIneligible ?? true;
   const items: RadarItem<T>[] = [];
 
   for (const g of grants) {
@@ -233,7 +296,16 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
       hiddenByFilters++;
       continue;
     }
-    const item = toRadarItem(g, { now, leadTimeWeeks: opts.leadTimeWeeks, searching: opts.searching });
+    const item = toRadarItem(g, {
+      now,
+      leadTimeWeeks: opts.leadTimeWeeks,
+      searching: opts.searching,
+      rules: opts.rules,
+    });
+    if (hideIneligible && item.ruled && item.verdict === "not_eligible" && opts.verdict !== "not_eligible") {
+      hiddenByRules++;
+      continue;
+    }
     if (opts.country !== "all" && item.country !== opts.country.toUpperCase()) {
       hiddenByFilters++;
       continue;
@@ -298,6 +370,7 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
     groups,
     hiddenByAmount,
     hiddenByFilters,
+    hiddenByRules,
     counts,
     next: items.find((i) => !i.parked) ?? null,
   };
