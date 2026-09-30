@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useIsAdmin } from "@/lib/use-platform";
+import { useIsAdmin, useIsConsultant, isConsultantPath } from "@/lib/use-platform";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -226,9 +226,12 @@ export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
     staleTime: 5 * 60_000,
   });
   const currentPath = useRouterState({ select: (r) => r.location.pathname });
+  const isConsultant = useIsConsultant();
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.adminOnly || isAdmin),
+    items: group.items.filter((item) =>
+      isConsultant ? isConsultantPath(item.to) : !item.adminOnly || isAdmin,
+    ),
   })).filter((group) => group.items.length > 0);
   const activeItem = findActiveItem(currentPath, visibleGroups);
 
