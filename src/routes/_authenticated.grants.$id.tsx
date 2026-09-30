@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { useTranslation } from "react-i18next";
 import { Activity, ArrowLeft, Building2, Calendar, DollarSign, Globe, Tag } from "lucide-react";
 import { runEvaluator } from "@/agents/evaluator.functions";
@@ -61,7 +62,26 @@ export const Route = createFileRoute("/_authenticated/grants/$id")({
     agent: typeof raw.agent === "string" ? raw.agent : undefined,
     step: typeof raw.step === "string" ? raw.step : undefined,
   }),
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(detailQuery(params.id)),
+  loader: async ({ context, params }) => {
+    try {
+      return await context.queryClient.ensureQueryData(detailQuery(params.id));
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Grant not found")) throw notFound();
+      throw e;
+    }
+  },
+  errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error} reset={reset} />,
+  notFoundComponent: () => (
+    <div className="mx-auto max-w-lg space-y-3 p-8 text-center">
+      <h1 className="text-xl font-semibold">This grant is no longer available</h1>
+      <p className="text-sm text-muted-foreground">
+        It may have been removed when the catalog was reset. Search again from Grant Radar.
+      </p>
+      <Link to="/grants" className="text-primary underline">
+        Back to Grant Radar
+      </Link>
+    </div>
+  ),
   component: GrantDetailPage,
 });
 
