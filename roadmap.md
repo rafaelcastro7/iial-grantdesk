@@ -1,8 +1,8 @@
-# GrantDesk roadmap
+# Roadmap
 
-- [x] Migrate the application and database to Lovable Cloud
-- [x] Configure the external-first AI chain with Lovable AI as fallback
-- [x] Verify Rocío can sign in and access the admin workspace
-- [ ] Test Rocío's complete grant workflow in the live portal
-- [ ] Remove stale Ollama messaging and repair workflow blockers found during testing
-- [ ] Re-test discovery, eligibility, proposal drafting, and submission readiness
+- [ ] Replicar para Juan Marcelo y Clarissa el perfil institucional y preparación de conocimiento usados por Rocío.
+- [ ] Unificar el sistema visual en todas las pantallas, eliminando mezclas incoherentes de superficies claras y oscuras.
+- [ ] Automatizar búsqueda, validación determinista y clasificación de todos los grants existentes y nuevos.
+- [ ] Mostrar razones de descarte comprensibles y permitir subsanar u omitir razones con revalidación auditable.
+- [ ] Eliminar pasos redundantes y verificar el flujo completo con los tres administradores.
+- [ ] Ejecutar pruebas de reglas, seguridad, tipos y recorrido end-to-end.
