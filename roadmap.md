@@ -1,12 +1,8 @@
-# GrantDesk migration roadmap
+# GrantDesk roadmap
 
-- [x] Clone and inspect github.com/rafaelcastro7/grantdesk
-- [x] Enable Lovable Cloud
-- [ ] Copy app code (routes, components, lib, server) into project
-- [ ] Apply database schema migrations (26 files) + GRANTs to Lovable Cloud
-- [ ] Replace Supabase local config with Lovable Cloud clients
-- [ ] Replace Groq/Cerebras/Gemini/Ollama LLM chain with Lovable AI Gateway
-- [ ] Replace Ollama embeddings with Lovable AI Gateway embeddings (dimension-matched)
-- [ ] Enable email auth (+ Google sign-in)
-- [ ] Ingestion/refresh: expose as server function trigger (no local daemon)
-- [ ] Verify build, sign-up, catalog, client, matches flows in browser
+- [x] Migrate the application and database to Lovable Cloud
+- [x] Configure the external-first AI chain with Lovable AI as fallback
+- [x] Verify Rocío can sign in and access the admin workspace
+- [ ] Test Rocío's complete grant workflow in the live portal
+- [ ] Remove stale Ollama messaging and repair workflow blockers found during testing
+- [ ] Re-test discovery, eligibility, proposal drafting, and submission readiness
