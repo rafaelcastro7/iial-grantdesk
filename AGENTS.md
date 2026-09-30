@@ -20,3 +20,8 @@
 - Schema changes are additive: retired columns get a `DEPRECATED` comment instead of being dropped.
 
 - Typecheck excludes test/e2e/fixture files and disables noPropertyAccessFromIndexSignature, noUncheckedIndexedAccess and exactOptionalPropertyTypes — the synced GitHub code was written against those looser settings.
+
+- Semantic catalog search reads `grant_embeddings` (model `gemini-embedding-2/768`) through `match_grant_search_documents`; `grant_search_documents` is deprecated. A missing `grant_search_runtime_config` row means hybrid mode, not lexical-only — a silent default to lexical hid half the retrieval.
+- New users get their profile + default role from the idempotent `ensure_current_user()` RPC called in the `_authenticated` layout, because triggers on the auth schema are not allowed here.
+- Eligibility headline surfaces a failed soft check (e.g. short runway) instead of "meets every requirement"; soft checks still never flip the verdict.
+- Live synthetic tests (`src/evals/grant-search.live.test.ts`) hit the real cloud database and AI gateway and run only with `LIVE_CLOUD=1`; the default unit run spends no credits.

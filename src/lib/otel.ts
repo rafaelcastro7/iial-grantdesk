@@ -6,18 +6,7 @@
 // Ref: https://opentelemetry.io/docs/specs/semconv/gen-ai/
 
 export type GenAIEvent = {
-  "gen_ai.system":
-    | "lovable"
-    | "google.gemini"
-    | "openai"
-    | "ollama"
-    | "cerebras"
-    | "gemini"
-    | "groq"
-    | "free.groq"
-    | "free.gemini"
-    | "free.cerebras"
-    | "free.ollama";
+  "gen_ai.system": "lovable";
   "gen_ai.request.model": string;
   "gen_ai.operation.name": "chat" | "embedding" | "generate_content";
   "gen_ai.usage.input_tokens"?: number;

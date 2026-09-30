@@ -47,3 +47,35 @@ test("consultant signs in and walks the main screens", async ({ page }) => {
 
   expect(errors, `page errors: ${errors.join(" | ")}`).toEqual([]);
 });
+
+test("grant search returns relevant results and opens a grant", async ({ page }) => {
+  const errors = trackErrors(page);
+  await signIn(page);
+  await page.goto("/grants");
+  const box = page.getByRole("searchbox", { name: "Search grants" }).or(page.getByLabel("Search grants")).first();
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await box.fill("clean technology");
+  await expect(page.getByText(/mode hybrid/i)).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText(/semantic search is degraded/i)).toHaveCount(0);
+  const firstGrant = page.locator('a[href^="/grants/"]').first();
+  await expect(firstGrant).toBeVisible({ timeout: 45_000 });
+  await page.screenshot({ path: "test-results/e2e-grant-search.png" });
+  await firstGrant.click();
+  await expect(page).toHaveURL(/\/grants\/[0-9a-f-]{36}/, { timeout: 30_000 });
+  await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/something went wrong|unexpected error/i)).toHaveCount(0);
+  await page.screenshot({ path: "test-results/e2e-grant-detail.png" });
+  expect(errors, `page errors: ${errors.join(" | ")}`).toEqual([]);
+});
+
+test("a brand-new user can sign up and reach the dashboard", async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto("/auth");
+  await page.getByRole("button", { name: /sign up|create account|register/i }).first().click();
+  await page.locator("input[type=email]").fill(`e2e+${Date.now()}@example.com`);
+  await page.locator("input[type=password]").fill("E2e-Signup-2026!");
+  await page.locator("form button[type=submit]").click();
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 45_000 });
+  await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
+  expect(errors, `page errors: ${errors.join(" | ")}`).toEqual([]);
+});

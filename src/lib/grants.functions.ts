@@ -193,11 +193,14 @@ export const listGrants = createServerFn({ method: "GET" })
       latencyMs: 0,
     };
     const hasSearch = !!data.search && data.search.length >= 2;
-    const effectiveSearchMode: "hybrid" | "lexical-only" | "shadow" = !searchConfig?.hybrid_enabled
-      ? "lexical-only"
-      : searchConfig.shadow_mode
-        ? "shadow"
-        : "hybrid";
+    // No config row means "use the default": hybrid. Only an explicit
+    // hybrid_enabled=false turns semantic retrieval off.
+    const effectiveSearchMode: "hybrid" | "lexical-only" | "shadow" =
+      searchConfig?.hybrid_enabled === false
+        ? "lexical-only"
+        : searchConfig?.shadow_mode
+          ? "shadow"
+          : "hybrid";
     if (data.search && data.search.length >= 2) {
       const { searchGrantCatalogHybrid } = await import("@/lib/grant-search-hybrid.server");
       const hybrid = await searchGrantCatalogHybrid(
@@ -554,9 +557,9 @@ export const listGrants = createServerFn({ method: "GET" })
           returned: grantsWithProfile.length,
         } as Json,
         latency_ms: searchDiagnostics.latencyMs,
-        fusion_weights: { lexical: 0.7, semantic: 0.3, rrf_k: 60 } as Json,
+        fusion_weights: { lexical: 0.55, semantic: 0.45, rrf_k: 60 } as Json,
         index_version: SEARCH_INDEX_VERSION,
-        embedding_model: "nomic-embed-text",
+        embedding_model: "gemini-embedding-2/768",
         taxonomy_version: SEARCH_TAXONOMY_VERSION,
         ranking_version: searchConfig?.ranking_version ?? SEARCH_RANKING_VERSION,
         retrieval_mode: retrievalMode,

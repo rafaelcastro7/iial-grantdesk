@@ -4127,6 +4127,7 @@ export type Database = {
         Returns: boolean
       }
       ensure_consultant: { Args: never; Returns: undefined }
+      ensure_current_user: { Args: never; Returns: undefined }
       find_consultant_by_email: {
         Args: { target_email: string }
         Returns: string
