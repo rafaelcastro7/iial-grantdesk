@@ -194,6 +194,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "agent_runs_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
         ]
       }
       agent_trace_steps: {
@@ -233,7 +240,15 @@ export type Database = {
           status?: string
           step?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "agent_trace_steps_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       answer_library: {
         Row: {
@@ -316,6 +331,20 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "answer_library_knowledge_chunk_id_fkey"
+            columns: ["knowledge_chunk_id"]
+            isOneToOne: true
+            referencedRelation: "knowledge_chunks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_library_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       approval_instances: {
@@ -349,7 +378,15 @@ export type Database = {
           status?: string
           workflow_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "approval_instances_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "approval_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       approval_steps: {
         Row: {
@@ -385,7 +422,15 @@ export type Database = {
           step_order?: number
           workflow_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "approval_steps_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "approval_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       approval_workflows: {
         Row: {
@@ -760,7 +805,22 @@ export type Database = {
           title?: string
           type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "compliance_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_items_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       compliance_matrices: {
         Row: {
@@ -796,7 +856,15 @@ export type Database = {
           proposal_id?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "compliance_matrices_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       consent_ledger: {
         Row: {
@@ -925,7 +993,22 @@ export type Database = {
           url?: string
           via?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "crawl_ledger_funder_id_fkey"
+            columns: ["funder_id"]
+            isOneToOne: false
+            referencedRelation: "funder_source_yield"
+            referencedColumns: ["funder_id"]
+          },
+          {
+            foreignKeyName: "crawl_ledger_funder_id_fkey"
+            columns: ["funder_id"]
+            isOneToOne: false
+            referencedRelation: "funders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       discovery_config: {
         Row: {
@@ -1021,7 +1104,22 @@ export type Database = {
           times_seen?: number
           url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "discovery_registration_gates_funder_id_fkey"
+            columns: ["funder_id"]
+            isOneToOne: false
+            referencedRelation: "funder_source_yield"
+            referencedColumns: ["funder_id"]
+          },
+          {
+            foreignKeyName: "discovery_registration_gates_funder_id_fkey"
+            columns: ["funder_id"]
+            isOneToOne: false
+            referencedRelation: "funders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       discovery_sources: {
         Row: {
@@ -1078,7 +1176,22 @@ export type Database = {
           updated_at?: string
           url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "discovery_sources_funder_id_fkey"
+            columns: ["funder_id"]
+            isOneToOne: false
+            referencedRelation: "funder_source_yield"
+            referencedColumns: ["funder_id"]
+          },
+          {
+            foreignKeyName: "discovery_sources_funder_id_fkey"
+            columns: ["funder_id"]
+            isOneToOne: false
+            referencedRelation: "funders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       discovery_sources_registry: {
         Row: {
@@ -1384,7 +1497,15 @@ export type Database = {
           source_url?: string
           value?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "evidence_spans_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fit_rules: {
         Row: {
@@ -1678,7 +1799,15 @@ export type Database = {
           updated_at?: string
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "funders_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_deadline_observations: {
         Row: {
@@ -1705,7 +1834,22 @@ export type Database = {
           observed_deadline?: string
           source_url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grant_deadline_observations_evidence_span_id_fkey"
+            columns: ["evidence_span_id"]
+            isOneToOne: false
+            referencedRelation: "evidence_spans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_deadline_observations_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_embeddings: {
         Row: {
@@ -1791,7 +1935,15 @@ export type Database = {
           run_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grant_evaluations_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_events: {
         Row: {
@@ -1827,7 +1979,15 @@ export type Database = {
           reason?: string | null
           to_status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grant_events_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_search_benchmark_runs: {
         Row: {
@@ -1896,7 +2056,15 @@ export type Database = {
           grant_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grant_search_documents_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: true
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_search_feedback: {
         Row: {
@@ -1941,7 +2109,22 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grant_search_feedback_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_search_feedback_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "grant_search_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_search_feedback_events: {
         Row: {
@@ -1983,7 +2166,22 @@ export type Database = {
           score_snapshot?: Json
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grant_search_feedback_events_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_search_feedback_events_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "grant_search_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_search_profiles: {
         Row: {
@@ -2061,7 +2259,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grant_search_profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_search_runs: {
         Row: {
@@ -2121,7 +2327,22 @@ export type Database = {
           taxonomy_version?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grant_search_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_search_runs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "grant_search_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grant_search_runtime_config: {
         Row: {
@@ -2331,6 +2552,13 @@ export type Database = {
             referencedRelation: "funders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "grants_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       knowledge_chunks: {
@@ -2370,7 +2598,15 @@ export type Database = {
           source_kind?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_chunks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       logic_models: {
         Row: {
@@ -2409,7 +2645,15 @@ export type Database = {
           proposal_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "logic_models_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       matches: {
         Row: {
@@ -2526,7 +2770,15 @@ export type Database = {
           title_fr?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notifications_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       org_profiles: {
         Row: {
@@ -2622,7 +2874,15 @@ export type Database = {
           website?: string | null
           years_operating?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "org_profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organizations: {
         Row: {
@@ -2691,7 +2951,22 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "outcomes_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outcomes_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: true
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       past_awards: {
         Row: {
