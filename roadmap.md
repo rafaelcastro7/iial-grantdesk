@@ -7,7 +7,7 @@
 - [x] Auditoría integral y evaluación 1-a-1 de las 54 convocatorias del catálogo con el perfil institucional de Rocío, con fallback determinista ante saturación de LLMs.
 - [x] Incorporar botón de auto-evaluación en lote con progreso en tiempo real en la barra de herramientas del Radar.
 - [ ] Replicar para Juan Marcelo y Clarissa el perfil institucional y preparación de conocimiento usados por Rocío.
-- [ ] Mostrar razones de descarte comprensibles y permitir subsanar u omitir razones con revalidación auditable.
+- [x] Mostrar razones de descarte comprensibles en el listado de resultados (Radar/Cards) y sincronizar el veredicto del evaluador sin incoherencias en todo el sistema.
 - [ ] Eliminar pasos redundantes y verificar el flujo completo con los tres administradores.
 - [x] Ejecutar pruebas de reglas, seguridad, tipos y recorrido end-to-end.
 - [x] Mover requisitos críticos detectados en la propuesta Alliance al análisis inicial del grant.

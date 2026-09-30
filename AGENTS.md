@@ -21,6 +21,8 @@
 - Search `grant_embeddings` through `match_grant_search_documents`; if vector results return fewer than 20 rows (or vectors are pending), always run tokenized keyword fallback across `grants` (title, summary, eligibility_note) and `funders.name` so search queries never falsely return empty.
 - Provision new users through idempotent `ensure_current_user()` in the authenticated layout because auth-schema triggers are unavailable.
 - Surface failed soft eligibility checks without changing their verdict effect.
+- Evaluation precedence: A grant's persisted `grant_evaluations` record is authoritative. In `toRadarItem`, `g.evaluation` takes precedence over preliminary heuristics, ensuring that an evaluation verdict (`eligible` vs `not_eligible`) updates immediately in the UI with its detailed rationale, normalized fit percentage, and next action.
+- In `listGrants`, `includeHardBlocked` defaults to `true` and projects `evaluation` status/fit onto returned grants so Radar and Dashboard maintain coherent global counts.
 - Evaluator calls must never abort the batch pipeline: if cloud LLMs are rate-limited (429) or unavailable, evaluateGrant falls back to the deterministic rules engine (`rules-engine-deterministic`) ensuring continuous 100% completion.
 - Coerce and normalize `fit_score` to `[0, 1]` in evaluator schemas to absorb models returning 0-100 scales.
 - Run live cloud/AI tests only with `LIVE_CLOUD=1` to avoid accidental spend.
