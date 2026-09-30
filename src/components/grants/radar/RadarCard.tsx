@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, CalendarClock, ExternalLink, Loader2, MapPin, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, ExternalLink, Loader2, MapPin, Wallet } from "lucide-react";
 import type { GrantRowData } from "@/components/grants/GrantRow";
 import {
   GrantFeedbackControls,
@@ -46,6 +46,7 @@ export function RadarCard({
   highlight?: boolean;
 }) {
   const g = item.grant;
+  const criticalRequirements = (g.requirements ?? []).filter((requirement) => requirement.isCritical);
   const busy =
     actions.evaluatingIds.has(g.id) ||
     actions.pending === g.id ||
@@ -68,7 +69,7 @@ export function RadarCard({
   return (
     <article
       className={cn(
-        "group rounded-lg border bg-card p-4 transition-colors hover:border-primary/40",
+        "group rounded-md border bg-card p-4 transition-colors hover:border-primary/40",
         highlight && "border-primary/50 ring-1 ring-primary/20",
         item.parked && "opacity-75",
       )}
@@ -106,6 +107,17 @@ export function RadarCard({
               <span className="font-medium text-foreground">Rules: </span>
               {item.reason}
             </p>
+          )}
+          {criticalRequirements.length > 0 && (
+            <div className="mt-2 border-l-2 border-warning pl-3">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-warning">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {criticalRequirements.length} critical requirement{criticalRequirements.length === 1 ? "" : "s"}
+              </p>
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                {criticalRequirements.map((requirement) => requirement.requirement).join(" · ")}
+              </p>
+            </div>
           )}
           <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <span className={cn("inline-flex items-center gap-1", timingTone)}>
