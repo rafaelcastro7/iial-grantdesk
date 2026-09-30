@@ -326,8 +326,8 @@ function V2DesktopNav({
         </div>
       </nav>
 
-      {!simple && (<div className="border-t border-white/10 p-3">
-        <div className="rounded-md border border-white/10 bg-white/[0.055] p-3">
+      <div className="border-t border-white/10 p-3">
+        {!simple && (<div className="rounded-md border border-white/10 bg-white/[0.055] p-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-white">
             <Bot className="h-4 w-4 text-brand-green" />
             AI stack
@@ -348,7 +348,7 @@ function V2DesktopNav({
               </TooltipContent>
             </Tooltip>
           </div>
-        </div>
+        </div>)}
 
         <div className="mt-3 flex items-center justify-end gap-2">
           <Tooltip>
