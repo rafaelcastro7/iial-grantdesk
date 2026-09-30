@@ -230,7 +230,9 @@ function ProposalDetailPage() {
     setErr(null);
     try {
       await critic({ data: { proposalId: id } });
-      await qc.invalidateQueries({ queryKey: ["proposal", id] });
+      // The reviewer changes score, summary, rubric and section findings.
+      // Wait for the active detail to refresh so users immediately see them.
+      await qc.refetchQueries({ queryKey: ["proposal", id], type: "active" });
       toast.success("Quality review completed");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
