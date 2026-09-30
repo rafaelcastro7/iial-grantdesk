@@ -6,3 +6,6 @@
 - [ ] Mostrar razones de descarte comprensibles y permitir subsanar u omitir razones con revalidación auditable.
 - [ ] Eliminar pasos redundantes y verificar el flujo completo con los tres administradores.
 - [ ] Ejecutar pruebas de reglas, seguridad, tipos y recorrido end-to-end.
+- [ ] Mover requisitos críticos detectados en la propuesta Alliance al análisis inicial del grant.
+- [ ] Ejecutar y consolidar revisión experta y matriz de cumplimiento durante la evaluación del grant.
+- [ ] Auditar a fondo Alliance, corregir enriquecimiento/análisis y validar con otro grant sin evaluación previa.
