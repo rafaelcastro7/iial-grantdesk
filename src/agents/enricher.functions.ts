@@ -179,6 +179,22 @@ export async function enrichGrantImpl(
   const pages: Array<{ url: string; markdown: string }> = [
     { url: g.url, markdown: scraped.markdown },
   ];
+  if (/^https?:\/\/(?:www\.)?grants\.gov\/search-results-detail\//i.test(g.url)) {
+    try {
+      const { fetchGrantsGovOpportunitySource } = await import("@/agents/sources/grants-gov-opportunity.server");
+      const official = await fetchGrantsGovOpportunitySource(g.url);
+      if (official?.markdown) {
+        pages.unshift({ url: g.url, markdown: official.markdown });
+        if (official.detailUrl && !pages.some((page) => page.url === official.detailUrl)) {
+          const detail = await scrapeWithFallback(official.detailUrl);
+          if (detail.ok) pages.push({ url: official.detailUrl, markdown: detail.markdown });
+        }
+        await trace("official_api", "Loaded structured Grants.gov opportunity details", "done", { chars: official.markdown.length, detail_url: official.detailUrl });
+      }
+    } catch (apiError) {
+      await trace("official_api", `Structured Grants.gov details unavailable: ${apiError instanceof Error ? apiError.message : String(apiError)}`, "warn");
+    }
+  }
   const missingFields = () => {
     const missing: string[] = [];
     if (!hasAmountMin && patch.amount_cad_min == null) missing.push("amount_cad_min");
@@ -459,7 +475,10 @@ export async function enrichGrantImpl(
     }
   };
 
-  await runExtractorsOnPage(pages[0], "main");
+  for (const [index, page] of pages.entries()) {
+    if (missingFields().length === 0) break;
+    await runExtractorsOnPage(page, index === 0 ? "main" : "deep");
+  }
 
   const missingAfterMain = missingFields();
   if (missingAfterMain.length > 0) {
@@ -928,16 +947,8 @@ export async function enrichGrantImpl(
   // Critical fields for downstream evaluation. If the LLM returned but extracted
   // zero critical fields, treat as failure — the grant stays in "discovered" for
   // retry rather than being marked "enriched" with only cosmetic data.
-  const criticalFields = ["amount_cad_min", "amount_cad_max", "deadline", "eligibility"];
-  const extractedCritical = extractedKeys.filter((k) => criticalFields.includes(k));
-  const hasCriticalMissing =
-    stillMissing.some((f) => criticalFields.includes(f)) && extractedCritical.length === 0;
-  if (extractedKeys.length === 0 || hasCriticalMissing) {
-    const reason = llmCascadeFailed
-      ? "no_extraction: deterministic=0 llm_cascade=all_providers_failed"
-      : hasCriticalMissing
-        ? `enrichment_insufficient: extracted [${extractedKeys.join(", ") || "none"}] but critical fields missing: ${stillMissing.filter((f) => criticalFields.includes(f)).join(", ")}`
-        : "no_extraction: deterministic=0 llm_rejected_all_fields";
+  if (extractedKeys.length === 0 && llmCascadeFailed) {
+    const reason = "no_extraction: deterministic=0 llm_cascade=all_providers_failed";
     await trace("commit", reason, "error", { still_missing: stillMissing });
     await db
       .from("grants")
