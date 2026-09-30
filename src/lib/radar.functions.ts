@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getOrgProfileForUser } from "@/lib/org-profile-query";
 
 export type RadarClientProfile = {
   clientId: string;
@@ -15,12 +16,18 @@ export type RadarClientProfile = {
 export const listRadarProfiles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<RadarClientProfile[]> => {
+    const { data: organization, error: organizationError } = await getOrgProfileForUser(
+      context.supabase,
+      context.userId,
+    );
+    if (organizationError) throw new Error(organizationError.message);
+
     const { data, error } = await context.supabase
       .from("clients")
       .select("id, name, client_profiles(jurisdictions, stage, annual_budget, currency, lead_time_weeks)")
       .order("name");
     if (error) throw new Error(error.message);
-    return (data ?? []).flatMap((row) => {
+    const clientProfiles = (data ?? []).flatMap((row) => {
       const raw = (row as { client_profiles: unknown }).client_profiles;
       const p = (Array.isArray(raw) ? raw[0] : raw) as
         | {
@@ -45,4 +52,21 @@ export const listRadarProfiles = createServerFn({ method: "GET" })
         },
       ];
     });
+
+    if (!organization) return clientProfiles;
+    const organizationProfile: RadarClientProfile = {
+      clientId: `organization:${organization.org_id ?? organization.user_id}`,
+      name: organization.org_name,
+      jurisdictions: organization.jurisdictions ?? [],
+      stage: organization.registration_status ?? organization.stage,
+      annualBudget: organization.annual_budget_cad,
+      currency: "CAD",
+      leadTimeWeeks: 4,
+    };
+    return [
+      organizationProfile,
+      ...clientProfiles.filter(
+        (profile) => profile.name.trim().toLowerCase() !== organization.org_name.trim().toLowerCase(),
+      ),
+    ];
   });

@@ -175,6 +175,7 @@ function GrantsPage() {
   const checkProfile = useMemo(
     () =>
       radarProfiles.find((p) => p.clientId === checkClientId) ??
+      radarProfiles.find((p) => p.clientId.startsWith("organization:")) ??
       radarProfiles.find((p) => p.name.toUpperCase() === "IIAL") ??
       radarProfiles[0] ??
       null,
@@ -300,8 +301,15 @@ function GrantsPage() {
 
   const onDraft = (grantId: string) =>
     run(`${grantId}:draft`, async () => {
-      const r = await strategize({ data: { grantId } });
-      await navigate({ to: "/proposals/$id", params: { id: r.proposalId } });
+      try {
+        const r = await strategize({ data: { grantId } });
+        await navigate({ to: "/proposals/$id", params: { id: r.proposalId } });
+      } catch (e) {
+        if (e instanceof Error && e.message.includes("org_profile_missing")) {
+          throw new Error("Complete the IIAL organization profile before starting a proposal.");
+        }
+        throw e;
+      }
     });
 
   const onEnrich = (grantId: string) =>

@@ -771,7 +771,7 @@ function toUserFacingActionError(error: unknown): string {
   const lower = raw.toLowerCase();
 
   if (lower.includes("ollama") || lower.includes("model") || lower.includes("llm")) {
-    return "The local AI model could not complete this step. Open the reasoning trace or Admin > Agents to confirm Ollama is running and the configured model is installed, then retry.";
+    return "The AI provider chain could not complete this step. Open the reasoning trace or Admin > Agents to review the failed provider attempts, then retry.";
   }
   if (raw.includes("grant_not_enriched_yet")) {
     return "Fetch details first. The evaluator needs the enriched grant facts before it can validate fit rules.";

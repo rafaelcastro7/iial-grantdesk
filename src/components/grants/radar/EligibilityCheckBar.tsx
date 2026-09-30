@@ -1,6 +1,7 @@
 import { ShieldCheck } from "lucide-react";
 import type { RadarClientProfile } from "@/lib/radar.functions";
 import type { RadarResult, RadarGrant } from "@/lib/grant-radar";
+import { Button } from "@/components/ui/button";
 
 /**
  * Shows who every grant is being checked against, and the outcome of that
@@ -65,13 +66,13 @@ export function EligibilityCheckBar({
           <Stat label="Needs input" value={counts.needsInput} tone="text-needs-input" />
           <Stat label="Ruled out" value={ruledOut} tone="text-ineligible" />
         </dl>
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onToggleHide}
-          className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
         >
           {hideIneligible ? "Show ruled out" : "Hide ruled out"}
-        </button>
+        </Button>
       </div>
     </div>
   );

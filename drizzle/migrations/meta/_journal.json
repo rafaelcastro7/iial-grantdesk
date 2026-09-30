@@ -64,6 +64,20 @@
       "when": 1790754705366,
       "tag": "0008_fix_semantic_search_and_user_bootstrap",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790760892292,
+      "tag": "0009_restore_operational_module_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790761127312,
+      "tag": "0010_restore_default_proposal_template",
+      "breakpoints": true
     }
   ]
 }

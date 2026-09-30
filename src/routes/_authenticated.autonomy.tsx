@@ -71,7 +71,7 @@ function AutonomyPage() {
       <PageHeader
         eyebrow="Autonomy"
         title="Mission control"
-        description="Live view of the local self-improvement daemons and everything they learn: memory, lessons, self-improvement backlog, techniques, and skills. Read-only, on-device, zero cloud tokens."
+        description="Live view of automated improvement jobs and what they learn: memory, lessons, backlog, techniques, and skills. Read-only, with auditable activity."
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="gap-1.5">

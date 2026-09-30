@@ -467,7 +467,9 @@ export function GrantDetailExpress({
   const rows = eligibilityRows(eligibility);
   const fitScore = evaluation ? Math.round(evaluation.fit_score * 100) : null;
   const enrichmentFailed = status === "discovered" && (enrichAttempts ?? 0) >= MAX_ENRICH_ATTEMPTS;
-  const canDraft = ["scored", "shortlisted", "in_proposal"].includes(status);
+  const canDraft =
+    ["scored", "shortlisted", "in_proposal"].includes(status) ||
+    evaluation?.eligibility_pass === true;
   const shouldEvaluate = status === "enriched" || status === "scored" || !!evaluation;
   const shouldFetch = status === "discovered" && !enrichmentFailed;
   const completeness = computeCompleteness({

@@ -39,16 +39,16 @@ opportunities. It helps an organization discover, evaluate, prioritize, draft,
 submit, and manage grants from first lead through post-award reporting.
 
 The system is designed for teams that need more than a static grant directory.
-It combines grant discovery, structured enrichment, local AI evaluation,
+It combines grant discovery, structured enrichment, AI-assisted evaluation,
 proposal drafting, evidence tracking, team workflows, quality review,
 competitive intelligence, and post-award management in one workspace.
 
-The platform is local-first:
+The platform uses managed cloud services with an auditable AI provider chain:
 
-- Data is stored in local Supabase/PostgreSQL.
-- AI inference runs through local Ollama models.
-- The application runs locally at `http://localhost:8080`.
-- The operating model is designed for zero cloud LLM token cost.
+- Data is stored in Lovable Cloud.
+- AI calls try Cerebras, Groq, and Gemini before using Lovable AI as fallback.
+- Eligibility verdicts come from deterministic rules, not from an AI model.
+- The application is available through the GrantDesk portal.
 - Evidence, audit trails, and scoring rationale are retained for review.
 
 ## How to Open the Platform
@@ -1154,7 +1154,7 @@ Open:
 | Page            | URL                  | Purpose                                              |
 | --------------- | -------------------- | ---------------------------------------------------- |
 | Admin dashboard | `/admin`             | Administrative overview                              |
-| Agents          | `/admin/agents`      | Configure local AI agents and model behavior         |
+| Agents          | `/admin/agents`      | Review AI agents, prompts, and provider behavior      |
 | Candidates      | `/admin/candidates`  | Review funder candidates                             |
 | History         | `/admin/history`     | Review admin history                                 |
 | Modules         | `/admin/modules`     | Manage platform modules                              |
@@ -1296,11 +1296,10 @@ Check:
 
 Then re-run evaluation if the underlying data changed.
 
-### Local Model Is Missing
+### An AI Provider Is Unavailable
 
-If an agent model is not installed in Ollama, the system should fall back to the
-configured local fallback model when available. Admins can review model
-configuration in:
+The system records a failed provider attempt and continues through the configured
+provider chain. Admins can review agent configuration and traces in:
 
 ```text
 /admin/agents
@@ -1335,7 +1334,7 @@ Check proposal readiness:
 
 | Term               | Meaning                                                         |
 | ------------------ | --------------------------------------------------------------- |
-| Agent              | A local AI worker specialized for a specific task               |
+| Agent              | An AI-assisted worker specialized for a specific task            |
 | Audit trail        | Record of changes and important actions                         |
 | Enrichment         | Fetching and structuring grant details from official sources    |
 | Evidence span      | Source-backed snippet supporting an extracted fact or decision  |
