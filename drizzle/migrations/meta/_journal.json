@@ -92,6 +92,13 @@
       "when": 1790777105811,
       "tag": "0012_add_consultant_role",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790780848083,
+      "tag": "0013_agent_flags_readable",
+      "breakpoints": true
     }
   ]
 }
