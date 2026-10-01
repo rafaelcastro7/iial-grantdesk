@@ -20,6 +20,8 @@ export async function evaluateGrantImpl(opts: {
    * whole list for free; "Check fit" later runs the full review.
    */
   rulesOnly?: boolean;
+  /** Force fresh evaluation, bypassing cache. */
+  force?: boolean;
 }) {
   const { grantId, userId, userSupabase } = opts;
   const { assertAgentEnabled } = await import("@/lib/admin-agents.functions");
@@ -192,11 +194,20 @@ export async function evaluateGrantImpl(opts: {
     .digest("hex");
   const { data: prior } = await userSupabase
     .from("grant_evaluations")
-    .select("fit_score, eligibility_pass, run_id, rule_snapshot")
+    .select("fit_score, eligibility_pass, run_id, model, llm_fit_score, rule_snapshot")
     .eq("user_id", userId)
     .eq("grant_id", g.id)
     .maybeSingle();
-  if (prior && (prior.rule_snapshot as { input_hash?: string } | null)?.input_hash === inputHash) {
+
+  const priorModel = (prior as { model?: string | null } | null)?.model;
+  const isFallbackPrior = priorModel === "rules-engine-deterministic" && !rulesResult.hard_fail;
+  const canReuse =
+    !opts.force &&
+    (!isFallbackPrior || opts.rulesOnly) &&
+    prior &&
+    (prior.rule_snapshot as { input_hash?: string } | null)?.input_hash === inputHash;
+
+  if (canReuse) {
     await trace(
       "cache",
       "Inputs unchanged since last evaluation - reusing verdict (0 tokens)",
@@ -254,7 +265,7 @@ export async function evaluateGrantImpl(opts: {
         agent: "evaluator",
         runId,
         temperature: 0.1,
-        maxOutputTokens: 256,
+        maxOutputTokens: 1024,
         responseFormat: "json",
         validate: (text) => {
           try {
@@ -352,7 +363,7 @@ export async function evaluateGrantImpl(opts: {
       user_id: userId,
       grant_id: g.id,
       fit_score: parsed.fit_score,
-      llm_fit_score: llmFit,
+      llm_fit_score: usedModel === "rules-engine-deterministic" ? null : llmFit,
       eligibility_pass: parsed.eligibility_pass,
       evaluated_at: new Date().toISOString(),
       rationale_en: parsed.rationale_en,
@@ -372,13 +383,22 @@ export async function evaluateGrantImpl(opts: {
         detected_partner_type: rulesResult.detected_partner_type,
         cost_share_pct: rulesResult.cost_share_pct,
         rolling_intake: rulesResult.rolling_intake,
+        is_exhaustive: usedModel !== "rules-engine-deterministic" || rulesResult.hard_fail,
+        is_precheck: opts.rulesOnly ?? false,
         critical_requirements: (g.requirements ?? []).filter(
           (requirement: { isCritical?: boolean }) => requirement.isCritical,
         ),
         review_stages: {
           enrichment: "complete",
           deterministic_rules: "complete",
-          expert_fit_review: "complete",
+          expert_fit_review:
+            usedModel !== "rules-engine-deterministic"
+              ? "complete"
+              : rulesResult.hard_fail
+                ? "short_circuit_hard_fail"
+                : opts.rulesOnly
+                  ? "pending"
+                  : "fallback_rules_only",
           pre_application_compliance:
             (g.requirements ?? []).length > 0 ? "complete" : "needs_source_detail",
         },

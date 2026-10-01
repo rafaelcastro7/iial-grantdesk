@@ -363,7 +363,7 @@ function GrantsPage() {
     run(grantId, async () => {
       setEvaluatingIds((s) => new Set(s).add(grantId));
       try {
-        await evaluate({ data: { grantId } });
+        await evaluate({ data: { grantId, force: true } });
       } finally {
         setEvaluatingIds((s) => {
           const n = new Set(s);
@@ -374,25 +374,31 @@ function GrantsPage() {
     });
 
   const onEvaluateAllListed = async () => {
-    const candidateItems = radar.items.filter(
-      (item) => item.verdict === "needs_input" || item.fit == null,
-    );
-    if (candidateItems.length === 0) {
-      setInfo("Every listed grant is already checked.");
+    // Pick grants that have no evaluation or only had a rules-only pre-check
+    const candidateItems = radar.items.filter((item) => {
+      const ev = item.grant.evaluation;
+      if (!ev) return true;
+      const meta = ev as { is_exhaustive?: boolean; model?: string };
+      return meta.is_exhaustive === false || meta.model === "rules-engine-deterministic";
+    });
+    // If all are already evaluated exhaustively, re-evaluate all listed opportunities
+    const targets = candidateItems.length > 0 ? candidateItems : radar.items;
+    if (targets.length === 0) {
+      setInfo("No listed grants to evaluate.");
       return;
     }
     setEvaluatingAll(true);
     setError(null);
-    setInfo(`Checking ${candidateItems.length} grants…`);
+    setInfo(`Evaluating ${targets.length} grants exhaustively…`);
     let count = 0;
     try {
-      for (const item of candidateItems) {
+      for (const item of targets) {
         count++;
         const g = item.grant;
-        setEvalProgress({ current: count, total: candidateItems.length, lastTitle: g.title });
+        setEvalProgress({ current: count, total: targets.length, lastTitle: g.title });
         setEvaluatingIds((s) => new Set(s).add(g.id));
         try {
-          await evaluate({ data: { grantId: g.id } });
+          await evaluate({ data: { grantId: g.id, force: true } });
         } catch (err) {
           console.warn(`Could not check "${g.title}":`, err);
         } finally {
@@ -404,7 +410,7 @@ function GrantsPage() {
         }
       }
       await refresh();
-      setInfo(`Done: ${count} grants checked.`);
+      setInfo(`Done: ${count} grants exhaustively evaluated.`);
     } catch (e) {
       fail(e);
     } finally {

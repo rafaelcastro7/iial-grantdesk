@@ -153,6 +153,10 @@ type ExternalProvider = {
 /** OpenAI-compatible chat completions (Cerebras and Groq share the shape). */
 function openAiCompatible(url: string, model: string): ExternalProvider["call"] {
   return async (request, apiKey) => {
+    let messages = request.messages;
+    if (request.json && !messages.some((m) => m.content.toLowerCase().includes("json"))) {
+      messages = [{ role: "system", content: "Respond with valid JSON object." }, ...messages];
+    }
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -161,7 +165,7 @@ function openAiCompatible(url: string, model: string): ExternalProvider["call"] 
       },
       body: JSON.stringify({
         model,
-        messages: request.messages,
+        messages,
         temperature: request.temperature ?? 0.2,
         ...(request.maxTokens ? { max_tokens: request.maxTokens } : {}),
         ...(request.json ? { response_format: { type: "json_object" } } : {}),
@@ -181,8 +185,20 @@ function openAiCompatible(url: string, model: string): ExternalProvider["call"] 
 }
 
 const EXTERNAL_PROVIDERS: (ExternalProvider & {
-  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY";
+  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GOOGLE_AI_STUDIO_KEY";
 })[] = [
+  {
+    name: "groq-gpt-20b",
+    model: "openai/gpt-oss-20b",
+    envKey: "GROQ_API_KEY",
+    call: openAiCompatible("https://api.groq.com/openai/v1/chat/completions", "openai/gpt-oss-20b"),
+  },
+  {
+    name: "groq-gpt-120b",
+    model: "openai/gpt-oss-120b",
+    envKey: "GROQ_API_KEY",
+    call: openAiCompatible("https://api.groq.com/openai/v1/chat/completions", "openai/gpt-oss-120b"),
+  },
   {
     name: "groq",
     model: "qwen/qwen3.8-27b",
@@ -268,7 +284,7 @@ export async function callLlm(
       );
       continue;
     }
-    for (let tryIdx = 0; tryIdx < 2; tryIdx++) {
+    for (let tryIdx = 0; tryIdx < 3; tryIdx++) {
       const started = Date.now();
       try {
         const text = await provider.call(request, apiKey);
@@ -292,12 +308,16 @@ export async function callLlm(
           providerCooldown.set(provider.name, Date.now() + 60 * 60_000);
           break;
         }
-        if (tryIdx === 1 && /\b429\b|rate limit/i.test(message)) {
-          providerCooldown.set(provider.name, Date.now() + 60_000);
-        }
-        if (tryIdx === 0 && (message.includes("429") || message.includes("rate limit"))) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          continue;
+        if (/\b429\b|rate limit/i.test(message)) {
+          const matchWait = message.match(/try again in ([\d\.]+)s/i);
+          const waitSec = matchWait ? parseFloat(matchWait[1]) : 3;
+          const waitMs = Math.min(Math.max(Math.ceil(waitSec * 1000) + 1200, 2500), 12000);
+          if (tryIdx < 2) {
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
+            continue;
+          } else {
+            providerCooldown.set(provider.name, Date.now() + 10_000);
+          }
         }
         break;
       }

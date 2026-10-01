@@ -6,13 +6,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // directly (avoiding TanStack server-fn resolver lookups across handlers).
 export const runEvaluator = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ grantId: z.string().uuid() }).parse(input))
+  .inputValidator((input) =>
+    z.object({ grantId: z.string().uuid(), force: z.boolean().optional() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { evaluateGrantImpl } = await import("@/agents/evaluator.impl.server");
     return evaluateGrantImpl({
       grantId: data.grantId,
       userId: context.userId,
       userSupabase: context.supabase,
+      force: data.force,
     });
   });
 
@@ -23,7 +26,9 @@ export const runEvaluator = createServerFn({ method: "POST" })
  */
 export const startEvaluator = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ grantId: z.string().uuid() }).parse(input))
+  .inputValidator((input) =>
+    z.object({ grantId: z.string().uuid(), force: z.boolean().optional() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { evaluateGrantImpl } = await import("@/agents/evaluator.impl.server");
     const { runInBackground } = await import("@/lib/background.server");
@@ -36,6 +41,7 @@ export const startEvaluator = createServerFn({ method: "POST" })
         userId: context.userId,
         userSupabase: context.supabase,
         runId,
+        force: data.force,
       }),
     );
     return { ok: true as const, runId, startedAt, background: true as const };

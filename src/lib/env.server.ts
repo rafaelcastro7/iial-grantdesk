@@ -16,6 +16,8 @@ const schema = z.object({
   /** External chat providers, tried before the gateway to save its credits. */
   CEREBRAS_API_KEY: z.string().min(10).optional(),
   GROQ_API_KEY: z.string().min(10).optional(),
+  GOOGLE_AI_STUDIO_KEY: z.string().min(10).optional(),
+  GEMINI_API_KEY: z.string().min(10).optional(),
 });
 
 export type ServerEnv = z.infer<typeof schema>;

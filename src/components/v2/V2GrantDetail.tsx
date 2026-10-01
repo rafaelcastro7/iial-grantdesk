@@ -212,12 +212,18 @@ export function V2GrantDetail({
   const criticalRequirements = requirements.filter((item) => item.isCritical);
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
   const fitScore = evaluation ? Math.round(evaluation.fit_score * 100) : null;
-  const ruleChecks =
-    (
-      evaluation?.rule_snapshot as {
-        checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
-      } | null
-    )?.checks ?? [];
+  const ruleSnapshot = evaluation?.rule_snapshot as {
+    checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
+    is_exhaustive?: boolean;
+    hard_fail?: boolean;
+  } | null;
+  const isExhaustive =
+    Boolean(
+      (evaluation?.model != null && evaluation.model !== "rules-engine-deterministic") ||
+      ruleSnapshot?.hard_fail === true ||
+      ruleSnapshot?.is_exhaustive === true
+    );
+  const ruleChecks = ruleSnapshot?.checks ?? [];
 
   const evalVerdict = evaluation
     ? evaluationVerdict({
@@ -470,7 +476,7 @@ export function V2GrantDetail({
               ) : (
                 <SearchCheck className="h-4 w-4" />
               )}
-              {evaluation ? "Re-check fit" : "Check fit"}
+              {evaluation ? (isExhaustive ? "Re-check fit" : "Run exhaustive fit") : "Check fit"}
             </Button>
 
             {existingProposalId ? (
@@ -530,7 +536,7 @@ export function V2GrantDetail({
           <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Fit Score &amp; Verdict
+                {isExhaustive ? "Fit Score & Verdict" : "Pre-check (AI Pending)"}
               </span>
               <span className={cn("h-2.5 w-2.5 rounded-full", verdict.dot)} />
             </div>
@@ -559,17 +565,21 @@ export function V2GrantDetail({
                 }
                 className="rounded-md font-semibold text-xs"
               >
-                {evalVerdict === "eligible"
-                  ? "Eligible"
-                  : evalVerdict === "needs_input"
-                    ? "Needs Input"
-                    : evalVerdict === "not_eligible"
-                      ? "Ineligible"
-                      : "Unchecked"}
+                {!isExhaustive && evaluation
+                  ? "Pre-checked"
+                  : evalVerdict === "eligible"
+                    ? "Eligible"
+                    : evalVerdict === "needs_input"
+                      ? "Needs Input"
+                      : evalVerdict === "not_eligible"
+                        ? "Ineligible"
+                        : "Unchecked"}
               </Badge>
             </div>
             <p className="mt-1 text-xs font-medium text-foreground truncate" title={verdict.label}>
-              {verdict.label}
+              {!isExhaustive && evaluation
+                ? "Preliminary rule screen · Run check for full AI review"
+                : verdict.label}
             </p>
           </div>
 

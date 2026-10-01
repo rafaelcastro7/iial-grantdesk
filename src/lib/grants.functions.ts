@@ -353,18 +353,26 @@ export const listGrants = createServerFn({ method: "GET" })
         rationale_fr: string;
         created_at: string;
         rule_verdict: string | null;
+        model: string | null;
+        llm_fit_score: number | null;
+        is_exhaustive: boolean;
       }
     >();
     for (const chunk of chunkIds((rows ?? []).map((row) => row.id))) {
       const { data: evals, error: evalsError } = await context.supabase
         .from("grant_evaluations")
         .select(
-          "grant_id, fit_score, eligibility_pass, rationale_en, rationale_fr, created_at, rule_verdict:rule_snapshot->>verdict",
+          "grant_id, fit_score, llm_fit_score, model, eligibility_pass, rationale_en, rationale_fr, created_at, rule_snapshot, rule_verdict:rule_snapshot->>verdict",
         )
         .eq("user_id", context.userId)
         .in("grant_id", chunk);
       if (evalsError) throw new Error(`grant_evaluations: ${evalsError.message}`);
       for (const evaluation of evals ?? []) {
+        const snap = evaluation.rule_snapshot as { hard_fail?: boolean; is_exhaustive?: boolean } | null;
+        const isExhaustive =
+          snap?.is_exhaustive === true ||
+          (evaluation.model != null && evaluation.model !== "rules-engine-deterministic") ||
+          snap?.hard_fail === true;
         evalsByGrant.set(evaluation.grant_id, {
           fit_score: Number(evaluation.fit_score),
           eligibility_pass: !!evaluation.eligibility_pass,
@@ -372,6 +380,12 @@ export const listGrants = createServerFn({ method: "GET" })
           rationale_fr: evaluation.rationale_fr ?? "",
           created_at: evaluation.created_at,
           rule_verdict: (evaluation as { rule_verdict?: string | null }).rule_verdict ?? null,
+          model: (evaluation as { model?: string | null }).model ?? null,
+          llm_fit_score:
+            (evaluation as { llm_fit_score?: number | null }).llm_fit_score != null
+              ? Number((evaluation as { llm_fit_score?: number | null }).llm_fit_score)
+              : null,
+          is_exhaustive: isExhaustive,
         });
       }
     }
@@ -1117,13 +1131,18 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
       const profileChangedAt = rulesChangedAt;
       for (const e of existing ?? []) {
         const at = new Date((e as { evaluated_at?: string | null }).evaluated_at ?? 0).getTime();
-        // Deterministic verdicts written by an older evaluator version are
-        // re-run too (0 tokens); model-written ones are kept.
         const meta = e as { model?: string | null; prompt_version?: string | null };
+        const isDeterministic = meta.model === "rules-engine-deterministic";
         const outdated =
-          meta.model === "rules-engine-deterministic" &&
+          isDeterministic &&
           meta.prompt_version !== EVALUATOR_PROMPT_VERSION;
-        if (at >= profileChangedAt && !outdated) done.add(e.grant_id);
+        if (at >= profileChangedAt && !outdated) {
+          if (!data.rulesOnly && isDeterministic) {
+            // Needs exhaustive evaluation with model
+          } else {
+            done.add(e.grant_id);
+          }
+        }
       }
     }
     const todo = ids.filter((id) => !done.has(id)).slice(0, data.limit);
