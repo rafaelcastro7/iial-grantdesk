@@ -35,6 +35,7 @@ import { MAX_ENRICH_ATTEMPTS, isTerminalGrantStatus } from "@/agents/pipeline-st
 import { EvaluationDetail } from "@/components/grants/EvaluationDetail";
 import { EvidenceChip } from "@/components/grants/EvidencePanel";
 import { FetchTrailPanel } from "@/components/grants/FetchTrailPanel";
+import { EligibilityIssues } from "@/components/grants/EligibilityIssues";
 import { FitEvaluation } from "@/components/grants/FitEvaluation";
 import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
 import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
@@ -81,6 +82,7 @@ type Evaluation = {
   rationale_fr?: string | null;
   created_at: string;
   axis_breakdown?: unknown;
+  rule_snapshot?: unknown;
 } | null;
 
 type GrantEvent = {
@@ -202,6 +204,12 @@ export function V2GrantDetail({
   const criticalRequirements = requirements.filter((item) => item.isCritical);
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
   const fitScore = evaluation ? Math.round(evaluation.fit_score * 100) : null;
+  const ruleChecks =
+    (
+      evaluation?.rule_snapshot as {
+        checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
+      } | null
+    )?.checks ?? [];
   const deadline = getDeadlineState(grant.deadline);
   const amount = amountLabel(
     grant.amount_cad_min,
@@ -398,6 +406,7 @@ export function V2GrantDetail({
                 <Sparkles className="h-5 w-5 text-brand" />
               </div>
               <p className="mt-3 text-sm leading-6 text-muted-foreground">{verdict.detail}</p>
+              {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
 
               <div className="mt-5 space-y-2">
                 {canFetch && (
@@ -1080,7 +1089,7 @@ function getVerdict({
     label: evaluation.eligibility_pass ? "Low priority" : "Eligibility risk",
     detail: evaluation.eligibility_pass
       ? "The fit signal is weak. Keep the record for reference unless strategy changes."
-      : "The evaluator found an eligibility issue. Resolve that before drafting.",
+      : "It does not meet one or more of your eligibility rules. Below: what the grant asks for, what your profile says, and how to fix it if it is a profile setting.",
   };
 }
 

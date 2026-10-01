@@ -181,3 +181,184 @@ export function humanizeBriefCondition(condition: string): string {
   );
   return labelled ? explainCondition({ label: labelled[1] }) : condition;
 }
+
+export type CheckExplanation = {
+  title: string;
+  grantSays: string | null;
+  profileSays: string | null;
+  fix: string;
+  /** True when changing the organization profile or rules could resolve it. */
+  profileFixable: boolean;
+};
+
+type FullCheck = CheckLike & { detail?: string; hard?: boolean };
+
+const humanList = (raw: string) =>
+  raw
+    .replace(/[[\]{}()]/g, "")
+    .split(/\s*,\s*/)
+    .map((value) => value.trim().replace(/[_-]+/g, " "))
+    .filter((value) => value && value !== "none")
+    .join(", ") || "none listed";
+
+/**
+ * Side-by-side explanation of one failed or flagged check: what the grant
+ * asks for, what the profile says, and what the consultant can do. Parses the
+ * rule engine's stored detail strings, so it also works on old evaluations.
+ */
+export function describeCheck(check: FullCheck): CheckExplanation {
+  const key = `${check.id ?? ""} ${check.label}`;
+  const detail = check.detail ?? "";
+  const title = explainCheck(check);
+  let m: RegExpMatchArray | null;
+
+  if (/sop_filter_1_legal|legal eligibility/i.test(key)) {
+    if ((m = detail.match(/restricted to (.+?); allowed profile: (.+)$/i))) {
+      return {
+        title,
+        grantSays: `Only ${humanList(m[1])}`,
+        profileSays: humanList(m[2]),
+        profileFixable: true,
+        fix: "If your organization also qualifies as one of the types the grant asks for, add it to your applicant types.",
+      };
+    }
+    if ((m = detail.match(/eligible types \((.+?)\) do not include allowed profile \((.+?)\)/i))) {
+      return {
+        title,
+        grantSays: humanList(m[1]),
+        profileSays: humanList(m[2]),
+        profileFixable: true,
+        fix: "If your organization also qualifies as one of the types the grant accepts, add it to your applicant types.",
+      };
+    }
+    return {
+      title,
+      grantSays: null,
+      profileSays: null,
+      profileFixable: true,
+      fix: "The call does not state clearly who can apply; check the official page.",
+    };
+  }
+  if (
+    /sectors_required|required sectors/i.test(key) &&
+    (m = detail.match(/Grant sectors \[(.*?)\] do not overlap with \[(.*?)\]/i))
+  ) {
+    return {
+      title,
+      grantSays: humanList(m[1]),
+      profileSays: humanList(m[2]),
+      profileFixable: true,
+      fix: "If your work also covers one of the grant's sectors, add it to your program sectors.",
+    };
+  }
+  if (
+    /jurisdiction_required|required jurisdiction/i.test(key) &&
+    (m = detail.match(/^(.+?) is incompatible with \{(.+)\}/i))
+  ) {
+    return {
+      title,
+      grantSays: `Open to ${m[1]}`,
+      profileSays: humanList(m[2]),
+      profileFixable: true,
+      fix: "If your organization is registered or operates there, add that jurisdiction to your profile.",
+    };
+  }
+  if (
+    /jurisdiction_excluded|excluded jurisdiction/i.test(key) &&
+    (m = detail.match(/^(.+?) is excluded/i))
+  ) {
+    return {
+      title,
+      grantSays: m[1],
+      profileSays: `${m[1]} is in your excluded list`,
+      profileFixable: true,
+      fix: "Remove it from your excluded jurisdictions if you now want these opportunities.",
+    };
+  }
+  if (/amount_min|amount >=/i.test(key)) {
+    const want = check.label.match(/\$[\d,]+/)?.[0];
+    const got = detail.match(/\$[\d,]+/)?.[0];
+    return {
+      title,
+      grantSays: got ? `Up to ${got}` : "Amount not published",
+      profileSays: want ? `At least ${want}` : null,
+      profileFixable: true,
+      fix: "Lower your minimum useful award in the profile if smaller grants are worth it.",
+    };
+  }
+  if (/amount_max|amount <=/i.test(key)) {
+    const cap = check.label.match(/\$[\d,]+/)?.[0];
+    const got = detail.match(/\$[\d,]+/)?.[0];
+    return {
+      title,
+      grantSays: got ? `From ${got}` : "Amount not published",
+      profileSays: cap ? `At most ${cap}` : null,
+      profileFixable: true,
+      fix: "Raise your maximum in the profile if you can manage a larger award.",
+    };
+  }
+  if (/costshare|cost share/i.test(key)) {
+    const cap = check.label.match(/(\d+)%/)?.[1];
+    const got = detail.match(/(\d+)%/)?.[1];
+    return {
+      title,
+      grantSays: got ? `You contribute about ${got}%` : null,
+      profileSays: cap ? `Up to ${cap}%` : null,
+      profileFixable: true,
+      fix: "Raise the maximum cost share in your profile if leadership can cover it.",
+    };
+  }
+  if (/runway|days until deadline/i.test(key)) {
+    const want = check.label.match(/(\d+)\s*(?:w|days)/)?.[0];
+    return {
+      title,
+      grantSays: detail || null,
+      profileSays: want ? `You need at least ${want.replace("w", " weeks")}` : null,
+      profileFixable: true,
+      fix: "Shorten your required preparation time in the rules if your team can move faster.",
+    };
+  }
+  if (/strategic|capabilit/i.test(key)) {
+    return {
+      title,
+      grantSays: "None of your capabilities appear in the call",
+      profileSays: null,
+      profileFixable: true,
+      fix: "Add the capabilities this project would use to your profile, or skip it if it is outside your expertise.",
+    };
+  }
+  if (/keywords_required|required keywords/i.test(key) && (m = detail.match(/one of: (.+)$/i))) {
+    return {
+      title,
+      grantSays: "Does not mention them",
+      profileSays: `Requires: ${m[1]}`,
+      profileFixable: true,
+      fix: "Relax your required keywords if they are too narrow.",
+    };
+  }
+  if (/keywords_excluded|excluded keywords/i.test(key) && (m = detail.match(/one of: (.+)$/i))) {
+    return {
+      title,
+      grantSays: "Mentions an excluded topic",
+      profileSays: `Excludes: ${m[1]}`,
+      profileFixable: true,
+      fix: "Remove the keyword from your exclusions if it should not rule grants out.",
+    };
+  }
+  if (/university/i.test(key)) {
+    return {
+      title,
+      grantSays: "A university research partner",
+      profileSays: "No confirmed partner",
+      profileFixable: false,
+      fix: "Find a university partner and get a letter of commitment before applying.",
+    };
+  }
+  return {
+    title,
+    grantSays: detail || null,
+    profileSays: null,
+    profileFixable: false,
+    fix: "Review the official call before deciding.",
+  };
+}
