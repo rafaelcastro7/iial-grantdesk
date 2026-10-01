@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowRight, CalendarClock, ExternalLink, Loader2, MapPin, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarClock,
+  ExternalLink,
+  Loader2,
+  MapPin,
+  Wallet,
+} from "lucide-react";
 import type { GrantRowData } from "@/components/grants/GrantRow";
 import {
   GrantFeedbackControls,
@@ -48,7 +56,9 @@ export function RadarCard({
   simple?: boolean;
 }) {
   const g = item.grant;
-  const criticalRequirements = (g.requirements ?? []).filter((requirement) => requirement.isCritical);
+  const criticalRequirements = (g.requirements ?? []).filter(
+    (requirement) => requirement.isCritical,
+  );
   const busy =
     actions.evaluatingIds.has(g.id) ||
     actions.pending === g.id ||
@@ -93,7 +103,9 @@ export function RadarCard({
               </span>
             )}
             {g.isNewSinceLastReview && (
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">New</span>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                New
+              </span>
             )}
           </div>
           <Link
@@ -116,7 +128,7 @@ export function RadarCard({
               )}
               title={item.reason}
             >
-              <p className="line-clamp-2">
+              <p className="line-clamp-3 whitespace-pre-line">
                 <span className="font-semibold text-foreground">
                   {item.verdict === "not_eligible"
                     ? "Motivo de descarte: "
@@ -132,7 +144,8 @@ export function RadarCard({
             <div className="mt-2 border-l-2 border-warning pl-3">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-warning">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                {criticalRequirements.length} critical requirement{criticalRequirements.length === 1 ? "" : "s"}
+                {criticalRequirements.length} critical requirement
+                {criticalRequirements.length === 1 ? "" : "s"}
               </p>
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                 {criticalRequirements.map((requirement) => requirement.requirement).join(" · ")}
@@ -154,7 +167,9 @@ export function RadarCard({
                 <span className="text-muted-foreground">Needs source verification</span>
               )}
               {g.reviewState.next_action && (
-                <span className="line-clamp-1 text-muted-foreground">Next: {g.reviewState.next_action}</span>
+                <span className="line-clamp-1 text-muted-foreground">
+                  Next: {g.reviewState.next_action}
+                </span>
               )}
             </div>
           )}

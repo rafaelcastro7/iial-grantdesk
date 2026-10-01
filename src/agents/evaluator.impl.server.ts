@@ -3,6 +3,7 @@
 // without going through the TanStack server-fn resolver.
 
 import { createHash } from "node:crypto";
+import { explainFailures } from "@/lib/eligibility-explain";
 import { EvaluatorOutput, PROMPTS, normalizeEvaluatorRaw } from "@/agents/schemas";
 import { canTransition, type GrantStatus } from "@/agents/pipeline-stages.shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -202,7 +203,7 @@ export async function evaluateGrantImpl(opts: {
     parsed = {
       fit_score: Math.max(0, Math.min(1, rulesResult.rule_score / 100)),
       eligibility_pass: false,
-      rationale_en: `Evaluated using deterministic screening rules (score: ${rulesResult.rule_score}/100, hard_fail: true). Disqualifying criteria: ${reasonText}.`,
+      rationale_en: explainFailures(failedChecks),
       rationale_fr: null,
     };
   } else {
@@ -255,7 +256,9 @@ export async function evaluateGrantImpl(opts: {
       parsed = {
         fit_score: ruleUnit,
         eligibility_pass: !rulesResult.hard_fail,
-        rationale_en: `Evaluated using IIAL deterministic screening rules (score: ${rulesResult.rule_score}/100, hard_fail: ${rulesResult.hard_fail}). Criteria checks: ${rulesResult.checks.map((c) => `${c.label}: ${c.status.toUpperCase()}`).join("; ")}.`,
+        rationale_en: rulesResult.checks.some((c) => c.status === "fail")
+          ? explainFailures(rulesResult.checks.filter((c) => c.status === "fail"))
+          : "No disqualifying issues found in your eligibility rules; the AI review was unavailable, so this score comes from the rules alone.",
         rationale_fr: null,
       };
     }

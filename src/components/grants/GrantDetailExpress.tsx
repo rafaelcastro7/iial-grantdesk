@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import { explainEnrichmentResult } from "@/lib/enrichment-message";
+import { humanizeRationale } from "@/lib/eligibility-explain";
 
 const DAY_MS = 86_400_000;
 
@@ -520,19 +521,27 @@ export function GrantDetailExpress({
         </div>
       )}
       {criticalReqs.length > 0 && (
-        <section className="border-l-4 border-warning bg-card px-5 py-4 shadow-sm" aria-label="Critical requirements">
+        <section
+          className="border-l-4 border-warning bg-card px-5 py-4 shadow-sm"
+          aria-label="Critical requirements"
+        >
           <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <div className="min-w-0">
               <p className="font-semibold text-foreground">Resolve before proposal work</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                The initial grant evaluation found {criticalReqs.length} blocking requirement{criticalReqs.length === 1 ? "" : "s"}.
+                The initial grant evaluation found {criticalReqs.length} blocking requirement
+                {criticalReqs.length === 1 ? "" : "s"}.
               </p>
               <ul className="mt-3 space-y-2">
                 {criticalReqs.map((requirement, index) => (
                   <li key={`${requirement.requirement}-${index}`} className="text-sm">
                     <span className="font-medium text-foreground">{requirement.requirement}</span>
-                    {requirement.value && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{requirement.value}</span>}
+                    {requirement.value && (
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                        {requirement.value}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -744,7 +753,9 @@ export function GrantDetailExpress({
               </div>
               <div className="space-y-4">
                 {evaluation?.rationale_en && (
-                  <p className="text-sm leading-7 text-foreground">{evaluation.rationale_en}</p>
+                  <p className="whitespace-pre-line text-sm leading-7 text-foreground">
+                    {humanizeRationale(evaluation.rationale_en)}
+                  </p>
                 )}
                 {rows.length > 0 ? (
                   <div>

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AxisScore } from "@/agents/fit-rules.shared";
+import { humanizeRationale } from "@/lib/eligibility-explain";
 
 type Stage = "discovered" | "enriched" | "evaluated" | "verdict";
 
@@ -292,7 +293,7 @@ export function FitEvaluation(props: Props) {
                 {L.rationale}
               </p>
               <p className="mt-0.5 text-sm leading-relaxed text-foreground/90">
-                {e.rationale_en || e.rationale_fr || ""}
+                {humanizeRationale(e.rationale_en) || e.rationale_fr || ""}
               </p>
             </div>
           </div>

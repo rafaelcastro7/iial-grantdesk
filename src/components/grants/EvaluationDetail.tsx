@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import { Button } from "@/components/ui/button";
+import { humanizeRationale } from "@/lib/eligibility-explain";
 
 const STATUS_ICON = {
   pass: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
@@ -250,11 +251,13 @@ export function EvaluationDetail({ grantId }: { grantId: string }) {
         {evaluation?.rationale_en && (
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase mb-2 flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5" /> AI rationale
-              <span className="text-[10px] normal-case font-normal">({evaluation.model})</span>
+              <FileText className="h-3.5 w-3.5" /> Why
+              {!/deterministic/.test(evaluation.model ?? "") && (
+                <span className="text-[10px] normal-case font-normal">({evaluation.model})</span>
+              )}
             </p>
             <div className="text-sm whitespace-pre-wrap rounded-md border bg-card p-3 leading-relaxed">
-              {evaluation.rationale_en}
+              {humanizeRationale(evaluation.rationale_en)}
             </div>
           </div>
         )}

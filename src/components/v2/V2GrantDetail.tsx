@@ -46,6 +46,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import { cn } from "@/lib/utils";
+import { humanizeRationale } from "@/lib/eligibility-explain";
 
 // Persistent (not per-tab) preference, same rationale as UI_VERSION_STORAGE_KEY
 // in ui-version.ts: which mode a person wants is a standing choice about how
@@ -552,7 +553,7 @@ export function V2GrantDetail({
                     ? {
                         fit_score: evaluation.fit_score,
                         eligibility_pass: evaluation.eligibility_pass,
-                        rationale_en: evaluation.rationale_en,
+                        rationale_en: humanizeRationale(evaluation.rationale_en) ?? "",
                         rationale_fr: evaluation.rationale_fr ?? "",
                         created_at: evaluation.created_at,
                         axis_breakdown:

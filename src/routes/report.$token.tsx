@@ -8,6 +8,7 @@ import { getSharedReport, type SharedReport } from "@/lib/share-report.functions
 import type { AxisScore } from "@/agents/fit-rules.shared";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { humanizeRationale } from "@/lib/eligibility-explain";
 
 export const Route = createFileRoute("/report/$token")({
   head: () => ({ meta: [{ title: "Grant Fit Report — IIAL" }] }),
@@ -118,7 +119,7 @@ function ReportBody({ report }: { report: SharedReport }) {
               <CardTitle className="text-base">Assessment rationale</CardTitle>
             </CardHeader>
             <CardContent className="text-sm leading-relaxed whitespace-pre-wrap">
-              {evaluation.rationale_en}
+              {humanizeRationale(evaluation.rationale_en)}
             </CardContent>
           </Card>
         )}

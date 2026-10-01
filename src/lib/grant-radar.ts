@@ -11,6 +11,7 @@
 // out of the list (counted, and one toggle away).
 
 import { decideEligibility } from "@/lib/eligibility";
+import { humanizeRationale } from "@/lib/eligibility-explain";
 
 export type RadarVerdict = "eligible" | "needs_input" | "not_eligible";
 export type RadarTiming = "closed" | "too_soon" | "urgent" | "comfortable" | "open_ended";
@@ -244,7 +245,10 @@ export function toRadarItem<T extends RadarGrant>(
 
   if (g.evaluation) {
     verdict = g.evaluation.eligibility_pass ? "eligible" : "not_eligible";
-    reason = (g.evaluation as { rationale_en?: string }).rationale_en ?? ruled?.reason ?? null;
+    reason =
+      humanizeRationale((g.evaluation as { rationale_en?: string }).rationale_en) ??
+      ruled?.reason ??
+      null;
     isRuled = true;
   } else if (g.hardBlocked) {
     verdict = "not_eligible";
