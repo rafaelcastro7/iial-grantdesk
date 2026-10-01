@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getOrgProfile } from "@/lib/org.functions";
 import { autoEvaluatePending, listGrants } from "@/lib/grants.functions";
 import { getVerdictSummary } from "@/lib/fit-insights.functions";
-import { evaluationVerdict } from "@/lib/grant-radar";
+import { evaluationVerdict, realFit } from "@/lib/grant-radar";
 import { getFunderDashboardStats } from "@/lib/funder-dashboard.functions";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -166,7 +166,8 @@ function Dashboard() {
       (a, b) =>
         VERDICT_RANK[evaluationVerdict(b.evaluation!)] -
           VERDICT_RANK[evaluationVerdict(a.evaluation!)] ||
-        b.evaluation!.fit_score - a.evaluation!.fit_score,
+        // Real (AI-reviewed) fit; rules-only pre-checks have no score yet.
+        (realFit(b.evaluation) ?? -1) - (realFit(a.evaluation) ?? -1),
     )
     .slice(0, 5);
 
@@ -238,7 +239,13 @@ type MatchGrant = {
   title: string;
   deadline: string | null;
   funder: { name: string } | { name: string }[] | null;
-  evaluation: { fit_score: number; eligibility_pass: boolean; rule_verdict?: string | null } | null;
+  evaluation: {
+    fit_score: number;
+    eligibility_pass: boolean;
+    rule_verdict?: string | null;
+    model?: string | null;
+    is_exhaustive?: boolean | null;
+  } | null;
 };
 
 const VERDICT_RANK = { eligible: 2, needs_input: 1, not_eligible: 0 } as const;
@@ -519,7 +526,7 @@ function V2Metric({
 
 function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
   const f = Array.isArray(grant.funder) ? grant.funder[0] : grant.funder;
-  const fit = grant.evaluation ? Math.round(grant.evaluation.fit_score * 100) : null;
+  const fit = realFit(grant.evaluation);
   const eligible = grant.evaluation?.eligibility_pass ?? false;
   const days = grant.deadline
     ? Math.ceil((new Date(grant.deadline).getTime() - now) / DAY_MS)
@@ -573,10 +580,10 @@ function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
       <div className="flex items-center gap-2 md:justify-end">
         <div className="text-right">
           <div className="text-2xl font-bold leading-none tabular-nums tracking-tight text-primary">
-            {fit == null ? "-" : fit}
+            {fit == null ? "—" : fit}
           </div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            fit score
+            {fit == null && grant.evaluation ? "AI review pending" : "fit score"}
           </div>
         </div>
       </div>

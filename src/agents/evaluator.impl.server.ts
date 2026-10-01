@@ -58,7 +58,7 @@ export async function evaluateGrantImpl(opts: {
     userSupabase
       .from("grants")
       .select(
-        "id, title, summary, url, amount_cad_min, amount_cad_max, deadline, eligibility, requirements, sectors, country, status, scored_at, funder:funders(name, jurisdiction)",
+        "id, title, summary, url, amount_cad_min, amount_cad_max, deadline, deadline_kind, eligibility, eligibility_note, applicant_types, requirements, sectors, country, status, scored_at, funder:funders(name, jurisdiction)",
       )
       .eq("id", grantId)
       .maybeSingle(),

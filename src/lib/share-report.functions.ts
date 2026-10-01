@@ -95,7 +95,7 @@ export const getSharedReport = createServerFn({ method: "GET" })
       supabaseAdmin
         .from("grant_evaluations")
         .select(
-          "fit_score, eligibility_pass, rationale_en, axis_breakdown, created_at, rule_verdict:rule_snapshot->>verdict",
+          "fit_score, eligibility_pass, rationale_en, axis_breakdown, created_at, model, rule_snapshot, rule_verdict:rule_snapshot->>verdict",
         )
         .eq("grant_id", s.grant_id)
         .eq("user_id", s.user_id)

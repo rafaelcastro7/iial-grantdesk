@@ -174,6 +174,26 @@ export function isFullReview(ev: {
   return ev.model != null && ev.model !== "rules-engine-deterministic";
 }
 
+/**
+ * The fit score to show, 0..100, or null while only the rules pre-check has
+ * run. Every screen (radar, dashboard, detail, report) reads it through this.
+ */
+export function realFit(
+  ev:
+    | {
+        fit_score?: number | null;
+        model?: string | null;
+        is_exhaustive?: boolean | null;
+        rule_snapshot?: unknown;
+      }
+    | null
+    | undefined,
+): number | null {
+  if (!ev || !isFullReview(ev) || ev.fit_score == null) return null;
+  const f = Number(ev.fit_score);
+  return Math.round(f <= 1 ? f * 100 : f);
+}
+
 export function verdictOf(g: RadarGrant): RadarVerdict {
   if (g.evaluation) return evaluationVerdict(g.evaluation);
   if (g.hardBlocked) return "not_eligible";
@@ -314,9 +334,7 @@ export function toRadarItem<T extends RadarGrant>(
   const amount = grantAmount(g);
   // Per-user only: grants.fit_score is a global column (another member's
   // last score), so an unevaluated grant shows no fit rather than theirs.
-  const fitRaw =
-    g.evaluation && isFullReview(g.evaluation) ? (g.evaluation.fit_score ?? null) : null;
-  const fit = fitRaw != null ? (fitRaw <= 1 ? Math.round(fitRaw * 100) : Math.round(fitRaw)) : null;
+  const fit = realFit(g.evaluation);
   const parked = timing === "closed" || timing === "too_soon" || verdict === "not_eligible";
   return {
     grant: g,
@@ -482,11 +500,27 @@ export function countryName(code: string): string {
   }
 }
 
-export function formatMoney(value: number | null): string {
+/**
+ * Currency the grant's amounts are in. Amounts are stored in the funder's
+ * currency (US federal calls are in USD even in the amount_cad_* columns),
+ * so a US grant must never be labelled CAD.
+ */
+export function grantCurrency(g: {
+  currency?: string | null;
+  country?: string | null;
+}): "CAD" | "USD" {
+  const c = (g.currency ?? "").toUpperCase();
+  if (c === "USD" || c === "CAD") return c;
+  return (g.country ?? "").toUpperCase() === "US" ? "USD" : "CAD";
+}
+
+export function formatMoney(value: number | null, currency: "CAD" | "USD" = "CAD"): string {
   if (value == null) return "Amount not published";
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
-  if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
-  return `$${value}`;
+  const sign = currency === "USD" ? "US$" : "$";
+  if (value >= 1_000_000)
+    return `${sign}${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+  if (value >= 1_000) return `${sign}${Math.round(value / 1_000)}K`;
+  return `${sign}${value}`;
 }
 
 export function timingLabel(item: Pick<RadarItem<RadarGrant>, "timing" | "daysLeft">): string {

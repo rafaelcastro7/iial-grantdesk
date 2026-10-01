@@ -55,6 +55,7 @@ import {
   FUNDING_KIND_LABEL,
   evaluationVerdict,
   fundingKindOf,
+  grantCurrency,
   isFullReview,
 } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
@@ -107,6 +108,8 @@ type Grant = {
   summary: string | null;
   amount_cad_min: number | null;
   amount_cad_max: number | null;
+  currency?: string | null;
+  country?: string | null;
   deadline: string | null;
   sectors: string[] | null;
   eligibility: Record<string, unknown> | null;
@@ -233,10 +236,12 @@ export function V2GrantDetail({
       })
     : null;
   const deadline = getDeadlineState(grant.deadline);
+  const currency = grantCurrency(grant);
   const amount = amountLabel(
     grant.amount_cad_min,
     grant.amount_cad_max,
     grant.status !== "discovered",
+    currency,
   );
   const quality = getQualityState({ grant, evaluation, requirements, eligibilityRows });
   const verdict = getVerdict({
@@ -637,7 +642,9 @@ export function V2GrantDetail({
                 ? "Open continuously"
                 : grant.deadline_kind === "estimated"
                   ? `${deadline.detail} (estimated)`
-                  : deadline.detail}
+                  : grant.deadline && grant.deadline_kind !== "confirmed"
+                    ? `${deadline.detail} · not verified on the source`
+                    : deadline.detail}
             </p>
           </div>
 
@@ -1281,20 +1288,17 @@ function getVerdict({
   };
 }
 
-function amountLabel(min: number | null, max: number | null, everEnriched: boolean): string {
-  if (min != null && max != null)
-    return min === max ? formatCad(max) : `${formatCad(min)} – ${formatCad(max)}`;
-  if (max != null) return `Up to ${formatCad(max)}`;
-  if (min != null) return `From ${formatCad(min)}`;
+function amountLabel(
+  min: number | null,
+  max: number | null,
+  everEnriched: boolean,
+  currency: "CAD" | "USD",
+): string {
+  const f = (v: number) => formatMoney(v, currency);
+  if (min != null && max != null) return min === max ? f(max) : `${f(min)} – ${f(max)}`;
+  if (max != null) return `Up to ${f(max)}`;
+  if (min != null) return `From ${f(min)}`;
   return everEnriched ? "Not published" : "Not extracted";
-}
-
-function formatCad(value: number) {
-  return new Intl.NumberFormat("en-CA", {
-    currency: "CAD",
-    maximumFractionDigits: 0,
-    style: "currency",
-  }).format(value);
 }
 
 function formatDate(value: string) {

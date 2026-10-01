@@ -2,6 +2,7 @@
 // The unguessable token in the URL is the credential; data is fetched server-side
 // after validating token + expiry + revocation.
 import { createFileRoute } from "@tanstack/react-router";
+import { realFit } from "@/lib/grant-radar";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, ShieldCheck, Loader2 } from "lucide-react";
 import { getSharedReport, type SharedReport } from "@/lib/share-report.functions";
@@ -70,7 +71,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function ReportBody({ report }: { report: SharedReport }) {
   const { grant, evaluation, evidence } = report;
-  const fitPct = evaluation ? Math.round(evaluation.fit_score * 100) : null;
+  const fitPct = realFit(evaluation);
   const axes = evaluation?.axis_breakdown ?? null;
   const fmt = (n: number | null) => (n == null ? "—" : `$${n.toLocaleString("en-CA")}`);
 

@@ -19,6 +19,7 @@ import {
   VERDICT_LABELS,
   countryName,
   formatMoney,
+  grantCurrency,
   timingLabel,
   type RadarItem,
 } from "@/lib/grant-radar";
@@ -184,7 +185,10 @@ export function RadarCard({
             </span>
             <span className="inline-flex items-center gap-1 text-muted-foreground">
               <Wallet className="h-3.5 w-3.5" />
-              {formatMoney(item.amount)}
+              {formatMoney(
+                item.amount,
+                grantCurrency(g as { currency?: string | null; country?: string | null }),
+              )}
             </span>
             <span className="inline-flex items-center gap-1 text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />

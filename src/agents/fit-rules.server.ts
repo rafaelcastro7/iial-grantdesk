@@ -27,7 +27,17 @@ export type GrantForRules = {
   country?: string | null;
   summary?: string | null;
   title?: string | null;
-  requirements?: Array<{ category?: string; requirement?: string; value?: string; isCritical?: boolean }> | null;
+  requirements?: Array<{
+    category?: string;
+    requirement?: string;
+    value?: string;
+    isCritical?: boolean;
+  }> | null;
+  /** Applicant types the enricher extracted from the source (facet). */
+  applicant_types?: string[] | null;
+  /** "confirmed" | "estimated" | "rolling" ... from the enricher. */
+  deadline_kind?: string | null;
+  eligibility_note?: string | null;
 };
 
 export type RuleCheck = {
@@ -51,7 +61,8 @@ export type RulesResult = {
   // Only meaningful when detected_role === "partner" — which KIND of partner
   // the eligibility text implies, so the brief can say "you'll need a
   // municipal co-applicant" instead of just "partner".
-  detected_partner_type: "municipality" | "first_nation" | "university" | "co_applicant" | "other" | null;
+  detected_partner_type:
+    "municipality" | "first_nation" | "university" | "co_applicant" | "other" | null;
   cost_share_pct: number | null;
   rolling_intake: boolean;
 };
@@ -181,6 +192,7 @@ function buildHaystack(g: GrantForRules): string {
           ? JSON.stringify(g.eligibility)
           : "",
       g.summary ?? "",
+      g.eligibility_note ?? "",
       g.title ?? "",
       g.requirements ? JSON.stringify(g.requirements) : "",
     ].join(" "),
@@ -197,7 +209,11 @@ function buildHaystack(g: GrantForRules): string {
 }
 
 function detectRole(hay: string): "lead" | "partner" | "unknown" {
-  if (/\bpartner\s+with\s+(?:an?\s+)?(?:universit(?:y|ies)|university researcher|academic|college)\b/.test(hay)) {
+  if (
+    /\bpartner\s+with\s+(?:an?\s+)?(?:universit(?:y|ies)|university researcher|academic|college)\b/.test(
+      hay,
+    )
+  ) {
     return "partner";
   }
   const partner =
@@ -222,7 +238,11 @@ export function detectPartnerType(
     return "first_nation";
   if (/\b(municipal(ity|ities)?|city of|town of|municipalit[ée]s?)\b/.test(hay))
     return "municipality";
-  if (/\b(universit(?:y|ies)|post[- ]secondary|academic institution|college|university researcher)\b/.test(hay))
+  if (
+    /\b(universit(?:y|ies)|post[- ]secondary|academic institution|college|university researcher)\b/.test(
+      hay,
+    )
+  )
     return "university";
   if (/\b(co-?applicant|joint application|consortium)\b/.test(hay)) return "co_applicant";
   return "other";
@@ -352,7 +372,11 @@ function applicantCategories(text: string): ApplicantCategory[] {
   if (/\b(municipalit(?:y|ies)|local government|cities|towns)\b/.test(text)) {
     categories.add("municipality");
   }
-  if (/\b(universit(?:y|ies)|colleges?|post[- ]secondary)\b/.test(text)) {
+  if (
+    /\b(universit(?:y|ies)|colleges?|post[- ]secondary|academic|research institutions?)\b/.test(
+      text,
+    )
+  ) {
     categories.add("university");
   }
   if (/\b(individuals?|private citizens?)\b/.test(text)) categories.add("individual");
@@ -388,7 +412,10 @@ function detectExplicitEligibleApplicantTypes(g: GrantForRules): ApplicantCatego
     text.match(
       /(?:eligible applicants?(?: are| include)?|open to|who can apply|applicants? must be)[^.\n]{0,240}/g,
     ) ?? [];
-  return [...new Set([...structured, ...clauses.flatMap(applicantCategories)])];
+  // Applicant types the enricher already extracted are explicit statements
+  // too; ignoring them left F1 at "skip" and the verdict at "needs input".
+  const extracted = (g.applicant_types ?? []).flatMap((t) => applicantCategories(norm(t)));
+  return [...new Set([...structured, ...extracted, ...clauses.flatMap(applicantCategories)])];
 }
 
 export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date()): RulesResult {
@@ -398,7 +425,7 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
   const hay = buildHaystack(g);
   const structuredEligibility =
     g.eligibility && typeof g.eligibility === "object" && !Array.isArray(g.eligibility)
-      ? g.eligibility as Record<string, unknown>
+      ? (g.eligibility as Record<string, unknown>)
       : null;
   const requiresResearchUniversity =
     structuredEligibility?.research_university === true &&
@@ -410,12 +437,19 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
       ? detectPartnerType(hay)
       : null;
   const cost_share_pct = detectCostShare(hay);
-  const rolling_intake = isRollingIntake(hay, g.deadline);
+  const rolling_intake = g.deadline_kind === "rolling" || isRollingIntake(hay, g.deadline);
 
   const universityPartnerRequirement = (g.requirements ?? []).find((requirement) => {
     if (!requirement.isCritical) return false;
     const text = norm(`${requirement.requirement ?? ""} ${requirement.value ?? ""}`);
-    return /\b(universit(?:y|ies)|post secondary|post-secondary|academic|college|researcher)\b/.test(text) && /\b(partner|co applicant|co-applicant|collaborat|commitment|eligible institution)\b/.test(text);
+    return (
+      /\b(universit(?:y|ies)|post secondary|post-secondary|academic|college|researcher)\b/.test(
+        text,
+      ) &&
+      /\b(partner|co applicant|co-applicant|collaborat|commitment|eligible institution)\b/.test(
+        text,
+      )
+    );
   });
   if (universityPartnerRequirement || requiresResearchUniversity) {
     checks.push({
