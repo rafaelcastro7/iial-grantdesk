@@ -722,7 +722,28 @@ export async function enrichGrantImpl(
     },
   );
 
-  const stillMissing = missingFields();
+  // Only ask the model for a field the sources could contain: with no money
+  // figure anywhere it cannot find an amount, with no date it cannot find a
+  // deadline. Asking anyway spent tokens on guaranteed "not found" answers.
+  const sourceText = pages.map((page) => page.markdown).join("\n");
+  const FIELD_CUES: Record<string, RegExp> = {
+    amount_cad_min: /\$\s?\d|\d[\d,.\s]*(?:\$|CAD|USD|dollars?|million)/i,
+    amount_cad_max: /\$\s?\d|\d[\d,.\s]*(?:\$|CAD|USD|dollars?|million)/i,
+    deadline:
+      /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\s+(?:janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)|rolling|ongoing|continuous/i,
+  };
+  const missingBeforeCues = missingFields();
+  const stillMissing = missingBeforeCues.filter((field) => {
+    const cue = FIELD_CUES[field];
+    return !cue || cue.test(sourceText);
+  });
+  if (stillMissing.length < missingBeforeCues.length) {
+    await trace(
+      "llm_scope",
+      `Not asking the model for ${missingBeforeCues.filter((f) => !stillMissing.includes(f)).join(", ")}: no cue in the sources`,
+      "info",
+    );
+  }
 
   // Security: sanitize markdown + enforce size limit
   const { sanitizeMarkdown, validateTotalMarkdownSize } =

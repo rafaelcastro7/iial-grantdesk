@@ -69,6 +69,11 @@ export function restMinutesFor(message: string): number {
   return 0;
 }
 
+// Per-process cooldown for free-tier providers after a rate limit.
+const providerCooldown = new Map<string, number>();
+const QUOTA_EXHAUSTED =
+  /exceeded your current quota|tokens per day|requests per day|\bTPD\b|\bRPD\b|daily limit/i;
+
 export class LlmUnavailableError extends Error {
   constructor(public readonly attempts: string[]) {
     super(`the model could not be reached: ${attempts.join("; ")}`);
@@ -290,6 +295,13 @@ export async function callLlm(
   for (const provider of EXTERNAL_PROVIDERS) {
     const apiKey = env[provider.envKey];
     if (!apiKey) continue;
+    const coolingUntil = providerCooldown.get(provider.name) ?? 0;
+    if (Date.now() < coolingUntil) {
+      attempts.push(
+        `${provider.name}: skipped (rate-limited until ${new Date(coolingUntil).toISOString()})`,
+      );
+      continue;
+    }
     for (let tryIdx = 0; tryIdx < 2; tryIdx++) {
       const started = Date.now();
       try {
@@ -308,6 +320,15 @@ export async function callLlm(
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         attempts.push(`${provider.name}: ${message}`);
+        // A spent daily quota will not recover on retry: stop calling this
+        // provider for an hour instead of failing (and waiting) on every grant.
+        if (QUOTA_EXHAUSTED.test(message)) {
+          providerCooldown.set(provider.name, Date.now() + 60 * 60_000);
+          break;
+        }
+        if (tryIdx === 1 && /\b429\b|rate limit/i.test(message)) {
+          providerCooldown.set(provider.name, Date.now() + 60_000);
+        }
         if (tryIdx === 0 && (message.includes("429") || message.includes("rate limit"))) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           continue;
