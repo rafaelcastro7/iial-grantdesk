@@ -1816,7 +1816,10 @@ export const addGrantByUrl = createServerFn({ method: "POST" })
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Same page already in the catalog (any spelling of the URL): reuse it.
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    const canonicalKey = `user-added:${host}${url.pathname}${url.search}`;
+
+    // Same page already in the catalog (any spelling of the URL or canonical key): reuse it.
     const { data: existing, error: existingError } = await supabaseAdmin
       .from("grants")
       .select("id, title")
@@ -1827,40 +1830,92 @@ export const addGrantByUrl = createServerFn({ method: "POST" })
       return { grantId: existing[0].id, isNew: false, title: existing[0].title };
     }
 
+    const { data: existingByKey, error: keyErr } = await supabaseAdmin
+      .from("grants")
+      .select("id, title")
+      .eq("canonical_key", canonicalKey)
+      .limit(1);
+    if (keyErr) throw new Error(keyErr.message);
+    if (existingByKey?.[0]) {
+      return { grantId: existingByKey[0].id, isNew: false, title: existingByKey[0].title };
+    }
+
     // Read the page head for a real title and the funder's name (0 tokens).
     const meta = await readPageMeta(url.toString());
-    const host = url.hostname.replace(/^www\./, "");
+    const funderCountry = countryFromHost(host);
+    const funderName = (meta.siteName?.trim() || host).slice(0, 200);
 
-    // Funder: one already registered on this host, else a new one.
-    const { data: funders } = await supabaseAdmin
+    // Funder: 1) match by host on source_url or website
+    const { data: hostMatches } = await supabaseAdmin
       .from("funders")
-      .select("id, source_url")
-      .ilike("source_url", `%://${host}%`)
-      .limit(5);
-    const sameHost = (funders ?? []).find((f) => {
-      try {
-        return new URL(f.source_url ?? "").hostname.replace(/^www\./, "") === host;
-      } catch {
-        return false;
+      .select("id, source_url, website, name, country")
+      .or(`source_url.ilike.%${host}%,website.ilike.%${host}%`)
+      .limit(20);
+
+    const matchedByHost = (hostMatches ?? []).find((f) => {
+      for (const candidate of [f.source_url, f.website]) {
+        if (!candidate) continue;
+        try {
+          const h = new URL(candidate).hostname.replace(/^www\./, "").toLowerCase();
+          if (h === host || h.endsWith(`.${host}`) || host.endsWith(`.${h}`)) return true;
+        } catch {
+          // ignore malformed URLs
+        }
       }
+      return false;
     });
-    let funderId = sameHost?.id ?? null;
+
+    let funderId = matchedByHost?.id ?? null;
+
+    // Funder: 2) match by unique constraint (name, country)
+    if (!funderId && funderName) {
+      const { data: nameMatches } = await supabaseAdmin
+        .from("funders")
+        .select("id, name, country")
+        .ilike("name", funderName)
+        .eq("country", funderCountry)
+        .limit(1);
+      if (nameMatches?.[0]?.id) {
+        funderId = nameMatches[0].id;
+      }
+    }
+
+    // Funder: 3) insert a new one if not found, with conflict recovery
     if (!funderId) {
       const { data: created, error: funderError } = await supabaseAdmin
         .from("funders")
         .insert({
-          name: meta.siteName ?? host,
-          country: countryFromHost(host),
+          name: funderName,
+          country: funderCountry,
+          website: url.origin,
           source_url: url.origin,
         } as never)
         .select("id")
         .single();
-      if (funderError || !created) {
-        throw new Error(
-          `Could not register the funder: ${funderError?.message ?? "unknown error"}`,
-        );
+
+      if (funderError) {
+        if (
+          funderError.message?.includes("funders_name_country_key") ||
+          funderError.code === "23505"
+        ) {
+          const { data: recovered } = await supabaseAdmin
+            .from("funders")
+            .select("id")
+            .ilike("name", funderName)
+            .eq("country", funderCountry)
+            .limit(1);
+          if (recovered?.[0]?.id) {
+            funderId = recovered[0].id;
+          }
+        }
+        if (!funderId) {
+          throw new Error(
+            `Could not register the funder: ${funderError.message ?? "unknown error"}`,
+          );
+        }
+      } else if (created) {
+        funderId = (created as { id: string }).id;
       }
-      funderId = (created as { id: string }).id;
     }
 
     const { createHash } = await import("node:crypto");
@@ -1872,15 +1927,29 @@ export const addGrantByUrl = createServerFn({ method: "POST" })
         title: meta.title ?? provisionalTitle(url),
         summary: meta.description,
         url: href,
-        country: countryFromHost(host),
-        currency: countryFromHost(host) === "US" ? "USD" : "CAD",
+        country: funderCountry,
+        currency: funderCountry === "US" ? "USD" : "CAD",
         status: "discovered",
         source_hash: createHash("sha256").update(href).digest("hex"),
-        canonical_key: `user-added:${host}${url.pathname}${url.search}`,
+        canonical_key: canonicalKey,
       } as never)
       .select("id, title")
       .single();
+
     if (insertErr || !inserted) {
+      if (
+        insertErr?.message?.includes("grants_canonical_key_uidx") ||
+        insertErr?.code === "23505"
+      ) {
+        const { data: existingConflict } = await supabaseAdmin
+          .from("grants")
+          .select("id, title")
+          .eq("canonical_key", canonicalKey)
+          .limit(1);
+        if (existingConflict?.[0]) {
+          return { grantId: existingConflict[0].id, isNew: false, title: existingConflict[0].title };
+        }
+      }
       throw new Error(`Could not add the grant: ${insertErr?.message ?? "unknown error"}`);
     }
     const grant = inserted as { id: string; title: string };

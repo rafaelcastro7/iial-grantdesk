@@ -194,19 +194,56 @@ function ProposalDetailPage() {
     await navigate({ to: "/" });
   }
 
-  async function onDraft(sectionId: string) {
+  async function onDraft(sectionId: string, opts: { humanEdited?: boolean } = {}) {
+    // Redrafting replaces the text; a section someone edited by hand needs a yes.
+    if (
+      opts.humanEdited &&
+      !window.confirm("This section was edited by hand. Replace it with a new AI draft?")
+    ) {
+      return;
+    }
     setPending(sectionId);
     setErr(null);
     try {
       await draft({ data: { sectionId, topK: 6 } });
       await qc.invalidateQueries({ queryKey: ["proposal", id] });
-      toast.success("Section drafted successfully");
+      toast.success("Section drafted");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = writerErrorMessage(e);
       setErr(msg);
       toast.error(msg);
     } finally {
       setPending(null);
+    }
+  }
+
+  // Drafts every empty section one after another, so a proposal is never left
+  // half-written by having to click nine buttons.
+  async function onDraftAllEmpty() {
+    const empty = (data.sections ?? []).filter((s) => !(s.content_en ?? "").trim());
+    if (empty.length === 0) {
+      toast.success("Every section already has a draft.");
+      return;
+    }
+    setErr(null);
+    let done = 0;
+    const failed: string[] = [];
+    for (const s of empty) {
+      setPending(s.id);
+      try {
+        await draft({ data: { sectionId: s.id, topK: 6 } });
+        done++;
+      } catch (e) {
+        failed.push(`${s.heading_en}: ${writerErrorMessage(e)}`);
+      }
+      await qc.invalidateQueries({ queryKey: ["proposal", id] });
+    }
+    setPending(null);
+    if (failed.length) {
+      setErr(`Drafted ${done} of ${empty.length} sections. Not drafted:\n${failed.join("\n")}`);
+      toast.error(`${failed.length} section(s) could not be drafted`);
+    } else {
+      toast.success(`Drafted ${done} section(s)`);
     }
   }
   async function onSaveEdit(sectionId: string) {
@@ -586,6 +623,15 @@ function ProposalDetailPage() {
             </Card>
 
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">
+                  {data.sections.filter((s) => (s.content_en ?? "").trim()).length} of{" "}
+                  {data.sections.length} sections drafted
+                </p>
+                <Button size="sm" disabled={pending != null} onClick={onDraftAllEmpty}>
+                  Draft all empty sections
+                </Button>
+              </div>
               {data.sections.map((s) => {
                 const heading = fr && s.heading_fr ? s.heading_fr : s.heading_en;
                 const content = fr && s.content_fr ? s.content_fr : s.content_en;
@@ -638,7 +684,7 @@ function ProposalDetailPage() {
                             size="sm"
                             variant="secondary"
                             disabled={pending === s.id}
-                            onClick={() => onDraft(s.id)}
+                            onClick={() => onDraft(s.id, { humanEdited: !!s.human_edited })}
                           >
                             {pending === s.id ? t("app.loading") : t("proposals.draftSection")}
                           </Button>
@@ -646,6 +692,13 @@ function ProposalDetailPage() {
                       </div>
                       {notes.angle && (
                         <p className="text-xs text-muted-foreground mt-1 italic">{notes.angle}</p>
+                      )}
+                      {(notes.must_cover ?? []).length > 0 && (
+                        <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
+                          {(notes.must_cover ?? []).map((point) => (
+                            <li key={point}>{point}</li>
+                          ))}
+                        </ul>
                       )}
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -1012,4 +1065,23 @@ function ReadinessMetric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-lg font-semibold">{value}</p>
     </div>
   );
+}
+
+/** Writer failures in words a consultant can act on. */
+function writerErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (raw.includes("no_knowledge_chunks")) {
+    return "There is no organization knowledge to cite yet. Add documents or complete the profile, then retry.";
+  }
+  if (raw.includes("writer_low_quality")) {
+    return "The AI draft was too short or had placeholders, so it was not saved. Retry the section.";
+  }
+  if (raw.includes("writer_citation_invalid")) {
+    return "The AI cited sources it was not given, so the draft was not saved. Retry the section.";
+  }
+  if (raw.includes("writer_parse_failed") || raw.includes("writer_llm_failed")) {
+    return "The AI could not write this section right now. Retry in a moment.";
+  }
+  if (raw.includes("agent_disabled")) return "The writer agent is disabled in Admin > Agents.";
+  return raw;
 }

@@ -73,6 +73,42 @@ export function validateCitations(
   return { ok: true };
 }
 
+// Output budget and length by section kind: budgets, evaluation plans and
+// work plans need room for numbers; a summary does not.
+const SECTION_TOKENS: Record<string, number> = {
+  summary: 700,
+  problem: 1100,
+  solution: 1300,
+  impact: 1100,
+  evaluation: 1300,
+  budget: 1300,
+  timeline: 1100,
+  team: 900,
+  sustainability: 1000,
+};
+const SECTION_WORDS: Record<string, string> = {
+  summary: "150-250",
+  team: "200-350",
+  budget: "250-500",
+  evaluation: "300-500",
+  solution: "300-550",
+};
+
+/** Why a drafted section is not usable, or null when it is. */
+export function sectionQualityProblem(text: string, heading?: string | null): string | null {
+  const body = (text ?? "").trim();
+  if (/\[(insert|add|placeholder|tbd|your |organization name)|\blorem ipsum\b|\bTBD\b|\bXXX+\b/i.test(body)) {
+    return "placeholder_text";
+  }
+  const words = body.split(/\s+/).filter(Boolean).length;
+  if (words < 90) return "too_short";
+  if (heading && body.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() ===
+      heading.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()) {
+    return "heading_only";
+  }
+  return null;
+}
+
 export const draftSection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
@@ -95,7 +131,7 @@ export const draftSection = createServerFn({ method: "POST" })
     const { data: section, error: se } = await context.supabase
       .from("proposal_sections")
       .select(
-        "id, kind, heading_en, heading_fr, critic_notes, proposal_id, proposal:proposals(id, title, language, grant:grants(id, title, summary, deadline, amount_cad_min, amount_cad_max, eligibility, sectors))",
+        "id, kind, heading_en, heading_fr, critic_notes, proposal_id, proposal:proposals(id, title, language, grant:grants(id, title, summary, deadline, amount_cad_min, amount_cad_max, currency, eligibility, eligibility_note, requirements, sectors, applicant_types, funding_uses, funder:funders(name, jurisdiction)))",
       )
       .eq("id", data.sectionId)
       .maybeSingle();
@@ -110,7 +146,29 @@ export const draftSection = createServerFn({ method: "POST" })
       : null;
     if (!grant) throw new Error("grant_not_found");
 
-    const notes = (section.critic_notes ?? {}) as { angle?: string; must_cover?: string[] };
+    const notes = (section.critic_notes ?? {}) as {
+      angle?: string;
+      must_cover?: string[];
+      findings?: unknown;
+    };
+    // The organization itself: the writer used to see it only through the
+    // top RAG chunks, so an off-topic retrieval left it nothing true to say.
+    const { getOrgProfileForUser } = await import("@/lib/org-profile-query");
+    const { data: orgRow } = await getOrgProfileForUser(context.supabase, context.userId);
+    const org = (orgRow ?? {}) as Record<string, unknown>;
+    const organization = {
+      name: org.legal_name ?? org.org_name ?? null,
+      mission: org.mission ?? null,
+      applicant_types: org.applicant_types ?? null,
+      jurisdictions: org.jurisdictions ?? null,
+      sectors: org.sectors ?? null,
+      activities: org.activities ?? null,
+      capabilities: org.capabilities ?? null,
+      populations_served: org.populations_served ?? null,
+      focus_areas: org.focus_areas ?? null,
+      years_operating: org.years_operating ?? null,
+      employee_count: org.employee_count ?? null,
+    };
     const query = [
       section.heading_en,
       notes.angle ?? "",
@@ -141,7 +199,9 @@ export const draftSection = createServerFn({ method: "POST" })
         // while 800-token generations could exceed Ollama's practical
         // non-streamed request window. 450 keeps enough room for a useful
         // section plus citations while bounding local latency.
-        maxOutputTokens: 450,
+        // Room for a real section (metrics, costs, timelines) plus citations;
+        // 450 tokens forced 120-word sections that could not be specific.
+        maxOutputTokens: SECTION_TOKENS[section.kind ?? ""] ?? 1100,
         responseFormat: "json",
         // Schema guard: coerceWriterOutput repairs common shape issues, but a
         // provider's output that's still unusable after coercion (or not
@@ -151,8 +211,10 @@ export const draftSection = createServerFn({ method: "POST" })
         // guard's verdict matches what the real parse will do.
         validate: (text) => {
           try {
-            WriterOutput.parse(coerceWriterOutput(JSON.parse(extractJsonObject(text)), allowed));
-            return true;
+            const out = WriterOutput.parse(
+              coerceWriterOutput(JSON.parse(extractJsonObject(text)), allowed),
+            );
+            return sectionQualityProblem(out.content_en, section.heading_en) === null;
           } catch {
             return false;
           }
@@ -167,21 +229,29 @@ export const draftSection = createServerFn({ method: "POST" })
             content: JSON.stringify({
               grant: {
                 title: grant.title,
+                funder: (grant as { funder?: unknown }).funder ?? null,
                 summary: grant.summary,
                 deadline: grant.deadline,
-                amount_cad_min: grant.amount_cad_min,
-                amount_cad_max: grant.amount_cad_max,
+                amount_min: grant.amount_cad_min,
+                amount_max: grant.amount_cad_max,
+                currency: (grant as { currency?: string | null }).currency ?? "CAD",
                 eligibility: grant.eligibility,
+                eligibility_note: (grant as { eligibility_note?: string | null }).eligibility_note,
+                // What the funder asks for: the section must answer these.
+                requirements: (grant as { requirements?: unknown }).requirements ?? [],
                 sectors: grant.sectors,
+                funding_uses: (grant as { funding_uses?: string[] | null }).funding_uses,
               },
+              organization,
               section: {
                 kind: section.kind,
                 heading_en: section.heading_en,
                 heading_fr: section.heading_fr,
                 angle: notes.angle,
                 must_cover: notes.must_cover,
-                output_contract:
-                  "Write content_en as the full section body in 120-220 words. Do not return the heading as content_en.",
+                // A redraft fixes what the critic found instead of repeating it.
+                reviewer_findings_to_fix: notes.findings ?? null,
+                output_contract: `Write content_en as the full section body in ${SECTION_WORDS[section.kind ?? ""] ?? "250-450"} words. Address every must_cover point and every funder requirement relevant to this section. Use concrete facts about the organization and the project; never write placeholders such as [Insert ...], TBD or lorem ipsum. Do not return the heading as content_en.`,
               },
               chunks: numbered.map((c) => ({
                 marker: c.marker,
@@ -237,6 +307,24 @@ export const draftSection = createServerFn({ method: "POST" })
         `writer_parse_failed: ${parseErr instanceof Error ? parseErr.message : "unknown"}`,
       );
     }
+    const quality = sectionQualityProblem(parsed.content_en, section.heading_en);
+    if (quality) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("agent_runs").insert({
+        run_id: runId,
+        agent: "writer",
+        status: "failed",
+        model,
+        input_tokens: llm.inputTokens ?? 0,
+        output_tokens: llm.outputTokens ?? 0,
+        latency_ms: Date.now() - t0,
+        user_id: context.userId,
+        grant_id: grant.id,
+        error: `quality: ${quality}`,
+        metadata: { section_id: section.id },
+      });
+      throw new Error(`writer_low_quality: ${quality}`);
+    }
     const check = validateCitations(parsed.content_en, parsed.citations, allowed);
     if (!check.ok) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -267,6 +355,8 @@ export const draftSection = createServerFn({ method: "POST" })
         content_en: parsed.content_en,
         content_fr: parsed.content_fr,
         citations: citationsForStorage,
+        // This text is the AI's again; the "Human-edited" badge must go.
+        human_edited: false,
       })
       .eq("id", section.id);
     if (ue) throw new Error(ue.message);

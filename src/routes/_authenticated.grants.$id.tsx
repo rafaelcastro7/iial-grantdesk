@@ -326,6 +326,9 @@ function toUserFacingActionError(error: unknown): string {
   if (raw.includes("grant_not_enriched_yet")) {
     return "Fetch details first. The evaluator needs the enriched grant facts before it can validate fit rules.";
   }
+  if (raw.includes("plan_unusable") || raw.includes("strategist_")) {
+    return "The AI could not produce a usable plan for this grant, so no proposal was created and nothing generic was saved. Try Draft proposal again.";
+  }
   if (raw.includes("not_eligible")) {
     return "Drafting is only available for grants your fit check found eligible.";
   }

@@ -61,6 +61,34 @@ const FALLBACK_ANGLE_BY_KIND: Record<string, string> = {
 // like `introduction: {...}`. Local 8B models drift from the exact schema, so we
 // never trust their shape; we only harvest their content. Guarantees the schema
 // passes (title >= 3 chars, >= 3 valid sections).
+/**
+ * Share of template sections for which the model gave a real angle (>= 10
+ * chars) or must_cover list, matched by kind or heading. 0 when nothing usable.
+ */
+export function planCoverage(raw: unknown, templateSections: TemplateSection[]): number {
+  if (templateSections.length === 0) return 0;
+  const obj = asRecord(raw);
+  const keys = new Set<string>();
+  const consider = (key: string, val: unknown) => {
+    const v = asRecord(val);
+    const angle = typeof v.angle === "string" ? v.angle.trim() : "";
+    const cover = Array.isArray(v.must_cover) ? v.must_cover.length : 0;
+    if (key && (angle.length >= 10 || cover > 0)) keys.add(key.toLowerCase());
+  };
+  if (Array.isArray(obj.sections)) {
+    for (const s of obj.sections) {
+      const sr = asRecord(s);
+      consider(typeof sr.kind === "string" ? sr.kind : "", s);
+      consider(typeof sr.heading_en === "string" ? sr.heading_en : "", s);
+    }
+  }
+  for (const [k, v] of Object.entries(obj)) consider(k, v);
+  const hit = templateSections.filter(
+    (t) => keys.has(t.kind.toLowerCase()) || keys.has(t.heading_en.toLowerCase()),
+  ).length;
+  return hit / templateSections.length;
+}
+
 function coerceStrategistPlan(
   raw: unknown,
   grantTitle: string,
@@ -149,7 +177,7 @@ export const runStrategist = createServerFn({ method: "POST" })
         context.supabase
           .from("grants")
           .select(
-            "id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max, deadline, eligibility, sectors, language, funder:funders(name, jurisdiction)",
+            "id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max, currency, deadline, eligibility, eligibility_note, requirements, applicant_types, funding_uses, sectors, language, funder:funders(name, jurisdiction)",
           )
           .eq("id", data.grantId)
           .maybeSingle(),
@@ -221,8 +249,24 @@ export const runStrategist = createServerFn({ method: "POST" })
         agent: "strategist",
         runId,
         temperature: 0.2,
-        maxOutputTokens: 900,
+        // A plan for ~9 sections with angles and must_cover lists; 900 tokens
+        // cut the JSON off and the plan silently fell back to generic text.
+        maxOutputTokens: 2500,
         responseFormat: "json",
+        // Accept only a plan that is really about this grant: a fallback
+        // made of template headings is what produced useless drafts.
+        validate: (text) => {
+          try {
+            return (
+              planCoverage(
+                JSON.parse(extractJsonObject(text)),
+                (tpl.sections ?? []) as TemplateSection[],
+              ) >= 0.5
+            );
+          } catch {
+            return false;
+          }
+        },
         messages: [
           {
             role: "system",
@@ -266,6 +310,14 @@ export const runStrategist = createServerFn({ method: "POST" })
         raw = JSON.parse(extractJsonObject(llm.text));
       } catch (jsonErr) {
         recoveredParseError = jsonErr instanceof Error ? jsonErr.message : "invalid_json";
+      }
+      const coverage = planCoverage(raw, (tpl.sections ?? []) as TemplateSection[]);
+      if (recoveredParseError || coverage < 0.5) {
+        // Never save a plan that is mostly fallback text: fail visibly so the
+        // user can retry, instead of drafting a generic proposal.
+        throw new Error(
+          `plan_unusable: ${recoveredParseError ?? `only ${Math.round(coverage * 100)}% of sections planned`}`,
+        );
       }
       parsed = coerceStrategistPlan(raw, g.title, (tpl.sections ?? []) as TemplateSection[]);
     } catch (parseErr) {
