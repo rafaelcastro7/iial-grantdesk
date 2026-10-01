@@ -3,7 +3,7 @@
 // without going through the TanStack server-fn resolver.
 
 import { createHash } from "node:crypto";
-import { explainFailures } from "@/lib/eligibility-explain";
+import { narrateEvaluation } from "@/lib/eligibility-explain";
 import { EvaluatorOutput, PROMPTS, normalizeEvaluatorRaw } from "@/agents/schemas";
 import { canTransition, type GrantStatus } from "@/agents/pipeline-stages.shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -73,6 +73,14 @@ export async function evaluateGrantImpl(opts: {
     throw new Error("org_profile_missing");
   }
   const effectiveOrg = org as Record<string, unknown>;
+  const narrate = (mode: "rules" | "fallback") =>
+    narrateEvaluation({
+      orgName:
+        (effectiveOrg.org_name as string | null) ?? (effectiveOrg.legal_name as string | null),
+      grantTitle: g.title,
+      checks: rulesResult.checks as never,
+      mode,
+    });
   await trace(
     "load",
     `Loaded grant "${g.title?.slice(0, 60)}" and org "${(effectiveOrg as { org_name?: string }).org_name ?? "(unnamed)"}"`,
@@ -224,7 +232,7 @@ export async function evaluateGrantImpl(opts: {
     parsed = {
       fit_score: Math.max(0, Math.min(1, rulesResult.rule_score / 100)),
       eligibility_pass: false,
-      rationale_en: explainFailures(failedChecks),
+      rationale_en: narrate("rules"),
       rationale_fr: null,
     };
   } else if (opts.rulesOnly) {
@@ -234,10 +242,7 @@ export async function evaluateGrantImpl(opts: {
     parsed = {
       fit_score: Math.max(0, Math.min(1, rulesResult.rule_score / 100)),
       eligibility_pass: !rulesResult.hard_fail,
-      rationale_en:
-        failed.length > 0
-          ? explainFailures(failed)
-          : "Checked automatically against your eligibility rules with no issues found. Use “Check fit” for a full review of the call.",
+      rationale_en: narrate("rules"),
       rationale_fr: null,
     };
   } else {
@@ -290,9 +295,7 @@ export async function evaluateGrantImpl(opts: {
       parsed = {
         fit_score: ruleUnit,
         eligibility_pass: !rulesResult.hard_fail,
-        rationale_en: rulesResult.checks.some((c) => c.status === "fail")
-          ? explainFailures(rulesResult.checks.filter((c) => c.status === "fail"))
-          : "No disqualifying issues found in your eligibility rules; the AI review was unavailable, so this score comes from the rules alone.",
+        rationale_en: narrate("fallback"),
         rationale_fr: null,
       };
     }

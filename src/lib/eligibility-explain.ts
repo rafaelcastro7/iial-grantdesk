@@ -370,3 +370,73 @@ export function explainFitScore(fit: number, threshold: number): string {
   }
   return `Not recommended yet: the overall match is ${fit}/100, below the ${threshold} needed. It does not break any hard eligibility rule, but too little of your profile (sectors, capabilities, priorities) lines up with what this call funds.`;
 }
+
+type NarrateInput = {
+  orgName?: string | null;
+  grantTitle?: string | null;
+  checks: FullCheck[];
+  /** Why there is no AI review: a quick pre-check, or the model was unavailable. */
+  mode?: "rules" | "fallback";
+};
+
+const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+const trimDot = (text: string) => text.replace(/\.\s*$/, "");
+
+/** One sentence that contrasts what the grant asks with what the organization is. */
+function contrastSentence(check: FullCheck, org: string): string {
+  const key = `${check.id ?? ""} ${check.label}`;
+  const d = describeCheck(check);
+  const grant = d.grantSays;
+  const mine = d.profileSays;
+  if (grant && mine) {
+    if (/legal eligibility|sop_filter_1_legal/i.test(key))
+      return `The program accepts ${lower(grant)}, while ${org} is registered as ${mine}.`;
+    if (/sectors_required|required sectors/i.test(key))
+      return `It funds work in ${grant}, which does not overlap with ${org}'s sectors (${mine}).`;
+    if (/jurisdiction_required|required jurisdiction/i.test(key))
+      return `It is ${lower(grant)}, and ${org} is based in ${mine}.`;
+    if (/amount_min|amount >=/i.test(key))
+      return `It offers ${lower(grant)}, below the ${lower(mine)} that ${org} considers worth pursuing.`;
+    if (/amount_max|amount <=/i.test(key))
+      return `Awards start ${lower(grant)}, more than the ${lower(mine)} ${org} can manage.`;
+    if (/costshare|cost share/i.test(key))
+      return `It expects the applicant to cover ${lower(grant).replace(/^you contribute /, "")} of the costs, more than the ${mine} ${org} can contribute.`;
+  }
+  return d.title.replace(/\byour organization(?:'s)?\b/gi, (m) =>
+    m.endsWith("'s") ? `${org}'s` : org,
+  );
+}
+
+/**
+ * Plain, explanatory rationale for verdicts produced without the AI review:
+ * the verdict and main reason, then the contrast between what the grant asks
+ * and what the organization is, then what to do. Matches the tone of the
+ * model-written rationales so every verdict reads the same way.
+ */
+export function narrateEvaluation({ orgName, grantTitle, checks, mode = "rules" }: NarrateInput): string {
+  const org = orgName?.trim() || "Your organization";
+  const program = grantTitle?.trim() ? `“${grantTitle.trim()}”` : "this program";
+  const failed = checks.filter((c) => c.status === "fail");
+  if (failed.length === 0) {
+    const tail =
+      mode === "fallback"
+        ? "The AI review was unavailable, so this verdict comes from the profile rules alone; confirm the details on the official page before writing."
+        : "This was a quick automatic check against the profile; use “Check fit” for a full review of the call before committing time to it.";
+    return `${org} meets every eligibility rule in its profile for ${program}: nothing in the call rules it out on applicant type, location, sectors, amount or timing. ${tail}`;
+  }
+  const hard = failed.filter((c) => c.hard !== false);
+  const lead = hard.length ? hard : failed;
+  const first = lead[0];
+  const opening = `${org} is not a fit for ${program}. ${contrastSentence(first, org)}`;
+  const others = failed
+    .filter((c) => c !== first)
+    .map((c) => contrastSentence(c, org))
+    .filter((s, i, all) => all.indexOf(s) === i)
+    .slice(0, 2);
+  const more = others.length ? ` In addition, ${lower(others.join(" "))}` : "";
+  const fix = describeCheck(first);
+  const next = fix.profileFixable
+    ? ` If that is not accurate, ${lower(trimDot(fix.fix))} and the grant will be re-checked.`
+    : ` ${fix.fix}`;
+  return `${opening}${more}${next}`;
+}
