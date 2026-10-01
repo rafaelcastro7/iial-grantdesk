@@ -19,8 +19,15 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Sign in to IIAL grant intelligence platform." },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>): { redirect?: string } => ({
+    redirect: typeof s.redirect === "string" ? s.redirect : undefined,
+  }),
   component: AuthPage,
 });
+
+function safeNext(raw?: string): string {
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
+}
 
 const authSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -32,6 +39,9 @@ type AuthFormValues = z.infer<typeof authSchema>;
 function AuthPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const next = safeNext(Route.useSearch().redirect);
+  const go = () =>
+    next.startsWith("/.lovable/") ? (window.location.href = next) : navigate({ to: next as never });
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,13 +70,13 @@ function AuthPage() {
           ? supabase.auth.signInWithPassword(values)
           : supabase.auth.signUp({
               ...values,
-              options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+              options: { emailRedirectTo: `${window.location.origin}${next}` },
             });
       const { error } = await fn;
       if (error) throw error;
       const session = await waitForSession();
       if (!session) throw new Error("Unable to establish a session after sign in.");
-      await navigate({ to: "/dashboard" });
+      await go();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -93,7 +103,7 @@ function AuthPage() {
       if (error) throw error;
       const session = await waitForSession();
       if (!session) throw new Error("Unable to establish a session after demo sign in.");
-      await navigate({ to: "/dashboard" });
+      await go();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

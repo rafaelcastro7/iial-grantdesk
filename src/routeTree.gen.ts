@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ComplianceRouteImport } from './routes/compliance'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
 import { Route as AuthenticatedAnswersRouteImport } from './routes/_authenticated.answers'
 import { Route as AuthenticatedAutonomyRouteImport } from './routes/_authenticated.autonomy'
@@ -31,6 +33,7 @@ import { Route as AuthenticatedRenewalRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedSubmissionsRouteImport } from './routes/_authenticated.submissions'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated.tasks'
 import { Route as ReportTokenRouteImport } from './routes/report.$token'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated.admin.index'
 import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated.admin.agents'
 import { Route as AuthenticatedAdminAuditTrailRouteImport } from './routes/_authenticated.admin.audit-trail'
@@ -86,6 +89,17 @@ const ComplianceRoute = ComplianceRouteImport.update({
   path: '/compliance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -176,6 +190,11 @@ const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
 const ReportTokenRoute = ReportTokenRouteImport.update({
   id: '/report/$token',
   path: '/report/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
@@ -385,6 +404,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
+  '/mcp': typeof McpRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/answers': typeof AuthenticatedAnswersRoute
   '/autonomy': typeof AuthenticatedAutonomyRoute
@@ -403,6 +424,7 @@ export interface FileRoutesByFullPath {
   '/submissions': typeof AuthenticatedSubmissionsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/report/$token': typeof ReportTokenRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
   '/admin/candidates': typeof AuthenticatedAdminCandidatesRoute
@@ -443,6 +465,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
+  '/mcp': typeof McpRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/answers': typeof AuthenticatedAnswersRoute
   '/autonomy': typeof AuthenticatedAutonomyRoute
   '/compliance-calendar': typeof AuthenticatedComplianceCalendarRoute
@@ -460,6 +484,7 @@ export interface FileRoutesByTo {
   '/submissions': typeof AuthenticatedSubmissionsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/report/$token': typeof ReportTokenRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
   '/admin/candidates': typeof AuthenticatedAdminCandidatesRoute
@@ -502,6 +527,8 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
+  '/mcp': typeof McpRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/answers': typeof AuthenticatedAnswersRoute
   '/_authenticated/autonomy': typeof AuthenticatedAutonomyRoute
@@ -520,6 +547,7 @@ export interface FileRoutesById {
   '/_authenticated/submissions': typeof AuthenticatedSubmissionsRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/report/$token': typeof ReportTokenRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/_authenticated/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
   '/_authenticated/admin/candidates': typeof AuthenticatedAdminCandidatesRoute
@@ -562,6 +590,8 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/compliance'
+    | '/mcp'
+    | '/.well-known/oauth-protected-resource'
     | '/admin'
     | '/answers'
     | '/autonomy'
@@ -580,6 +610,7 @@ export interface FileRouteTypes {
     | '/submissions'
     | '/tasks'
     | '/report/$token'
+    | '/.lovable/oauth/consent'
     | '/admin/agents'
     | '/admin/audit-trail'
     | '/admin/candidates'
@@ -620,6 +651,8 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/compliance'
+    | '/mcp'
+    | '/.well-known/oauth-protected-resource'
     | '/answers'
     | '/autonomy'
     | '/compliance-calendar'
@@ -637,6 +670,7 @@ export interface FileRouteTypes {
     | '/submissions'
     | '/tasks'
     | '/report/$token'
+    | '/.lovable/oauth/consent'
     | '/admin/agents'
     | '/admin/audit-trail'
     | '/admin/candidates'
@@ -678,6 +712,8 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/compliance'
+    | '/mcp'
+    | '/.well-known/oauth-protected-resource'
     | '/_authenticated/admin'
     | '/_authenticated/answers'
     | '/_authenticated/autonomy'
@@ -696,6 +732,7 @@ export interface FileRouteTypes {
     | '/_authenticated/submissions'
     | '/_authenticated/tasks'
     | '/report/$token'
+    | '/.lovable/oauth/consent'
     | '/_authenticated/admin/agents'
     | '/_authenticated/admin/audit-trail'
     | '/_authenticated/admin/candidates'
@@ -738,7 +775,10 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
   ComplianceRoute: typeof ComplianceRoute
+  McpRoute: typeof McpRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ReportTokenRoute: typeof ReportTokenRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
   ApiPublicHooksDeadlinesRoute: typeof ApiPublicHooksDeadlinesRoute
   ApiPublicHooksDiscoverRoute: typeof ApiPublicHooksDiscoverRoute
@@ -778,6 +818,20 @@ declare module '@tanstack/react-router' {
       path: '/compliance'
       fullPath: '/compliance'
       preLoaderRoute: typeof ComplianceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -904,6 +958,13 @@ declare module '@tanstack/react-router' {
       path: '/report/$token'
       fullPath: '/report/$token'
       preLoaderRoute: typeof ReportTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/': {
@@ -1290,7 +1351,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
   ComplianceRoute: ComplianceRoute,
+  McpRoute: McpRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ReportTokenRoute: ReportTokenRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
   ApiPublicHooksDeadlinesRoute: ApiPublicHooksDeadlinesRoute,
   ApiPublicHooksDiscoverRoute: ApiPublicHooksDiscoverRoute,
