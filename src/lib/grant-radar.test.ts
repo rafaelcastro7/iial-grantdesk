@@ -200,7 +200,7 @@ describe("confirmed eligibility", () => {
       { ...opts, rules },
     ).items;
     expect(item.verdict).toBe("needs_input");
-    expect(item.reason).toContain("Check fit");
+    expect(item.reason).toContain("preliminary check");
   });
   it("puts evaluated-eligible grants before preliminary ones", () => {
     const r = buildRadar(

@@ -260,7 +260,7 @@ export function toRadarItem<T extends RadarGrant>(
     // contradicted by the grant detail. Only an evaluation confirms eligibility.
     if (ruled.verdict === "eligible") {
       verdict = "needs_input";
-      reason = "Passes the preliminary check — run “Check fit” to confirm you can apply.";
+      reason = "Passes the preliminary check — the eligibility check runs automatically.";
     } else {
       verdict = ruled.verdict;
       reason = ruled.reason;

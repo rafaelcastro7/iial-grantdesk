@@ -1024,7 +1024,15 @@ export const enrichGrant = createServerFn({ method: "POST" })
 export const autoEvaluatePending = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    z.object({ limit: z.number().int().min(1).max(100).default(50) }).parse(i ?? {}),
+    z
+      .object({
+        limit: z.number().int().min(1).max(100).default(50),
+        // Default: free pre-check of the whole list (rules only, 0 tokens),
+        // running in the background so the page does not wait.
+        rulesOnly: z.boolean().default(true),
+        background: z.boolean().default(true),
+      })
+      .parse(i ?? {}),
   )
   .handler(async ({ data, context }) => {
     // Without an org profile every evaluation throws org_profile_missing.
@@ -1068,20 +1076,29 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
     const { evaluateGrantImpl } = await import("@/agents/evaluator.impl.server");
     let evaluated = 0;
     let skipped = 0;
-    for (const grantId of todo) {
-      try {
-        await evaluateGrantImpl({
-          grantId,
-          userId: context.userId,
-          userSupabase: context.supabase,
-        });
-        evaluated++;
-      } catch (err) {
-        console.warn(`[autoEvaluatePending] Error evaluating grant ${grantId}:`, err);
-        skipped++;
+    const work = async () => {
+      for (const grantId of todo) {
+        try {
+          await evaluateGrantImpl({
+            grantId,
+            userId: context.userId,
+            userSupabase: context.supabase,
+            rulesOnly: data.rulesOnly,
+          });
+          evaluated++;
+        } catch (err) {
+          console.warn(`[autoEvaluatePending] Error evaluating grant ${grantId}:`, err);
+          skipped++;
+        }
       }
+    };
+    if (data.background) {
+      const { runInBackground } = await import("@/lib/background.server");
+      runInBackground(work);
+      return { ok: true, evaluated: 0, skipped: 0, queued: todo.length };
     }
-    return { ok: true, evaluated, skipped };
+    await work();
+    return { ok: true, evaluated, skipped, queued: 0 };
   });
 
 // List recent agent_runs (and recent grant_events) for the live event panel.

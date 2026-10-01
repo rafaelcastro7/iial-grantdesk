@@ -15,6 +15,11 @@ export async function evaluateGrantImpl(opts: {
   userSupabase: SupabaseClient;
   /** Pre-assigned run id, so a caller can return it before the run finishes. */
   runId?: string;
+  /**
+   * Deterministic rules only, no model call (0 tokens). Used to pre-check a
+   * whole list for free; "Check fit" later runs the full review.
+   */
+  rulesOnly?: boolean;
 }) {
   const { grantId, userId, userSupabase } = opts;
   const { assertAgentEnabled } = await import("@/lib/admin-agents.functions");
@@ -166,6 +171,8 @@ export async function evaluateGrantImpl(opts: {
         org: effectiveOrg,
         rules,
         v: PROMPTS.evaluator.version,
+        // A rules-only verdict must not satisfy a later full "Check fit".
+        mode: opts.rulesOnly ? "rules" : "full",
       }),
     )
     .digest("hex");
@@ -206,6 +213,19 @@ export async function evaluateGrantImpl(opts: {
       fit_score: Math.max(0, Math.min(1, rulesResult.rule_score / 100)),
       eligibility_pass: false,
       rationale_en: explainFailures(failedChecks),
+      rationale_fr: null,
+    };
+  } else if (opts.rulesOnly) {
+    await trace("llm_call", "Rules-only pre-check (no model call, 0 tokens)", "ok");
+    usedModel = "rules-engine-deterministic";
+    const failed = rulesResult.checks.filter((c) => c.status === "fail");
+    parsed = {
+      fit_score: Math.max(0, Math.min(1, rulesResult.rule_score / 100)),
+      eligibility_pass: !rulesResult.hard_fail,
+      rationale_en:
+        failed.length > 0
+          ? explainFailures(failed)
+          : "Checked automatically against your eligibility rules with no issues found. Use “Check fit” for a full review of the call.",
       rationale_fr: null,
     };
   } else {

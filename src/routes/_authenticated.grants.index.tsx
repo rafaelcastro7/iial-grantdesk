@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useSuspenseQuery,
   useQuery,
@@ -8,7 +8,12 @@ import {
   useMutation,
 } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listGrants, discoverAllFunders, enrichGrant } from "@/lib/grants.functions";
+import {
+  autoEvaluatePending,
+  discoverAllFunders,
+  enrichGrant,
+  listGrants,
+} from "@/lib/grants.functions";
 import { startEvaluator } from "@/agents/evaluator.functions";
 import { getGrantDetail } from "@/lib/grant-detail.functions";
 import { runStrategist } from "@/agents/strategist.functions";
@@ -249,6 +254,34 @@ function GrantsPage() {
       }),
     [grants, filters, searching, checkProfile, hideIneligible],
   );
+
+  // Free pre-check of the whole list: grants without any evaluation are
+  // checked against the eligibility rules on the server (0 tokens) so the
+  // radar never shows "not checked" items. Runs once per visit; "Check fit"
+  // remains the full AI review.
+  const autoEval = useServerFn(autoEvaluatePending);
+  const autoEvalStarted = useRef(false);
+  const unchecked = grants.filter((g) => !(g as { evaluation?: unknown }).evaluation).length;
+  useEffect(() => {
+    if (autoEvalStarted.current || unchecked === 0) return;
+    autoEvalStarted.current = true;
+    let cancelled = false;
+    void autoEval({ data: { limit: 100 } })
+      .then(async (result) => {
+        const queued = (result as { queued?: number }).queued ?? 0;
+        // Refresh while the server works through the queue.
+        for (let i = 0; i < Math.min(24, Math.ceil(queued / 2) + 2) && !cancelled; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 5_000));
+          await qc.invalidateQueries({ queryKey: ["grants"] });
+        }
+      })
+      .catch(() => {
+        // Pre-check is best-effort; the page works without it.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [unchecked, autoEval, qc]);
   const sectors = useMemo(() => collectSectors(grants), [grants]);
   const countries = useMemo(() => {
     const list = data.availableCountries ?? [];
