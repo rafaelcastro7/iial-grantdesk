@@ -4,6 +4,7 @@ import type { GrantRowData } from "@/components/grants/GrantRow";
 import { DiscoveryProgress } from "@/components/grants/DiscoveryProgress";
 import { EventLog } from "@/components/grants/EventLog";
 import { FunderSelector } from "@/components/grants/FunderSelector";
+import { AddGrantModal } from "@/components/grants/AddGrantModal";
 import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,7 +78,8 @@ export function RadarWorkspace({
               : "Search, deterministic validation and critical requirements in one operational view."}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <AddGrantModal />
           {!simple && <NotebookLMBridge />}
           {isAdmin && (
             <Button variant="outline" size="sm" onClick={() => setShowSources((v) => !v)}>

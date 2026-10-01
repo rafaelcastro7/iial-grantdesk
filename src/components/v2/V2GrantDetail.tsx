@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
@@ -10,11 +11,13 @@ import {
   ClipboardCheck,
   Clock3,
   DollarSign,
+  ExternalLink,
   FileCheck2,
   FileText,
   Gauge,
   Globe2,
   History,
+  Info,
   Landmark,
   Link2,
   ListChecks,
@@ -28,6 +31,7 @@ import {
   ShieldCheck,
   Sparkles,
   Tags,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -51,9 +55,6 @@ import { FUNDING_KIND_LABEL, evaluationVerdict, fundingKindOf } from "@/lib/gran
 import { cn } from "@/lib/utils";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 
-// Persistent (not per-tab) preference, same rationale as UI_VERSION_STORAGE_KEY
-// in ui-version.ts: which mode a person wants is a standing choice about how
-// THEY read grant pages, not transient session state.
 const DETAIL_MODE_STORAGE_KEY = "iial.ui.grantDetailMode";
 type DetailMode = "simple" | "technical";
 
@@ -160,8 +161,6 @@ type Props = {
   onShortlist: () => void;
 };
 
-const DAY_MS = 86_400_000;
-
 const STATUS_LABEL: Record<string, string> = {
   discovered: "Discovered",
   enriched: "Details fetched",
@@ -217,7 +216,7 @@ export function V2GrantDetail({
         checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
       } | null
     )?.checks ?? [];
-  // Same reading as the radar card, so both always show the same verdict.
+
   const evalVerdict = evaluation
     ? evaluationVerdict({
         eligibility_pass: evaluation.eligibility_pass,
@@ -240,36 +239,27 @@ export function V2GrantDetail({
     status: grant.status,
     enrichAttempts: grant.enrich_attempts,
   });
+
   const canFetch = grant.status === "discovered" && !verdict.enrichmentFailed;
-  // Evaluation used to require leaving "discovered", i.e. a successful scrape.
-  // That made every grant whose source page 404s a permanent dead end: 1341
-  // catalog entries arrive from open data (Innovation Canada's Business
-  // Benefits Finder) already carrying a real description, and their recorded
-  // URL is the administering organization's page, which frequently moves. The
-  // evaluator only needs enough text to judge fit, and a summary is enough —
-  // so offer the action whenever we actually have something to evaluate.
   const hasEvaluableContent = (grant.summary ?? "").trim().length > 0;
   const canEvaluate = grant.status !== "discovered" || !!evaluation || hasEvaluableContent;
   const evaluateBlockedReason = canEvaluate
     ? null
     : verdict.enrichmentFailed
-      ? "We couldn't read this grant's page, so there's nothing to assess yet. Open the official page to check it by hand."
-      : "Fetch the details first so there's something to assess.";
+      ? "We couldn't read this grant's page. Open the official page to check it by hand."
+      : "Fetch details first so there is text to assess.";
   const canDraft =
     ["scored", "shortlisted", "in_proposal"].includes(grant.status) ||
     evaluation?.eligibility_pass === true;
-  // Why drafting is unavailable, in the user's terms. The evaluator only
-  // promotes a grant to "scored" when eligibility passes, so an honest
-  // "not eligible" verdict leaves this button disabled forever.
   const draftBlockedReason = canDraft
     ? null
     : evaluation && evaluation.eligibility_pass === false
-      ? "Drafting is off: this grant was assessed as not eligible for your organization. Update your profile or re-evaluate if that looks wrong."
+      ? "Drafting is off: assessed as not eligible for your organization. Update profile if wrong."
       : evaluation
-        ? "Drafting is unavailable until this grant passes the eligibility check."
-        : "Check fit first - drafting unlocks once this grant has been evaluated.";
+        ? "Drafting is unavailable until eligibility passes."
+        : "Check fit first to unlock drafting.";
+
   const actionDisabled = busy != null;
-  const hasBriefingTools = (isAdmin && grant.status === "scored") || !!traceRun;
   const [detailMode, setDetailMode] = useDetailMode();
   const isTechnical = detailMode === "technical";
 
@@ -278,8 +268,7 @@ export function V2GrantDetail({
   const fundingUses = grant.funding_uses ?? [];
   const populations = grant.populations_served ?? [];
   const sectors = grant.sectors ?? [];
-  // Boolean eligibility flags read as a list of who the funder names; other
-  // structured values stay as labelled rows.
+
   const eligibleGroups = eligibilityRows
     .filter(([, value]) => value === true)
     .map(([key]) => ELIGIBILITY_LABEL[key] ?? humanizeKey(key));
@@ -289,6 +278,7 @@ export function V2GrantDetail({
   const otherSources = (grant.confirmed_source_urls ?? [])
     .filter((url) => url !== grant.url && url !== grant.funder?.source_url)
     .slice(0, 6);
+
   const deadlineTone =
     deadline.days == null
       ? "neutral"
@@ -298,30 +288,59 @@ export function V2GrantDetail({
           ? "warning"
           : "neutral";
 
+  // Check if partner or special condition mentioned in rationale / summary
+  const partnerCheck = ruleChecks.find(
+    (c) => c.ruleName.includes("partner") || c.ruleName.includes("university"),
+  );
+  const requiresPartner =
+    partnerCheck != null ||
+    (grant.summary ?? "").toLowerCase().includes("partner") ||
+    (grant.summary ?? "").toLowerCase().includes("university");
+
   return (
-    <section className="mx-auto max-w-[1400px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button asChild variant="outline" size="sm" className="gap-2">
-          <Link to="/grants">
-            <ArrowLeft className="h-4 w-4" />
-            Grant radar
-          </Link>
-        </Button>
+    <div className="w-full max-w-[1700px] space-y-4 px-3 py-4 sm:px-6 lg:py-5">
+      {/* ----------------- TOP NAVBAR & CONTROL BAR ----------------- */}
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3.5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button asChild variant="outline" size="sm" className="gap-1.5 font-medium">
+            <Link to="/grants">
+              <ArrowLeft className="h-4 w-4" />
+              Grant radar
+            </Link>
+          </Button>
+          <div className="h-4 w-px bg-border hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="rounded-md font-medium text-xs">
+              {FUNDING_KIND_LABEL[kind]}
+            </Badge>
+            {kind !== "grant" && (
+              <Badge variant="outline" className="rounded-md border-amber-500/50 text-amber-700 dark:text-amber-300 text-xs">
+                Not a grant
+              </Badge>
+            )}
+            <Badge variant="outline" className="rounded-md bg-muted/50 text-xs">
+              {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
+            </Badge>
+            {duplicateGroupSize > 1 && (
+              <Badge variant="outline" className="rounded-md border-amber-500/50 text-amber-700 text-xs">
+                {duplicateGroupSize} similar
+              </Badge>
+            )}
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
-          <div
-            className="inline-flex rounded-md border p-0.5 text-sm"
-            role="group"
-            aria-label="Detail level"
-          >
+          {/* Detail mode toggle */}
+          <div className="inline-flex rounded-md border bg-muted/40 p-0.5 text-xs">
             {(["simple", "technical"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setDetailMode(mode)}
                 className={cn(
-                  "rounded-[5px] px-3 py-1 font-medium capitalize transition-colors",
+                  "rounded-[4px] px-2.5 py-1 font-medium capitalize transition-all",
                   detailMode === mode
-                    ? "bg-brand text-brand-foreground"
+                    ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -329,134 +348,274 @@ export function V2GrantDetail({
               </button>
             ))}
           </div>
+
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="gap-2"
+            className="gap-1.5 h-8 text-xs"
             disabled={busy === "share"}
             onClick={onShare}
           >
-            <Link2 className="h-4 w-4" />
-            {busy === "share" ? "Creating" : shareUrl ? "Copied" : "Share"}
+            <Link2 className="h-3.5 w-3.5" />
+            {busy === "share" ? "Sharing..." : shareUrl ? "Link Copied" : "Share"}
           </Button>
+
           {grant.url && (
-            <ExternalLinkPreview url={grant.url} className={buttonVariants({ size: "sm" })}>
-              Official page
+            <ExternalLinkPreview url={grant.url} className={buttonVariants({ size: "sm", variant: "outline", className: "h-8 text-xs gap-1.5" })}>
+              <span>Official page</span>
+              <ExternalLink className="h-3 w-3" />
             </ExternalLinkPreview>
           )}
-        </div>
-      </div>
 
+          <DismissGrantControl
+            grantId={grant.id}
+            defaultReason={kind === "loan" ? "loan_not_grant" : "outside_field"}
+          />
+        </div>
+      </header>
+
+      {/* ----------------- ERROR / BUSY NOTICES ----------------- */}
       {err && (
-        <section className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium">
           {err}
-        </section>
+        </div>
       )}
       {busy === "enrich" && (
-        <section className="flex items-center gap-2 rounded-md border border-teal-500/40 bg-teal-500/5 px-4 py-3 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          Fetching live details from the funder page. This can take 20 to 60 seconds.
-        </section>
+        <div className="flex items-center gap-2.5 rounded-md border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-900 dark:text-teal-200">
+          <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+          Fetching live details from official funder page (20-60s)...
+        </div>
       )}
 
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-4">
-          {/* 1. What the opportunity is: identity, money, timing, who, what. */}
-          <div className="rounded-md border bg-card p-5 shadow-sm sm:p-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-md">
-                {FUNDING_KIND_LABEL[kind]}
-              </Badge>
-              {kind !== "grant" && (
-                <Badge
-                  variant="outline"
-                  className="rounded-md border-amber-500/50 text-amber-800 dark:text-amber-300"
-                >
-                  Not a grant
-                </Badge>
-              )}
-              {grant.funder_type && (
-                <Badge variant="outline" className="rounded-md">
-                  {displayTag(grant.funder_type)} funder
-                </Badge>
-              )}
-              {duplicateGroupSize > 1 && (
-                <Badge variant="outline" className="rounded-md text-amber-700">
-                  {duplicateGroupSize} similar records
-                </Badge>
-              )}
-            </div>
-
-            <h1 className="mt-3 max-w-4xl text-2xl font-semibold leading-tight sm:text-3xl">
+      {/* ----------------- HERO EXECUTIVE KPI STRIP ----------------- */}
+      <section className="rounded-xl border bg-card p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          {/* Grant Title & Funder Info */}
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-3xl leading-tight">
               {grant.title}
             </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Landmark className="h-4 w-4" />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                <Landmark className="h-4 w-4 text-primary" />
                 {funderName}
               </span>
               {grant.funder?.jurisdiction && (
                 <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" />
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                   {grant.funder.jurisdiction}
                 </span>
               )}
-              <span className="inline-flex items-center gap-1.5 uppercase">
-                <Globe2 className="h-4 w-4" />
+              {grant.funder_type && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  {displayTag(grant.funder_type)}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 uppercase">
+                <Globe2 className="h-3.5 w-3.5 text-muted-foreground" />
                 {grant.language}
               </span>
             </div>
-
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              <SignalTile
-                icon={DollarSign}
-                label={kind === "grant" ? "Award amount" : "Financing amount"}
-                value={amount}
-                detail={
-                  grant.historical_awards
-                    ? `Past awards: median ${formatMoney(grant.historical_awards.median, grant.historical_awards.currency)}, 90% under ${formatMoney(grant.historical_awards.p90, grant.historical_awards.currency)} (${grant.historical_awards.count} agreements)`
-                    : undefined
-                }
-              />
-              <SignalTile
-                icon={CalendarClock}
-                label="Deadline"
-                value={
-                  grant.deadline_kind === "rolling" && !grant.deadline ? "Rolling" : deadline.label
-                }
-                detail={
-                  grant.deadline_kind === "rolling"
-                    ? "Rolling intake"
-                    : grant.deadline_kind === "estimated"
-                      ? `${deadline.detail} (estimated)`
-                      : deadline.detail
-                }
-                tone={deadlineTone}
-              />
-            </div>
-
-            <dl className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              <FactRow label="Who can apply" values={applicantTypes} />
-              <FactRow label="What it pays for" values={fundingUses} />
-              <FactRow label="Who it is meant to help" values={populations} />
-              <FactRow label="Sectors" values={sectors} />
-            </dl>
-
-            <div className="mt-6 border-t pt-5">
-              <h2 className="text-sm font-semibold">About this opportunity</h2>
-              <p className="mt-2 max-w-3xl whitespace-pre-line text-sm leading-7 text-muted-foreground">
-                {grant.summary?.trim() ||
-                  "No reliable description yet. Fetch details or open the official page."}
-              </p>
-            </div>
           </div>
 
-          {/* 2. What the funder asks for. */}
+          {/* Action CTAs Cluster */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
+            {canFetch && (
+              <Button
+                variant="outline"
+                size="default"
+                className="gap-2 font-medium"
+                disabled={actionDisabled}
+                onClick={onFetchDetails}
+              >
+                {busy === "enrich" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Fetch details
+              </Button>
+            )}
+
+            <Button
+              size="default"
+              variant={canFetch ? "outline" : "default"}
+              className="gap-2 font-semibold shadow-xs"
+              disabled={actionDisabled || !canEvaluate}
+              onClick={onEvaluate}
+              title={evaluateBlockedReason ?? undefined}
+            >
+              {busy === "eval" ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />}
+              {evaluation ? "Re-check fit" : "Check fit"}
+            </Button>
+
+            {existingProposalId ? (
+              <Button asChild size="default" className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Link to="/proposals/$id" params={{ id: existingProposalId }}>
+                  <FileText className="h-4 w-4" />
+                  Open proposal
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                size="default"
+                className="gap-2 font-semibold shadow-xs"
+                variant="default"
+                disabled={actionDisabled || !canDraft}
+                onClick={onDraft}
+                title={draftBlockedReason ?? undefined}
+              >
+                {busy === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Draft proposal
+              </Button>
+            )}
+
+            {grant.status !== "discovered" && (
+              <NotebookLMBridge grantId={grant.id} label="Notebook" />
+            )}
+
+            {isAdmin && grant.status === "scored" && (
+              <Button
+                variant="outline"
+                size="default"
+                disabled={busy === "shortlist"}
+                onClick={onShortlist}
+              >
+                Shortlist
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* 4-Column Executive KPI Cards */}
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* Card 1: Fit & Eligibility Verdict */}
+          <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Fit Score &amp; Verdict
+              </span>
+              <span className={cn("h-2.5 w-2.5 rounded-full", verdict.dot)} />
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span
+                className={cn(
+                  "text-2xl sm:text-3xl font-bold tabular-nums tracking-tight",
+                  evaluation?.eligibility_pass
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : fitScore == null
+                      ? "text-muted-foreground"
+                      : "text-rose-600 dark:text-rose-400",
+                )}
+              >
+                {fitScore == null ? "—" : `${fitScore}/100`}
+              </span>
+              <Badge
+                variant={
+                  evalVerdict === "eligible"
+                    ? "secondary"
+                    : evalVerdict === "needs_input"
+                      ? "outline"
+                      : "destructive"
+                }
+                className="rounded-md font-semibold text-xs"
+              >
+                {evalVerdict === "eligible"
+                  ? "Eligible"
+                  : evalVerdict === "needs_input"
+                    ? "Needs Input"
+                    : evalVerdict === "not_eligible"
+                      ? "Ineligible"
+                      : "Unchecked"}
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs font-medium text-foreground truncate" title={verdict.label}>
+              {verdict.label}
+            </p>
+          </div>
+
+          {/* Card 2: Award Amount */}
+          <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Award Amount
+              </span>
+              <DollarSign className="h-4 w-4 text-primary" />
+            </div>
+            <div className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+              {amount}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground truncate">
+              {grant.historical_awards
+                ? `Median ${formatMoney(grant.historical_awards.median, grant.historical_awards.currency)} (${grant.historical_awards.count} awards)`
+                : kind === "grant" ? "Non-repayable" : "Financing"}
+            </p>
+          </div>
+
+          {/* Card 3: Deadline & Days Left */}
+          <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Deadline
+              </span>
+              <CalendarClock className={cn("h-4 w-4", deadlineTone === "warning" ? "text-amber-500" : deadlineTone === "danger" ? "text-rose-500" : "text-primary")} />
+            </div>
+            <div className={cn(
+              "mt-2 text-xl sm:text-2xl font-bold tracking-tight truncate",
+              deadlineTone === "danger" ? "text-rose-600" : deadlineTone === "warning" ? "text-amber-600" : "text-foreground"
+            )}>
+              {grant.deadline_kind === "rolling" && !grant.deadline ? "Rolling Intake" : deadline.label}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground truncate">
+              {grant.deadline_kind === "rolling"
+                ? "Open continuously"
+                : grant.deadline_kind === "estimated"
+                  ? `${deadline.detail} (estimated)`
+                  : deadline.detail}
+            </p>
+          </div>
+
+          {/* Card 4: Critical Requirements Summary */}
+          <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Critical Asks
+              </span>
+              <ListChecks className="h-4 w-4 text-primary" />
+            </div>
+            <div className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+              {criticalRequirements.length} Critical
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground truncate">
+              {requirements.length > 0
+                ? `${requirements.length} total requirements extracted`
+                : "Open page to verify"}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ----------------- PARTNER / CRITICAL CALLOUT BANNER ----------------- */}
+      {requiresPartner && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200">
+          <Users className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-bold uppercase tracking-wide">Partnership Requirement</h3>
+            <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+              You'll likely need to apply alongside an eligible university or postsecondary researcher. The funder text implies IIAL cannot apply as a sole lead without an academic partner.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------- MAIN WIDESCREEN WORKSPACE (8 COLS MAIN + 4 COLS RAIL) ----------------- */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        {/* ================= LEFT MAIN COLUMN (8 COLS) ================= */}
+        <main className="space-y-5 lg:col-span-8">
+
+          {/* 1. CRITICAL APPLICATION CHECKLIST & REQUIREMENTS */}
           <Panel
             icon={FileCheck2}
-            title="What they ask for"
-            description="Critical conditions first, then documents and other asks."
+            title="Application Checklist & Requirements"
+            description="Critical conditions first, followed by required documentation and eligibility rules."
             actions={
               isTechnical && requirements.length > 0 ? (
                 <EvidenceChip
@@ -471,24 +630,80 @@ export function V2GrantDetail({
               <EmptyState
                 icon={FileCheck2}
                 title="No requirements extracted yet"
-                body="Check the official page for documents, matching funds and conditions before assigning work."
+                body="Check the official page for matching funds, university partnerships, and documentation before assigning work."
               />
             ) : (
-              <div className="space-y-3">
-                <RequirementGroup title="Critical" requirements={criticalRequirements} />
-                <RequirementGroup
-                  title="Other requirements"
-                  requirements={requirements.filter((item) => !item.isCritical)}
-                />
+              <div className="space-y-4">
+                {criticalRequirements.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      Critical Conditions ({criticalRequirements.length})
+                    </h3>
+                    <ul className="grid gap-2 sm:grid-cols-2">
+                      {criticalRequirements.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-xs leading-relaxed">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                          <div>
+                            <span className="font-semibold text-foreground block">{item.requirement}</span>
+                            {item.value && <span className="text-muted-foreground mt-0.5 block">{item.value}</span>}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {requirements.filter((item) => !item.isCritical).length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                      Standard Requirements
+                    </h3>
+                    <ul className="grid gap-2 sm:grid-cols-2">
+                      {requirements
+                        .filter((item) => !item.isCritical)
+                        .map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-2.5 rounded-lg border bg-background/60 p-3 text-xs leading-relaxed">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                            <div>
+                              <span className="font-medium text-foreground block">{item.requirement}</span>
+                              {item.value && <span className="text-muted-foreground mt-0.5 block">{item.value}</span>}
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </Panel>
 
-          {/* 3. The funder's own eligibility statements (facts, not our verdict). */}
+          {/* 2. PROGRAM SNAPSHOT & ABOUT THE OPPORTUNITY */}
+          <Panel
+            icon={FileText}
+            title="Program Snapshot & Scope"
+            description="High-level summary of what the grant funds, target applicants, and sector coverage."
+          >
+            <div className="space-y-4">
+              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                {grant.summary?.trim() ||
+                  "No reliable description extracted yet. Click 'Fetch details' or view official page."}
+              </p>
+
+              <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FactRow label="Who can apply" values={applicantTypes} />
+                <FactRow label="What it pays for" values={fundingUses} />
+                <FactRow label="Who it is meant to help" values={populations} />
+                <FactRow label="Sectors" values={sectors} />
+              </div>
+            </div>
+          </Panel>
+
+          {/* 3. FUNDER'S ELIGIBILITY STATEMENTS */}
           <Panel
             icon={ShieldCheck}
-            title="Eligibility rules stated by the funder"
-            description="What the source says about who qualifies."
+            title="Eligibility Rules Stated by Funder"
+            description="What the official source explicitly says about who qualifies."
             actions={
               isTechnical && eligibilityRows.length > 0 ? (
                 <EvidenceChip
@@ -508,16 +723,20 @@ export function V2GrantDetail({
                 body="Confirm who qualifies on the official page before pursuing."
               />
             ) : (
-              <div className="space-y-3 text-sm">
-                {grant.eligibility_note && <p className="leading-6">{grant.eligibility_note}</p>}
+              <div className="space-y-4 text-sm">
+                {grant.eligibility_note && (
+                  <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
+                    {grant.eligibility_note}
+                  </p>
+                )}
                 {eligibleGroups.length > 0 && (
                   <div>
-                    <div className="text-xs font-semibold uppercase text-muted-foreground">
-                      Mentioned as eligible
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
+                      Explicitly Eligible Groups
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
                       {eligibleGroups.map((label) => (
-                        <Badge key={label} variant="secondary" className="rounded-md">
+                        <Badge key={label} variant="secondary" className="rounded-md text-xs py-1 px-2.5">
                           {label}
                         </Badge>
                       ))}
@@ -525,61 +744,63 @@ export function V2GrantDetail({
                   </div>
                 )}
                 {eligibilityDetails.length > 0 && (
-                  <dl className="grid gap-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     {eligibilityDetails.map(([key, value]) => (
-                      <div key={key} className="rounded-md border bg-background/70 p-3">
-                        <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                      <div key={key} className="rounded-lg border bg-background/70 p-3">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
                           {ELIGIBILITY_LABEL[key] ?? humanizeKey(key)}
-                        </dt>
-                        <dd className="mt-1">
+                        </span>
+                        <div className="mt-1 text-xs">
                           <ValueBlock value={value} />
-                        </dd>
+                        </div>
                       </div>
                     ))}
-                  </dl>
+                  </div>
                 )}
               </div>
             )}
           </Panel>
 
-          <ManualFactsPanel grant={grant} />
-
+          {/* 4. OPPORTUNITY BRIEF (If enriched/scored) */}
           {grant.status !== "discovered" && (
             <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={isTechnical} />
           )}
 
-          <Panel icon={Link2} title="Sources" description="Where these facts come from.">
-            <div className="space-y-2 text-sm">
-              {grant.url && <SourceLink href={grant.url} label="Grant page" />}
+          {/* 5. MANUAL FACTS OVERRIDE PANEL */}
+          <ManualFactsPanel grant={grant} />
+
+          {/* 6. OFFICIAL SOURCES & VERIFICATION LINKS */}
+          <Panel icon={Link2} title="Official Sources & Provenance" description="Validated web URLs and observation dates.">
+            <div className="space-y-2.5 text-sm">
+              {grant.url && <SourceLink href={grant.url} label="Official Grant Page" />}
               {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
-                <SourceLink href={grant.funder.source_url} label="Funder website" />
+                <SourceLink href={grant.funder.source_url} label="Funder Main Portal" />
               )}
               {otherSources.map((url) => (
                 <SourceLink key={url} href={url} label={url.replace(/^https?:\/\/(www\.)?/, "")} />
               ))}
               {!grant.url && !grant.funder?.source_url && (
-                <p className="text-muted-foreground">No official URL stored.</p>
+                <p className="text-xs text-muted-foreground">No official URL stored.</p>
               )}
-              <p className="pt-1 text-xs text-muted-foreground">
-                First found {formatDateTime(grant.discovered_at)} · last checked{" "}
-                {formatDateTime(grant.last_seen_at)}
-              </p>
+              <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
+                <span>First discovered: {formatDateTime(grant.discovered_at)}</span>
+                <span>Last checked: {formatDateTime(grant.last_seen_at)}</span>
+              </div>
             </div>
           </Panel>
+        </main>
 
-          {/* 4. Our assessment comes after the facts. */}
-          <div className="flex items-center gap-3 pt-4">
-            <h2 className="text-lg font-semibold">Assessment for your organization</h2>
-            <div className="h-px flex-1 bg-border" />
-          </div>
+        {/* ================= RIGHT SIDEBAR / DECISION RAIL (4 COLS) ================= */}
+        <aside className="space-y-5 lg:col-span-4">
 
+          {/* AI FIT & ELIGIBILITY VERDICT BREAKDOWN */}
           <Panel
             icon={ClipboardCheck}
-            title="Fit and eligibility check"
+            title="IIAL Fit &amp; Decision Rationale"
             description={
               evaluation
-                ? `Checked ${formatDateTime(evaluation.created_at)} against your profile.`
-                : "Not checked yet."
+                ? `Evaluated ${formatDateTime(evaluation.created_at)}`
+                : "Fit check not executed yet."
             }
             actions={
               isTechnical && evaluation ? (
@@ -587,13 +808,21 @@ export function V2GrantDetail({
               ) : undefined
             }
           >
-            <p className="text-sm leading-6 text-muted-foreground">{verdict.detail}</p>
-            {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
-            {!isTechnical && evaluation?.rationale_en && (
-              <p className="mt-3 text-sm leading-6">{humanizeRationale(evaluation.rationale_en)}</p>
-            )}
+            <div className="space-y-3">
+              <p className="text-xs leading-relaxed text-muted-foreground">{verdict.detail}</p>
+
+              {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
+
+              {!isTechnical && evaluation?.rationale_en && (
+                <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed text-foreground">
+                  <span className="font-semibold block mb-1">Evaluator Rationale:</span>
+                  {humanizeRationale(evaluation.rationale_en)}
+                </div>
+              )}
+            </div>
           </Panel>
 
+          {/* TECHNICAL SCORE BREAKDOWN (WHEN TECHNICAL MODE ACTIVE) */}
           {isTechnical && (
             <FitEvaluation
               status={grant.status}
@@ -616,214 +845,94 @@ export function V2GrantDetail({
               fr={false}
             />
           )}
+
           {isTechnical && grant.enriched_at && <EvaluationDetail grantId={grant.id} />}
 
+          {/* DATA COMPLETENESS & QUALITY GAUGE (TECHNICAL MODE) */}
           {isTechnical && (
             <>
               <Panel
                 icon={Gauge}
-                title="Data quality"
-                description="Whether this record has enough grounded detail for a decision."
+                title="Data Quality &amp; Grounding"
+                description="Grounded extraction completeness."
               >
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">Completeness</span>
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span>Completeness</span>
                   <span className="tabular-nums">
-                    {quality.pct}% · {quality.known}/{quality.total} fields
+                    {quality.pct}% ({quality.known}/{quality.total} fields)
                   </span>
                 </div>
-                <div className="mt-2 h-2 rounded-full bg-muted">
+                <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                   <div
-                    className="h-2 rounded-full bg-primary"
+                    className="h-2 rounded-full bg-primary transition-all duration-300"
                     style={{ width: `${quality.pct}%` }}
                   />
                 </div>
-                <ul className="mt-3 space-y-2 text-sm">
+                <ul className="mt-3 space-y-1.5 text-xs">
                   {quality.checks.map((check) => (
-                    <li key={check.label} className="flex items-center justify-between gap-3">
+                    <li key={check.label} className="flex items-center justify-between gap-2">
                       <span className="text-muted-foreground">{check.label}</span>
                       {check.ok ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                       ) : (
-                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                       )}
                     </li>
                   ))}
                 </ul>
               </Panel>
-              <Panel icon={History} title="Lifecycle history" description="Status changes.">
+
+              {/* LIFECYCLE HISTORY */}
+              <Panel icon={History} title="Lifecycle Audit Log" description="Status transitions over time.">
                 {events.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No status events yet.</p>
+                  <p className="text-xs text-muted-foreground">No status events logged yet.</p>
                 ) : (
-                  <ol className="space-y-3">
-                    {events.slice(0, 8).map((event, index) => (
-                      <li key={`${event.created_at}-${index}`} className="flex gap-3 text-sm">
-                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                        <span className="min-w-0">
-                          <span className="block font-medium">
-                            {event.from_status ?? "none"} to {event.to_status}
+                  <ol className="space-y-2 text-xs">
+                    {events.slice(0, 6).map((event, index) => (
+                      <li key={`${event.created_at}-${index}`} className="flex gap-2.5">
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                        <div className="min-w-0">
+                          <span className="font-semibold block">
+                            {event.from_status ?? "none"} &rarr; {event.to_status}
                           </span>
-                          <span className="block text-xs text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground">
                             {formatDateTime(event.created_at)}
                           </span>
-                        </span>
+                        </div>
                       </li>
                     ))}
                   </ol>
                 )}
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Seen {grant.times_seen ?? 1} times ·{" "}
+                <div className="mt-3 pt-2 border-t text-[11px] text-muted-foreground flex justify-between items-center">
+                  <span>Times seen: {grant.times_seen ?? 1}</span>
                   <Link
                     to="/grants/$id/audit"
                     params={{ id: grant.id }}
-                    className="text-primary underline-offset-4 hover:underline"
+                    className="text-primary underline-offset-4 hover:underline font-medium"
                   >
-                    Scoring details
+                    View audit report
                   </Link>
-                </p>
+                </div>
               </Panel>
+
               <SelfCheckBanner
                 grantId={grant.id}
                 retrying={busy === "enrich"}
                 onRetry={onFetchDetails}
               />
+
               <FetchTrailPanel
                 grantId={grant.id}
                 retrying={busy === "enrich"}
                 errorMsg={grant.enrich_last_error ?? null}
                 onRetry={onFetchDetails}
               />
-              {traceRun && (
-                <Badge variant="outline" className="rounded-md">
-                  Trace ready: {traceRun.agent || "agent"}
-                </Badge>
-              )}
             </>
           )}
-        </div>
 
-        {/* Decision rail: stays in view while reading the facts. */}
-        <aside className="min-w-0">
-          <div className="space-y-4 rounded-md border bg-card p-5 shadow-sm lg:sticky lg:top-4">
-            <div>
-              <div className="text-[11px] font-semibold uppercase text-muted-foreground">
-                Next step
-              </div>
-              <div className="mt-1 flex items-center gap-2 text-lg font-semibold leading-snug">
-                <span className={cn("h-2 w-2 shrink-0 rounded-full", verdict.dot)} />
-                {verdict.label}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-md border bg-background/70 p-3">
-                <div className="text-xs text-muted-foreground">Fit</div>
-                <div
-                  className={cn(
-                    "mt-1 text-xl font-semibold tabular-nums",
-                    evaluation?.eligibility_pass
-                      ? "text-emerald-600"
-                      : fitScore == null
-                        ? ""
-                        : "text-rose-600",
-                  )}
-                >
-                  {fitScore == null ? "—" : `${fitScore}/100`}
-                </div>
-              </div>
-              <div className="rounded-md border bg-background/70 p-3">
-                <div className="text-xs text-muted-foreground">Eligible</div>
-                <div className="mt-1 text-xl font-semibold">
-                  {evalVerdict === "eligible"
-                    ? "Yes"
-                    : evalVerdict === "needs_input"
-                      ? "Unclear"
-                      : evalVerdict === "not_eligible"
-                        ? "No"
-                        : "—"}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {canFetch && (
-                <Button className="w-full gap-2" disabled={actionDisabled} onClick={onFetchDetails}>
-                  {busy === "enrich" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  Fetch details
-                </Button>
-              )}
-              <Button
-                className="w-full gap-2"
-                variant={canFetch ? "outline" : "default"}
-                disabled={actionDisabled || !canEvaluate}
-                onClick={onEvaluate}
-                title={evaluateBlockedReason ?? undefined}
-              >
-                {busy === "eval" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <SearchCheck className="h-4 w-4" />
-                )}
-                {evaluation ? "Re-check fit" : "Check fit"}
-              </Button>
-              {evaluateBlockedReason && (
-                <p className="text-xs text-muted-foreground">{evaluateBlockedReason}</p>
-              )}
-              {existingProposalId ? (
-                <Button asChild className="w-full gap-2">
-                  <Link to="/proposals/$id" params={{ id: existingProposalId }}>
-                    <FileText className="h-4 w-4" />
-                    Open proposal
-                  </Link>
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    className="w-full gap-2"
-                    variant="outline"
-                    disabled={actionDisabled || !canDraft}
-                    onClick={onDraft}
-                    title={draftBlockedReason ?? undefined}
-                  >
-                    {busy === "draft" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    Draft proposal
-                  </Button>
-                  {draftBlockedReason && (
-                    <p className="text-xs text-muted-foreground">{draftBlockedReason}</p>
-                  )}
-                </>
-              )}
-              {isAdmin && grant.status === "scored" && (
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  disabled={busy === "shortlist"}
-                  onClick={onShortlist}
-                >
-                  Shortlist
-                </Button>
-              )}
-              {grant.status !== "discovered" && (
-                <NotebookLMBridge grantId={grant.id} label="Notebook" />
-              )}
-              <DismissGrantControl
-                grantId={grant.id}
-                defaultReason={kind === "loan" ? "loan_not_grant" : "outside_field"}
-              />
-            </div>
-          </div>
         </aside>
-      </section>
-    </section>
+      </div>
+    </div>
   );
 }
 
@@ -842,16 +951,16 @@ const ELIGIBILITY_LABEL: Record<string, string> = {
 function FactRow({ label, values }: { label: string; values: string[] }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase text-muted-foreground">{label}</dt>
-      <dd className="mt-1.5 flex flex-wrap gap-1.5 text-sm">
+      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mt-1 flex flex-wrap gap-1 text-xs">
         {values.length ? (
           values.map((value) => (
-            <Badge key={value} variant="outline" className="rounded-md font-normal">
+            <Badge key={value} variant="outline" className="rounded-md font-normal bg-background/50">
               {displayTag(value)}
             </Badge>
           ))
         ) : (
-          <span className="text-muted-foreground">Not stated</span>
+          <span className="text-muted-foreground text-xs">Not specified</span>
         )}
       </dd>
     </div>
@@ -872,15 +981,15 @@ function Panel({
   title: string;
 }) {
   return (
-    <section className="rounded-md border bg-card shadow-sm">
-      <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-background text-primary">
-            <Icon className="h-4 w-4" />
+    <section className="rounded-xl border bg-card shadow-xs overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3 bg-muted/10">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border bg-background text-primary shadow-2xs">
+            <Icon className="h-3.5 w-3.5" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-base font-semibold leading-tight">{title}</h2>
-            {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
+            <h2 className="text-sm font-bold tracking-tight text-foreground leading-tight">{title}</h2>
+            {description && <p className="text-xs text-muted-foreground truncate">{description}</p>}
           </div>
         </div>
         {actions && <div className="shrink-0">{actions}</div>}
@@ -890,111 +999,14 @@ function Panel({
   );
 }
 
-function SectionHeading({
-  actions,
-  description,
-  icon: Icon,
-  title,
-}: {
-  actions?: ReactNode;
-  description?: string;
-  icon: LucideIcon;
-  title: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex min-w-0 items-start gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-card text-primary">
-          <Icon className="h-4 w-4" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold leading-tight">{title}</h2>
-          {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
-        </div>
-      </div>
-      {actions && <div className="shrink-0">{actions}</div>}
-    </div>
-  );
-}
-
-function SignalTile({
-  detail,
-  icon: Icon,
-  label,
-  tone = "neutral",
-  value,
-}: {
-  detail?: string;
-  icon: LucideIcon;
-  label: string;
-  tone?: "danger" | "neutral" | "success" | "warning";
-  value: string;
-}) {
-  const toneClass =
-    tone === "success"
-      ? "text-emerald-600"
-      : tone === "warning"
-        ? "text-amber-600"
-        : tone === "danger"
-          ? "text-rose-600"
-          : "text-primary";
-  return (
-    <div className="rounded-md border bg-background/70 p-3">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Icon className="h-4 w-4 text-primary" />
-        {label}
-      </div>
-      <div className={cn("mt-2 text-xl font-semibold leading-snug", toneClass)}>{value}</div>
-      {detail && <div className="mt-1 text-xs text-muted-foreground">{detail}</div>}
-    </div>
-  );
-}
-
-function QualityMini({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border bg-card p-3">
-      <div className="text-muted-foreground">{label}</div>
-      <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function RequirementGroup({ requirements, title }: { requirements: Requirement[]; title: string }) {
-  if (requirements.length === 0) return null;
-  return (
-    <div>
-      <h3 className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-        {title}
-      </h3>
-      <ul className="mt-2 divide-y rounded-md border">
-        {requirements.map((requirement, index) => (
-          <li key={`${requirement.category}-${index}`} className="p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant={requirement.isCritical ? "destructive" : "secondary"}
-                className="rounded-md text-[10px]"
-              >
-                {requirement.isCritical ? "critical" : requirement.category}
-              </Badge>
-            </div>
-            <p className="mt-2 text-sm font-medium leading-6">{requirement.requirement}</p>
-            {requirement.value && (
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">{requirement.value}</p>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function SourceLink({ href, label }: { href: string; label: string }) {
   return (
     <ExternalLinkPreview
       url={href}
-      className="flex items-center justify-between gap-3 rounded-md border bg-background/70 px-3 py-2 transition-colors hover:bg-accent"
+      className="flex items-center justify-between gap-3 rounded-lg border bg-background/70 px-3 py-2 text-xs transition-colors hover:bg-accent hover:text-accent-foreground"
     >
-      <span className="min-w-0 truncate">{label}</span>
+      <span className="min-w-0 truncate font-medium">{label}</span>
+      <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
     </ExternalLinkPreview>
   );
 }
@@ -1009,12 +1021,12 @@ function EmptyState({
   title: string;
 }) {
   return (
-    <div className="rounded-md border border-dashed bg-muted/25 p-5 text-center">
-      <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground">
+    <div className="rounded-lg border border-dashed bg-muted/20 p-5 text-center">
+      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg border bg-background text-muted-foreground">
         <Icon className="h-4 w-4" />
       </div>
-      <p className="mt-3 text-sm font-semibold">{title}</p>
-      <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">{body}</p>
+      <p className="mt-2 text-xs font-semibold text-foreground">{title}</p>
+      <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground leading-relaxed">{body}</p>
     </div>
   );
 }
@@ -1023,7 +1035,7 @@ function getDeadlineState(deadline: string | null) {
   if (!deadline) {
     return {
       label: "No fixed deadline",
-      detail: "Rolling or not extracted",
+      detail: "Rolling or unextracted intake",
       days: null as number | null,
     };
   }
@@ -1032,9 +1044,10 @@ function getDeadlineState(deadline: string | null) {
     return { label: "Unparsed deadline", detail: deadline, days: null as number | null };
   }
   const days = Math.ceil((date.getTime() - Date.now()) / DAY_MS);
+  const DAY_MS = 86_400_000;
   if (days < 0) return { label: "Closed", detail: formatDate(deadline), days };
   if (days === 0) return { label: "Closes today", detail: formatDate(deadline), days };
-  return { label: `${days} days`, detail: formatDate(deadline), days };
+  return { label: `${days} days left`, detail: formatDate(deadline), days };
 }
 
 function getQualityState({
@@ -1050,12 +1063,12 @@ function getQualityState({
 }) {
   const checks = [
     { label: "Summary", ok: !!grant.summary?.trim() },
-    { label: "Funding", ok: grant.amount_cad_min != null || grant.amount_cad_max != null },
-    { label: "Deadline", ok: !!grant.deadline },
-    { label: "Eligibility", ok: eligibilityRows.length > 0 },
-    { label: "Sectors", ok: !!grant.sectors?.length },
-    { label: "Requirements", ok: requirements.length > 0 },
-    { label: "Fit evaluation", ok: !!evaluation },
+    { label: "Funding Range", ok: grant.amount_cad_min != null || grant.amount_cad_max != null },
+    { label: "Deadline Date", ok: !!grant.deadline },
+    { label: "Eligibility Rules", ok: eligibilityRows.length > 0 },
+    { label: "Sectors & Tags", ok: !!grant.sectors?.length },
+    { label: "Critical Requirements", ok: requirements.length > 0 },
+    { label: "Fit Evaluation", ok: !!evaluation },
   ];
   const known = checks.filter((check) => check.ok).length;
   return { checks, known, total: checks.length, pct: Math.round((known / checks.length) * 100) };
@@ -1081,15 +1094,15 @@ function getVerdict({
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
-      label: "Awarded",
-      detail: "This opportunity was won. Use it for reporting, renewal, and evidence history.",
+      label: "Awarded Opportunity",
+      detail: "This opportunity was won. Retain for post-award reporting and evidence history.",
     };
   }
   if (status === "submitted" || status === "in_proposal") {
     return {
       dot: "bg-teal-500",
       enrichmentFailed,
-      label: status === "submitted" ? "Awaiting decision" : "Drafting in progress",
+      label: status === "submitted" ? "Awaiting Funder Decision" : "Proposal Drafting in Progress",
       detail: STATUS_DETAIL[status],
     };
   }
@@ -1097,74 +1110,71 @@ function getVerdict({
     return {
       dot: "bg-rose-500",
       enrichmentFailed,
-      label: "Do not prioritize",
-      detail: "This record is closed, archived, or no longer actionable for new proposal work.",
+      label: "Closed / Expired",
+      detail: "This record is closed or past deadline. Retain for historical reference.",
     };
   }
   if (enrichmentFailed) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Validate source first",
-      detail:
-        "Automation could not verify enough structured facts. Review the official page before proposal work.",
+      label: "Validate Source First",
+      detail: "Automated extraction could not read enough structured facts. Review official page manually.",
     };
   }
   if (qualityPct < 55) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Incomplete lead",
-      detail:
-        "Useful for tracking, but not yet strong enough for a confident pursue/no-pursue decision.",
+      label: "Incomplete Lead",
+      detail: "Useful lead, but details are not yet complete enough for a final decision.",
     };
   }
   if (!evaluation) {
     return {
       dot: "bg-teal-500",
       enrichmentFailed,
-      label: "Ready for fit check",
-      detail: "The record has usable detail. Run the evaluator before assigning proposal time.",
+      label: "Ready for Fit Check",
+      detail: "The record has usable detail. Run the evaluator to confirm organization fit.",
     };
   }
   if (evaluation.eligibility_pass && evaluation.fit_score >= 0.7) {
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
-      label: "Strong pursue",
-      detail: "High fit and no eligibility blocker were found. Move into proposal planning.",
+      label: "Strong Pursue (High Fit)",
+      detail: "High strategic fit and no eligibility blockers found. Recommended to start proposal.",
     };
   }
   if (evaluation.eligibility_pass && evaluation.fit_score >= 0.45) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Selective pursue",
-      detail: "Potentially useful if it maps to an active project or partner commitment.",
+      label: "Selective Pursue",
+      detail: "Potentially useful if aligned with an active project or partner commitment.",
     };
   }
   if (evalVerdict === "needs_input") {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Confirm eligibility",
-      detail:
-        "No rule rules you out, but the call does not state every eligibility condition. Confirm the points below before investing time.",
+      label: "Confirm Eligibility",
+      detail: "No explicit disqualifier, but check key conditions before investing drafting time.",
     };
   }
   return {
     dot: "bg-rose-500",
     enrichmentFailed,
-    label: evaluation.eligibility_pass ? "Low priority" : "Not a fit",
+    label: evaluation.eligibility_pass ? "Low Priority" : "Ineligible / Hard Blocker",
     detail: evaluation.eligibility_pass
-      ? "The fit signal is weak. Keep the record for reference unless strategy changes."
-      : "It does not meet one or more of your eligibility rules. Below: what the grant asks for, what your profile says, and how to fix it if it is a profile setting.",
+      ? "Fit signal is weak. Retain for reference."
+      : "Does not meet one or more eligibility rules. Review rule checks to resolve profile settings.",
   };
 }
 
 function amountLabel(min: number | null, max: number | null, everEnriched: boolean): string {
   if (min != null && max != null)
-    return min === max ? formatCad(max) : `${formatCad(min)} to ${formatCad(max)}`;
+    return min === max ? formatCad(max) : `${formatCad(min)} – ${formatCad(max)}`;
   if (max != null) return `Up to ${formatCad(max)}`;
   if (min != null) return `From ${formatCad(min)}`;
   return everEnriched ? "Not published" : "Not extracted";

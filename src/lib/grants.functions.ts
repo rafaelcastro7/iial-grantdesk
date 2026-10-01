@@ -1730,3 +1730,154 @@ export const restoreGrant = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/** Add a grant manually by entering its URL, then trigger auto-enrichment. */
+export const addGrantByUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z
+      .object({
+        url: z
+          .string()
+          .trim()
+          .min(4, "URL is required")
+          .refine(
+            (val) => {
+              try {
+                const u = val.startsWith("http://") || val.startsWith("https://") ? val : `https://${val}`;
+                new URL(u);
+                return true;
+              } catch {
+                return false;
+              }
+            },
+            { message: "Please enter a valid HTTP or HTTPS URL" },
+          ),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    let inputUrl = data.url.trim();
+    if (!/^https?:\/\//i.test(inputUrl)) {
+      inputUrl = "https://" + inputUrl;
+    }
+    const urlObj = new URL(inputUrl);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Check if grant already exists by exact URL
+    const { data: existing } = await supabaseAdmin
+      .from("grants")
+      .select("id, title, status")
+      .eq("url", inputUrl)
+      .maybeSingle();
+
+    if (existing) {
+      return { grantId: existing.id, isNew: false, title: existing.title };
+    }
+
+    // Match by domain + path to avoid minor query param duplicates
+    const searchPattern = `%${urlObj.hostname}${urlObj.pathname.replace(/\/$/, "")}%`;
+    const { data: existingSimilar } = await supabaseAdmin
+      .from("grants")
+      .select("id, title, status")
+      .ilike("url", searchPattern)
+      .maybeSingle();
+
+    if (existingSimilar) {
+      return { grantId: existingSimilar.id, isNew: false, title: existingSimilar.title };
+    }
+
+    // Extract funder name from hostname (e.g. sac-isc.gc.ca -> SAC-ISC)
+    const hostname = urlObj.hostname.replace(/^www\./i, "");
+    const mainDomainPart = hostname.split(".")[0];
+    const funderName = mainDomainPart.toUpperCase();
+
+    let funderId: string | null = null;
+    const { data: existingFunder } = await supabaseAdmin
+      .from("funders")
+      .select("id")
+      .ilike("name", `%${funderName}%`)
+      .maybeSingle();
+
+    if (existingFunder) {
+      funderId = existingFunder.id;
+    } else {
+      const { data: newFunder } = await supabaseAdmin
+        .from("funders")
+        .insert({
+          name: hostname,
+          country: "CA",
+          source_url: `${urlObj.protocol}//${urlObj.hostname}`,
+        } as never)
+        .select("id")
+        .maybeSingle();
+
+      if (newFunder) {
+        funderId = (newFunder as { id: string }).id;
+      } else {
+        const { data: fallbackFunder } = await supabaseAdmin
+          .from("funders")
+          .select("id")
+          .limit(1)
+          .maybeSingle();
+        funderId = (fallbackFunder as { id: string } | null)?.id ?? null;
+      }
+    }
+
+    if (!funderId) {
+      throw new Error("Could not assign a funder for this grant URL.");
+    }
+
+    // Construct preliminary title from URL path slug
+    const pathSegments = urlObj.pathname.split("/").filter(Boolean);
+    const rawSlug = pathSegments[pathSegments.length - 1] || hostname;
+    const readableTitle = rawSlug
+      .replace(/[-_]/g, " ")
+      .replace(/\.(html?|php|aspx?)$/i, "")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    const initialTitle = readableTitle.length > 3 ? readableTitle : `Opportunity at ${hostname}`;
+
+    const canonicalKey = `user-added:${urlObj.hostname}:${urlObj.pathname}`;
+    const sourceHash = Array.from(new TextEncoder().encode(inputUrl))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+      .slice(0, 32);
+
+    const { data: inserted, error: insertErr } = await supabaseAdmin
+      .from("grants")
+      .insert({
+        funder_id: funderId,
+        title: initialTitle,
+        url: inputUrl,
+        country: "CA",
+        currency: "CAD",
+        status: "discovered",
+        source_hash: sourceHash,
+        canonical_key: canonicalKey,
+      } as never)
+      .select("id, title")
+      .single();
+
+    if (insertErr || !inserted) {
+      throw new Error(`Failed to add grant: ${insertErr?.message || "Unknown database error"}`);
+    }
+
+    const newGrantId = (inserted as { id: string; title: string }).id;
+
+    // Trigger enrichment in the background
+    const { enrichGrantImpl } = await import("@/agents/enricher.functions");
+    enrichGrantImpl(newGrantId, {
+      db: supabaseAdmin as never,
+      userId: context.userId,
+      force: true,
+    }).catch((err) => {
+      console.error("Auto-enrichment error on user-added grant:", err);
+    });
+
+    return {
+      grantId: newGrantId,
+      isNew: true,
+      title: (inserted as { id: string; title: string }).title,
+    };
+  });
+
