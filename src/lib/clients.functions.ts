@@ -408,7 +408,7 @@ export const listGrantsForOrganization = createServerFn({ method: "GET" })
         `id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max,
          deadline, sectors, language, url, status, created_at,
          funder:funders(id, name, name_fr, jurisdiction),
-         evaluation:grant_evaluations!left(fit_score, rationale_en, rationale_fr, eligibility_pass, created_at, rule_verdict:rule_snapshot->>verdict)`,
+         evaluation:grant_evaluations!left(fit_score, rationale_en, rationale_fr, eligibility_pass, created_at, model, rule_verdict:rule_snapshot->>verdict)`,
       )
       .eq("org_id", data.orgId)
       // Evaluations are per user: without this the card showed whichever

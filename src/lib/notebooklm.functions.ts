@@ -165,21 +165,19 @@ export async function buildNotebookBriefingImpl(opts: {
     const { data: evals } = await supabase
       .from("grant_evaluations")
       .select(
-        "grant_id, fit_score, eligibility_pass, rationale_en, created_at, rule_verdict:rule_snapshot->>verdict",
+        "grant_id, fit_score, eligibility_pass, rationale_en, created_at, model, rule_verdict:rule_snapshot->>verdict",
       )
       .eq("user_id", userId)
       .in("grant_id", ids)
       .order("created_at", { ascending: false });
-    const evalByGrant = new Map<
-      string,
-      { fit: number; verdict: string; rationale: string }
-    >();
+    const evalByGrant = new Map<string, { fit: number; verdict: string; rationale: string }>();
     for (const e of evals ?? []) {
       if (evalByGrant.has(e.grant_id)) continue; // keep latest only
       // Stored fit is 0..1; the export reads it as a score out of 100.
       const raw = Number(e.fit_score);
       const v = evaluationVerdict({
         eligibility_pass: !!e.eligibility_pass,
+        model: (e as { model?: string | null }).model ?? null,
         rule_verdict: (e as { rule_verdict?: string | null }).rule_verdict ?? null,
       });
       evalByGrant.set(e.grant_id, {

@@ -245,6 +245,7 @@ interface GrantRow {
     rationale_fr?: string | null;
     eligibility_pass?: boolean | null;
     rule_verdict?: string | null;
+    model?: string | null;
     created_at: string;
   } | null;
 }
@@ -317,6 +318,7 @@ function GrantCard({ grant }: { grant: GrantRow }) {
           {grant.evaluation &&
             evaluationVerdict({
               eligibility_pass: !!grant.evaluation.eligibility_pass,
+              model: grant.evaluation.model,
               rule_verdict: grant.evaluation.rule_verdict,
             }) === "not_eligible" && (
               <Badge variant="destructive" className="text-xs">

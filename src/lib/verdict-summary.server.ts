@@ -39,11 +39,12 @@ export async function loadUserVerdicts(
     fit_score: number | null;
     eligibility_pass: boolean | null;
     rule_snapshot: unknown;
+    model?: string | null;
   }> = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await db
       .from("grant_evaluations")
-      .select("grant_id, fit_score, eligibility_pass, rule_snapshot")
+      .select("grant_id, fit_score, eligibility_pass, rule_snapshot, model")
       .eq("user_id", userId)
       .order("grant_id")
       .range(from, from + PAGE - 1);
@@ -84,6 +85,8 @@ export async function loadUserVerdicts(
       title: g.title,
       verdict: evaluationVerdict({
         eligibility_pass: !!e.eligibility_pass,
+        model: e.model ?? null,
+        rule_snapshot: e.rule_snapshot,
         rule_verdict: (e.rule_snapshot as { verdict?: string } | null)?.verdict ?? null,
       }),
       fit: Math.round(fit <= 1 ? fit * 100 : fit),

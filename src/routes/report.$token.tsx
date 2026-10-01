@@ -2,7 +2,7 @@
 // The unguessable token in the URL is the credential; data is fetched server-side
 // after validating token + expiry + revocation.
 import { createFileRoute } from "@tanstack/react-router";
-import { realFit } from "@/lib/grant-radar";
+import { evaluationVerdict, realFit } from "@/lib/grant-radar";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, ShieldCheck, Loader2 } from "lucide-react";
 import { getSharedReport, type SharedReport } from "@/lib/share-report.functions";
@@ -94,7 +94,7 @@ function ReportBody({ report }: { report: SharedReport }) {
               evaluation
                 ? evaluation.eligibility_pass
                   ? "Yes"
-                  : evaluation.rule_verdict === "needs_input"
+                  : evaluationVerdict(evaluation) === "needs_input"
                     ? "Unclear"
                     : "No"
                 : "—"

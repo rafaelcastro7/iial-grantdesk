@@ -233,6 +233,8 @@ export function V2GrantDetail({
   const evalVerdict = evaluation
     ? evaluationVerdict({
         eligibility_pass: evaluation.eligibility_pass,
+        model: evaluation.model,
+        rule_snapshot: evaluation.rule_snapshot,
         rule_verdict:
           (evaluation.rule_snapshot as { verdict?: string } | null | undefined)?.verdict ?? null,
       })
@@ -945,9 +947,7 @@ export function V2GrantDetail({
                   ? {
                       fit_score: evaluation.fit_score,
                       eligibility_pass: evaluation.eligibility_pass,
-                      rule_verdict:
-                        (evaluation.rule_snapshot as { verdict?: string } | null | undefined)
-                          ?.verdict ?? null,
+                      rule_verdict: evalVerdict === "needs_input" ? "needs_input" : null,
                       rationale_en: humanizeRationale(evaluation.rationale_en) ?? "",
                       rationale_fr: evaluation.rationale_fr ?? "",
                       created_at: evaluation.created_at,

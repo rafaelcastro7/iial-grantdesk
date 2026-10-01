@@ -50,6 +50,8 @@ export type SharedReport = {
     fit_score: number;
     eligibility_pass: boolean;
     rule_verdict?: string | null;
+    model?: string | null;
+    rule_snapshot?: { hard_fail?: boolean; is_exhaustive?: boolean; verdict?: string } | null;
     rationale_en: string;
     axis_breakdown: AxisScore[] | null;
     created_at: string;

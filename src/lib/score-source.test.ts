@@ -70,3 +70,24 @@ describe("amount rules and guards", () => {
     expect(isPlausibleAwardAmount(0, "x")).toBe(false);
   });
 });
+
+describe("final verdicts", () => {
+  it("an AI 'not eligible' is final even when the rules could not decide", async () => {
+    const { evaluationVerdict } = await import("@/lib/grant-radar");
+    expect(
+      evaluationVerdict({
+        eligibility_pass: false,
+        rule_verdict: "needs_input",
+        model: "openai/gpt-oss-20b",
+      }),
+    ).toBe("not_eligible");
+    expect(
+      evaluationVerdict({
+        eligibility_pass: false,
+        rule_verdict: "needs_input",
+        model: "rules-engine-deterministic",
+      }),
+    ).toBe("needs_input");
+    expect(evaluationVerdict({ eligibility_pass: true, model: "x" })).toBe("eligible");
+  });
+});

@@ -153,8 +153,14 @@ export function grantAmount(g: RadarGrant): number | null {
 export function evaluationVerdict(ev: {
   eligibility_pass: boolean;
   rule_verdict?: string | null;
+  model?: string | null;
+  is_exhaustive?: boolean | null;
+  rule_snapshot?: unknown;
 }): RadarVerdict {
   if (ev.eligibility_pass) return "eligible";
+  // The AI review read the whole call, including what the rules could not
+  // decide: its "no" is final, not "needs a check".
+  if (isFullReview(ev)) return "not_eligible";
   return ev.rule_verdict === "needs_input" ? "needs_input" : "not_eligible";
 }
 
