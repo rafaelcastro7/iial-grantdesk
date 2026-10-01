@@ -109,39 +109,39 @@ export function humanizeRationale(rationale: string | null | undefined): string 
 const ACTIONS: Array<{ match: RegExp; text: string }> = [
   {
     match: /^sop_filter_4_strategic$|strategic fit/i,
-    text: "Show how the project uses your organization's strengths — the call does not mention any of the capabilities in your profile.",
+    text: "Align project narrative: Frame core capabilities around the funder's priority themes in the proposal scope.",
   },
   {
     match: /^sectors_required$|required sectors/i,
-    text: "Confirm the program covers your field; its listed focus areas differ from your sectors.",
+    text: "Verify sector coverage: Ensure your specific application topic fits within the funder's active eligible domains.",
   },
   {
     match: /^sop_filter_1_legal$|legal eligibility/i,
-    text: "Confirm your organization type is accepted — the call does not state it clearly.",
+    text: "Confirm legal structure: Ensure your specific organization type (e.g. non-profit, SME, research entity) is recognized by the call.",
   },
   {
     match: /^jurisdiction_required$|required jurisdiction/i,
-    text: "Confirm organizations from your country or region can apply.",
+    text: "Confirm geographic eligibility: Ensure applicant headquarters or operational project site qualifies in this jurisdiction.",
   },
   {
     match: /^sop_filter_3_match_verify$|cash-match/i,
-    text: "Confirm with leadership that the required cash contribution is available.",
+    text: "Validate matching funds: Confirm internal budget availability or external co-sponsors for required cost-share contributions.",
   },
   {
     match: /^sop_filter_5_runway$|runway/i,
-    text: "Plan the timeline carefully — there is little time left before the deadline.",
+    text: "Fast-track drafting timeline: Submission deadline is approaching; prioritize core narrative and mandatory letters immediately.",
   },
   {
     match: /^required_university_partner$|university partnership/i,
-    text: "Line up a university research partner and get a letter of commitment.",
+    text: "Academic partner needed: Identify an eligible postsecondary research co-applicant and secure an institutional commitment letter.",
   },
   {
     match: /^deadline$|days until deadline/i,
-    text: "Check the deadline — it is close or not confirmed.",
+    text: "Verify portal cut-off: Check the official deadline time zone and portal maintenance windows to avoid last-minute lockouts.",
   },
   {
     match: /^amount_min$|amount >=/i,
-    text: "Check the award size is worth the effort; it may be below your minimum.",
+    text: "Validate ROI: Confirm grant size justifies the administrative effort and overhead of the application.",
   },
 ];
 
@@ -155,14 +155,14 @@ export function explainCondition(check: CheckLike): string {
 /** Rewrites stored brief reasons written in the old technical wording. */
 export function humanizeBriefReason(reason: string): string {
   if (/soft fail\(s\)|warning\(s\)/i.test(reason))
-    return "Worth pursuing once the points below are confirmed.";
+    return "Worth pursuing once the operational points below are confirmed.";
   const hard = reason.match(/^Hard fail on \d+ filter\(s\):\s*(.+)$/i);
   if (hard) {
     const labels = hard[1].split(";").map((label) => ({ label: label.trim() }));
-    return `Not recommended. ${[...new Set(labels.map(explainCheck))].join(" ")}`;
+    return `Not recommended: ${[...new Set(labels.map(explainCheck))].join(" ")}`;
   }
   if (/filters passed; rule score/i.test(reason)) {
-    return "Recommended: it meets all of your organization's eligibility rules.";
+    return "Recommended: Strong strategic alignment and satisfies all organization eligibility criteria.";
   }
   return reason;
 }
@@ -171,11 +171,11 @@ export function humanizeBriefReason(reason: string): string {
 export function humanizeBriefCondition(condition: string): string {
   const borderline = condition.match(/^Borderline fit \(rule score (\d+)\/100/i);
   if (borderline) {
-    return `The match is moderate (${borderline[1]}/100). Before writing, contact the program officer to confirm the project fits what they fund.`;
+    return `Moderate alignment (${borderline[1]}/100): Schedule a 15-minute concept call with the Program Officer to validate scope before writing.`;
   }
   const cash = condition.match(/^Confirm cash-match availability \(~(\d+)%\)/i);
   if (cash)
-    return `Confirm with leadership that you can contribute about ${cash[1]}% of the costs in cash.`;
+    return `Co-funding sign-off: Confirm internal or partner commitment for ~${cash[1]}% matching contribution.`;
   const labelled = condition.match(
     /^(SOP F\d[^:]*|Required [^:]+|Excluded [^:]+|Amount [^:]+|>= [^:]+):\s/i,
   );
