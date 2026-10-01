@@ -256,7 +256,10 @@ export async function enrichGrantImpl(
         }
         // Past awards for the program's assistance listing (USAspending), and
         // the listing numbers themselves. Best-effort, separate write.
-        const listing = official.assistanceListings[0];
+        // With many listings (umbrella NIH notices) the first one is arbitrary
+        // and its awards would mislead; only use history for 1-2 listings.
+        const listing =
+          official.assistanceListings.length <= 2 ? official.assistanceListings[0] : undefined;
         if (listing) {
           try {
             const { fetchUsAwardsForListing } = await import("@/agents/sources/us-awards.server");
