@@ -12,7 +12,7 @@ export const getGrantDetail = createServerFn({ method: "GET" })
     const { data: grant, error } = await context.supabase
       .from("grants")
       .select(
-        "id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max, deadline, sectors, eligibility, requirements, language, url, status, fit_score, discovered_at, enriched_at, scored_at, last_seen_at, times_seen, enrich_attempts, enrich_last_error, funder_id, funder:funders(id, name, name_fr, jurisdiction, source_url)",
+        "id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max, deadline, sectors, eligibility, eligibility_note, applicant_types, requirements, language, url, status, fit_score, discovered_at, enriched_at, scored_at, last_seen_at, times_seen, enrich_attempts, enrich_last_error, funder_id, funder:funders(id, name, name_fr, jurisdiction, source_url)",
       )
       .eq("id", data.id)
       .maybeSingle();
@@ -28,6 +28,18 @@ export const getGrantDetail = createServerFn({ method: "GET" })
       .maybeSingle();
     (grant as Record<string, unknown>).historical_awards =
       (history as { historical_awards?: unknown } | null)?.historical_awards ?? null;
+    // Separate from the history read so one missing column cannot hide the other.
+    const { data: provenance } = await context.supabase
+      .from("grants")
+      .select("manual_fields, field_search_status" as never)
+      .eq("id", data.id)
+      .maybeSingle();
+    const prov = provenance as {
+      manual_fields?: Record<string, unknown>;
+      field_search_status?: Record<string, unknown>;
+    } | null;
+    (grant as Record<string, unknown>).manual_fields = prov?.manual_fields ?? {};
+    (grant as Record<string, unknown>).field_search_status = prov?.field_search_status ?? {};
 
     // Same duplicate-record signal as listGrants — a real, recurring
     // data-quality issue (see grants.functions.ts's normalizeTitle comment).

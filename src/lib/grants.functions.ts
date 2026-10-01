@@ -1553,3 +1553,60 @@ export const refreshCatalog = createServerFn({ method: "POST" })
       evaluated,
     };
   });
+
+const MANUAL_FIELDS = [
+  "amount_cad_min",
+  "amount_cad_max",
+  "deadline",
+  "eligibility_note",
+  "sectors",
+  "applicant_types",
+] as const;
+
+/**
+ * Human completion of a fact the automatic search did not find. Goes through
+ * the set_grant_manual_field RPC (allow-listed fields, typed validation, audit
+ * of who/when); enrichment never overwrites a manually entered field.
+ */
+export const setGrantManualField = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z
+      .object({
+        grantId: z.string().uuid(),
+        field: z.enum(MANUAL_FIELDS),
+        value: z.union([
+          z.number().nonnegative(),
+          z.string().max(4000),
+          z.array(z.string().min(1).max(80)).max(20),
+          z.null(),
+        ]),
+        note: z.string().max(500).optional(),
+      })
+      .refine(
+        (v) =>
+          v.value === null ||
+          (["amount_cad_min", "amount_cad_max"].includes(v.field)
+            ? typeof v.value === "number"
+            : v.field === "deadline"
+              ? typeof v.value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.value)
+              : ["sectors", "applicant_types"].includes(v.field)
+                ? Array.isArray(v.value)
+                : typeof v.value === "string"),
+        { message: "value does not match the field type" },
+      )
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc(
+      "set_grant_manual_field" as never,
+      {
+        p_grant_id: data.grantId,
+        p_field: data.field,
+        p_value: data.value,
+        p_note: data.note ?? null,
+      } as never,
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

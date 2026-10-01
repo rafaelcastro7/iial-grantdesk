@@ -36,6 +36,7 @@ import { EvaluationDetail } from "@/components/grants/EvaluationDetail";
 import { EvidenceChip } from "@/components/grants/EvidencePanel";
 import { FetchTrailPanel } from "@/components/grants/FetchTrailPanel";
 import { FitEvaluation } from "@/components/grants/FitEvaluation";
+import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
 import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { OpportunityBriefPanel } from "@/components/grants/OpportunityBriefPanel";
 import type { AxisScore } from "@/agents/fit-rules.shared";
@@ -116,6 +117,10 @@ type Grant = {
   } | null;
   enrich_last_error?: string | null;
   enrich_attempts?: number | null;
+  eligibility_note?: string | null;
+  applicant_types?: string[] | null;
+  manual_fields?: ManualFactsGrant["manual_fields"];
+  field_search_status?: ManualFactsGrant["field_search_status"];
   historical_awards?: {
     program: string;
     currency?: "CAD" | "USD";
@@ -594,6 +599,8 @@ export function V2GrantDetail({
               </div>
             )}
           </Panel>
+
+          <ManualFactsPanel grant={grant} />
 
           {grant.status !== "discovered" && (
             <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={isTechnical} />

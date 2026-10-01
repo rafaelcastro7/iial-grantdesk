@@ -1214,6 +1214,43 @@ export async function enrichGrantImpl(
     );
   }
 
+  // Facts a person entered by hand win over anything extracted. Read
+  // separately and tolerate failure: the column is newer than this code path.
+  const { data: manualRow } = await db
+    .from("grants")
+    .select("manual_fields" as never)
+    .eq("id", g.id)
+    .maybeSingle();
+  const manualFields = Object.keys(
+    ((manualRow as { manual_fields?: Record<string, unknown> } | null)?.manual_fields ??
+      {}) as object,
+  );
+  for (const field of manualFields) {
+    if (field in patch) {
+      delete patch[field];
+      await trace("manual", `Kept the human-entered ${field}; extraction not applied`, "info");
+    }
+  }
+
+  // Record what was looked for and not found, so the UI can say "searched,
+  // not found" and invite a person to complete it.
+  const checkedAt = new Date().toISOString();
+  const notFound = missingBeforeCues.filter(
+    (field) => !(field in patch) && !manualFields.includes(field),
+  );
+  const searchStatus = Object.fromEntries(
+    notFound.map((field) => [field, { status: "not_found", checked_at: checkedAt }]),
+  );
+  {
+    const { error: statusError } = await db
+      .from("grants")
+      .update({ field_search_status: searchStatus } as never)
+      .eq("id", g.id);
+    if (!statusError && notFound.length > 0) {
+      await trace("search_status", `Searched, not found: ${notFound.join(", ")}`, "info");
+    }
+  }
+
   // Fix: ensure amount_cad_min <= amount_cad_max before update
   const finalMin = patch.amount_cad_min ?? g.amount_cad_min;
   const finalMax = patch.amount_cad_max ?? g.amount_cad_max;
