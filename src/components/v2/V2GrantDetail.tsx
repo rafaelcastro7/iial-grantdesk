@@ -701,10 +701,13 @@ export function V2GrantDetail({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* ================= LEFT MAIN COLUMN (8 COLS) ================= */}
         <main className="space-y-5 lg:col-span-8">
-          {/* 2. PROGRAM SNAPSHOT & ABOUT THE OPPORTUNITY */}
+          {/* 1. OPPORTUNITY BRIEF (WHAT YOU NEED TO APPLY - TOP PRIORITY) */}
+          <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={isTechnical} />
+
+          {/* 2. PROGRAM OVERVIEW & SCOPE */}
           <Panel
             icon={FileText}
-            title="Program Snapshot & Scope"
+            title="Program Scope & Coverage"
             description="High-level summary of what the grant funds, target applicants, and sector coverage."
           >
             <div className="space-y-4">
@@ -873,12 +876,7 @@ export function V2GrantDetail({
             )}
           </Panel>
 
-          {/* 4. OPPORTUNITY BRIEF (If enriched/scored) */}
-          {grant.status !== "discovered" && (
-            <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={isTechnical} />
-          )}
-
-          {/* 5. MANUAL FACTS OVERRIDE PANEL */}
+          {/* MANUAL FACTS OVERRIDE PANEL */}
           <ManualFactsPanel grant={grant} />
 
           {/* 6. OFFICIAL SOURCES & VERIFICATION LINKS */}
