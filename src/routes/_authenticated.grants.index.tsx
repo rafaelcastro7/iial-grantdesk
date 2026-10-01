@@ -261,14 +261,16 @@ function GrantsPage() {
   // remains the full AI review.
   const autoEval = useServerFn(autoEvaluatePending);
   const autoEvalStarted = useRef(false);
-  const unchecked = grants.filter((g) => !(g as { evaluation?: unknown }).evaluation).length;
+  const hasGrants = grants.length > 0;
   useEffect(() => {
-    if (autoEvalStarted.current || unchecked === 0) return;
+    // Once per visit; the server picks grants with no or stale verdicts.
+    if (autoEvalStarted.current || !hasGrants) return;
     autoEvalStarted.current = true;
     let cancelled = false;
     void autoEval({ data: { limit: 100 } })
       .then(async (result) => {
         const queued = (result as { queued?: number }).queued ?? 0;
+        if (queued === 0) return;
         // Refresh while the server works through the queue.
         for (let i = 0; i < Math.min(24, Math.ceil(queued / 2) + 2) && !cancelled; i++) {
           await new Promise((resolve) => setTimeout(resolve, 5_000));
@@ -281,7 +283,7 @@ function GrantsPage() {
     return () => {
       cancelled = true;
     };
-  }, [unchecked, autoEval, qc]);
+  }, [hasGrants, autoEval, qc]);
   const sectors = useMemo(() => collectSectors(grants), [grants]);
   const countries = useMemo(() => {
     const list = data.availableCountries ?? [];

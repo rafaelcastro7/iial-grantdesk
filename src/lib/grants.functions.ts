@@ -1063,11 +1063,19 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
     for (const chunk of chunkIds(ids)) {
       const { data: existing, error: existingError } = await context.supabase
         .from("grant_evaluations")
-        .select("grant_id")
+        .select("grant_id, evaluated_at")
         .eq("user_id", context.userId)
         .in("grant_id", chunk);
       if (existingError) throw new Error(`grant_evaluations: ${existingError.message}`);
-      for (const e of existing ?? []) done.add(e.grant_id);
+      // A verdict older than the last profile change is stale: re-check it so
+      // a profile fix (e.g. adding an applicant type) re-evaluates the list.
+      const profileChangedAt = new Date(
+        (org as { updated_at?: string | null }).updated_at ?? 0,
+      ).getTime();
+      for (const e of existing ?? []) {
+        const at = new Date((e as { evaluated_at?: string | null }).evaluated_at ?? 0).getTime();
+        if (at >= profileChangedAt) done.add(e.grant_id);
+      }
     }
     const todo = ids.filter((id) => !done.has(id)).slice(0, data.limit);
 
