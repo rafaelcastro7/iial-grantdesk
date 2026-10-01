@@ -38,7 +38,27 @@ export type GrantForRules = {
   /** "confirmed" | "estimated" | "rolling" ... from the enricher. */
   deadline_kind?: string | null;
   eligibility_note?: string | null;
+  /** Currency of the amount columns; US federal calls are stored in USD. */
+  currency?: string | null;
 };
+
+// Approximate USD->CAD rate, only to compare a US award with the CAD floor
+// and ceiling in the rules; the UI always shows the original currency.
+export const USD_TO_CAD = 1.37;
+
+function isUsd(g: GrantForRules): boolean {
+  const c = (g.currency ?? "").toUpperCase();
+  if (c === "USD") return true;
+  if (c === "CAD") return false;
+  return (g.country ?? "").toUpperCase() === "US";
+}
+
+/** Amount in CAD plus a human description in the original currency. */
+function inCad(g: GrantForRules, value: number): { cad: number; text: string } {
+  if (!isUsd(g)) return { cad: value, text: `$${value.toLocaleString()}` };
+  const cad = Math.round(value * USD_TO_CAD);
+  return { cad, text: `$${cad.toLocaleString()} CAD (US$${value.toLocaleString()})` };
+}
 
 export type RuleCheck = {
   id: string;
@@ -592,13 +612,14 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
         detail: "Grant amount is unknown",
       });
     } else {
-      const ok = max >= rules.min_amount_cad;
+      const v = inCad(g, max);
+      const ok = v.cad >= rules.min_amount_cad;
       checks.push({
         id: "amount_min",
         label: `Amount >= $${rules.min_amount_cad.toLocaleString()}`,
         status: ok ? "pass" : "fail",
         hard: rules.hard_fail_on_amount,
-        detail: `Grant max = $${max.toLocaleString()}`,
+        detail: `Grant max = ${v.text}`,
       });
     }
   }
@@ -614,13 +635,14 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
         detail: "Grant amount is unknown",
       });
     } else {
-      const ok = min <= rules.max_amount_cad;
+      const v = inCad(g, min);
+      const ok = v.cad <= rules.max_amount_cad;
       checks.push({
         id: "amount_max",
         label: `Amount <= $${rules.max_amount_cad.toLocaleString()}`,
         status: ok ? "pass" : "fail",
         hard: rules.hard_fail_on_amount,
-        detail: `Grant min = $${min.toLocaleString()}`,
+        detail: `Grant min = ${v.text}`,
       });
     }
   }

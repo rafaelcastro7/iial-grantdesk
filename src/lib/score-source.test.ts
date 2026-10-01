@@ -8,7 +8,11 @@ describe("single score source", () => {
     expect(realFit({ fit_score: 1, model: "rules-engine-deterministic" })).toBeNull();
     expect(realFit({ fit_score: 0.76, model: "openai/gpt-oss-20b" })).toBe(76);
     expect(
-      realFit({ fit_score: 0.2, model: "rules-engine-deterministic", rule_snapshot: { hard_fail: true } }),
+      realFit({
+        fit_score: 0.2,
+        model: "rules-engine-deterministic",
+        rule_snapshot: { hard_fail: true },
+      }),
     ).toBe(20);
     expect(realFit(null)).toBeNull();
   });
@@ -28,7 +32,8 @@ describe("rules use the extracted facets", () => {
     const base = { title: "Program", summary: "Funding for projects.", country: "CA" };
     const without = evaluateRules(rules, base);
     const withTypes = evaluateRules(rules, { ...base, applicant_types: ["nonprofit"] });
-    const legal = (r: typeof without) => r.checks.find((c) => c.id === "sop_filter_1_legal")?.status;
+    const legal = (r: typeof without) =>
+      r.checks.find((c) => c.id === "sop_filter_1_legal")?.status;
     expect(legal(withTypes)).toBe("pass");
     expect(legal(without)).not.toBe("pass");
   });
@@ -36,5 +41,32 @@ describe("rules use the extracted facets", () => {
   it("treats deadline_kind rolling as rolling intake", () => {
     const r = evaluateRules(DEFAULT_RULES, { title: "X", summary: "Y", deadline_kind: "rolling" });
     expect(r.rolling_intake).toBe(true);
+  });
+});
+
+describe("amount rules and guards", () => {
+  it("compares a US award in CAD against the CAD floor", async () => {
+    const { USD_TO_CAD } = await import("@/agents/fit-rules.server");
+    const rules = { ...DEFAULT_RULES, min_amount_cad: 60_000, max_amount_cad: null };
+    const r = evaluateRules(rules, {
+      title: "X",
+      summary: "Y",
+      country: "US",
+      currency: "USD",
+      amount_cad_max: 50_000,
+    });
+    const check = r.checks.find((c) => c.id === "amount_min");
+    expect(50_000 * USD_TO_CAD).toBeGreaterThan(60_000);
+    expect(check?.status).toBe("pass");
+    expect(check?.detail).toContain("US$50,000");
+  });
+
+  it("rejects program budgets proposed as award amounts", async () => {
+    const { isPlausibleAwardAmount } = await import("@/agents/extractors/amounts.server");
+    expect(isPlausibleAwardAmount(250_000, "up to $250,000 per project")).toBe(true);
+    expect(isPlausibleAwardAmount(50_000_000, "The program has a budget of $50 million")).toBe(
+      false,
+    );
+    expect(isPlausibleAwardAmount(0, "x")).toBe(false);
   });
 });

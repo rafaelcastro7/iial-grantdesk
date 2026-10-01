@@ -138,6 +138,8 @@ type Grant = {
   populations_served?: string[] | null;
   funder_type?: string | null;
   deadline_kind?: string | null;
+  next_expected_deadline?: string | null;
+  next_expected_deadline_confidence?: number | null;
   confirmed_source_urls?: string[] | null;
   manual_fields?: ManualFactsGrant["manual_fields"];
   field_search_status?: ManualFactsGrant["field_search_status"];
@@ -638,13 +640,21 @@ export function V2GrantDetail({
                 : deadline.label}
             </div>
             <p className="mt-1 text-xs text-muted-foreground truncate">
-              {grant.deadline_kind === "rolling"
-                ? "Open continuously"
-                : grant.deadline_kind === "estimated"
-                  ? `${deadline.detail} (estimated)`
-                  : grant.deadline && grant.deadline_kind !== "confirmed"
-                    ? `${deadline.detail} · not verified on the source`
-                    : deadline.detail}
+              {(deadline.days == null || deadline.days < 0) &&
+              grant.deadline_kind !== "rolling" &&
+              grant.next_expected_deadline
+                ? `Next cycle expected ${formatDate(grant.next_expected_deadline)}${
+                    grant.next_expected_deadline_confidence != null
+                      ? ` (${Math.round(Number(grant.next_expected_deadline_confidence) * 100)}% confidence)`
+                      : ""
+                  }`
+                : grant.deadline_kind === "rolling"
+                  ? "Open continuously"
+                  : grant.deadline_kind === "estimated"
+                    ? `${deadline.detail} (estimated)`
+                    : grant.deadline && grant.deadline_kind !== "confirmed"
+                      ? `${deadline.detail} · not verified on the source`
+                      : deadline.detail}
             </p>
           </div>
 

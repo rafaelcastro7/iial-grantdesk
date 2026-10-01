@@ -606,11 +606,40 @@ export const listGrants = createServerFn({ method: "GET" })
         .replace(DIACRITICS, "")
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
-    const groupCounts = new Map<string, number>();
+    // Duplicates: same funder + same title, or the same page under any funder
+    // (the grant detail counts them the same way).
+    const { urlVariants } = await import("@/lib/grant-intake.shared");
+    const parent = new Map<string, string>();
+    const find = (id: string): string => {
+      let root = id;
+      while (parent.get(root) && parent.get(root) !== root) root = parent.get(root)!;
+      parent.set(id, root);
+      return root;
+    };
+    const union = (a: string, b: string) => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+    };
+    const firstByKey = new Map<string, string>();
     for (const g of grants) {
-      const key = `${g.funder_id ?? "none"}|${normalizeTitle(g.title)}`;
-      groupCounts.set(key, (groupCounts.get(key) ?? 0) + 1);
+      parent.set(g.id, g.id);
+      const keys = [`t:${g.funder_id ?? "none"}|${normalizeTitle(g.title)}`];
+      try {
+        if (g.url) keys.push(`u:${urlVariants(new URL(g.url))[0]}`);
+      } catch {
+        // Unparseable URL: title key only.
+      }
+      for (const key of keys) {
+        const seen = firstByKey.get(key);
+        if (seen) union(seen, g.id);
+        else firstByKey.set(key, g.id);
+      }
     }
+    const groupSizeById = new Map<string, number>();
+    const rootSize = new Map<string, number>();
+    for (const g of grants) rootSize.set(find(g.id), (rootSize.get(find(g.id)) ?? 0) + 1);
+    for (const g of grants) groupSizeById.set(g.id, rootSize.get(find(g.id)) ?? 1);
 
     // Countries present in the whole catalog, not just this page — the filter
     // dropdown has to offer countries the current (Canada-first) page excludes.
@@ -720,7 +749,8 @@ export const listGrants = createServerFn({ method: "GET" })
           isNewSinceLastReview,
           changedSinceFeedback,
         }) => {
-          const evalScore = evaluation?.fit_score ?? g.fit_score;
+          // Per-user only: grants.fit_score is a global column.
+          const evalScore = evaluation?.fit_score ?? null;
           const isEvaluated = evaluation != null;
           return {
             ...g,
@@ -744,8 +774,7 @@ export const listGrants = createServerFn({ method: "GET" })
             combinedRelevance,
             evaluation,
             reviewState: reviewByGrant.get(g.id) ?? null,
-            duplicateGroupSize:
-              groupCounts.get(`${g.funder_id ?? "none"}|${normalizeTitle(g.title)}`) ?? 1,
+            duplicateGroupSize: groupSizeById.get(g.id) ?? 1,
           };
         },
       ),

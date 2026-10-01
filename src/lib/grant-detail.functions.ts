@@ -32,7 +32,7 @@ export const getGrantDetail = createServerFn({ method: "GET" })
     const { data: facets } = await context.supabase
       .from("grants")
       .select(
-        "funding_uses, populations_served, funder_type, deadline_kind, confirmed_source_urls" as never,
+        "funding_uses, populations_served, funder_type, deadline_kind, confirmed_source_urls, next_expected_deadline, next_expected_deadline_confidence" as never,
       )
       .eq("id", data.id)
       .maybeSingle();
@@ -68,9 +68,26 @@ export const getGrantDetail = createServerFn({ method: "GET" })
       .select("id, title")
       .eq("funder_id", grant.funder_id);
     const normalizedSelf = normalizeTitle(grant.title);
-    const duplicateGroupSize = (siblings ?? []).filter(
-      (s) => normalizeTitle(s.title) === normalizedSelf,
-    ).length;
+    const duplicateIds = new Set(
+      (siblings ?? []).filter((s) => normalizeTitle(s.title) === normalizedSelf).map((s) => s.id),
+    );
+    // The same page listed under another funder (or renamed) is the same call.
+    if (grant.url) {
+      const { urlVariants } = await import("@/lib/grant-intake.shared");
+      let variants: string[] = [grant.url];
+      try {
+        variants = urlVariants(new URL(grant.url));
+      } catch {
+        // Not a parseable URL: compare as stored.
+      }
+      const { data: sameUrl } = await context.supabase
+        .from("grants")
+        .select("id")
+        .in("url", variants);
+      for (const row of sameUrl ?? []) duplicateIds.add(row.id);
+    }
+    duplicateIds.add(grant.id);
+    const duplicateGroupSize = duplicateIds.size;
 
     const { data: evaluation } = await context.supabase
       .from("grant_evaluations")

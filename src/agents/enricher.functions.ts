@@ -1257,13 +1257,35 @@ export async function enrichGrantImpl(
   const finalMin = patch.amount_cad_min ?? g.amount_cad_min;
   const finalMax = patch.amount_cad_max ?? g.amount_cad_max;
   if (finalMin != null && finalMax != null && finalMin > finalMax) {
-    patch.amount_cad_min = null;
-    patch.amount_cad_max = null;
+    // Drop only what this run extracted; a stored value that was fine on its
+    // own stays (clearing both showed "Not published" for a known amount).
+    const newMin = patch.amount_cad_min != null;
+    const newMax = patch.amount_cad_max != null;
+    if (newMin && !newMax) delete patch.amount_cad_min;
+    else if (newMax && !newMin) delete patch.amount_cad_max;
+    else {
+      patch.amount_cad_min = null;
+      patch.amount_cad_max = null;
+    }
     await trace(
       "schema",
       `amount_cad_min (${finalMin}) > amount_cad_max (${finalMax}) — clearing both to avoid constraint violation`,
       "warn",
     );
+  }
+
+  // Description: when the stored one is missing or a stub, take the first
+  // substantial paragraph of the grant page (0 tokens). A manual edit wins.
+  if ((g.summary ?? "").trim().length < 80 && !manualFields.includes("summary")) {
+    const lead = leadParagraph(pages[0]?.markdown ?? "");
+    if (lead) {
+      patch.summary = lead;
+      await trace(
+        "summary",
+        `Description filled from the grant page (${lead.length} chars)`,
+        "info",
+      );
+    }
   }
 
   // Rechecking an archived/expired/lost record may refresh its facts, but must
@@ -1333,3 +1355,22 @@ export const runEnricher = createServerFn({ method: "POST" })
       force: true,
     });
   });
+
+/** First paragraph that reads like a description: prose, not menus, links or headings. */
+function leadParagraph(markdown: string): string | null {
+  for (const raw of markdown.split(/\n\s*\n/)) {
+    const text = raw
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/[*_`>#]+/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text.length < 120 || text.length > 1200) continue;
+    if (/^(skip to|menu|home|search|cookie|sign in|language|share)/i.test(text)) continue;
+    const words = text.split(" ");
+    const sentences = (text.match(/[.!?](\s|$)/g) ?? []).length;
+    if (words.length < 20 || sentences < 1) continue;
+    return text.length > 600 ? `${text.slice(0, 597).replace(/\s+\S*$/, "")}…` : text;
+  }
+  return null;
+}
