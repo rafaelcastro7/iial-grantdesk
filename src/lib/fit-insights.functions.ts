@@ -160,6 +160,8 @@ export const applyProfileSuggestion = createServerFn({ method: "POST" })
       .object({
         kind: z.enum(["add_applicant_type", "add_sector", "add_jurisdiction", "lower_min_amount"]),
         value: z.string().min(1).max(80),
+        /** Grants this suggestion was raised for; re-checked right away. */
+        grantIds: z.array(z.string().uuid()).max(200).default([]),
       })
       .parse(i),
   )
@@ -212,5 +214,26 @@ export const applyProfileSuggestion = createServerFn({ method: "POST" })
         .update(rulesPatch as never)
         .eq("user_id", context.userId);
     }
-    return { ok: true };
+
+    // Re-check at once the grants that were failing on this rule, so the
+    // ones it unblocks show up immediately (rules only, 0 tokens). The rest
+    // of the catalog is re-checked as stale on the next radar/insights load.
+    const { evaluateGrantImpl } = await import("@/agents/evaluator.impl.server");
+    let rechecked = 0;
+    let nowPassing = 0;
+    for (const grantId of data.grantIds) {
+      try {
+        const r = (await evaluateGrantImpl({
+          grantId,
+          userId: context.userId,
+          userSupabase: context.supabase,
+          rulesOnly: true,
+        })) as { eligibility_pass?: boolean };
+        rechecked++;
+        if (r?.eligibility_pass) nowPassing++;
+      } catch (err) {
+        console.warn(`[applyProfileSuggestion] re-check failed for ${grantId}:`, err);
+      }
+    }
+    return { ok: true, rechecked, nowPassing };
   });

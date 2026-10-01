@@ -18,6 +18,7 @@ function FitInsightsPage() {
   const apply = useServerFn(applyProfileSuggestion);
   const qc = useQueryClient();
   const [applied, setApplied] = useState<Set<string>>(new Set());
+  const [result, setResult] = useState<string | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ["fit-insights"],
     queryFn: () => fetchInsights(),
@@ -39,10 +40,19 @@ function FitInsightsPage() {
     };
   }, [recheck, qc, applied.size]);
   const mutation = useMutation({
-    mutationFn: (s: { kind: string; value: string }) =>
-      apply({ data: s as { kind: "add_sector"; value: string } }),
-    onSuccess: async (_r, s) => {
+    mutationFn: (s: { kind: string; value: string; grantIds: string[] }) =>
+      apply({ data: s as { kind: "add_sector"; value: string; grantIds: string[] } }),
+    onSuccess: async (r, s) => {
       setApplied((prev) => new Set(prev).add(`${s.kind}:${s.value}`));
+      const { rechecked = 0, nowPassing = 0 } = (r ?? {}) as {
+        rechecked?: number;
+        nowPassing?: number;
+      };
+      setResult(
+        rechecked > 0
+          ? `Re-checked ${rechecked} grant${rechecked === 1 ? "" : "s"} affected by this rule: ${nowPassing} now pass${nowPassing === 1 ? "es" : ""}.`
+          : "Profile updated.",
+      );
       await qc.invalidateQueries({ queryKey: ["grants"] });
       await qc.invalidateQueries({ queryKey: ["org", "self"] });
       await qc.invalidateQueries({ queryKey: ["fit-insights"] });
@@ -110,9 +120,19 @@ function FitInsightsPage() {
                           size="sm"
                           variant={done ? "outline" : "default"}
                           disabled={done || mutation.isPending}
-                          onClick={() => mutation.mutate({ kind: s.kind, value: s.value })}
+                          onClick={() =>
+                            mutation.mutate({
+                              kind: s.kind,
+                              value: s.value,
+                              grantIds: s.grants.map((g) => g.id),
+                            })
+                          }
                         >
-                          {done ? (
+                          {mutation.isPending &&
+                          mutation.variables?.kind === s.kind &&
+                          mutation.variables?.value === s.value ? (
+                            <>Re-checking…</>
+                          ) : done ? (
                             <>
                               <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Added
                             </>
@@ -132,8 +152,8 @@ function FitInsightsPage() {
               )}
               {applied.size > 0 && (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Profile updated. Every grant is being re-checked; the counts above refresh
-                  when it finishes.
+                  {result} The rest of the catalog is re-checked in the background; the counts above
+                  refresh when it finishes.
                 </p>
               )}
             </CardContent>
