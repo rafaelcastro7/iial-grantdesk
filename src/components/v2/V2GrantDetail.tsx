@@ -124,6 +124,11 @@ type Grant = {
   enrich_attempts?: number | null;
   eligibility_note?: string | null;
   applicant_types?: string[] | null;
+  funding_uses?: string[] | null;
+  populations_served?: string[] | null;
+  funder_type?: string | null;
+  deadline_kind?: string | null;
+  confirmed_source_urls?: string[] | null;
   manual_fields?: ManualFactsGrant["manual_fields"];
   field_search_status?: ManualFactsGrant["field_search_status"];
   historical_awards?: {
@@ -259,8 +264,33 @@ export function V2GrantDetail({
   const [detailMode, setDetailMode] = useDetailMode();
   const isTechnical = detailMode === "technical";
 
+  const kind = fundingKindOf(grant);
+  const applicantTypes = grant.applicant_types ?? [];
+  const fundingUses = grant.funding_uses ?? [];
+  const populations = grant.populations_served ?? [];
+  const sectors = grant.sectors ?? [];
+  // Boolean eligibility flags read as a list of who the funder names; other
+  // structured values stay as labelled rows.
+  const eligibleGroups = eligibilityRows
+    .filter(([, value]) => value === true)
+    .map(([key]) => ELIGIBILITY_LABEL[key] ?? humanizeKey(key));
+  const eligibilityDetails = eligibilityRows.filter(
+    ([, value]) => typeof value !== "boolean" && value != null && value !== "",
+  );
+  const otherSources = (grant.confirmed_source_urls ?? [])
+    .filter((url) => url !== grant.url && url !== grant.funder?.source_url)
+    .slice(0, 6);
+  const deadlineTone =
+    deadline.days == null
+      ? "neutral"
+      : deadline.days < 0
+        ? "danger"
+        : deadline.days <= 14
+          ? "warning"
+          : "neutral";
+
   return (
-    <section className="mx-auto max-w-[1500px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
+    <section className="mx-auto max-w-[1400px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="outline" size="sm" className="gap-2">
           <Link to="/grants">
@@ -274,36 +304,32 @@ export function V2GrantDetail({
             role="group"
             aria-label="Detail level"
           >
-            <button
-              type="button"
-              onClick={() => setDetailMode("simple")}
-              className={cn(
-                "rounded-[5px] px-3 py-1 font-medium transition-colors",
-                !isTechnical
-                  ? "bg-brand text-brand-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Simple
-            </button>
-            <button
-              type="button"
-              onClick={() => setDetailMode("technical")}
-              className={cn(
-                "rounded-[5px] px-3 py-1 font-medium transition-colors",
-                isTechnical
-                  ? "bg-brand text-brand-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Technical
-            </button>
+            {(["simple", "technical"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setDetailMode(mode)}
+                className={cn(
+                  "rounded-[5px] px-3 py-1 font-medium capitalize transition-colors",
+                  detailMode === mode
+                    ? "bg-brand text-brand-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
-          <Button asChild variant="outline" size="sm" className="gap-2">
-            <Link to="/grants/$id/audit" params={{ id: grant.id }}>
-              <History className="h-4 w-4" />
-              Scoring details
-            </Link>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={busy === "share"}
+            onClick={onShare}
+          >
+            <Link2 className="h-4 w-4" />
+            {busy === "share" ? "Creating" : shareUrl ? "Copied" : "Share"}
           </Button>
           {grant.url && (
             <ExternalLinkPreview url={grant.url} className={buttonVariants({ size: "sm" })}>
@@ -313,236 +339,11 @@ export function V2GrantDetail({
         </div>
       </div>
 
-      <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="rounded-md border bg-card shadow-sm">
-          <div className="grid min-h-[360px] lg:grid-cols-[minmax(0,1.2fr)_330px]">
-            <div className="p-5 sm:p-6">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="gap-1.5 rounded-md px-2.5 py-1">
-                  <span className={cn("h-1.5 w-1.5 rounded-full", verdict.dot)} />
-                  {verdict.label}
-                </Badge>
-                <Badge variant="secondary" className="rounded-md">
-                  {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
-                </Badge>
-                {fundingKindOf(grant) !== "grant" && (
-                  <Badge
-                    variant="outline"
-                    className="rounded-md border-amber-500/50 text-amber-800 dark:text-amber-300"
-                  >
-                    {FUNDING_KIND_LABEL[fundingKindOf(grant)]} — not a grant
-                  </Badge>
-                )}
-                {duplicateGroupSize > 1 && (
-                  <Badge variant="outline" className="rounded-md text-amber-700">
-                    {duplicateGroupSize} similar records
-                  </Badge>
-                )}
-              </div>
-
-              <h1 className="mt-4 max-w-4xl text-3xl font-semibold leading-tight sm:text-4xl">
-                {grant.title}
-              </h1>
-
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
-                  <Landmark className="h-4 w-4" />
-                  {funderName}
-                </span>
-                {grant.funder?.jurisdiction && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4" />
-                    {grant.funder.jurisdiction}
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1.5 uppercase">
-                  <Globe2 className="h-4 w-4" />
-                  {grant.language}
-                </span>
-              </div>
-
-              <p className="mt-5 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                {grant.summary?.trim() ||
-                  "A reliable summary is not available yet. Fetch details to pull more context from the official funder page."}
-              </p>
-
-              <div className="mt-6 grid gap-2 sm:grid-cols-3">
-                <SignalTile
-                  icon={DollarSign}
-                  label="Funding"
-                  value={amount}
-                  detail={
-                    grant.amount_cad_max == null && grant.historical_awards
-                      ? `Past awards: median ${formatMoney(grant.historical_awards.median, grant.historical_awards.currency)}, 90% under ${formatMoney(grant.historical_awards.p90, grant.historical_awards.currency)} (${grant.historical_awards.count} agreements)`
-                      : undefined
-                  }
-                />
-                <SignalTile
-                  icon={CalendarClock}
-                  label="Deadline"
-                  value={deadline.label}
-                  detail={deadline.detail}
-                />
-                <SignalTile
-                  icon={fitScore == null ? Gauge : BarChart3}
-                  label="Fit"
-                  value={fitScore == null ? "Not scored" : `${fitScore}/100`}
-                  detail={
-                    evaluation
-                      ? evaluation.eligibility_pass
-                        ? "Eligible"
-                        : "Eligibility risk"
-                      : "Run evaluator"
-                  }
-                  tone={
-                    evaluation?.eligibility_pass
-                      ? "success"
-                      : fitScore == null
-                        ? "neutral"
-                        : "danger"
-                  }
-                />
-              </div>
-            </div>
-
-            <aside className="border-t bg-muted/35 p-5 lg:border-l lg:border-t-0">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-normal text-muted-foreground">
-                    Decision brief
-                  </div>
-                  <div className="mt-1 text-lg font-semibold leading-snug">{verdict.label}</div>
-                </div>
-                <Sparkles className="h-5 w-5 text-brand" />
-              </div>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{verdict.detail}</p>
-              {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
-
-              <div className="mt-5 space-y-2">
-                {canFetch && (
-                  <Button
-                    className="w-full gap-2"
-                    disabled={actionDisabled}
-                    onClick={onFetchDetails}
-                  >
-                    {busy === "enrich" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    Fetch details
-                  </Button>
-                )}
-                <div className="w-full">
-                  <Button
-                    className="w-full gap-2"
-                    variant={canFetch ? "outline" : "default"}
-                    disabled={actionDisabled || !canEvaluate}
-                    onClick={onEvaluate}
-                    title={evaluateBlockedReason ?? undefined}
-                  >
-                    {busy === "eval" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <SearchCheck className="h-4 w-4" />
-                    )}
-                    {evaluation ? "Re-evaluate fit" : "Check fit"}
-                  </Button>
-                  {evaluateBlockedReason && (
-                    <p className="mt-1.5 text-xs text-muted-foreground">{evaluateBlockedReason}</p>
-                  )}
-                </div>
-                {existingProposalId ? (
-                  <Button asChild className="w-full gap-2">
-                    <Link to="/proposals/$id" params={{ id: existingProposalId }}>
-                      <FileText className="h-4 w-4" />
-                      Open proposal
-                    </Link>
-                  </Button>
-                ) : (
-                  <div className="w-full">
-                    <Button
-                      className="w-full gap-2"
-                      disabled={actionDisabled || !canDraft}
-                      onClick={onDraft}
-                      title={draftBlockedReason ?? undefined}
-                    >
-                      {busy === "draft" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                      Draft proposal
-                    </Button>
-                    {/* A permanently greyed-out button with no explanation is
-                        the single most confusing state on this page: the app
-                        knows exactly why drafting is blocked (not evaluated
-                        yet, or evaluated as not eligible) and used to say
-                        nothing at all. */}
-                    {draftBlockedReason && (
-                      <p className="mt-1.5 text-xs text-muted-foreground">{draftBlockedReason}</p>
-                    )}
-                  </div>
-                )}
-                <DismissGrantControl
-                  grantId={grant.id}
-                  defaultReason={
-                    fundingKindOf(grant) === "loan" ? "loan_not_grant" : "outside_field"
-                  }
-                />
-              </div>
-
-              <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-                <QualityMini label="Completeness" value={`${quality.pct}%`} />
-                <QualityMini label="Evidence fields" value={`${quality.known}/${quality.total}`} />
-              </div>
-            </aside>
-          </div>
-        </div>
-
-        <aside className="rounded-md border bg-card p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Clock3 className="h-4 w-4 text-primary" />
-            History
-          </div>
-          <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-xs">
-            <div className="flex gap-2">
-              <dt className="text-muted-foreground">First found</dt>
-              <dd className="text-foreground">{formatDateTime(grant.discovered_at)}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="text-muted-foreground">Last checked</dt>
-              <dd className="text-foreground">{formatDateTime(grant.last_seen_at)}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="text-muted-foreground">Times seen</dt>
-              <dd className="text-foreground">{grant.times_seen ?? 1}</dd>
-            </div>
-          </dl>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busy === "share"}
-              onClick={onShare}
-            >
-              <Link2 className="h-4 w-4" />
-              {busy === "share" ? "Creating" : shareUrl ? "Copied" : "Share"}
-            </Button>
-            {grant.status !== "discovered" && (
-              <NotebookLMBridge grantId={grant.id} label="Notebook" />
-            )}
-          </div>
-        </aside>
-      </section>
-
       {err && (
         <section className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {err}
         </section>
       )}
-
       {busy === "enrich" && (
         <section className="flex items-center gap-2 rounded-md border border-teal-500/40 bg-teal-500/5 px-4 py-3 text-sm">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -550,53 +351,103 @@ export function V2GrantDetail({
         </section>
       )}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
-          {isTechnical && (
-            <section className="space-y-3">
-              <SectionHeading
-                actions={
-                  evaluation ? (
-                    <EvidenceChip
-                      field="fit_score"
-                      label="Score evidence"
-                      onClick={onOpenEvidence}
-                    />
-                  ) : undefined
-                }
-                description="The action recommendation, score, and rationale generated for this organization."
-                icon={ClipboardCheck}
-                title="Fit and eligibility"
-              />
-              <FitEvaluation
-                status={grant.status}
-                discoveredAt={grant.discovered_at}
-                enrichedAt={grant.enriched_at}
-                scoredAt={grant.scored_at}
-                evaluation={
-                  evaluation
-                    ? {
-                        fit_score: evaluation.fit_score,
-                        eligibility_pass: evaluation.eligibility_pass,
-                        rationale_en: humanizeRationale(evaluation.rationale_en) ?? "",
-                        rationale_fr: evaluation.rationale_fr ?? "",
-                        created_at: evaluation.created_at,
-                        axis_breakdown:
-                          (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
-                      }
-                    : null
-                }
-                fr={false}
-              />
-            </section>
-          )}
+          {/* 1. What the opportunity is: identity, money, timing, who, what. */}
+          <div className="rounded-md border bg-card p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="rounded-md">
+                {FUNDING_KIND_LABEL[kind]}
+              </Badge>
+              {kind !== "grant" && (
+                <Badge
+                  variant="outline"
+                  className="rounded-md border-amber-500/50 text-amber-800 dark:text-amber-300"
+                >
+                  Not a grant
+                </Badge>
+              )}
+              {grant.funder_type && (
+                <Badge variant="outline" className="rounded-md">
+                  {displayTag(grant.funder_type)} funder
+                </Badge>
+              )}
+              {duplicateGroupSize > 1 && (
+                <Badge variant="outline" className="rounded-md text-amber-700">
+                  {duplicateGroupSize} similar records
+                </Badge>
+              )}
+            </div>
 
-          {isTechnical && grant.enriched_at && <EvaluationDetail grantId={grant.id} />}
+            <h1 className="mt-3 max-w-4xl text-2xl font-semibold leading-tight sm:text-3xl">
+              {grant.title}
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <Landmark className="h-4 w-4" />
+                {funderName}
+              </span>
+              {grant.funder?.jurisdiction && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4" />
+                  {grant.funder.jurisdiction}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 uppercase">
+                <Globe2 className="h-4 w-4" />
+                {grant.language}
+              </span>
+            </div>
 
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <SignalTile
+                icon={DollarSign}
+                label={kind === "grant" ? "Award amount" : "Financing amount"}
+                value={amount}
+                detail={
+                  grant.historical_awards
+                    ? `Past awards: median ${formatMoney(grant.historical_awards.median, grant.historical_awards.currency)}, 90% under ${formatMoney(grant.historical_awards.p90, grant.historical_awards.currency)} (${grant.historical_awards.count} agreements)`
+                    : undefined
+                }
+              />
+              <SignalTile
+                icon={CalendarClock}
+                label="Deadline"
+                value={
+                  grant.deadline_kind === "rolling" && !grant.deadline ? "Rolling" : deadline.label
+                }
+                detail={
+                  grant.deadline_kind === "rolling"
+                    ? "Rolling intake"
+                    : grant.deadline_kind === "estimated"
+                      ? `${deadline.detail} (estimated)`
+                      : deadline.detail
+                }
+                tone={deadlineTone}
+              />
+            </div>
+
+            <dl className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              <FactRow label="Who can apply" values={applicantTypes} />
+              <FactRow label="What it pays for" values={fundingUses} />
+              <FactRow label="Who it is meant to help" values={populations} />
+              <FactRow label="Sectors" values={sectors} />
+            </dl>
+
+            <div className="mt-6 border-t pt-5">
+              <h2 className="text-sm font-semibold">About this opportunity</h2>
+              <p className="mt-2 max-w-3xl whitespace-pre-line text-sm leading-7 text-muted-foreground">
+                {grant.summary?.trim() ||
+                  "No reliable description yet. Fetch details or open the official page."}
+              </p>
+            </div>
+          </div>
+
+          {/* 2. What the funder asks for. */}
           <Panel
             icon={FileCheck2}
-            title="Application requirements"
-            description="Critical asks first, then supporting requirements."
+            title="What they ask for"
+            description="Critical conditions first, then documents and other asks."
             actions={
               isTechnical && requirements.length > 0 ? (
                 <EvidenceChip
@@ -610,32 +461,25 @@ export function V2GrantDetail({
             {requirements.length === 0 ? (
               <EmptyState
                 icon={FileCheck2}
-                title="No structured requirements yet"
-                body="Fetch details or review the official page before assigning proposal work."
+                title="No requirements extracted yet"
+                body="Check the official page for documents, matching funds and conditions before assigning work."
               />
             ) : (
               <div className="space-y-3">
-                {criticalRequirements.length > 0 && (
-                  <RequirementGroup title="Critical" requirements={criticalRequirements} />
-                )}
+                <RequirementGroup title="Critical" requirements={criticalRequirements} />
                 <RequirementGroup
-                  title="Supporting"
+                  title="Other requirements"
                   requirements={requirements.filter((item) => !item.isCritical)}
                 />
               </div>
             )}
           </Panel>
 
-          <ManualFactsPanel grant={grant} />
-
-          {grant.status !== "discovered" && (
-            <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={isTechnical} />
-          )}
-
+          {/* 3. The funder's own eligibility statements (facts, not our verdict). */}
           <Panel
             icon={ShieldCheck}
-            title="Eligibility evidence"
-            description="Parsed eligibility fields from the funder source."
+            title="Eligibility rules stated by the funder"
+            description="What the source says about who qualifies."
             actions={
               isTechnical && eligibilityRows.length > 0 ? (
                 <EvidenceChip
@@ -646,63 +490,137 @@ export function V2GrantDetail({
               ) : undefined
             }
           >
-            {eligibilityRows.length === 0 ? (
+            {eligibleGroups.length === 0 &&
+            eligibilityDetails.length === 0 &&
+            !grant.eligibility_note ? (
               <EmptyState
                 icon={ShieldAlert}
-                title="Eligibility is not structured yet"
-                body="This record may still be a lead. Pull more source context before pursuing."
+                title="No eligibility rules extracted yet"
+                body="Confirm who qualifies on the official page before pursuing."
               />
             ) : (
-              <dl className="grid gap-2">
-                {eligibilityRows.map(([key, value]) => (
-                  <div key={key} className="rounded-md border bg-background/70 p-3">
-                    <dt className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-                      {humanizeKey(key)}
-                    </dt>
-                    <dd className="mt-1 text-sm">
-                      <ValueBlock value={value} />
-                    </dd>
+              <div className="space-y-3 text-sm">
+                {grant.eligibility_note && <p className="leading-6">{grant.eligibility_note}</p>}
+                {eligibleGroups.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">
+                      Mentioned as eligible
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {eligibleGroups.map((label) => (
+                        <Badge key={label} variant="secondary" className="rounded-md">
+                          {label}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </dl>
+                )}
+                {eligibilityDetails.length > 0 && (
+                  <dl className="grid gap-2">
+                    {eligibilityDetails.map(([key, value]) => (
+                      <div key={key} className="rounded-md border bg-background/70 p-3">
+                        <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                          {ELIGIBILITY_LABEL[key] ?? humanizeKey(key)}
+                        </dt>
+                        <dd className="mt-1">
+                          <ValueBlock value={value} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </div>
             )}
           </Panel>
 
+          <ManualFactsPanel grant={grant} />
+
+          {grant.status !== "discovered" && (
+            <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={isTechnical} />
+          )}
+
+          <Panel icon={Link2} title="Sources" description="Where these facts come from.">
+            <div className="space-y-2 text-sm">
+              {grant.url && <SourceLink href={grant.url} label="Grant page" />}
+              {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
+                <SourceLink href={grant.funder.source_url} label="Funder website" />
+              )}
+              {otherSources.map((url) => (
+                <SourceLink key={url} href={url} label={url.replace(/^https?:\/\/(www\.)?/, "")} />
+              ))}
+              {!grant.url && !grant.funder?.source_url && (
+                <p className="text-muted-foreground">No official URL stored.</p>
+              )}
+              <p className="pt-1 text-xs text-muted-foreground">
+                First found {formatDateTime(grant.discovered_at)} · last checked{" "}
+                {formatDateTime(grant.last_seen_at)}
+              </p>
+            </div>
+          </Panel>
+
+          {/* 4. Our assessment comes after the facts. */}
+          <div className="flex items-center gap-3 pt-4">
+            <h2 className="text-lg font-semibold">Assessment for your organization</h2>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
           <Panel
-            icon={Tags}
-            title="Sectors and fit signals"
-            description="Themes used for discovery, matching, and search."
+            icon={ClipboardCheck}
+            title="Fit and eligibility check"
+            description={
+              evaluation
+                ? `Checked ${formatDateTime(evaluation.created_at)} against your profile.`
+                : "Not checked yet."
+            }
             actions={
-              isTechnical && grant.sectors?.length ? (
-                <EvidenceChip field="sectors" label="Sector evidence" onClick={onOpenEvidence} />
+              isTechnical && evaluation ? (
+                <EvidenceChip field="fit_score" label="Score evidence" onClick={onOpenEvidence} />
               ) : undefined
             }
           >
-            <div className="flex flex-wrap gap-2">
-              {grant.sectors?.length ? (
-                grant.sectors.map((sector) => (
-                  <Badge key={sector} variant="secondary" className="rounded-md">
-                    {displayTag(sector)}
-                  </Badge>
-                ))
-              ) : (
-                <span className="text-sm text-muted-foreground">No sectors extracted yet.</span>
-              )}
-            </div>
+            <p className="text-sm leading-6 text-muted-foreground">{verdict.detail}</p>
+            {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
+            {!isTechnical && evaluation?.rationale_en && (
+              <p className="mt-3 text-sm leading-6">{humanizeRationale(evaluation.rationale_en)}</p>
+            )}
           </Panel>
-        </div>
 
-        <aside className="min-w-0 space-y-4">
-          <Panel
-            icon={Gauge}
-            title="Data quality"
-            description="Whether this record has enough grounded detail for a decision."
-          >
-            <div className="space-y-3">
-              <div>
+          {isTechnical && (
+            <FitEvaluation
+              status={grant.status}
+              discoveredAt={grant.discovered_at}
+              enrichedAt={grant.enriched_at}
+              scoredAt={grant.scored_at}
+              evaluation={
+                evaluation
+                  ? {
+                      fit_score: evaluation.fit_score,
+                      eligibility_pass: evaluation.eligibility_pass,
+                      rationale_en: humanizeRationale(evaluation.rationale_en) ?? "",
+                      rationale_fr: evaluation.rationale_fr ?? "",
+                      created_at: evaluation.created_at,
+                      axis_breakdown:
+                        (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
+                    }
+                  : null
+              }
+              fr={false}
+            />
+          )}
+          {isTechnical && grant.enriched_at && <EvaluationDetail grantId={grant.id} />}
+
+          {isTechnical && (
+            <>
+              <Panel
+                icon={Gauge}
+                title="Data quality"
+                description="Whether this record has enough grounded detail for a decision."
+              >
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">Completeness</span>
-                  <span className="tabular-nums">{quality.pct}%</span>
+                  <span className="tabular-nums">
+                    {quality.pct}% · {quality.known}/{quality.total} fields
+                  </span>
                 </div>
                 <div className="mt-2 h-2 rounded-full bg-muted">
                   <div
@@ -710,68 +628,50 @@ export function V2GrantDetail({
                     style={{ width: `${quality.pct}%` }}
                   />
                 </div>
-              </div>
-              <ul className="space-y-2 text-sm">
-                {quality.checks.map((check) => (
-                  <li key={check.label} className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">{check.label}</span>
-                    {check.ok ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4 text-amber-600" />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Panel>
-
-          <Panel icon={Link2} title="Official sources" description="User-facing source links.">
-            <div className="space-y-2 text-sm">
-              {grant.url && <SourceLink href={grant.url} label="Grant page" />}
-              {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
-                <SourceLink href={grant.funder.source_url} label="Funder website" />
-              )}
-              {!grant.url && !grant.funder?.source_url && (
-                <p className="text-muted-foreground">No official URL stored.</p>
-              )}
-            </div>
-          </Panel>
-
-          {isTechnical && (
-            <Panel
-              icon={History}
-              title="Lifecycle history"
-              description="Latest grant status changes."
-            >
-              {events.length === 0 ? (
-                <EmptyState
-                  icon={History}
-                  title="No status events"
-                  body="Events will appear as enrichment, evaluation, and proposal work happens."
-                />
-              ) : (
-                <ol className="space-y-3">
-                  {events.slice(0, 8).map((event, index) => (
-                    <li key={`${event.created_at}-${index}`} className="flex gap-3 text-sm">
-                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                      <span className="min-w-0">
-                        <span className="block font-medium">
-                          {event.from_status ?? "none"} to {event.to_status}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">
-                          {formatDateTime(event.created_at)}
-                        </span>
-                      </span>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {quality.checks.map((check) => (
+                    <li key={check.label} className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">{check.label}</span>
+                      {check.ok ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      )}
                     </li>
                   ))}
-                </ol>
-              )}
-            </Panel>
-          )}
-
-          {isTechnical && (
-            <>
+                </ul>
+              </Panel>
+              <Panel icon={History} title="Lifecycle history" description="Status changes.">
+                {events.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No status events yet.</p>
+                ) : (
+                  <ol className="space-y-3">
+                    {events.slice(0, 8).map((event, index) => (
+                      <li key={`${event.created_at}-${index}`} className="flex gap-3 text-sm">
+                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                        <span className="min-w-0">
+                          <span className="block font-medium">
+                            {event.from_status ?? "none"} to {event.to_status}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {formatDateTime(event.created_at)}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Seen {grant.times_seen ?? 1} times ·{" "}
+                  <Link
+                    to="/grants/$id/audit"
+                    params={{ id: grant.id }}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    Scoring details
+                  </Link>
+                </p>
+              </Panel>
               <SelfCheckBanner
                 grantId={grant.id}
                 retrying={busy === "enrich"}
@@ -783,36 +683,163 @@ export function V2GrantDetail({
                 errorMsg={grant.enrich_last_error ?? null}
                 onRetry={onFetchDetails}
               />
+              {traceRun && (
+                <Badge variant="outline" className="rounded-md">
+                  Trace ready: {traceRun.agent || "agent"}
+                </Badge>
+              )}
             </>
           )}
+        </div>
 
-          {(isTechnical || (isAdmin && grant.status === "scored")) && (
-            <Panel icon={NotebookText} title="Briefing tools" description="Human review outputs.">
-              {hasBriefingTools ? (
-                <div className="flex flex-wrap gap-2">
-                  {isAdmin && grant.status === "scored" && (
-                    <Button size="sm" disabled={busy === "shortlist"} onClick={onShortlist}>
-                      Shortlist
-                    </Button>
+        {/* Decision rail: stays in view while reading the facts. */}
+        <aside className="min-w-0">
+          <div className="space-y-4 rounded-md border bg-card p-5 shadow-sm lg:sticky lg:top-4">
+            <div>
+              <div className="text-[11px] font-semibold uppercase text-muted-foreground">
+                Next step
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-lg font-semibold leading-snug">
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", verdict.dot)} />
+                {verdict.label}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-md border bg-background/70 p-3">
+                <div className="text-xs text-muted-foreground">Fit</div>
+                <div
+                  className={cn(
+                    "mt-1 text-xl font-semibold tabular-nums",
+                    evaluation?.eligibility_pass
+                      ? "text-emerald-600"
+                      : fitScore == null
+                        ? ""
+                        : "text-rose-600",
                   )}
-                  {isTechnical && traceRun && (
-                    <Badge variant="outline" className="rounded-md">
-                      Trace ready: {traceRun.agent || "agent"}
-                    </Badge>
-                  )}
+                >
+                  {fitScore == null ? "—" : `${fitScore}/100`}
                 </div>
-              ) : (
-                <EmptyState
-                  icon={NotebookText}
-                  title="Briefing tools unlock after verification"
-                  body="Fetch reliable details or resolve the source issue before generating proposal briefs."
-                />
+              </div>
+              <div className="rounded-md border bg-background/70 p-3">
+                <div className="text-xs text-muted-foreground">Eligible</div>
+                <div className="mt-1 text-xl font-semibold">
+                  {evaluation ? (evaluation.eligibility_pass ? "Yes" : "No") : "—"}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {canFetch && (
+                <Button className="w-full gap-2" disabled={actionDisabled} onClick={onFetchDetails}>
+                  {busy === "enrich" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Fetch details
+                </Button>
               )}
-            </Panel>
-          )}
+              <Button
+                className="w-full gap-2"
+                variant={canFetch ? "outline" : "default"}
+                disabled={actionDisabled || !canEvaluate}
+                onClick={onEvaluate}
+                title={evaluateBlockedReason ?? undefined}
+              >
+                {busy === "eval" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <SearchCheck className="h-4 w-4" />
+                )}
+                {evaluation ? "Re-check fit" : "Check fit"}
+              </Button>
+              {evaluateBlockedReason && (
+                <p className="text-xs text-muted-foreground">{evaluateBlockedReason}</p>
+              )}
+              {existingProposalId ? (
+                <Button asChild className="w-full gap-2">
+                  <Link to="/proposals/$id" params={{ id: existingProposalId }}>
+                    <FileText className="h-4 w-4" />
+                    Open proposal
+                  </Link>
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    className="w-full gap-2"
+                    variant="outline"
+                    disabled={actionDisabled || !canDraft}
+                    onClick={onDraft}
+                    title={draftBlockedReason ?? undefined}
+                  >
+                    {busy === "draft" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    Draft proposal
+                  </Button>
+                  {draftBlockedReason && (
+                    <p className="text-xs text-muted-foreground">{draftBlockedReason}</p>
+                  )}
+                </>
+              )}
+              {isAdmin && grant.status === "scored" && (
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={busy === "shortlist"}
+                  onClick={onShortlist}
+                >
+                  Shortlist
+                </Button>
+              )}
+              {grant.status !== "discovered" && (
+                <NotebookLMBridge grantId={grant.id} label="Notebook" />
+              )}
+              <DismissGrantControl
+                grantId={grant.id}
+                defaultReason={kind === "loan" ? "loan_not_grant" : "outside_field"}
+              />
+            </div>
+          </div>
         </aside>
       </section>
     </section>
+  );
+}
+
+const ELIGIBILITY_LABEL: Record<string, string> = {
+  smb: "Small and medium businesses",
+  startup: "Startups",
+  non_profit: "Nonprofits",
+  for_profit: "For-profit companies",
+  indigenous: "Indigenous organizations or people",
+  government: "Public bodies and governments",
+  individual: "Individuals",
+  research_university: "Universities and research institutions",
+  ai_ml: "AI / machine learning work",
+};
+
+function FactRow({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold uppercase text-muted-foreground">{label}</dt>
+      <dd className="mt-1.5 flex flex-wrap gap-1.5 text-sm">
+        {values.length ? (
+          values.map((value) => (
+            <Badge key={value} variant="outline" className="rounded-md font-normal">
+              {displayTag(value)}
+            </Badge>
+          ))
+        ) : (
+          <span className="text-muted-foreground">Not stated</span>
+        )}
+      </dd>
+    </div>
   );
 }
 

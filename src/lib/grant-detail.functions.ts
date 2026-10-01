@@ -28,6 +28,15 @@ export const getGrantDetail = createServerFn({ method: "GET" })
       .maybeSingle();
     (grant as Record<string, unknown>).historical_awards =
       (history as { historical_awards?: unknown } | null)?.historical_awards ?? null;
+    // At-a-glance facts for the detail header; tolerant like the reads around it.
+    const { data: facets } = await context.supabase
+      .from("grants")
+      .select(
+        "funding_uses, populations_served, funder_type, deadline_kind, confirmed_source_urls" as never,
+      )
+      .eq("id", data.id)
+      .maybeSingle();
+    Object.assign(grant as Record<string, unknown>, (facets as Record<string, unknown>) ?? {});
     // Separate from the history read so one missing column cannot hide the other.
     const { data: provenance } = await context.supabase
       .from("grants")
