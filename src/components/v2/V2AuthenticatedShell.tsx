@@ -138,7 +138,12 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Set up",
     accent: "teal",
     items: [
-      { to: "/org", label: "About us", description: "Profile and criteria", icon: Building2 },
+      {
+        to: "/org",
+        label: "Organization profile",
+        description: "Who you are and what you apply for",
+        icon: Building2,
+      },
       {
         to: "/fit-rules",
         label: "What we show you",
