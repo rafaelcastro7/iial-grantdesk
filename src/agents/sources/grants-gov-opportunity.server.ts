@@ -13,9 +13,22 @@ type Forecast = Omit<Synopsis, "synopsisDesc" | "responseDate"> & {
   forecastDesc?: unknown;
   estApplicationResponseDate?: unknown;
 };
-type Payload = { errorcode?: unknown; data?: { synopsis?: Synopsis; forecast?: Forecast } };
+type Payload = {
+  errorcode?: unknown;
+  data?: {
+    synopsis?: Synopsis;
+    forecast?: Forecast;
+    cfdas?: Array<{ cfdaNumber?: unknown; programTitle?: unknown }>;
+  };
+};
 
-export type GrantsGovOpportunitySource = { markdown: string; detailUrl: string | null };
+export type AssistanceListing = { number: string; title: string | null };
+export type GrantsGovOpportunitySource = {
+  markdown: string;
+  detailUrl: string | null;
+  /** CFDA / Assistance Listing numbers, used to look up past awards. */
+  assistanceListings: AssistanceListing[];
+};
 
 export function grantsGovOpportunityId(url: string): number | null {
   const match = /^https?:\/\/(?:www\.)?grants\.gov\/search-results-detail\/(\d+)(?:[/?#]|$)/i.exec(
@@ -93,7 +106,14 @@ export async function fetchGrantsGovOpportunitySource(
     .map((item) => plainText(item.description))
     .filter(Boolean);
   if (sectors.length > 0) lines.push(`Funding activity categories: ${sectors.join("; ")}.`);
+  const assistanceListings = (payload.data?.cfdas ?? [])
+    .filter((item) => typeof item.cfdaNumber === "string" && item.cfdaNumber.trim())
+    .map((item) => ({
+      number: String(item.cfdaNumber).trim(),
+      title: typeof item.programTitle === "string" ? item.programTitle.trim() : null,
+    }));
   return {
+    assistanceListings,
     markdown: lines.filter(Boolean).join("\n\n"),
     detailUrl:
       typeof synopsis.fundingDescLinkUrl === "string" && synopsis.fundingDescLinkUrl.trim()

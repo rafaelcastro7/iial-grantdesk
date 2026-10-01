@@ -12,6 +12,7 @@ const API = "https://open.canada.ca/data/api/action/datastore_search";
 
 export type HistoricalAwards = {
   program: string;
+  currency: "CAD" | "USD";
   count: number;
   sample: number;
   median: number;
@@ -78,6 +79,7 @@ async function fetchProgram(program: string): Promise<HistoricalAwards | null> {
   if (!body.success || values.length < 3) return null;
   return {
     program,
+    currency: "CAD",
     count: body.result?.total ?? values.length,
     sample: values.length,
     median: quantile(values, 0.5),

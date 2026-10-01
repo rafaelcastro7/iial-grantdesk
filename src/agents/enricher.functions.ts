@@ -254,6 +254,31 @@ export async function enrichGrantImpl(
           const detail = await scrapeWithFallback(official.detailUrl);
           if (detail.ok) pages.push({ url: official.detailUrl, markdown: detail.markdown });
         }
+        // Past awards for the program's assistance listing (USAspending), and
+        // the listing numbers themselves. Best-effort, separate write.
+        const listing = official.assistanceListings[0];
+        if (listing) {
+          try {
+            const { fetchUsAwardsForListing } = await import("@/agents/sources/us-awards.server");
+            const history = await fetchUsAwardsForListing(listing.number, listing.title);
+            const { error: historyError } = await db
+              .from("grants")
+              .update({
+                assistance_listings: official.assistanceListings.map((item) => item.number),
+                ...(history ? { historical_awards: history } : {}),
+              } as never)
+              .eq("id", g.id);
+            if (history && !historyError) {
+              await trace(
+                "history",
+                `${history.sample} recent awards for CFDA ${listing.number} (median $${history.median})`,
+                "done",
+              );
+            }
+          } catch {
+            // No history: enrichment continues.
+          }
+        }
         await trace("official_api", "Loaded structured Grants.gov opportunity details", "done", {
           chars: official.markdown.length,
           detail_url: official.detailUrl,

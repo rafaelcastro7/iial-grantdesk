@@ -118,6 +118,7 @@ type Grant = {
   enrich_attempts?: number | null;
   historical_awards?: {
     program: string;
+    currency?: "CAD" | "USD";
     count: number;
     median: number;
     p90: number;
@@ -348,7 +349,7 @@ export function V2GrantDetail({
                   value={amount}
                   detail={
                     grant.amount_cad_max == null && grant.historical_awards
-                      ? `Past awards: median ${formatCad(grant.historical_awards.median)}, 90% under ${formatCad(grant.historical_awards.p90)} (${grant.historical_awards.count} agreements)`
+                      ? `Past awards: median ${formatMoney(grant.historical_awards.median, grant.historical_awards.currency)}, 90% under ${formatMoney(grant.historical_awards.p90, grant.historical_awards.currency)} (${grant.historical_awards.count} agreements)`
                       : undefined
                   }
                 />
@@ -1122,4 +1123,12 @@ function displayTag(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase())
     .replace(/\bAi\b/g, "AI")
     .replace(/\bSme\b/g, "SME");
+}
+
+function formatMoney(value: number, currency: "CAD" | "USD" = "CAD") {
+  return new Intl.NumberFormat(currency === "USD" ? "en-US" : "en-CA", {
+    currency,
+    maximumFractionDigits: 0,
+    style: "currency",
+  }).format(value);
 }
