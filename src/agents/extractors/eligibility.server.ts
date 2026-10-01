@@ -76,7 +76,9 @@ const RULES: Rule[] = [
     patterns: [
       // Students/researchers usually describe a project team, not an
       // individual applicant, so they no longer imply "individuals may apply".
-      /\bindividuals?\b/i,
+      // "individuals with limited English proficiency" / "individuals in the
+      // project team" describe people, not an individual applicant.
+      /\bindividuals?\b(?!\s+(?:with|in|who|from|of|on)\b)/i,
       /\bcitizens?\b/i,
       /\bindividus?\b/i,
     ],

@@ -172,3 +172,16 @@ describe("sector precision", () => {
     ).toContain("health");
   });
 });
+
+describe("individual applicants", () => {
+  it("does not treat descriptions of people as individual applicants", () => {
+    const text =
+      "This program supports access to healthcare for individuals with limited English proficiency.";
+    expect(extractEligibility(text).map((m) => m.tag)).not.toContain("individual");
+  });
+  it("keeps individuals listed as eligible applicants", () => {
+    expect(
+      extractEligibility("Eligible applicants: Individuals; nonprofits.").map((m) => m.tag),
+    ).toContain("individual");
+  });
+});
