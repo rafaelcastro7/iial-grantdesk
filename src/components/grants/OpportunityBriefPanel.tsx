@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { humanizeBriefCondition, humanizeBriefReason } from "@/lib/eligibility-explain";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 
 function StatusIcon({ s }: { s: string }) {
@@ -26,9 +27,9 @@ function StatusIcon({ s }: { s: string }) {
 }
 
 function VerdictBadge({ v }: { v: Brief["recommendation"]["verdict"] }) {
-  if (v === "go") return <Badge className="bg-green-600 hover:bg-green-700">GO</Badge>;
-  if (v === "no_go") return <Badge variant="destructive">NO-GO</Badge>;
-  return <Badge className="bg-amber-600 hover:bg-amber-700">GO-CONDITIONAL</Badge>;
+  if (v === "go") return <Badge className="bg-green-600 hover:bg-green-700">Recommended</Badge>;
+  if (v === "no_go") return <Badge variant="destructive">Not recommended</Badge>;
+  return <Badge className="bg-amber-600 hover:bg-amber-700">With conditions</Badge>;
 }
 
 export function OpportunityBriefPanel({
@@ -85,15 +86,13 @@ export function OpportunityBriefPanel({
             <div className="flex items-start gap-3 rounded-lg border-2 border-dashed p-3">
               <VerdictBadge v={b.recommendation.verdict} />
               <div className="flex-1 space-y-1">
-                <p className="text-xs">
-                  <strong>Reason:</strong> {b.recommendation.reason}
-                </p>
+                <p className="text-xs">{humanizeBriefReason(b.recommendation.reason)}</p>
                 {b.recommendation.conditions.length > 0 && (
                   <>
-                    <p className="mt-2 text-xs font-medium">Conditions</p>
+                    <p className="mt-2 text-xs font-medium">Before you start</p>
                     <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
                       {b.recommendation.conditions.map((c, i) => (
-                        <li key={i}>{c}</li>
+                        <li key={i}>{humanizeBriefCondition(c)}</li>
                       ))}
                     </ul>
                   </>

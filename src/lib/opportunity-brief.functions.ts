@@ -7,6 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getOrgProfileForUser } from "@/lib/org-profile-query";
+import { explainCheck, explainCondition } from "@/lib/eligibility-explain";
 import {
   DEFAULT_RULES,
   evaluateRules,
@@ -105,14 +106,14 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
 
     if (hardFails.length > 0) {
       verdict = "no_go";
-      reason = `Hard fail on ${hardFails.length} filter(s): ${hardFails.map((c) => c.label).join("; ")}`;
+      reason = `Not recommended. ${[...new Set(hardFails.map(explainCheck))].join(" ")}`;
     } else if (softFails.length > 0 || warnings.length > 0) {
       verdict = "go_conditional";
-      reason = `${softFails.length} soft fail(s) + ${warnings.length} warning(s); needs leadership review`;
-      for (const c of [...softFails, ...warnings]) conditions.push(`${c.label}: ${c.detail}`);
+      reason = "Worth pursuing once the points below are confirmed.";
+      for (const c of [...softFails, ...warnings]) conditions.push(explainCondition(c));
     } else {
       verdict = "go";
-      reason = `${rr.checks.length} filters passed; rule score ${rr.rule_score}/100`;
+      reason = "Recommended: it meets all of your organization's eligibility rules.";
     }
 
     // Experienced grant writers apply an "~80% fit or don't apply" discipline
@@ -122,13 +123,15 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
     // off most, before investing writer/critic time on a marginal fit.
     if (verdict !== "no_go" && rr.rule_score < 80) {
       conditions.push(
-        `Borderline fit (rule score ${rr.rule_score}/100, below the ~80% experienced grant-writers use as a go/no-go line) — consider confirming alignment with the funder's program officer before drafting`,
+        `The match is moderate (${rr.rule_score}/100). Before writing, contact the program officer to confirm the project fits what they fund.`,
       );
       if (verdict === "go") verdict = "go_conditional";
     }
 
     if (rr.cost_share_pct !== null && rr.cost_share_pct > 0 && rules.require_match_verification) {
-      conditions.push(`Confirm cash-match availability (~${rr.cost_share_pct}%) with leadership`);
+      conditions.push(
+        `Confirm with leadership that you can contribute about ${rr.cost_share_pct}% of the costs in cash.`,
+      );
       if (verdict === "go") verdict = "go_conditional";
     }
 

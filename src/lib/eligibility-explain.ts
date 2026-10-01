@@ -105,3 +105,79 @@ export function humanizeRationale(rationale: string | null | undefined): string 
     .map((label) => ({ label }));
   return explainFailures(failed);
 }
+
+const ACTIONS: Array<{ match: RegExp; text: string }> = [
+  {
+    match: /^sop_filter_4_strategic$|strategic fit/i,
+    text: "Show how the project uses your organization's strengths — the call does not mention any of the capabilities in your profile.",
+  },
+  {
+    match: /^sectors_required$|required sectors/i,
+    text: "Confirm the program covers your field; its listed focus areas differ from your sectors.",
+  },
+  {
+    match: /^sop_filter_1_legal$|legal eligibility/i,
+    text: "Confirm your organization type is accepted — the call does not state it clearly.",
+  },
+  {
+    match: /^jurisdiction_required$|required jurisdiction/i,
+    text: "Confirm organizations from your country or region can apply.",
+  },
+  {
+    match: /^sop_filter_3_match_verify$|cash-match/i,
+    text: "Confirm with leadership that the required cash contribution is available.",
+  },
+  {
+    match: /^sop_filter_5_runway$|runway/i,
+    text: "Plan the timeline carefully — there is little time left before the deadline.",
+  },
+  {
+    match: /^required_university_partner$|university partnership/i,
+    text: "Line up a university research partner and get a letter of commitment.",
+  },
+  {
+    match: /^deadline$|days until deadline/i,
+    text: "Check the deadline — it is close or not confirmed.",
+  },
+  {
+    match: /^amount_min$|amount >=/i,
+    text: "Check the award size is worth the effort; it may be below your minimum.",
+  },
+];
+
+/** What a consultant should do about a soft failure or warning. */
+export function explainCondition(check: CheckLike): string {
+  const key = check.id ?? "";
+  const hit = ACTIONS.find((entry) => entry.match.test(key) || entry.match.test(check.label));
+  return hit?.text ?? `Review: ${explainCheck(check).replace(/\.$/, "")}.`;
+}
+
+/** Rewrites stored brief reasons written in the old technical wording. */
+export function humanizeBriefReason(reason: string): string {
+  if (/soft fail\(s\)|warning\(s\)/i.test(reason))
+    return "Worth pursuing once the points below are confirmed.";
+  const hard = reason.match(/^Hard fail on \d+ filter\(s\):\s*(.+)$/i);
+  if (hard) {
+    const labels = hard[1].split(";").map((label) => ({ label: label.trim() }));
+    return `Not recommended. ${[...new Set(labels.map(explainCheck))].join(" ")}`;
+  }
+  if (/filters passed; rule score/i.test(reason)) {
+    return "Recommended: it meets all of your organization's eligibility rules.";
+  }
+  return reason;
+}
+
+/** Rewrites stored brief conditions ("SOP F4 - Strategic fit (...): detail"). */
+export function humanizeBriefCondition(condition: string): string {
+  const borderline = condition.match(/^Borderline fit \(rule score (\d+)\/100/i);
+  if (borderline) {
+    return `The match is moderate (${borderline[1]}/100). Before writing, contact the program officer to confirm the project fits what they fund.`;
+  }
+  const cash = condition.match(/^Confirm cash-match availability \(~(\d+)%\)/i);
+  if (cash)
+    return `Confirm with leadership that you can contribute about ${cash[1]}% of the costs in cash.`;
+  const labelled = condition.match(
+    /^(SOP F\d[^:]*|Required [^:]+|Excluded [^:]+|Amount [^:]+|>= [^:]+):\s/i,
+  );
+  return labelled ? explainCondition({ label: labelled[1] }) : condition;
+}
