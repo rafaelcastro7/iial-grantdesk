@@ -20,6 +20,8 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Radar,
   Lightbulb,
   RefreshCw,
@@ -247,6 +249,23 @@ export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
   })).filter((group) => group.items.length > 0);
   const activeItem = findActiveItem(currentPath, visibleGroups);
 
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem("iial.v2.sidebar.collapsed") === "true";
+    }
+    return false;
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("iial.v2.sidebar.collapsed", String(next));
+      }
+      return next;
+    });
+  };
+
   async function signOut() {
     await supabase.auth.signOut();
     await navigate({ to: "/" });
@@ -255,22 +274,37 @@ export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
   return (
     <TooltipProvider delayDuration={150}>
       <div data-ui-version="v2" className="min-h-screen bg-background text-foreground">
-        <div className="fixed inset-y-0 left-0 z-40 hidden w-[292px] border-r border-white/10 bg-sidebar text-white lg:flex lg:flex-col">
+        <aside
+          aria-label="Sidebar navigation"
+          className={cn(
+            "fixed inset-y-0 left-0 z-40 hidden border-r border-white/10 bg-sidebar text-white lg:flex lg:flex-col transition-all duration-300 ease-in-out",
+            collapsed ? "w-[68px]" : "w-[280px]",
+          )}
+        >
           <V2DesktopNav
             activePath={currentPath}
             groups={visibleGroups}
             onSignOut={signOut}
             llmRoute={llmRoute}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapsed}
           />
-        </div>
+        </aside>
 
-        <div className="min-h-screen lg:pl-[292px]">
+        <div
+          className={cn(
+            "min-h-screen transition-all duration-300 ease-in-out",
+            collapsed ? "lg:pl-[68px]" : "lg:pl-[280px]",
+          )}
+        >
           <V2TopBar
             activeItem={activeItem}
             activePath={currentPath}
             groups={visibleGroups}
             onSignOut={signOut}
             llmRoute={llmRoute}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapsed}
           />
           <TenantReadinessBanner />
           <main className="min-h-[calc(100vh-65px)] pb-10">{children}</main>
@@ -285,52 +319,129 @@ function V2DesktopNav({
   groups,
   onSignOut,
   llmRoute,
+  collapsed = false,
+  onToggleCollapse,
 }: {
   activePath: string;
   groups: NavGroup[];
   onSignOut: () => void;
   llmRoute: LlmRouteStatus;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const simple = useIsConsultant();
   return (
     <>
-      <div className="border-b border-white/10 px-5 py-4">
-        <Link to="/dashboard" className="group flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white text-sm font-black text-brand-deep shadow-sm">
-            II
+      <div className={cn("border-b border-white/10 transition-all duration-200", collapsed ? "px-2 py-3" : "px-5 py-4")}>
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2.5">
+            <Link to="/dashboard" className="group flex items-center justify-center">
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-white text-xs font-black text-brand-deep shadow-sm hover:scale-105 transition-transform"
+                title="IIAL Grants"
+              >
+                II
+              </div>
+            </Link>
+            {onToggleCollapse && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={onToggleCollapse}
+                    className="h-8 w-8 text-white/70 hover:bg-white/10 hover:text-white"
+                  >
+                    <PanelLeftOpen className="h-4 w-4" />
+                    <span className="sr-only">Expand sidebar</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Expand sidebar</TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={openCommandPalette}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-white/12 bg-white/[0.06] text-brand-green hover:bg-white/[0.1] transition-colors"
+                >
+                  <Command className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Search (Cmd K)</TooltipContent>
+            </Tooltip>
           </div>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold tracking-normal">IIAL Grants</div>
-            <div className="text-xs text-white/56">Opportunity operating system</div>
-          </div>
-        </Link>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between">
+              <Link to="/dashboard" className="group flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white text-sm font-black text-brand-deep shadow-sm">
+                  II
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold tracking-normal">IIAL Grants</div>
+                  <div className="text-xs text-white/56">Opportunity operating system</div>
+                </div>
+              </Link>
+              {onToggleCollapse && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={onToggleCollapse}
+                      className="h-8 w-8 text-white/70 hover:bg-white/10 hover:text-white"
+                    >
+                      <PanelLeftClose className="h-4 w-4" />
+                      <span className="sr-only">Collapse sidebar</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Collapse sidebar</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
 
-        <button
-          type="button"
-          onClick={openCommandPalette}
-          className="mt-4 flex w-full items-center justify-between rounded-md border border-white/12 bg-white/[0.06] px-3 py-2 text-left text-sm text-white/86 transition-colors hover:bg-white/[0.1]"
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            <Command className="h-4 w-4 shrink-0 text-brand-green" />
-            <span className="truncate">Search grants, funders, proposals</span>
-          </span>
-          <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/56">
-            Cmd K
-          </kbd>
-        </button>
+            <button
+              type="button"
+              onClick={openCommandPalette}
+              className="mt-4 flex w-full items-center justify-between rounded-md border border-white/12 bg-white/[0.06] px-3 py-2 text-left text-sm text-white/86 transition-colors hover:bg-white/[0.1]"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <Command className="h-4 w-4 shrink-0 text-brand-green" />
+                <span className="truncate">Search grants, funders, proposals</span>
+              </span>
+              <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/56">
+                Cmd K
+              </kbd>
+            </button>
+          </div>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary">
-        <div className="space-y-5">
+      <nav className={cn("flex-1 overflow-y-auto transition-all duration-200", collapsed ? "px-1.5 py-3" : "px-3 py-4")} aria-label="Primary">
+        <div className="space-y-4">
           {groups.map((group) => (
             <div key={group.label}>
-              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-normal text-white/46">
-                <span className={cn("h-1.5 w-1.5 rounded-full", ACCENT_CLASS[group.accent])} />
-                {group.label}
-              </div>
+              {!collapsed && (
+                <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-normal text-white/46">
+                  <span className={cn("h-1.5 w-1.5 rounded-full", ACCENT_CLASS[group.accent])} />
+                  {group.label}
+                </div>
+              )}
+              {collapsed && (
+                <div className="my-2 h-px bg-white/10 mx-2" title={group.label} />
+              )}
               <div className="space-y-1">
                 {group.items.map((item) => (
-                  <V2NavLink key={item.to} item={item} active={isPathActive(activePath, item.to)} />
+                  <V2NavLink
+                    key={item.to}
+                    item={item}
+                    active={isPathActive(activePath, item.to)}
+                    collapsed={collapsed}
+                  />
                 ))}
               </div>
             </div>
@@ -338,8 +449,8 @@ function V2DesktopNav({
         </div>
       </nav>
 
-      <div className="border-t border-white/10 p-3">
-        {!simple && (
+      <div className={cn("border-t border-white/10 transition-all duration-200", collapsed ? "p-2" : "p-3")}>
+        {!simple && !collapsed && (
           <div className="rounded-md border border-white/10 bg-white/[0.055] p-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-white">
               <Bot className="h-4 w-4 text-brand-green" />
@@ -364,7 +475,20 @@ function V2DesktopNav({
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-end gap-2">
+        {!simple && collapsed && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex h-9 w-9 mx-auto items-center justify-center rounded-md border border-white/10 bg-white/[0.055] text-brand-green cursor-pointer mb-2">
+                <Bot className="h-4 w-4" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              AI stack active: Lovable AI / Cloud
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-end gap-2 mt-3")}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -378,7 +502,7 @@ function V2DesktopNav({
                 <span className="sr-only">Sign out</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Sign out</TooltipContent>
+            <TooltipContent side={collapsed ? "right" : "top"}>Sign out</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -392,12 +516,16 @@ function V2TopBar({
   groups,
   onSignOut,
   llmRoute,
+  collapsed = false,
+  onToggleCollapse,
 }: {
   activeItem?: NavItem;
   activePath: string;
   groups: NavGroup[];
   onSignOut: () => void;
   llmRoute: LlmRouteStatus;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const Icon = activeItem?.icon ?? Sparkles;
 
@@ -412,6 +540,25 @@ function V2TopBar({
             onSignOut={onSignOut}
             llmRoute={llmRoute}
           />
+          {onToggleCollapse && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggleCollapse}
+                  className="hidden h-9 w-9 text-muted-foreground hover:text-foreground lg:flex"
+                >
+                  {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                  <span className="sr-only">{collapsed ? "Expand sidebar" : "Collapse sidebar"}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              </TooltipContent>
+            </Tooltip>
+          )}
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary shadow-xs">
             <Icon className="h-4.5 w-4.5" />
           </div>
@@ -549,8 +696,49 @@ function V2MobileNav({
   );
 }
 
-function V2NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function V2NavLink({
+  item,
+  active,
+  collapsed = false,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed?: boolean;
+}) {
   const Icon = item.icon;
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            to={item.to}
+            className={cn(
+              "group flex h-10 w-10 items-center justify-center rounded-md mx-auto transition-colors",
+              active
+                ? "bg-white text-brand-deep shadow-sm"
+                : "text-white/72 hover:bg-white/[0.08] hover:text-white",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-md border",
+                active ? "border-black/5 bg-brand-green" : "border-white/10 bg-white/[0.06]",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+            </span>
+            <span className="sr-only">{item.label}</span>
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="flex flex-col gap-0.5 max-w-56">
+          <span className="font-semibold text-xs text-foreground">{item.label}</span>
+          <span className="text-[11px] text-muted-foreground">{item.description}</span>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
   return (
     <Link
       to={item.to}
