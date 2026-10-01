@@ -1851,6 +1851,38 @@ export type Database = {
           },
         ]
       }
+      grant_dismissals: {
+        Row: {
+          created_at: string
+          grant_id: string
+          note: string | null
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grant_id: string
+          note?: string | null
+          reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grant_id?: string
+          note?: string | null
+          reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_dismissals_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grant_embeddings: {
         Row: {
           content_hash: string
