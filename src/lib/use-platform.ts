@@ -17,8 +17,8 @@ export function useModuleFlags() {
   });
 }
 
-/** Consultants only see Home (/dashboard) and Grant Radar (/grants). */
-export const CONSULTANT_PATHS = ["/dashboard", "/grants"];
+/** Consultants see Home (/dashboard), Grant Radar (/grants) and Fit insights (/insights). */
+export const CONSULTANT_PATHS = ["/dashboard", "/grants", "/insights"];
 export function isConsultantPath(path: string) {
   return CONSULTANT_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 }
