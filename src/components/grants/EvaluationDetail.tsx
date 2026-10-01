@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import { Button } from "@/components/ui/button";
+import { explainCheck, explainFitScore } from "@/lib/eligibility-explain";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 
 const STATUS_ICON = {
@@ -185,19 +186,19 @@ export function EvaluationDetail({ grantId }: { grantId: string }) {
           </p>
           {blockingFail ? (
             <p>
-              <span className="text-rose-600 font-semibold">Hard-fail</span> on{" "}
-              <span className="font-medium">{blockingFail.label}</span> — {blockingFail.detail}.
+              <span className="text-rose-600 font-semibold">Not eligible:</span>{" "}
+              {explainCheck(blockingFail)}
             </p>
           ) : evaluation && combinedPct != null ? (
             <p>
-              Combined fit <b>{combinedPct}</b> vs threshold <b>{rules.threshold_fit_pass}</b>. Rule
-              score {Math.round(rules.rule_score)}, raw AI {llmPct ?? "legacy / unavailable"}, AI
-              weight {Math.round(rules.weight_llm * 100)}%.
+              {explainFitScore(combinedPct, rules.threshold_fit_pass)}
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Details: rules score {Math.round(rules.rule_score)}, AI score{" "}
+                {llmPct ?? "not available"}, AI weight {Math.round(rules.weight_llm * 100)}%.
+              </span>
             </p>
           ) : (
-            <p>
-              Not evaluated yet. Current rule score: <b>{Math.round(rules.rule_score)}</b>.
-            </p>
+            <p>Not checked yet — the eligibility check runs automatically.</p>
           )}
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
             <span>

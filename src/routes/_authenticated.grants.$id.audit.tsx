@@ -10,6 +10,7 @@ import { getGrantAudit } from "@/lib/grant-audit.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { explainCheck, explainFitScore } from "@/lib/eligibility-explain";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 
 const auditQuery = (id: string) =>
@@ -23,7 +24,9 @@ export const Route = createFileRoute("/_authenticated/grants/$id/audit")({
     meta: [{ title: `Scoring details · Grant ${params.id.slice(0, 8)} — IIAL` }],
   }),
   loader: ({ context, params }) => context.queryClient.ensureQueryData(auditQuery(params.id)),
-  errorComponent: ({ error }) => <div className="p-6 text-destructive">{(error as Error).message}</div>,
+  errorComponent: ({ error }) => (
+    <div className="p-6 text-destructive">{(error as Error).message}</div>
+  ),
   notFoundComponent: () => <div className="p-6">Not found</div>,
   component: AuditPage,
 });
@@ -80,19 +83,18 @@ function AuditPage() {
             <span className="text-muted-foreground">Why:</span>{" "}
             {blockingFail ? (
               <span>
-                <b className="text-destructive">Hard-fail</b> on <i>{blockingFail.label}</i> —{" "}
-                {blockingFail.detail}.
+                <b className="text-destructive">Not eligible:</b> {explainCheck(blockingFail)}
               </span>
             ) : evaluation && evaluation.fit_score != null ? (
               <span>
-                Combined fit <b>{Math.round(evaluation.fit_score * 100)}</b> vs threshold{" "}
-                <b>{rules.threshold_fit_pass}</b>. Rule score {Math.round(rules.rule_score)}, LLM
-                weight {rules.weight_llm}.
+                {explainFitScore(Math.round(evaluation.fit_score * 100), rules.threshold_fit_pass)}
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Details: rules score {Math.round(rules.rule_score)}, AI weight{" "}
+                  {Math.round(rules.weight_llm * 100)}%.
+                </span>
               </span>
             ) : (
-              <span>
-                Not yet evaluated. Rule score so far: <b>{Math.round(rules.rule_score)}</b>.
-              </span>
+              <span>Not checked yet — the eligibility check runs automatically.</span>
             )}
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">

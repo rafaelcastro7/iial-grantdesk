@@ -362,3 +362,11 @@ export function describeCheck(check: FullCheck): CheckExplanation {
     fix: "Review the official call before deciding.",
   };
 }
+
+/** Plain-language reading of the combined fit score against the pass mark. */
+export function explainFitScore(fit: number, threshold: number): string {
+  if (fit >= threshold) {
+    return `Good match: ${fit}/100, above the ${threshold} needed to recommend it.`;
+  }
+  return `Not recommended yet: the overall match is ${fit}/100, below the ${threshold} needed. It does not break any hard eligibility rule, but too little of your profile (sectors, capabilities, priorities) lines up with what this call funds.`;
+}
