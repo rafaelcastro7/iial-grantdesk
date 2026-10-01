@@ -1851,6 +1851,38 @@ export type Database = {
           },
         ]
       }
+      grant_dismissals: {
+        Row: {
+          created_at: string
+          grant_id: string
+          note: string | null
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grant_id: string
+          note?: string | null
+          reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grant_id?: string
+          note?: string | null
+          reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_dismissals_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grant_embeddings: {
         Row: {
           content_hash: string
@@ -2655,14 +2687,17 @@ export type Database = {
           enrich_last_attempt_at: string | null
           enrich_last_error: string | null
           enriched_at: string | null
+          field_search_status: Json
           first_seen_at: string
           fit_score: number | null
           funder_id: string
           funder_type: string | null
           funding_uses: string[] | null
+          historical_awards: Json | null
           id: string
           language: string
           last_seen_at: string
+          manual_fields: Json
           next_expected_deadline: string | null
           next_expected_deadline_basis: string | null
           next_expected_deadline_confidence: number | null
@@ -2710,14 +2745,17 @@ export type Database = {
           enrich_last_attempt_at?: string | null
           enrich_last_error?: string | null
           enriched_at?: string | null
+          field_search_status?: Json
           first_seen_at?: string
           fit_score?: number | null
           funder_id: string
           funder_type?: string | null
           funding_uses?: string[] | null
+          historical_awards?: Json | null
           id?: string
           language?: string
           last_seen_at?: string
+          manual_fields?: Json
           next_expected_deadline?: string | null
           next_expected_deadline_basis?: string | null
           next_expected_deadline_confidence?: number | null
@@ -2765,14 +2803,17 @@ export type Database = {
           enrich_last_attempt_at?: string | null
           enrich_last_error?: string | null
           enriched_at?: string | null
+          field_search_status?: Json
           first_seen_at?: string
           fit_score?: number | null
           funder_id?: string
           funder_type?: string | null
           funding_uses?: string[] | null
+          historical_awards?: Json | null
           id?: string
           language?: string
           last_seen_at?: string
+          manual_fields?: Json
           next_expected_deadline?: string | null
           next_expected_deadline_basis?: string | null
           next_expected_deadline_confidence?: number | null
@@ -4576,6 +4617,15 @@ export type Database = {
       search_term_matches: {
         Args: { haystack: string; needle: string }
         Returns: boolean
+      }
+      set_grant_manual_field: {
+        Args: {
+          p_field: string
+          p_grant_id: string
+          p_note?: string
+          p_value: Json
+        }
+        Returns: undefined
       }
       user_org_ids: {
         Args: { _roles?: string[]; _uid: string }
