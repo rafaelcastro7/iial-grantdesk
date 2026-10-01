@@ -1731,153 +1731,145 @@ export const restoreGrant = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** Add a grant manually by entering its URL, then trigger auto-enrichment. */
+/** Adds a grant the user found elsewhere, by its URL. Reuses the catalog record when it already exists. */
 export const addGrantByUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z
-      .object({
-        url: z
-          .string()
-          .trim()
-          .min(4, "URL is required")
-          .refine(
-            (val) => {
-              try {
-                const u = val.startsWith("http://") || val.startsWith("https://") ? val : `https://${val}`;
-                new URL(u);
-                return true;
-              } catch {
-                return false;
-              }
-            },
-            { message: "Please enter a valid HTTP or HTTPS URL" },
-          ),
-      })
-      .parse(i),
-  )
+  .inputValidator((i) => z.object({ url: z.string().trim().min(4).max(2000) }).parse(i))
   .handler(async ({ data, context }) => {
-    let inputUrl = data.url.trim();
-    if (!/^https?:\/\//i.test(inputUrl)) {
-      inputUrl = "https://" + inputUrl;
+    const { countryFromHost, normalizeGrantUrl, provisionalTitle, urlVariants } =
+      await import("@/lib/grant-intake.shared");
+    let url: URL;
+    try {
+      url = normalizeGrantUrl(data.url);
+    } catch (e) {
+      throw new Error(
+        e instanceof Error && e.message.includes("public")
+          ? e.message
+          : "Please enter a valid web address (https://…).",
+      );
     }
-    const urlObj = new URL(inputUrl);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Check if grant already exists by exact URL
-    const { data: existing } = await supabaseAdmin
+    // Same page already in the catalog (any spelling of the URL): reuse it.
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from("grants")
-      .select("id, title, status")
-      .eq("url", inputUrl)
-      .maybeSingle();
-
-    if (existing) {
-      return { grantId: existing.id, isNew: false, title: existing.title };
+      .select("id, title")
+      .in("url", urlVariants(url))
+      .limit(1);
+    if (existingError) throw new Error(existingError.message);
+    if (existing?.[0]) {
+      return { grantId: existing[0].id, isNew: false, title: existing[0].title };
     }
 
-    // Match by domain + path to avoid minor query param duplicates
-    const searchPattern = `%${urlObj.hostname}${urlObj.pathname.replace(/\/$/, "")}%`;
-    const { data: existingSimilar } = await supabaseAdmin
-      .from("grants")
-      .select("id, title, status")
-      .ilike("url", searchPattern)
-      .maybeSingle();
+    // Read the page head for a real title and the funder's name (0 tokens).
+    const meta = await readPageMeta(url.toString());
+    const host = url.hostname.replace(/^www\./, "");
 
-    if (existingSimilar) {
-      return { grantId: existingSimilar.id, isNew: false, title: existingSimilar.title };
-    }
-
-    // Extract funder name from hostname (e.g. sac-isc.gc.ca -> SAC-ISC)
-    const hostname = urlObj.hostname.replace(/^www\./i, "");
-    const mainDomainPart = hostname.split(".")[0];
-    const funderName = mainDomainPart.toUpperCase();
-
-    let funderId: string | null = null;
-    const { data: existingFunder } = await supabaseAdmin
+    // Funder: one already registered on this host, else a new one.
+    const { data: funders } = await supabaseAdmin
       .from("funders")
-      .select("id")
-      .ilike("name", `%${funderName}%`)
-      .maybeSingle();
-
-    if (existingFunder) {
-      funderId = existingFunder.id;
-    } else {
-      const { data: newFunder } = await supabaseAdmin
+      .select("id, source_url")
+      .ilike("source_url", `%://${host}%`)
+      .limit(5);
+    const sameHost = (funders ?? []).find((f) => {
+      try {
+        return new URL(f.source_url ?? "").hostname.replace(/^www\./, "") === host;
+      } catch {
+        return false;
+      }
+    });
+    let funderId = sameHost?.id ?? null;
+    if (!funderId) {
+      const { data: created, error: funderError } = await supabaseAdmin
         .from("funders")
         .insert({
-          name: hostname,
-          country: "CA",
-          source_url: `${urlObj.protocol}//${urlObj.hostname}`,
+          name: meta.siteName ?? host,
+          country: countryFromHost(host),
+          source_url: url.origin,
         } as never)
         .select("id")
-        .maybeSingle();
-
-      if (newFunder) {
-        funderId = (newFunder as { id: string }).id;
-      } else {
-        const { data: fallbackFunder } = await supabaseAdmin
-          .from("funders")
-          .select("id")
-          .limit(1)
-          .maybeSingle();
-        funderId = (fallbackFunder as { id: string } | null)?.id ?? null;
+        .single();
+      if (funderError || !created) {
+        throw new Error(
+          `Could not register the funder: ${funderError?.message ?? "unknown error"}`,
+        );
       }
+      funderId = (created as { id: string }).id;
     }
 
-    if (!funderId) {
-      throw new Error("Could not assign a funder for this grant URL.");
-    }
-
-    // Construct preliminary title from URL path slug
-    const pathSegments = urlObj.pathname.split("/").filter(Boolean);
-    const rawSlug = pathSegments[pathSegments.length - 1] || hostname;
-    const readableTitle = rawSlug
-      .replace(/[-_]/g, " ")
-      .replace(/\.(html?|php|aspx?)$/i, "")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-    const initialTitle = readableTitle.length > 3 ? readableTitle : `Opportunity at ${hostname}`;
-
-    const canonicalKey = `user-added:${urlObj.hostname}:${urlObj.pathname}`;
-    const sourceHash = Array.from(new TextEncoder().encode(inputUrl))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")
-      .slice(0, 32);
-
+    const { createHash } = await import("node:crypto");
+    const href = url.toString();
     const { data: inserted, error: insertErr } = await supabaseAdmin
       .from("grants")
       .insert({
         funder_id: funderId,
-        title: initialTitle,
-        url: inputUrl,
-        country: "CA",
-        currency: "CAD",
+        title: meta.title ?? provisionalTitle(url),
+        summary: meta.description,
+        url: href,
+        country: countryFromHost(host),
+        currency: countryFromHost(host) === "US" ? "USD" : "CAD",
         status: "discovered",
-        source_hash: sourceHash,
-        canonical_key: canonicalKey,
+        source_hash: createHash("sha256").update(href).digest("hex"),
+        canonical_key: `user-added:${host}${url.pathname}${url.search}`,
       } as never)
       .select("id, title")
       .single();
-
     if (insertErr || !inserted) {
-      throw new Error(`Failed to add grant: ${insertErr?.message || "Unknown database error"}`);
+      throw new Error(`Could not add the grant: ${insertErr?.message ?? "unknown error"}`);
     }
-
-    const newGrantId = (inserted as { id: string; title: string }).id;
-
-    // Trigger enrichment in the background
-    const { enrichGrantImpl } = await import("@/agents/enricher.functions");
-    enrichGrantImpl(newGrantId, {
-      db: supabaseAdmin as never,
-      userId: context.userId,
-      force: true,
-    }).catch((err) => {
-      console.error("Auto-enrichment error on user-added grant:", err);
-    });
-
-    return {
-      grantId: newGrantId,
-      isNew: true,
-      title: (inserted as { id: string; title: string }).title,
-    };
+    const grant = inserted as { id: string; title: string };
+    await supabaseAdmin.from("grant_events").insert({
+      grant_id: grant.id,
+      from_status: null,
+      to_status: "discovered",
+      actor_user_id: context.userId,
+      reason: "Added by URL",
+      metadata: { source: "user_url" },
+    } as never);
+    // Enrichment and the fit check start on the detail page, where the user
+    // watches them; starting them here too would run the work twice.
+    return { grantId: grant.id, isNew: true, title: grant.title };
   });
 
+async function readPageMeta(href: string): Promise<{
+  title: string | null;
+  description: string | null;
+  siteName: string | null;
+}> {
+  const none = { title: null, description: null, siteName: null };
+  try {
+    const res = await fetch(href, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(8_000),
+      headers: { "user-agent": "Mozilla/5.0 (compatible; GrantDesk/1.0)", accept: "text/html" },
+    });
+    if (!res.ok || !(res.headers.get("content-type") ?? "").includes("html")) return none;
+    const head = (await res.text()).slice(0, 200_000);
+    const pick = (re: RegExp) => {
+      const v = head.match(re)?.[1];
+      return v
+        ? v
+            .replace(/&amp;/g, "&")
+            .replace(/&#39;|&apos;/g, "'")
+            .replace(/&quot;/g, '"')
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 300) || null
+        : null;
+    };
+    const metaContent = (name: string) =>
+      pick(
+        new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]*content=["']([^"']+)`, "i"),
+      ) ??
+      pick(
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${name}["']`, "i"),
+      );
+    return {
+      title: metaContent("og:title") ?? pick(/<title[^>]*>([^<]+)<\/title>/i),
+      description: metaContent("og:description") ?? metaContent("description"),
+      siteName: metaContent("og:site_name"),
+    };
+  } catch {
+    return none;
+  }
+}

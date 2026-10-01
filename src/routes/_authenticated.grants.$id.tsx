@@ -53,6 +53,8 @@ type GrantRequirementRow = {
 };
 
 type GrantSearch = {
+  /** Set when the grant was just added by URL: run the fit check once details are in. */
+  analyze?: string;
   evidence?: string;
   run?: string;
   agent?: string;
@@ -64,6 +66,7 @@ export const Route = createFileRoute("/_authenticated/grants/$id")({
     meta: [{ title: `Grant ${params.id.slice(0, 8)} - IIAL` }],
   }),
   validateSearch: (raw: Record<string, unknown>): GrantSearch => ({
+    analyze: raw.analyze === "1" || raw.analyze === 1 ? "1" : undefined,
     evidence: typeof raw.evidence === "string" ? raw.evidence : undefined,
     run: typeof raw.run === "string" ? raw.run : undefined,
     agent: typeof raw.agent === "string" ? raw.agent : undefined,
@@ -144,6 +147,16 @@ function GrantDetailPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, needsEnrich]);
+
+  // A grant added by URL gets its fit check as soon as its details are in.
+  const readyToAnalyze =
+    search.analyze === "1" && !!data.grant.enriched_at && !data.evaluation && !busy;
+  useEffect(() => {
+    if (!readyToAnalyze) return;
+    patchSearch({ analyze: undefined });
+    run("eval", "evaluator", () => evaluate());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readyToAnalyze]);
 
   const patchSearch = (patch: Partial<GrantSearch>) =>
     navigate({

@@ -161,6 +161,8 @@ type Props = {
   onShortlist: () => void;
 };
 
+const DAY_MS = 86_400_000;
+
 const STATUS_LABEL: Record<string, string> = {
   discovered: "Discovered",
   enriched: "Details fetched",
@@ -288,16 +290,15 @@ export function V2GrantDetail({
           ? "warning"
           : "neutral";
 
-  // Check if partner or special condition mentioned in rationale / summary
-  const partnerCheck = ruleChecks.find((c) => {
-    if (!c) return false;
-    const text = `${c.id ?? ""} ${c.label ?? ""} ${c.detail ?? ""}`.toLowerCase();
-    return text.includes("partner") || text.includes("university");
-  });
-  const requiresPartner =
-    partnerCheck != null ||
-    (grant.summary ?? "").toLowerCase().includes("partner") ||
-    (grant.summary ?? "").toLowerCase().includes("university");
+  // Only the rules engine's partner check raises the banner: matching the
+  // word "partner" in the summary flagged almost every grant ("partnering
+  // with industry"...).
+  const requiresPartner = ruleChecks.some(
+    (c) =>
+      !!c &&
+      /university_partner|university partnership/i.test(`${c.id ?? ""} ${c.label ?? ""}`) &&
+      (c.status === "fail" || c.status === "warn"),
+  );
 
   return (
     <div className="w-full max-w-[1700px] space-y-4 px-3 py-4 sm:px-6 lg:py-5">
@@ -316,7 +317,10 @@ export function V2GrantDetail({
               {FUNDING_KIND_LABEL[kind]}
             </Badge>
             {kind !== "grant" && (
-              <Badge variant="outline" className="rounded-md border-amber-500/50 text-amber-700 dark:text-amber-300 text-xs">
+              <Badge
+                variant="outline"
+                className="rounded-md border-amber-500/50 text-amber-700 dark:text-amber-300 text-xs"
+              >
                 Not a grant
               </Badge>
             )}
@@ -324,7 +328,10 @@ export function V2GrantDetail({
               {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
             </Badge>
             {duplicateGroupSize > 1 && (
-              <Badge variant="outline" className="rounded-md border-amber-500/50 text-amber-700 text-xs">
+              <Badge
+                variant="outline"
+                className="rounded-md border-amber-500/50 text-amber-700 text-xs"
+              >
                 {duplicateGroupSize} similar
               </Badge>
             )}
@@ -364,7 +371,14 @@ export function V2GrantDetail({
           </Button>
 
           {grant.url && (
-            <ExternalLinkPreview url={grant.url} className={buttonVariants({ size: "sm", variant: "outline", className: "h-8 text-xs gap-1.5" })}>
+            <ExternalLinkPreview
+              url={grant.url}
+              className={buttonVariants({
+                size: "sm",
+                variant: "outline",
+                className: "h-8 text-xs gap-1.5",
+              })}
+            >
               <span>Official page</span>
               <ExternalLink className="h-3 w-3" />
             </ExternalLinkPreview>
@@ -432,7 +446,11 @@ export function V2GrantDetail({
                 disabled={actionDisabled}
                 onClick={onFetchDetails}
               >
-                {busy === "enrich" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {busy === "enrich" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
                 Fetch details
               </Button>
             )}
@@ -445,12 +463,20 @@ export function V2GrantDetail({
               onClick={onEvaluate}
               title={evaluateBlockedReason ?? undefined}
             >
-              {busy === "eval" ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />}
+              {busy === "eval" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <SearchCheck className="h-4 w-4" />
+              )}
               {evaluation ? "Re-check fit" : "Check fit"}
             </Button>
 
             {existingProposalId ? (
-              <Button asChild size="default" className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Button
+                asChild
+                size="default"
+                className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
                 <Link to="/proposals/$id" params={{ id: existingProposalId }}>
                   <FileText className="h-4 w-4" />
                   Open proposal
@@ -465,7 +491,11 @@ export function V2GrantDetail({
                 onClick={onDraft}
                 title={draftBlockedReason ?? undefined}
               >
-                {busy === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {busy === "draft" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
                 Draft proposal
               </Button>
             )}
@@ -486,6 +516,11 @@ export function V2GrantDetail({
             )}
           </div>
         </div>
+        {(evaluateBlockedReason || draftBlockedReason) && !existingProposalId && (
+          <p className="mt-2 text-xs text-muted-foreground lg:text-right">
+            {evaluateBlockedReason ?? draftBlockedReason}
+          </p>
+        )}
 
         {/* 4-Column Executive KPI Cards */}
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -548,7 +583,9 @@ export function V2GrantDetail({
             <p className="mt-1 text-xs text-muted-foreground truncate">
               {grant.historical_awards
                 ? `Median ${formatMoney(grant.historical_awards.median, grant.historical_awards.currency)} (${grant.historical_awards.count} awards)`
-                : kind === "grant" ? "Non-repayable" : "Financing"}
+                : kind === "grant"
+                  ? "Non-repayable"
+                  : "Financing"}
             </p>
           </div>
 
@@ -558,13 +595,30 @@ export function V2GrantDetail({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Deadline
               </span>
-              <CalendarClock className={cn("h-4 w-4", deadlineTone === "warning" ? "text-amber-500" : deadlineTone === "danger" ? "text-rose-500" : "text-primary")} />
+              <CalendarClock
+                className={cn(
+                  "h-4 w-4",
+                  deadlineTone === "warning"
+                    ? "text-amber-500"
+                    : deadlineTone === "danger"
+                      ? "text-rose-500"
+                      : "text-primary",
+                )}
+              />
             </div>
-            <div className={cn(
-              "mt-2 text-xl sm:text-2xl font-bold tracking-tight truncate",
-              deadlineTone === "danger" ? "text-rose-600" : deadlineTone === "warning" ? "text-amber-600" : "text-foreground"
-            )}>
-              {grant.deadline_kind === "rolling" && !grant.deadline ? "Rolling Intake" : deadline.label}
+            <div
+              className={cn(
+                "mt-2 text-xl sm:text-2xl font-bold tracking-tight truncate",
+                deadlineTone === "danger"
+                  ? "text-rose-600"
+                  : deadlineTone === "warning"
+                    ? "text-amber-600"
+                    : "text-foreground",
+              )}
+            >
+              {grant.deadline_kind === "rolling" && !grant.deadline
+                ? "Rolling Intake"
+                : deadline.label}
             </div>
             <p className="mt-1 text-xs text-muted-foreground truncate">
               {grant.deadline_kind === "rolling"
@@ -602,7 +656,9 @@ export function V2GrantDetail({
           <div className="space-y-0.5">
             <h3 className="text-sm font-bold uppercase tracking-wide">Partnership Requirement</h3>
             <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
-              You'll likely need to apply alongside an eligible university or postsecondary researcher. The funder text implies IIAL cannot apply as a sole lead without an academic partner.
+              This call expects a university or postsecondary research partner, and none is
+              confirmed in your profile. Line up a partner and a letter of commitment before
+              applying.
             </p>
           </div>
         </div>
@@ -612,6 +668,26 @@ export function V2GrantDetail({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* ================= LEFT MAIN COLUMN (8 COLS) ================= */}
         <main className="space-y-5 lg:col-span-8">
+          {/* 2. PROGRAM SNAPSHOT & ABOUT THE OPPORTUNITY */}
+          <Panel
+            icon={FileText}
+            title="Program Snapshot & Scope"
+            description="High-level summary of what the grant funds, target applicants, and sector coverage."
+          >
+            <div className="space-y-4">
+              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                {grant.summary?.trim() ||
+                  "No reliable description extracted yet. Click 'Fetch details' or view official page."}
+              </p>
+
+              <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FactRow label="Who can apply" values={applicantTypes} />
+                <FactRow label="What it pays for" values={fundingUses} />
+                <FactRow label="Who it is meant to help" values={populations} />
+                <FactRow label="Sectors" values={sectors} />
+              </div>
+            </div>
+          </Panel>
 
           {/* 1. CRITICAL APPLICATION CHECKLIST & REQUIREMENTS */}
           <Panel
@@ -644,11 +720,20 @@ export function V2GrantDetail({
                     </h3>
                     <ul className="grid gap-2 sm:grid-cols-2">
                       {criticalRequirements.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-2.5 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-xs leading-relaxed">
+                        <li
+                          key={idx}
+                          className="flex items-start gap-2.5 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-xs leading-relaxed"
+                        >
                           <CheckCircle2 className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
                           <div>
-                            <span className="font-semibold text-foreground block">{item.requirement}</span>
-                            {item.value && <span className="text-muted-foreground mt-0.5 block">{item.value}</span>}
+                            <span className="font-semibold text-foreground block">
+                              {item.requirement}
+                            </span>
+                            {item.value && (
+                              <span className="text-muted-foreground mt-0.5 block">
+                                {item.value}
+                              </span>
+                            )}
                           </div>
                         </li>
                       ))}
@@ -665,11 +750,20 @@ export function V2GrantDetail({
                       {requirements
                         .filter((item) => !item.isCritical)
                         .map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2.5 rounded-lg border bg-background/60 p-3 text-xs leading-relaxed">
+                          <li
+                            key={idx}
+                            className="flex items-start gap-2.5 rounded-lg border bg-background/60 p-3 text-xs leading-relaxed"
+                          >
                             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
                             <div>
-                              <span className="font-medium text-foreground block">{item.requirement}</span>
-                              {item.value && <span className="text-muted-foreground mt-0.5 block">{item.value}</span>}
+                              <span className="font-medium text-foreground block">
+                                {item.requirement}
+                              </span>
+                              {item.value && (
+                                <span className="text-muted-foreground mt-0.5 block">
+                                  {item.value}
+                                </span>
+                              )}
                             </div>
                           </li>
                         ))}
@@ -678,27 +772,6 @@ export function V2GrantDetail({
                 )}
               </div>
             )}
-          </Panel>
-
-          {/* 2. PROGRAM SNAPSHOT & ABOUT THE OPPORTUNITY */}
-          <Panel
-            icon={FileText}
-            title="Program Snapshot & Scope"
-            description="High-level summary of what the grant funds, target applicants, and sector coverage."
-          >
-            <div className="space-y-4">
-              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
-                {grant.summary?.trim() ||
-                  "No reliable description extracted yet. Click 'Fetch details' or view official page."}
-              </p>
-
-              <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FactRow label="Who can apply" values={applicantTypes} />
-                <FactRow label="What it pays for" values={fundingUses} />
-                <FactRow label="Who it is meant to help" values={populations} />
-                <FactRow label="Sectors" values={sectors} />
-              </div>
-            </div>
           </Panel>
 
           {/* 3. FUNDER'S ELIGIBILITY STATEMENTS */}
@@ -738,7 +811,11 @@ export function V2GrantDetail({
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {eligibleGroups.map((label) => (
-                        <Badge key={label} variant="secondary" className="rounded-md text-xs py-1 px-2.5">
+                        <Badge
+                          key={label}
+                          variant="secondary"
+                          className="rounded-md text-xs py-1 px-2.5"
+                        >
                           {label}
                         </Badge>
                       ))}
@@ -772,7 +849,11 @@ export function V2GrantDetail({
           <ManualFactsPanel grant={grant} />
 
           {/* 6. OFFICIAL SOURCES & VERIFICATION LINKS */}
-          <Panel icon={Link2} title="Official Sources & Provenance" description="Validated web URLs and observation dates.">
+          <Panel
+            icon={Link2}
+            title="Official Sources & Provenance"
+            description="Validated web URLs and observation dates."
+          >
             <div className="space-y-2.5 text-sm">
               {grant.url && <SourceLink href={grant.url} label="Official Grant Page" />}
               {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
@@ -794,7 +875,6 @@ export function V2GrantDetail({
 
         {/* ================= RIGHT SIDEBAR / DECISION RAIL (4 COLS) ================= */}
         <aside className="space-y-5 lg:col-span-4">
-
           {/* AI FIT & ELIGIBILITY VERDICT BREAKDOWN */}
           <Panel
             icon={ClipboardCheck}
@@ -885,7 +965,11 @@ export function V2GrantDetail({
               </Panel>
 
               {/* LIFECYCLE HISTORY */}
-              <Panel icon={History} title="Lifecycle Audit Log" description="Status transitions over time.">
+              <Panel
+                icon={History}
+                title="Lifecycle Audit Log"
+                description="Status transitions over time."
+              >
                 {events.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No status events logged yet.</p>
                 ) : (
@@ -931,7 +1015,6 @@ export function V2GrantDetail({
               />
             </>
           )}
-
         </aside>
       </div>
     </div>
@@ -953,11 +1036,17 @@ const ELIGIBILITY_LABEL: Record<string, string> = {
 function FactRow({ label, values }: { label: string; values: string[] }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </dt>
       <dd className="mt-1 flex flex-wrap gap-1 text-xs">
         {values.length ? (
           values.map((value) => (
-            <Badge key={value} variant="outline" className="rounded-md font-normal bg-background/50">
+            <Badge
+              key={value}
+              variant="outline"
+              className="rounded-md font-normal bg-background/50"
+            >
               {displayTag(value)}
             </Badge>
           ))
@@ -990,7 +1079,9 @@ function Panel({
             <Icon className="h-3.5 w-3.5" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-sm font-bold tracking-tight text-foreground leading-tight">{title}</h2>
+            <h2 className="text-sm font-bold tracking-tight text-foreground leading-tight">
+              {title}
+            </h2>
             {description && <p className="text-xs text-muted-foreground truncate">{description}</p>}
           </div>
         </div>
@@ -1046,7 +1137,6 @@ function getDeadlineState(deadline: string | null) {
     return { label: "Unparsed deadline", detail: deadline, days: null as number | null };
   }
   const days = Math.ceil((date.getTime() - Date.now()) / DAY_MS);
-  const DAY_MS = 86_400_000;
   if (days < 0) return { label: "Closed", detail: formatDate(deadline), days };
   if (days === 0) return { label: "Closes today", detail: formatDate(deadline), days };
   return { label: `${days} days left`, detail: formatDate(deadline), days };
@@ -1121,7 +1211,8 @@ function getVerdict({
       dot: "bg-amber-500",
       enrichmentFailed,
       label: "Validate Source First",
-      detail: "Automated extraction could not read enough structured facts. Review official page manually.",
+      detail:
+        "Automated extraction could not read enough structured facts. Review official page manually.",
     };
   }
   if (qualityPct < 55) {
@@ -1145,7 +1236,8 @@ function getVerdict({
       dot: "bg-emerald-500",
       enrichmentFailed,
       label: "Strong Pursue (High Fit)",
-      detail: "High strategic fit and no eligibility blockers found. Recommended to start proposal.",
+      detail:
+        "High strategic fit and no eligibility blockers found. Recommended to start proposal.",
     };
   }
   if (evaluation.eligibility_pass && evaluation.fit_score >= 0.45) {

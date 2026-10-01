@@ -39,7 +39,11 @@ export function AddGrantModal({ triggerBtn }: { triggerBtn?: React.ReactNode }) 
       setOpen(false);
       setUrl("");
       // Navigate to detail page where auto-enrichment and evaluation run live
-      navigate({ to: "/grants/$id", params: { id: res.grantId } });
+      navigate({
+        to: "/grants/$id",
+        params: { id: res.grantId },
+        search: res.isNew ? { analyze: "1" } : {},
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add grant by URL.");
     } finally {
@@ -65,7 +69,8 @@ export function AddGrantModal({ triggerBtn }: { triggerBtn?: React.ReactNode }) 
               Analyze External Grant
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Paste the URL of any grant or funding program call. GrantDesk will fetch, extract eligibility requirements, and evaluate fit for your organization.
+              Paste the URL of any grant or funding program call. GrantDesk will fetch, extract
+              eligibility requirements, and evaluate fit for your organization.
             </DialogDescription>
           </DialogHeader>
 

@@ -7,12 +7,7 @@ import { FunderSelector } from "@/components/grants/FunderSelector";
 import { AddGrantModal } from "@/components/grants/AddGrantModal";
 import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { Button } from "@/components/ui/button";
-import {
-  NEXT_ACTION_LABELS,
-  countryName,
-  formatMoney,
-  type RadarResult,
-} from "@/lib/grant-radar";
+import { NEXT_ACTION_LABELS, countryName, formatMoney, type RadarResult } from "@/lib/grant-radar";
 import { RadarCard, type RadarActions } from "./RadarCard";
 import { RadarToolbar, type RadarFilterState } from "./RadarToolbar";
 
@@ -67,160 +62,184 @@ export function RadarWorkspace({
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-6 md:px-6">
       <section className="overflow-hidden rounded-lg border bg-card shadow-sm">
-      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b px-5 py-5 sm:flex sm:flex-wrap sm:items-end sm:justify-between md:px-7">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-foreground md:text-3xl">
-            Grant Radar
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {simple
-              ? "Every opportunity is already checked against IIAL's rules. Start with the green ones."
-              : "Search, deterministic validation and critical requirements in one operational view."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <AddGrantModal />
-          {!simple && <NotebookLMBridge />}
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => setShowSources((v) => !v)}>
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              Update sources
-            </Button>
-          )}
-        </div>
-      </header>
-
-      {isAdmin && showSources && (
-        <section className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
-          <span className="text-muted-foreground">Check official funder pages for new calls:</span>
-          <FunderSelector
-            fr={false}
-            selected={admin.selectedFunders}
-            onChange={admin.onSelectedFundersChange}
-          />
-          <Button size="sm" onClick={admin.onDiscover} disabled={admin.discovering}>
-            {admin.discovering && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-            {admin.selectedFunders.size > 0
-              ? `Check ${admin.selectedFunders.size} funder(s)`
-              : "Check all funders"}
-          </Button>
-        </section>
-      )}
-
-      {admin.activeJob && (
-        <DiscoveryProgress
-          jobId={admin.activeJob.jobId}
-          queued={admin.activeJob.queued}
-          fr={false}
-          onClose={admin.onCloseJob}
-        />
-      )}
-
-      {notices.filter((n) => !simple || n.tone === "error").map((n, i) => (
-        <div
-          key={i}
-          role="status"
-          className={
-            n.tone === "error"
-              ? "flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-              : "flex items-start justify-between gap-3 rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground"
-          }
-        >
-          <p className="break-words">{n.text}</p>
-          <button type="button" onClick={n.onClose} aria-label="Dismiss">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      ))}
-
-      {!simple && profileBar}
-
-      {!simple && reviewProgress}
-
-      <div className={`grid border-b md:divide-x ${simple ? "grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}>
-        <Stat label="You can apply" value={counts.eligible} tone="text-eligible" />
-        <Stat label="Need a check" value={counts.needsInput} tone="text-needs-input" />
-        <Stat label="Closing in your window" value={counts.closingSoon} tone="text-foreground" />
-        {!simple && (
-          <Stat label="Actionable value" value={counts.pipelineValue > 0 ? formatMoney(counts.pipelineValue) : "—"} tone="text-foreground" />
-        )}
-      </div>
-
-      {next && (
-        <section className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-3">
-            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-primary">Do this next</p>
-              <p className="font-medium text-foreground">
-                {simple ? "Best match right now" : NEXT_ACTION_LABELS[next.nextAction]}: {next.grant.title}
-              </p>
-            </div>
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b px-5 py-5 sm:flex sm:flex-wrap sm:items-end sm:justify-between md:px-7">
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-foreground md:text-3xl">
+              Grant Radar
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              {simple
+                ? "Every opportunity is already checked against IIAL's rules. Start with the green ones."
+                : "Search, deterministic validation and critical requirements in one operational view."}
+            </p>
           </div>
-        </section>
-      )}
+          <div className="flex flex-wrap items-center gap-2">
+            <AddGrantModal />
+            {!simple && <NotebookLMBridge />}
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={() => setShowSources((v) => !v)}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                Update sources
+              </Button>
+            )}
+          </div>
+        </header>
 
-      <div className="space-y-2 border-b px-4 py-4 md:px-7">
-        <RadarToolbar
-          value={filters}
-          onChange={onFiltersChange}
-          countries={countries}
-          sectors={sectors}
-        />
-        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
-          <span data-search-mode={searchMode ?? undefined}>
-            {searchMode && (searchMode === "hybrid" ? "Smart search · " : "Keyword search · ")}
-            Showing {radar.items.length} of {totalLoaded}
-            {radar.hiddenByAmount > 0 &&
-              ` · ${radar.hiddenByAmount} below the minimum amount`}
-            {radar.hiddenByFilters > 0 && ` · ${radar.hiddenByFilters} hidden by filters`}
-          </span>
-          {moreFilters && !simple && (
-            <button
-              type="button"
-              onClick={() => setShowMore((v) => !v)}
-              className="inline-flex items-center gap-1 hover:text-foreground"
+        {isAdmin && showSources && (
+          <section className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+            <span className="text-muted-foreground">
+              Check official funder pages for new calls:
+            </span>
+            <FunderSelector
+              fr={false}
+              selected={admin.selectedFunders}
+              onChange={admin.onSelectedFundersChange}
+            />
+            <Button size="sm" onClick={admin.onDiscover} disabled={admin.discovering}>
+              {admin.discovering && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              {admin.selectedFunders.size > 0
+                ? `Check ${admin.selectedFunders.size} funder(s)`
+                : "Check all funders"}
+            </Button>
+          </section>
+        )}
+
+        {admin.activeJob && (
+          <DiscoveryProgress
+            jobId={admin.activeJob.jobId}
+            queued={admin.activeJob.queued}
+            fr={false}
+            onClose={admin.onCloseJob}
+          />
+        )}
+
+        {notices
+          .filter((n) => !simple || n.tone === "error")
+          .map((n, i) => (
+            <div
+              key={i}
+              role="status"
+              className={
+                n.tone === "error"
+                  ? "flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                  : "flex items-start justify-between gap-3 rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground"
+              }
             >
-              More filters
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showMore ? "rotate-180" : ""}`} />
-            </button>
+              <p className="break-words">{n.text}</p>
+              <button type="button" onClick={n.onClose} aria-label="Dismiss">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+
+        {!simple && profileBar}
+
+        {!simple && reviewProgress}
+
+        <div
+          className={`grid border-b md:divide-x ${simple ? "grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}
+        >
+          <Stat label="You can apply" value={counts.eligible} tone="text-eligible" />
+          <Stat label="Need a check" value={counts.needsInput} tone="text-needs-input" />
+          <Stat label="Closing in your window" value={counts.closingSoon} tone="text-foreground" />
+          {!simple && (
+            <Stat
+              label="Actionable value"
+              value={counts.pipelineValue > 0 ? formatMoney(counts.pipelineValue) : "—"}
+              tone="text-foreground"
+            />
           )}
         </div>
-        {showMore && !simple && moreFilters}
-      </div>
 
-      {radar.items.length === 0 ? (
-        <EmptyState
-          hasAny={totalLoaded > 0}
-          isAdmin={isAdmin}
-          onReset={() => onFiltersChange({ ...filters, country: "all", sector: "all", verdict: "all", status: "active", minAmount: 0, search: "" })}
-          onDiscover={admin.onDiscover}
-        />
-      ) : (
-        <div className="space-y-8 px-4 py-5 md:px-7">
-          {radar.groups.map((group) => (
-            <section key={group.country} className="space-y-3">
-              <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
-                {countryName(group.country)}
-                <span className="text-sm font-normal text-muted-foreground">
-                  {group.items.length}
-                </span>
-              </h2>
-              <div className="space-y-2.5">
-                {group.items.map((item) => (
-                  <RadarCard
-                    key={item.grant.id}
-                    item={item}
-                    actions={actions}
-                    highlight={next?.grant.id === item.grant.id}
-                    simple={simple}
-                  />
-                ))}
+        {next && (
+          <section className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-primary">
+                  Do this next
+                </p>
+                <p className="font-medium text-foreground">
+                  {simple ? "Best match right now" : NEXT_ACTION_LABELS[next.nextAction]}:{" "}
+                  {next.grant.title}
+                </p>
               </div>
-            </section>
-          ))}
+            </div>
+          </section>
+        )}
+
+        <div className="space-y-2 border-b px-4 py-4 md:px-7">
+          <RadarToolbar
+            value={filters}
+            onChange={onFiltersChange}
+            countries={countries}
+            sectors={sectors}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+            <span data-search-mode={searchMode ?? undefined}>
+              {searchMode && (searchMode === "hybrid" ? "Smart search · " : "Keyword search · ")}
+              Showing {radar.items.length} of {totalLoaded}
+              {radar.hiddenByAmount > 0 && ` · ${radar.hiddenByAmount} below the minimum amount`}
+              {radar.hiddenByFilters > 0 && ` · ${radar.hiddenByFilters} hidden by filters`}
+            </span>
+            {moreFilters && !simple && (
+              <button
+                type="button"
+                onClick={() => setShowMore((v) => !v)}
+                className="inline-flex items-center gap-1 hover:text-foreground"
+              >
+                More filters
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${showMore ? "rotate-180" : ""}`}
+                />
+              </button>
+            )}
+          </div>
+          {showMore && !simple && moreFilters}
         </div>
-      )}
+
+        {radar.items.length === 0 ? (
+          <EmptyState
+            hasAny={totalLoaded > 0}
+            isAdmin={isAdmin}
+            onReset={() =>
+              onFiltersChange({
+                ...filters,
+                country: "all",
+                sector: "all",
+                verdict: "all",
+                status: "active",
+                minAmount: 0,
+                search: "",
+              })
+            }
+            onDiscover={admin.onDiscover}
+          />
+        ) : (
+          <div className="space-y-8 px-4 py-5 md:px-7">
+            {radar.groups.map((group) => (
+              <section key={group.country} className="space-y-3">
+                <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
+                  {countryName(group.country)}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {group.items.length}
+                  </span>
+                </h2>
+                <div className="space-y-2.5">
+                  {group.items.map((item) => (
+                    <RadarCard
+                      key={item.grant.id}
+                      item={item}
+                      actions={actions}
+                      highlight={next?.grant.id === item.grant.id}
+                      simple={simple}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
       </section>
 
       {isAdmin && !simple && (

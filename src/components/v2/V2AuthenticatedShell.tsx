@@ -37,8 +37,9 @@ import {
   ClipboardList,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+
 import { useIsAdmin, useIsConsultant, isConsultantPath } from "@/lib/use-platform";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getLlmRouteStatus, type LlmRouteStatus } from "@/lib/llm-route.functions";
 import { TenantReadinessBanner } from "@/components/org/TenantReadinessBanner";
+const SIDEBAR_COLLAPSED_KEY = "iial.v2.sidebar.collapsed";
 
 type NavItem = {
   to: string;
@@ -249,18 +251,24 @@ export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
   })).filter((group) => group.items.length > 0);
   const activeItem = findActiveItem(currentPath, visibleGroups);
 
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.localStorage.getItem("iial.v2.sidebar.collapsed") === "true";
+  // Read after mount: the server always renders expanded, so reading storage
+  // during the first render would make the hydrated markup disagree.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true");
+    } catch {
+      // Storage blocked (private mode): stay expanded.
     }
-    return false;
-  });
+  }, []);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("iial.v2.sidebar.collapsed", String(next));
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+      } catch {
+        // Not persisted; the toggle still works for this visit.
       }
       return next;
     });
@@ -332,7 +340,12 @@ function V2DesktopNav({
   const simple = useIsConsultant();
   return (
     <>
-      <div className={cn("border-b border-white/10 transition-all duration-200", collapsed ? "px-2 py-3" : "px-5 py-4")}>
+      <div
+        className={cn(
+          "border-b border-white/10 transition-all duration-200",
+          collapsed ? "px-2 py-3" : "px-5 py-4",
+        )}
+      >
         {collapsed ? (
           <div className="flex flex-col items-center gap-2.5">
             <Link to="/dashboard" className="group flex items-center justify-center">
@@ -421,7 +434,13 @@ function V2DesktopNav({
         )}
       </div>
 
-      <nav className={cn("flex-1 overflow-y-auto transition-all duration-200", collapsed ? "px-1.5 py-3" : "px-3 py-4")} aria-label="Primary">
+      <nav
+        className={cn(
+          "flex-1 overflow-y-auto transition-all duration-200",
+          collapsed ? "px-1.5 py-3" : "px-3 py-4",
+        )}
+        aria-label="Primary"
+      >
         <div className="space-y-4">
           {groups.map((group) => (
             <div key={group.label}>
@@ -431,9 +450,7 @@ function V2DesktopNav({
                   {group.label}
                 </div>
               )}
-              {collapsed && (
-                <div className="my-2 h-px bg-white/10 mx-2" title={group.label} />
-              )}
+              {collapsed && <div className="my-2 h-px bg-white/10 mx-2" title={group.label} />}
               <div className="space-y-1">
                 {group.items.map((item) => (
                   <V2NavLink
@@ -449,7 +466,12 @@ function V2DesktopNav({
         </div>
       </nav>
 
-      <div className={cn("border-t border-white/10 transition-all duration-200", collapsed ? "p-2" : "p-3")}>
+      <div
+        className={cn(
+          "border-t border-white/10 transition-all duration-200",
+          collapsed ? "p-2" : "p-3",
+        )}
+      >
         {!simple && !collapsed && (
           <div className="rounded-md border border-white/10 bg-white/[0.055] p-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-white">
@@ -488,7 +510,12 @@ function V2DesktopNav({
           </Tooltip>
         )}
 
-        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-end gap-2 mt-3")}>
+        <div
+          className={cn(
+            "flex items-center",
+            collapsed ? "justify-center" : "justify-end gap-2 mt-3",
+          )}
+        >
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -550,8 +577,14 @@ function V2TopBar({
                   onClick={onToggleCollapse}
                   className="hidden h-9 w-9 text-muted-foreground hover:text-foreground lg:flex"
                 >
-                  {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-                  <span className="sr-only">{collapsed ? "Expand sidebar" : "Collapse sidebar"}</span>
+                  {collapsed ? (
+                    <PanelLeftOpen className="h-4 w-4" />
+                  ) : (
+                    <PanelLeftClose className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">
+                    {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  </span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
