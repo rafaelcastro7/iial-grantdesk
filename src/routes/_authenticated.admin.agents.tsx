@@ -48,6 +48,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
+import { AiProviderStatusCard } from "@/components/admin/AiProviderStatusCard";
 
 const qo = queryOptions({
   queryKey: ["admin", "agent-configs"],
@@ -81,6 +82,8 @@ function AgentsPage() {
         title="Agent Console"
         description="Full parametrization for each of the 6 LLM agents — model, prompt, generation params, reliability, and a live test playground. Inspired by Langfuse, LangSmith and OpenAI Agent Builder consoles."
       />
+
+      <AiProviderStatusCard />
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {data.agents.map((a) => (

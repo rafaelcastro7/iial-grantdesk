@@ -32,3 +32,19 @@ export const getLlmRouteStatus = createServerFn({ method: "GET" })
     providers.push(process.env.LOVABLE_API_KEY ? "Lovable AI" : "Lovable AI (key missing)");
     return { cloudProviders: providers, localOnly: false };
   });
+
+/**
+ * Admin-only, on-demand provider check: availability and any quota the
+ * provider reports. One 1-token request per configured provider; never run on
+ * page load so viewing the page spends nothing.
+ */
+export const checkAiProviderStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({}))
+  .handler(async ({ context }) => {
+    const { assertAdmin } = await import("@/lib/admin-guard");
+    // The caller's own session can read its role; no service key needed.
+    await assertAdmin(context.userId, context.supabase as never);
+    const { checkAiProviders } = await import("@/server/ai-provider-status");
+    return checkAiProviders();
+  });

@@ -71,6 +71,12 @@ export function restMinutesFor(message: string): number {
 
 // Per-process cooldown for free-tier providers after a rate limit.
 const providerCooldown = new Map<string, number>();
+/** Providers currently skipped by this process, with the time they resume. */
+export function providerCooldownSnapshot(): Record<string, number> {
+  const now = Date.now();
+  return Object.fromEntries([...providerCooldown].filter(([, until]) => until > now));
+}
+
 const QUOTA_EXHAUSTED =
   /exceeded your current quota|tokens per day|requests per day|\bTPD\b|\bRPD\b|daily limit/i;
 
