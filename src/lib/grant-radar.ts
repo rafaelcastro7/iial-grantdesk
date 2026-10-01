@@ -255,8 +255,16 @@ export function toRadarItem<T extends RadarGrant>(
     reason = "Excluded by institutional eligibility rules.";
     isRuled = true;
   } else if (ruled) {
-    verdict = ruled.verdict;
-    reason = ruled.reason;
+    // A preliminary rules pass is not a confirmed fit: the full evaluation can
+    // still rule the grant out, and listing it under "You can apply" was
+    // contradicted by the grant detail. Only an evaluation confirms eligibility.
+    if (ruled.verdict === "eligible") {
+      verdict = "needs_input";
+      reason = "Passes the preliminary check — run “Check fit” to confirm you can apply.";
+    } else {
+      verdict = ruled.verdict;
+      reason = ruled.reason;
+    }
     isRuled = true;
   } else {
     verdict = "needs_input";

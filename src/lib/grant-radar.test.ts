@@ -177,3 +177,53 @@ describe("lexical fallback search", () => {
     expect(weak).toBeNull();
   });
 });
+
+describe("confirmed eligibility", () => {
+  const rules = {
+    jurisdictions: ["CA", "ON"],
+    stage: "nonprofit",
+    annualBudget: null,
+    currency: "CAD",
+    leadTimeWeeks: 4,
+  };
+  it("never lists a grant as 'can apply' from the preliminary check alone", () => {
+    const [item] = buildRadar(
+      [
+        {
+          id: "pre",
+          ...base,
+          country: "CA",
+          deadline: inDays(90).slice(0, 10),
+          amount_cad_max: 100_000,
+        },
+      ],
+      { ...opts, rules },
+    ).items;
+    expect(item.verdict).toBe("needs_input");
+    expect(item.reason).toContain("Check fit");
+  });
+  it("puts evaluated-eligible grants before preliminary ones", () => {
+    const r = buildRadar(
+      [
+        {
+          id: "pre",
+          ...base,
+          country: "CA",
+          deadline: inDays(90).slice(0, 10),
+          amount_cad_max: 100_000,
+        },
+        {
+          id: "confirmed",
+          ...base,
+          country: "CA",
+          deadline: inDays(90).slice(0, 10),
+          amount_cad_max: 100_000,
+          evaluation: { fit_score: 0.7, eligibility_pass: true },
+        },
+      ],
+      { ...opts, rules },
+    );
+    expect(r.items[0].grant.id).toBe("confirmed");
+    expect(r.counts.eligible).toBe(1);
+  });
+});
