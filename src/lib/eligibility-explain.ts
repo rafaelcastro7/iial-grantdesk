@@ -477,7 +477,11 @@ export function narrateNotPassing({
     const missing = [
       ...new Set(
         checks
-          .filter((c) => c.status === "warn" || c.status === "skip")
+          .filter(
+            (c) =>
+              (c.status === "warn" || c.status === "skip") &&
+              !/^(deadline|sop_filter_5_runway|amount_min|amount_max)$/.test(c.id ?? ""),
+          )
           .map((c) => UNCLEAR_LABEL.find((u) => u.match.test(`${c.id ?? ""} ${c.label}`))?.text)
           .filter((t): t is string => !!t),
       ),

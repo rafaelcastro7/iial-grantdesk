@@ -761,9 +761,20 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
   const passed = evaluable.filter((c) => c.status === "pass").length;
   const rule_score = evaluable.length === 0 ? 50 : Math.round((passed / evaluable.length) * 100);
 
+  // Only unknown *eligibility* leaves the verdict open. An unknown deadline or
+  // amount is timing/size, not who may apply: it is surfaced as a warning and
+  // never turns a decidable grant into "needs input".
+  const NON_ELIGIBILITY_GATES = new Set([
+    "deadline",
+    "sop_filter_5_runway",
+    "amount_min",
+    "amount_max",
+  ]);
   const hasIncompleteHardGates = checks.some(
     (c) =>
-      (c.hard || c.id === "jurisdiction_required") && (c.status === "warn" || c.status === "skip"),
+      (c.hard || c.id === "jurisdiction_required") &&
+      !NON_ELIGIBILITY_GATES.has(c.id) &&
+      (c.status === "warn" || c.status === "skip"),
   );
   const verdict: Verdict = hard_fail
     ? "ineligible"

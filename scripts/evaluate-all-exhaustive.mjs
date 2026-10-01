@@ -1,6 +1,6 @@
 // Credentials come from GRANTDESK_EMAIL / GRANTDESK_PASSWORD (e.g. in .env.local); never hardcode them.
 import * as dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: [".env.local", ".env"] });
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.VITE_SUPABASE_URL;
@@ -76,7 +76,9 @@ async function evaluateAllCatalogGrants() {
         userId: auth.user.id,
         userSupabase: sb,
         rulesOnly: false,
-        force: true,
+        // Free-tier providers only (Groq/Cerebras); never the paid gateway.
+        // No force: an unchanged AI verdict is reused instead of re-billed.
+        freeOnly: true,
       });
 
       console.log(
