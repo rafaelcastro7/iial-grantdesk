@@ -3,13 +3,10 @@ import {
   Archive,
   ArrowRight,
   BookOpen,
-  CalendarDays,
   CheckCircle2,
   Clock3,
   Database,
   FileSearch,
-  FileText,
-  Hash,
   Scale,
   Search,
   ShieldCheck,
@@ -19,9 +16,7 @@ import {
 import type { ReactNode } from "react";
 import { AppTopBar } from "@/components/AppSidebar";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import manualMarkdown from "../../docs/USER-MANUAL.md?raw";
-import { useUiVersion } from "@/components/v2/ui-version";
 
 export const Route = createFileRoute("/_authenticated/manual")({
   head: () => ({
@@ -50,84 +45,7 @@ const headings = blocks.filter(
 );
 
 function UserManualRoute() {
-  const sectionCount = headings.length;
-  const { version } = useUiVersion();
-
-  if (version === "v2") {
-    return <UserManualRouteV2 />;
-  }
-
-  return (
-    <>
-      <AppTopBar title="User Manual" />
-      <main className="min-h-screen bg-background">
-        <section className="mx-auto grid max-w-[1500px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="hidden lg:block">
-            <div className="sticky top-24 space-y-4">
-              <Card className="overflow-hidden rounded-md">
-                <CardContent className="p-0">
-                  <div className="border-b bg-muted/40 px-4 py-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold">
-                      <Hash className="h-4 w-4 text-primary" />
-                      Contents
-                    </div>
-                  </div>
-                  <nav className="max-h-[calc(100vh-190px)] overflow-auto p-2">
-                    {headings.map((heading) => (
-                      <a
-                        key={heading.id}
-                        href={`#${heading.id}`}
-                        className="block rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                      >
-                        {heading.text}
-                      </a>
-                    ))}
-                  </nav>
-                </CardContent>
-              </Card>
-            </div>
-          </aside>
-
-          <article className="min-w-0 space-y-5">
-            <section className="rounded-md border bg-card p-5 shadow-sm sm:p-6">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="rounded-md gap-1.5">
-                  <BookOpen className="h-3.5 w-3.5" />
-                  User guide
-                </Badge>
-                <Badge variant="outline" className="rounded-md gap-1.5">
-                  <FileText className="h-3.5 w-3.5" />
-                  {sectionCount} sections
-                </Badge>
-                <Badge variant="outline" className="rounded-md gap-1.5">
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  Updated July 21, 2026
-                </Badge>
-              </div>
-              <h1 className="mt-4 max-w-4xl font-display text-3xl font-semibold tracking-normal text-foreground sm:text-4xl">
-                IIAL Grants User Manual
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
-                A professional operating guide for discovery, funder intelligence, fit evaluation,
-                proposal workflows, post-award management, competitive intelligence, administration,
-                and the local autonomous improvement system.
-              </p>
-            </section>
-
-            <section className="rounded-md border bg-card shadow-sm">
-              <div className="manual-article px-5 py-6 sm:px-8 lg:px-10">
-                {blocks
-                  .filter((block) => !(block.type === "heading" && block.depth === 1))
-                  .map((block, index) => (
-                    <MarkdownBlock key={index} block={block} />
-                  ))}
-              </div>
-            </section>
-          </article>
-        </section>
-      </main>
-    </>
-  );
+  return <UserManualRouteV2 />;
 }
 
 // -----------------------------------------------------------------------------

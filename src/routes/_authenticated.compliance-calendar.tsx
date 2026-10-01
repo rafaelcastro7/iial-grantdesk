@@ -20,9 +20,7 @@ import {
   createComplianceItem,
   markComplianceComplete,
 } from "@/lib/compliance-calendar.functions";
-import { AppTopBar } from "@/components/AppSidebar";
 import { PageTransition } from "@/components/PageTransition";
-import { PageContainer, PageHeader } from "@/components/PageLayout";
 import { toast } from "sonner";
 import {
   Calendar,
@@ -37,7 +35,6 @@ import {
   Grid3X3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUiVersion } from "@/components/v2/ui-version";
 
 const calendarQO = queryOptions({
   queryKey: ["compliance", "calendar"],
@@ -95,7 +92,6 @@ function generateICal(
 }
 
 function ComplianceCalendarPage() {
-  const { version } = useUiVersion();
   const fetchCalendar = useServerFn(getComplianceCalendar);
   const { data: items } = useSuspenseQuery({
     queryKey: ["compliance", "calendar"],
@@ -168,15 +164,6 @@ function ComplianceCalendarPage() {
     return map;
   }, [items]);
 
-  const filteredItems = selectedDate ? itemsByDate.get(selectedDate) || [] : items;
-
-  const urgencyColor = {
-    overdue: "bg-red-500/15 text-red-700 border-red-500/25",
-    urgent: "bg-amber-500/15 text-amber-700 border-amber-500/25",
-    upcoming: "bg-blue-500/15 text-blue-700 border-blue-500/25",
-    normal: "bg-muted text-muted-foreground",
-  } as const;
-
   function exportICS() {
     const ics = generateICal(
       items
@@ -198,363 +185,26 @@ function ComplianceCalendarPage() {
     toast.success("Calendar exported (.ics)");
   }
 
-  if (version === "v2") {
-    return (
-      <ComplianceCalendarPageV2
-        items={items}
-        stats={stats}
-        completeMutation={completeMutation}
-        createMutation={createMutation}
-        createOpen={createOpen}
-        setCreateOpen={setCreateOpen}
-        formValues={formValues}
-        setFormValues={setFormValues}
-        exportICS={exportICS}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        gridDate={gridDate}
-        setGridDate={setGridDate}
-        gridDays={gridDays}
-        itemsByDate={itemsByDate}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-      />
-    );
-  }
-
   return (
-    <PageTransition>
-      <div className="min-h-screen">
-        <AppTopBar title="Compliance Calendar" />
-        <PageContainer size="wide">
-          <PageHeader
-            eyebrow="Operations"
-            title="Compliance Calendar"
-            description="Reporting deadlines and compliance milestones."
-            actions={
-              <>
-                <Button variant="outline" size="sm" onClick={exportICS}>
-                  <Download className="mr-1.5 h-4 w-4" />
-                  Export .ics
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("list")}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === "grid" ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <Grid3X3 className="h-4 w-4" />
-                </Button>
-                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="mr-1.5 h-4 w-4" />
-                      Create Item
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    {/* ... dialog content same as before ... */}
-                    <DialogHeader>
-                      <DialogTitle>Create Compliance Item</DialogTitle>
-                    </DialogHeader>
-                    <form
-                      className="space-y-4"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!formValues.title || !formValues.dueDate) {
-                          toast.error("Title and due date are required");
-                          return;
-                        }
-                        createMutation.mutate();
-                      }}
-                    >
-                      <div className="space-y-2">
-                        <Label htmlFor="title">Title</Label>
-                        <Input
-                          id="title"
-                          value={formValues.title}
-                          onChange={(e) => setFormValues((v) => ({ ...v, title: e.target.value }))}
-                          placeholder="e.g. Q3 Financial Report"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="type">Type</Label>
-                        <select
-                          id="type"
-                          value={formValues.type}
-                          onChange={(e) =>
-                            setFormValues((v) => ({
-                              ...v,
-                              type: e.target.value as typeof formValues.type,
-                            }))
-                          }
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        >
-                          <option value="progress_report">Progress Report</option>
-                          <option value="financial_report">Financial Report</option>
-                          <option value="final_report">Final Report</option>
-                          <option value="audit">Audit</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="dueDate">Due Date</Label>
-                        <Input
-                          id="dueDate"
-                          type="date"
-                          value={formValues.dueDate}
-                          onChange={(e) =>
-                            setFormValues((v) => ({ ...v, dueDate: e.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="frequency">Frequency</Label>
-                        <select
-                          id="frequency"
-                          value={formValues.frequency}
-                          onChange={(e) =>
-                            setFormValues((v) => ({
-                              ...v,
-                              frequency: e.target.value as typeof formValues.frequency,
-                            }))
-                          }
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        >
-                          <option value="once">Once</option>
-                          <option value="quarterly">Quarterly</option>
-                          <option value="semi_annual">Semi-Annual</option>
-                          <option value="annual">Annual</option>
-                        </select>
-                      </div>
-                      <Button type="submit" disabled={createMutation.isPending} className="w-full">
-                        {createMutation.isPending ? "Creating..." : "Create Item"}
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </>
-            }
-          />
-
-          <div className="grid gap-3 sm:grid-cols-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <p className="text-xs">Total Items</p>
-                </div>
-                <p className="mt-1 text-2xl font-semibold">{stats.total}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <p className="text-xs">Completed</p>
-                </div>
-                <p className="mt-1 text-2xl font-semibold text-emerald-600">{stats.completed}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <AlertTriangle className="h-4 w-4" />
-                  <p className="text-xs">Overdue</p>
-                </div>
-                <p className="mt-1 text-2xl font-semibold text-red-600">{stats.overdue}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <p className="text-xs">Compliance Rate</p>
-                </div>
-                <p className="mt-1 text-2xl font-semibold">{stats.complianceRate}%</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {viewMode === "grid" && (
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">
-                    {MONTHS[gridMonth]} {gridYear}
-                  </CardTitle>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setGridDate(new Date(gridYear, gridMonth - 1, 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setGridDate(new Date())}
-                    >
-                      Today
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setGridDate(new Date(gridYear, gridMonth + 1, 1))}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-7 gap-px rounded-md border bg-muted">
-                  {DAYS.map((d) => (
-                    <div
-                      key={d}
-                      className="bg-background px-2 py-1.5 text-center text-xs font-medium text-muted-foreground"
-                    >
-                      {d}
-                    </div>
-                  ))}
-                  {gridDays.map((day, i) => {
-                    if (day === null) return <div key={`e-${i}`} className="bg-background/50" />;
-                    const dateStr = `${gridYear}-${String(gridMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                    const dayItems = itemsByDate.get(dateStr) || [];
-                    const isToday =
-                      new Date().toDateString() ===
-                      new Date(gridYear, gridMonth, day).toDateString();
-                    const isSelected = selectedDate === dateStr;
-                    return (
-                      <button
-                        key={dateStr}
-                        onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                        className={cn(
-                          "flex flex-col items-center gap-0.5 bg-background px-1 py-1.5 text-sm transition-colors hover:bg-accent min-h-[56px]",
-                          isToday && "font-bold",
-                          isSelected && "bg-primary/10 ring-1 ring-primary",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            isToday &&
-                              "flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] text-primary-foreground",
-                          )}
-                        >
-                          {day}
-                        </span>
-                        {dayItems.length > 0 && (
-                          <div className="flex flex-wrap justify-center gap-0.5">
-                            {dayItems.slice(0, 3).map((_, idx) => (
-                              <span key={idx} className="h-1 w-1 rounded-full bg-primary" />
-                            ))}
-                            {dayItems.length > 3 && (
-                              <span className="text-[9px] text-muted-foreground">
-                                +{dayItems.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {selectedDate && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>
-                Showing items for <strong>{selectedDate}</strong>
-              </span>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedDate(null)}>
-                Clear filter
-              </Button>
-            </div>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                {selectedDate ? `Deadlines on ${selectedDate}` : "Upcoming Deadlines"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {filteredItems.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  {selectedDate ? "No items on this date." : "No compliance items tracked yet."}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {filteredItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between rounded-md border p-3"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            className={`text-[10px] ${urgencyColor[item.urgency as keyof typeof urgencyColor]}`}
-                          >
-                            {item.urgency}
-                          </Badge>
-                          <span className="text-sm font-medium">{item.title}</span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {item.type.replace("_", " ")} · {item.grantTitle}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="text-sm font-medium">{item.due_date}</p>
-                          {item.daysUntilDue !== null && (
-                            <p
-                              className={cn(
-                                "text-xs",
-                                item.daysUntilDue < 0
-                                  ? "text-red-600"
-                                  : item.daysUntilDue <= 7
-                                    ? "text-amber-600"
-                                    : "text-muted-foreground",
-                              )}
-                            >
-                              {item.daysUntilDue < 0
-                                ? `${Math.abs(item.daysUntilDue)}d overdue`
-                                : `${item.daysUntilDue}d remaining`}
-                            </p>
-                          )}
-                        </div>
-                        {item.status !== "completed" && (
-                          <button
-                            onClick={() => completeMutation.mutate(item.id)}
-                            disabled={completeMutation.isPending}
-                            className="rounded-md p-1.5 text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-600 disabled:opacity-50"
-                            title="Mark as complete"
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </PageContainer>
-      </div>
-    </PageTransition>
+    <ComplianceCalendarPageV2
+      items={items}
+      stats={stats}
+      completeMutation={completeMutation}
+      createMutation={createMutation}
+      createOpen={createOpen}
+      setCreateOpen={setCreateOpen}
+      formValues={formValues}
+      setFormValues={setFormValues}
+      exportICS={exportICS}
+      viewMode={viewMode}
+      setViewMode={setViewMode}
+      gridDate={gridDate}
+      setGridDate={setGridDate}
+      gridDays={gridDays}
+      itemsByDate={itemsByDate}
+      selectedDate={selectedDate}
+      setSelectedDate={setSelectedDate}
+    />
   );
 }
 
@@ -609,12 +259,14 @@ function ComplianceCalendarPageV2({
     dueDate: string;
     frequency: "once";
   };
-  setFormValues: React.Dispatch<React.SetStateAction<{
-    title: string;
-    type: "progress_report";
-    dueDate: string;
-    frequency: "once";
-  }>>;
+  setFormValues: React.Dispatch<
+    React.SetStateAction<{
+      title: string;
+      type: "progress_report";
+      dueDate: string;
+      frequency: "once";
+    }>
+  >;
   exportICS: () => void;
   viewMode: "list" | "grid";
   setViewMode: (mode: "list" | "grid") => void;
@@ -666,10 +318,14 @@ function ComplianceCalendarPageV2({
               </div>
               <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm"><Plus className="h-4 w-4" /> Add deadline</Button>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4" /> Add deadline
+                  </Button>
                 </DialogTrigger>
                 <DialogContent>
-                  <DialogHeader><DialogTitle>Add deadline</DialogTitle></DialogHeader>
+                  <DialogHeader>
+                    <DialogTitle>Add deadline</DialogTitle>
+                  </DialogHeader>
                   <form
                     className="space-y-4"
                     onSubmit={(event) => {
@@ -686,7 +342,9 @@ function ComplianceCalendarPageV2({
                       <Input
                         id="v2-deadline-title"
                         value={formValues.title}
-                        onChange={(event) => setFormValues((value) => ({ ...value, title: event.target.value }))}
+                        onChange={(event) =>
+                          setFormValues((value) => ({ ...value, title: event.target.value }))
+                        }
                       />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -695,7 +353,12 @@ function ComplianceCalendarPageV2({
                         <select
                           id="v2-deadline-type"
                           value={formValues.type}
-                          onChange={(event) => setFormValues((value) => ({ ...value, type: event.target.value as typeof value.type }))}
+                          onChange={(event) =>
+                            setFormValues((value) => ({
+                              ...value,
+                              type: event.target.value as typeof value.type,
+                            }))
+                          }
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
                           <option value="progress_report">Progress report</option>
@@ -711,7 +374,9 @@ function ComplianceCalendarPageV2({
                           id="v2-deadline-date"
                           type="date"
                           value={formValues.dueDate}
-                          onChange={(event) => setFormValues((value) => ({ ...value, dueDate: event.target.value }))}
+                          onChange={(event) =>
+                            setFormValues((value) => ({ ...value, dueDate: event.target.value }))
+                          }
                         />
                       </div>
                     </div>
@@ -720,7 +385,12 @@ function ComplianceCalendarPageV2({
                       <select
                         id="v2-deadline-frequency"
                         value={formValues.frequency}
-                        onChange={(event) => setFormValues((value) => ({ ...value, frequency: event.target.value as typeof value.frequency }))}
+                        onChange={(event) =>
+                          setFormValues((value) => ({
+                            ...value,
+                            frequency: event.target.value as typeof value.frequency,
+                          }))
+                        }
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
                         <option value="once">Once</option>
@@ -784,18 +454,42 @@ function ComplianceCalendarPageV2({
           {viewMode === "grid" ? (
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-base">{MONTHS[gridMonth]} {gridYear}</CardTitle>
+                <CardTitle className="text-base">
+                  {MONTHS[gridMonth]} {gridYear}
+                </CardTitle>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => setGridDate(new Date(gridYear, gridMonth - 1, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => setGridDate(new Date())}>Today</Button>
-                  <Button variant="ghost" size="icon" onClick={() => setGridDate(new Date(gridYear, gridMonth + 1, 1))}><ChevronRight className="h-4 w-4" /></Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setGridDate(new Date(gridYear, gridMonth - 1, 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setGridDate(new Date())}>
+                    Today
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setGridDate(new Date(gridYear, gridMonth + 1, 1))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-7 gap-px overflow-hidden rounded-md border bg-border">
-                  {DAYS.map((day) => <div key={day} className="bg-muted px-1 py-2 text-center text-xs font-medium text-muted-foreground">{day}</div>)}
+                  {DAYS.map((day) => (
+                    <div
+                      key={day}
+                      className="bg-muted px-1 py-2 text-center text-xs font-medium text-muted-foreground"
+                    >
+                      {day}
+                    </div>
+                  ))}
                   {gridDays.map((day, index) => {
-                    if (day === null) return <div key={`empty-${index}`} className="min-h-16 bg-background/60" />;
+                    if (day === null)
+                      return <div key={`empty-${index}`} className="min-h-16 bg-background/60" />;
                     const date = `${gridYear}-${String(gridMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                     const dayItems = itemsByDate.get(date) ?? [];
                     return (
@@ -803,26 +497,49 @@ function ComplianceCalendarPageV2({
                         key={date}
                         variant="ghost"
                         onClick={() => setSelectedDate(selectedDate === date ? null : date)}
-                        className={cn("h-16 min-w-0 flex-col gap-1 rounded-none bg-background p-1", selectedDate === date && "bg-primary/10")}
+                        className={cn(
+                          "h-16 min-w-0 flex-col gap-1 rounded-none bg-background p-1",
+                          selectedDate === date && "bg-primary/10",
+                        )}
                       >
                         <span>{day}</span>
-                        {dayItems.length > 0 && <Badge variant="secondary" className="h-4 px-1 text-[10px]">{dayItems.length}</Badge>}
+                        {dayItems.length > 0 && (
+                          <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                            {dayItems.length}
+                          </Badge>
+                        )}
                       </Button>
                     );
                   })}
                 </div>
                 {selectedDate && (
                   <div className="mt-4">
-                    <DeadlineGroup title={`Deadlines on ${selectedDate}`} items={itemsByDate.get(selectedDate) ?? []} completeMutation={completeMutation} />
+                    <DeadlineGroup
+                      title={`Deadlines on ${selectedDate}`}
+                      items={itemsByDate.get(selectedDate) ?? []}
+                      completeMutation={completeMutation}
+                    />
                   </div>
                 )}
               </CardContent>
             </Card>
           ) : (
             <>
-              <DeadlineGroup title="This week" items={groups.thisWeek} completeMutation={completeMutation} />
-              <DeadlineGroup title="This month" items={groups.thisMonth} completeMutation={completeMutation} />
-              <DeadlineGroup title="Later" items={groups.later} completeMutation={completeMutation} />
+              <DeadlineGroup
+                title="This week"
+                items={groups.thisWeek}
+                completeMutation={completeMutation}
+              />
+              <DeadlineGroup
+                title="This month"
+                items={groups.thisMonth}
+                completeMutation={completeMutation}
+              />
+              <DeadlineGroup
+                title="Later"
+                items={groups.later}
+                completeMutation={completeMutation}
+              />
             </>
           )}
 

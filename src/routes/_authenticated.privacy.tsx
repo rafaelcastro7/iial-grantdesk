@@ -14,7 +14,6 @@ import {
   exportMyData,
   requestAccountDeletion,
 } from "@/lib/compliance.functions";
-import { useUiVersion } from "@/components/v2/ui-version";
 import "@/i18n";
 
 export const Route = createFileRoute("/_authenticated/privacy")({
@@ -43,17 +42,12 @@ type Dsar = {
 };
 
 type ConsentType =
-  | "terms_of_service"
-  | "privacy_policy"
-  | "ai_processing"
-  | "cross_border_transfer"
-  | "marketing";
+  "terms_of_service" | "privacy_policy" | "ai_processing" | "cross_border_transfer" | "marketing";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 function PrivacyCenter() {
-  const { t, i18n } = useTranslation();
-  const { version } = useUiVersion();
+  const { t } = useTranslation();
   const lang: "en" | "fr" = "en"; // EN-only for now
 
   const [consents, setConsents] = useState<Consent[]>([]);
@@ -145,119 +139,19 @@ function PrivacyCenter() {
   const latestByType: Record<string, Consent | undefined> = {};
   for (const c of consents) if (!latestByType[c.consent_type]) latestByType[c.consent_type] = c;
 
-  if (version === "v2") {
-    return (
-      <PrivacyCenterV2
-        types={types}
-        latestByType={latestByType}
-        dsars={dsars}
-        msg={msg}
-        busy={busy}
-        t={t}
-        toggleConsent={toggleConsent}
-        doExport={doExport}
-        requestAccess={requestAccess}
-        doDelete={doDelete}
-      />
-    );
-  }
-
   return (
-    <main className="min-h-screen bg-background text-foreground p-6 max-w-3xl mx-auto">
-      <header className="flex items-center justify-between mb-6">
-        <Link to="/dashboard" className="text-sm text-muted-foreground hover:underline">
-          ← {t("nav.dashboard")}
-        </Link>
-        <LanguageSwitcher />
-      </header>
-
-      <h1 className="font-display text-2xl tracking-tight mb-2">{t("privacy.title")}</h1>
-      <p className="text-sm text-muted-foreground mb-6">{t("privacy.subtitle")}</p>
-
-      {msg && <div className="mb-4 text-sm rounded border border-border bg-muted p-2">{msg}</div>}
-
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle>{t("privacy.consents")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="text-sm space-y-2">
-            {types.map((tp) => {
-              const last = latestByType[tp];
-              const granted = last?.action === "granted";
-              return (
-                <li
-                  key={tp}
-                  className="flex items-center justify-between border-b border-border pb-2"
-                >
-                  <div>
-                    <div className="font-medium">{t(`privacy.types.${tp}`)}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {last ? `${last.action} · v${last.policy_version}` : t("privacy.notRecorded")}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={granted ? "outline" : "default"}
-                    disabled={busy}
-                    onClick={() => toggleConsent(tp, granted ? "revoked" : "granted")}
-                  >
-                    {granted ? t("privacy.revoke") : t("privacy.grant")}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle>{t("privacy.dataRights")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={doExport} disabled={busy}>
-              {t("privacy.exportData")}
-            </Button>
-            <Button variant="outline" onClick={() => requestAccess("access")} disabled={busy}>
-              {t("privacy.requestAccess")}
-            </Button>
-            <Button variant="outline" onClick={() => requestAccess("rectify")} disabled={busy}>
-              {t("privacy.requestRectify")}
-            </Button>
-            <Button variant="destructive" onClick={doDelete} disabled={busy}>
-              {t("privacy.requestDelete")}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground pt-2">{t("privacy.dsarSla")}</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("privacy.dsarHistory")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dsars.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("privacy.dsarEmpty")}</p>
-          ) : (
-            <ul className="text-sm divide-y divide-border">
-              {dsars.map((d) => (
-                <li key={d.id} className="py-2 flex items-center justify-between">
-                  <span>{t(`privacy.kinds.${d.kind}`)}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {d.status} · {new Date(d.created_at).toLocaleDateString()}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <ComplianceAndTrustCard />
-    </main>
+    <PrivacyCenterV2
+      types={types}
+      latestByType={latestByType}
+      dsars={dsars}
+      msg={msg}
+      busy={busy}
+      t={t}
+      toggleConsent={toggleConsent}
+      doExport={doExport}
+      requestAccess={requestAccess}
+      doDelete={doDelete}
+    />
   );
 }
 

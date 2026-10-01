@@ -18,6 +18,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getOrgProfileForUser } from "@/lib/org-profile-query";
 import { z } from "zod";
+import { evaluationVerdict } from "@/lib/grant-radar";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const ScopeEnum = z.enum(["single", "selected", "top-fit", "shortlisted", "all-enriched"]);
@@ -163,19 +164,27 @@ export async function buildNotebookBriefingImpl(opts: {
     // ── Per-user evaluation rationale (RLS-scoped, safe).
     const { data: evals } = await supabase
       .from("grant_evaluations")
-      .select("grant_id, fit_score, eligibility_pass, rationale_en, created_at")
+      .select(
+        "grant_id, fit_score, eligibility_pass, rationale_en, created_at, rule_verdict:rule_snapshot->>verdict",
+      )
       .eq("user_id", userId)
       .in("grant_id", ids)
       .order("created_at", { ascending: false });
     const evalByGrant = new Map<
       string,
-      { fit_score: number; eligibility_pass: boolean; rationale: string }
+      { fit: number; verdict: string; rationale: string }
     >();
     for (const e of evals ?? []) {
       if (evalByGrant.has(e.grant_id)) continue; // keep latest only
-      evalByGrant.set(e.grant_id, {
-        fit_score: Number(e.fit_score),
+      // Stored fit is 0..1; the export reads it as a score out of 100.
+      const raw = Number(e.fit_score);
+      const v = evaluationVerdict({
         eligibility_pass: !!e.eligibility_pass,
+        rule_verdict: (e as { rule_verdict?: string | null }).rule_verdict ?? null,
+      });
+      evalByGrant.set(e.grant_id, {
+        fit: Math.round(raw <= 1 ? raw * 100 : raw),
+        verdict: v === "eligible" ? "eligible" : v === "needs_input" ? "unclear" : "not eligible",
         rationale: (e.rationale_en ?? "").trim(),
       });
     }
@@ -274,7 +283,8 @@ export async function buildNotebookBriefingImpl(opts: {
         `| Deadline | ${r.deadline ?? "—"}${daysLeft != null ? ` _(${daysLeft >= 0 ? `${daysLeft} days left` : `${Math.abs(daysLeft)} days overdue`})_` : ""} |`,
         `| Sectors | ${(r.sectors ?? []).join(", ") || "—"} |`,
         `| Status | \`${r.status}\` |`,
-        `| Fit score | ${r.fit_score ?? evalRow?.fit_score ?? "—"} / 100 |`,
+        // Only this user's own evaluation: grants.fit_score is a global column.
+        `| Fit score | ${evalRow ? `${evalRow.fit} / 100` : "Not checked"} |`,
         `| Language | ${r.language} |`,
         `| Discovered | ${r.discovered_at.slice(0, 10)}${r.enriched_at ? ` · Enriched ${r.enriched_at.slice(0, 10)}` : ""}${r.scored_at ? ` · Scored ${r.scored_at.slice(0, 10)}` : ""} |`,
         `| IIAL id | \`${r.id}\` |`,
@@ -294,7 +304,7 @@ export async function buildNotebookBriefingImpl(opts: {
         parts.push(
           `### IIAL fit rationale`,
           ``,
-          `**Score:** ${evalRow.fit_score} / 100  ·  **Eligibility verdict:** ${evalRow.eligibility_pass ? "pass" : "fail"}`,
+          `**Score:** ${evalRow.fit} / 100  ·  **Eligibility verdict:** ${evalRow.verdict}`,
           ``,
           evalRow.rationale,
           ``,

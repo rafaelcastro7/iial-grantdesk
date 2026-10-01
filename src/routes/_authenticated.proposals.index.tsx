@@ -1,22 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { type ColumnDef } from "@tanstack/react-table";
 import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useTranslation } from "react-i18next";
 import { ArrowRight, FileText, RefreshCw } from "lucide-react";
 import { listProposals, ingestOrgProfileAsKnowledge } from "@/lib/proposals.functions";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { syncClientLocale } from "@/i18n/sync";
-import { AppTopBar } from "@/components/AppSidebar";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
-import { PageContainer, PageHeader } from "@/components/PageLayout";
 import { ProposalsListSkeleton } from "@/components/Skeletons";
-import { DataTable } from "@/components/DataTable";
-import { useUiVersion } from "@/components/v2/ui-version";
 import "@/i18n";
 
 type ProposalRow = {
@@ -52,8 +44,6 @@ export const Route = createFileRoute("/_authenticated/proposals/")({
 });
 
 function ProposalsPage() {
-  const { t } = useTranslation();
-  const { version } = useUiVersion();
   const fr = false; /* EN-only */
   const qc = useQueryClient();
   const fetchProposals = useServerFn(listProposals);
@@ -96,105 +86,7 @@ function ProposalsPage() {
     };
   });
 
-  const columns: ColumnDef<ProposalRow, unknown>[] = [
-    {
-      accessorKey: "title",
-      header: "Proposal",
-      cell: ({ row }) => (
-        <div>
-          <span className="font-medium">{row.original.title}</span>
-          <p className="text-xs text-muted-foreground">From: {row.original.grantTitle}</p>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={row.original.status === "draft" ? "secondary" : "default"}>
-          {t(`proposals.status.${row.original.status}`)}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: "version",
-      header: "Version",
-      cell: ({ row }) => <span className="text-sm">v{row.original.version}</span>,
-    },
-    {
-      accessorKey: "critic_score",
-      header: "Score",
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {row.original.critic_score != null
-            ? `${(Number(row.original.critic_score) * 100).toFixed(0)}%`
-            : "—"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "grantDeadline",
-      header: "Deadline",
-      cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground">
-          {row.original.grantDeadline
-            ? new Date(row.original.grantDeadline).toLocaleDateString("en-CA")
-            : "—"}
-        </span>
-      ),
-    },
-    {
-      id: "actions",
-      header: "",
-      cell: ({ row }) => (
-        <Link to="/proposals/$id" params={{ id: row.original.id }}>
-          <Button size="sm" variant="ghost">
-            Open →
-          </Button>
-        </Link>
-      ),
-    },
-  ];
-
-  if (version === "v2") {
-    return <ProposalsPageV2 ingesting={ingesting} msg={msg} rows={rows} onIngest={onIngest} />;
-  }
-
-  return (
-    <PageTransition>
-      <div className="min-h-screen">
-        <AppTopBar title={t("proposals.title")} />
-
-        <PageContainer size="default">
-          <PageHeader
-            eyebrow="Pipeline"
-            title={t("proposals.title")}
-            actions={
-              <Button size="sm" variant="secondary" onClick={onIngest} disabled={ingesting}>
-                {ingesting ? t("app.loading") : t("proposals.ingestKnowledge")}
-              </Button>
-            }
-          />
-          {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
-
-          {rows.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-muted-foreground">
-                {t("proposals.empty")}
-              </CardContent>
-            </Card>
-          ) : (
-            <DataTable
-              columns={columns}
-              data={rows}
-              searchColumn="title"
-              searchPlaceholder="Search proposals..."
-            />
-          )}
-        </PageContainer>
-      </div>
-    </PageTransition>
-  );
+  return <ProposalsPageV2 ingesting={ingesting} msg={msg} rows={rows} onIngest={onIngest} />;
 }
 
 // -----------------------------------------------------------------------------
