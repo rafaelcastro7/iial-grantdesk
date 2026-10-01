@@ -116,6 +116,13 @@ type Grant = {
   } | null;
   enrich_last_error?: string | null;
   enrich_attempts?: number | null;
+  historical_awards?: {
+    program: string;
+    count: number;
+    median: number;
+    p90: number;
+    latest_start: string | null;
+  } | null;
 };
 
 type Props = {
@@ -335,7 +342,16 @@ export function V2GrantDetail({
               </p>
 
               <div className="mt-6 grid gap-2 sm:grid-cols-3">
-                <SignalTile icon={DollarSign} label="Funding" value={amount} />
+                <SignalTile
+                  icon={DollarSign}
+                  label="Funding"
+                  value={amount}
+                  detail={
+                    grant.amount_cad_max == null && grant.historical_awards
+                      ? `Past awards: median ${formatCad(grant.historical_awards.median)}, 90% under ${formatCad(grant.historical_awards.p90)} (${grant.historical_awards.count} agreements)`
+                      : undefined
+                  }
+                />
                 <SignalTile
                   icon={CalendarClock}
                   label="Deadline"

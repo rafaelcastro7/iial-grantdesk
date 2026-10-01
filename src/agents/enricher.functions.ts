@@ -66,7 +66,7 @@ export async function enrichGrantImpl(
   const { data: g, error } = await db
     .from("grants")
     .select(
-      "id, title, summary, eligibility_note, language, url, status, amount_cad_min, amount_cad_max, deadline, eligibility, sectors, applicant_types, populations_served, funding_uses, funder_type, deadline_kind, source_freshness_at, enrich_attempts, confirmed_source_urls",
+      "id, title, summary, eligibility_note, language, url, status, amount_cad_min, amount_cad_max, deadline, eligibility, sectors, applicant_types, populations_served, funding_uses, funder_type, deadline_kind, source_freshness_at, enrich_attempts, confirmed_source_urls, country, funder:funders(name)",
     )
     .eq("id", data.grantId)
     .maybeSingle();
@@ -267,6 +267,38 @@ export async function enrichGrantImpl(
       );
     }
   }
+  // Past federal awards for Canadian programs (context for a realistic ask).
+  // Written separately and best-effort so a missing column or an unreachable
+  // dataset never fails the enrichment itself.
+  if ((g as { country?: string | null }).country === "CA") {
+    try {
+      const { fetchHistoricalAwards } = await import("@/agents/sources/canada-gc-awards.server");
+      const funderRel = (g as { funder?: { name?: string } | Array<{ name?: string }> | null })
+        .funder;
+      const funderName = Array.isArray(funderRel) ? funderRel[0]?.name : funderRel?.name;
+      const history = await fetchHistoricalAwards(g.title, funderName);
+      if (history) {
+        const { error: historyError } = await db
+          .from("grants")
+          .update({ historical_awards: history } as never)
+          .eq("id", g.id);
+        await trace(
+          "history",
+          historyError
+            ? `Historical awards found but not stored: ${historyError.message}`
+            : `${history.count} past awards for "${history.program}" (median ${history.median})`,
+          historyError ? "warn" : "done",
+        );
+      }
+    } catch (historyErr) {
+      await trace(
+        "history",
+        `Historical awards unavailable: ${String(historyErr).slice(0, 120)}`,
+        "warn",
+      );
+    }
+  }
+
   const missingFields = () => {
     const missing: string[] = [];
     if (!hasAmountMin && patch.amount_cad_min == null) missing.push("amount_cad_min");

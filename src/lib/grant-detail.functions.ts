@@ -19,6 +19,16 @@ export const getGrantDetail = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     if (!grant) throw new Error("Grant not found");
 
+    // Read separately and tolerate failure: the column is newer than the page,
+    // and a missing column must not break grant detail.
+    const { data: history } = await context.supabase
+      .from("grants")
+      .select("historical_awards" as never)
+      .eq("id", data.id)
+      .maybeSingle();
+    (grant as Record<string, unknown>).historical_awards =
+      (history as { historical_awards?: unknown } | null)?.historical_awards ?? null;
+
     // Same duplicate-record signal as listGrants — a real, recurring
     // data-quality issue (see grants.functions.ts's normalizeTitle comment).
     const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g");
