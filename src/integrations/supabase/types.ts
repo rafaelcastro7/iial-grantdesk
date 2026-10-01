@@ -2660,6 +2660,7 @@ export type Database = {
           funder_id: string
           funder_type: string | null
           funding_uses: string[] | null
+          historical_awards: Json | null
           id: string
           language: string
           last_seen_at: string
@@ -2715,6 +2716,7 @@ export type Database = {
           funder_id: string
           funder_type?: string | null
           funding_uses?: string[] | null
+          historical_awards?: Json | null
           id?: string
           language?: string
           last_seen_at?: string
@@ -2770,6 +2772,7 @@ export type Database = {
           funder_id?: string
           funder_type?: string | null
           funding_uses?: string[] | null
+          historical_awards?: Json | null
           id?: string
           language?: string
           last_seen_at?: string
