@@ -16,7 +16,9 @@ describe("narrateEvaluation", () => {
       ],
     });
     expect(text).toContain("IIAL is not a fit for “Dairy Innovation Program”.");
-    expect(text).toContain("accepts only for profit, while IIAL is registered as nonprofit, academic");
+    expect(text).toContain(
+      "accepts only for profit, while IIAL is registered as nonprofit, academic",
+    );
     expect(text).not.toMatch(/sop_filter|true|FAIL/);
   });
 

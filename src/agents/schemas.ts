@@ -254,7 +254,7 @@ Rules:
 - Do NOT translate to French. FR is handled on-demand by a different agent.`,
   },
   evaluator: {
-    version: "1.1.0",
+    version: "1.2.0",
     system: `You are a grant-fit evaluator for Canadian organizations.
 Given (a) a grant and (b) an organization profile, return a fit score in [0,1]
 plus a bilingual rationale.

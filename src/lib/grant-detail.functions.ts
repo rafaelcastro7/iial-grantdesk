@@ -36,7 +36,7 @@ export const getGrantDetail = createServerFn({ method: "GET" })
       )
       .eq("id", data.id)
       .maybeSingle();
-    Object.assign(grant as Record<string, unknown>, (facets as Record<string, unknown>) ?? {});
+    Object.assign(grant as Record<string, unknown>, (facets as unknown as Record<string, unknown> | null) ?? {});
     // Separate from the history read so one missing column cannot hide the other.
     const { data: provenance } = await context.supabase
       .from("grants")

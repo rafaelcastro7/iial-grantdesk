@@ -47,7 +47,7 @@ import { ValueBlock } from "@/components/grants/GrantDetailExpress";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
-import { FUNDING_KIND_LABEL, fundingKindOf } from "@/lib/grant-radar";
+import { FUNDING_KIND_LABEL, evaluationVerdict, fundingKindOf } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 
@@ -217,6 +217,14 @@ export function V2GrantDetail({
         checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
       } | null
     )?.checks ?? [];
+  // Same reading as the radar card, so both always show the same verdict.
+  const evalVerdict = evaluation
+    ? evaluationVerdict({
+        eligibility_pass: evaluation.eligibility_pass,
+        rule_verdict:
+          (evaluation.rule_snapshot as { verdict?: string } | null | undefined)?.verdict ?? null,
+      })
+    : null;
   const deadline = getDeadlineState(grant.deadline);
   const amount = amountLabel(
     grant.amount_cad_min,
@@ -227,6 +235,7 @@ export function V2GrantDetail({
   const verdict = getVerdict({
     deadlineDays: deadline.days,
     evaluation,
+    evalVerdict,
     qualityPct: quality.pct,
     status: grant.status,
     enrichAttempts: grant.enrich_attempts,
@@ -726,7 +735,13 @@ export function V2GrantDetail({
               <div className="rounded-md border bg-background/70 p-3">
                 <div className="text-xs text-muted-foreground">Eligible</div>
                 <div className="mt-1 text-xl font-semibold">
-                  {evaluation ? (evaluation.eligibility_pass ? "Yes" : "No") : "—"}
+                  {evalVerdict === "eligible"
+                    ? "Yes"
+                    : evalVerdict === "needs_input"
+                      ? "Unclear"
+                      : evalVerdict === "not_eligible"
+                        ? "No"
+                        : "—"}
                 </div>
               </div>
             </div>
@@ -1050,12 +1065,14 @@ function getVerdict({
   deadlineDays,
   enrichAttempts,
   evaluation,
+  evalVerdict,
   qualityPct,
   status,
 }: {
   deadlineDays: number | null;
   enrichAttempts?: number | null;
   evaluation: Evaluation;
+  evalVerdict: "eligible" | "needs_input" | "not_eligible" | null;
   qualityPct: number;
   status: string;
 }) {
@@ -1126,10 +1143,19 @@ function getVerdict({
       detail: "Potentially useful if it maps to an active project or partner commitment.",
     };
   }
+  if (evalVerdict === "needs_input") {
+    return {
+      dot: "bg-amber-500",
+      enrichmentFailed,
+      label: "Confirm eligibility",
+      detail:
+        "No rule rules you out, but the call does not state every eligibility condition. Confirm the points below before investing time.",
+    };
+  }
   return {
     dot: "bg-rose-500",
     enrichmentFailed,
-    label: evaluation.eligibility_pass ? "Low priority" : "Eligibility risk",
+    label: evaluation.eligibility_pass ? "Low priority" : "Not a fit",
     detail: evaluation.eligibility_pass
       ? "The fit signal is weak. Keep the record for reference unless strategy changes."
       : "It does not meet one or more of your eligibility rules. Below: what the grant asks for, what your profile says, and how to fix it if it is a profile setting.",

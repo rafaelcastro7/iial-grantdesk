@@ -3,7 +3,7 @@
 // without going through the TanStack server-fn resolver.
 
 import { createHash } from "node:crypto";
-import { narrateEvaluation } from "@/lib/eligibility-explain";
+import { narrateEvaluation, narrateNotPassing } from "@/lib/eligibility-explain";
 import { EvaluatorOutput, PROMPTS, normalizeEvaluatorRaw } from "@/agents/schemas";
 import { canTransition, type GrantStatus } from "@/agents/pipeline-stages.shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -311,6 +311,21 @@ export async function evaluateGrantImpl(opts: {
     combinedFit >= rules.threshold_fit_pass;
   parsed.fit_score = combinedFitUnit;
   parsed.eligibility_pass = eligibilityPass;
+  // The explanation must agree with the final verdict. Without a failed
+  // rule, a "no" comes from unclear eligibility or a low combined fit; say
+  // which, instead of leaving a rationale that reads as a pass.
+  if (!eligibilityPass && !rulesResult.hard_fail) {
+    const note = narrateNotPassing({
+      orgName:
+        (effectiveOrg.org_name as string | null) ?? (effectiveOrg.legal_name as string | null),
+      checks: rulesResult.checks as never,
+      unclear: rulesResult.verdict === "needs_input",
+      fit: combinedFit,
+      threshold: rules.threshold_fit_pass,
+    });
+    parsed.rationale_en =
+      usedModel === "rules-engine-deterministic" ? note : `${parsed.rationale_en.trim()} ${note}`;
+  }
   await trace(
     "combine",
     `LLM=${Math.round(llmFit * 100)} | rules=${rulesResult.rule_score} | combined=${combinedFit} | threshold=${rules.threshold_fit_pass} | pass=${eligibilityPass}`,
@@ -348,6 +363,8 @@ export async function evaluateGrantImpl(opts: {
       run_id: runId,
       rule_snapshot: {
         input_hash: inputHash,
+        verdict: rulesResult.verdict,
+        threshold: rules.threshold_fit_pass,
         checks: rulesResult.checks,
         hard_fail: rulesResult.hard_fail,
         rule_score: rulesResult.rule_score,

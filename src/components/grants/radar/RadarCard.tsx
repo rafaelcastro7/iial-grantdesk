@@ -137,10 +137,10 @@ export function RadarCard({
               <p className="line-clamp-3 whitespace-pre-line">
                 <span className="font-semibold text-foreground">
                   {item.verdict === "not_eligible"
-                    ? "Motivo de descarte: "
+                    ? "Why it is not a fit: "
                     : simple
                       ? "Why: "
-                      : "Reglas: "}
+                      : "Check: "}
                 </span>
                 {item.reason}
               </p>

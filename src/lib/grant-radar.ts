@@ -36,7 +36,12 @@ export type RadarGrant = {
     | { name?: string | null; country?: string | null }
     | Array<{ name?: string | null; country?: string | null }>
     | null;
-  evaluation?: { eligibility_pass: boolean; fit_score?: number | null } | null;
+  evaluation?: {
+    eligibility_pass: boolean;
+    fit_score?: number | null;
+    /** Rules engine verdict stored with the evaluation ("needs_input" = unclear, not a no). */
+    rule_verdict?: string | null;
+  } | null;
   summary?: string | null;
   amount_min?: number | null;
   amount_max?: number | null;
@@ -137,8 +142,22 @@ export function grantAmount(g: RadarGrant): number | null {
   return g.amount_cad_max ?? g.amount_cad_min ?? null;
 }
 
+/**
+ * The single reading of a stored evaluation, shared by the radar, the grant
+ * detail and the dashboard so they never disagree. A verdict the rules engine
+ * marked "needs_input" (the call does not state who can apply or where) is
+ * unclear, not a rejection.
+ */
+export function evaluationVerdict(ev: {
+  eligibility_pass: boolean;
+  rule_verdict?: string | null;
+}): RadarVerdict {
+  if (ev.eligibility_pass) return "eligible";
+  return ev.rule_verdict === "needs_input" ? "needs_input" : "not_eligible";
+}
+
 export function verdictOf(g: RadarGrant): RadarVerdict {
-  if (g.evaluation) return g.evaluation.eligibility_pass ? "eligible" : "not_eligible";
+  if (g.evaluation) return evaluationVerdict(g.evaluation);
   if (g.hardBlocked) return "not_eligible";
   return "needs_input";
 }
@@ -244,7 +263,7 @@ export function toRadarItem<T extends RadarGrant>(
   let isRuled = false;
 
   if (g.evaluation) {
-    verdict = g.evaluation.eligibility_pass ? "eligible" : "not_eligible";
+    verdict = evaluationVerdict(g.evaluation);
     reason =
       humanizeRationale((g.evaluation as { rationale_en?: string }).rationale_en) ??
       ruled?.reason ??

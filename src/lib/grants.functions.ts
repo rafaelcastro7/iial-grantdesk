@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { PROMPTS } from "@/agents/schemas";
+
+const EVALUATOR_PROMPT_VERSION = PROMPTS.evaluator.version;
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
 import { assertAdmin } from "@/lib/admin-guard";
@@ -348,12 +351,15 @@ export const listGrants = createServerFn({ method: "GET" })
         rationale_en: string;
         rationale_fr: string;
         created_at: string;
+        rule_verdict: string | null;
       }
     >();
     for (const chunk of chunkIds((rows ?? []).map((row) => row.id))) {
       const { data: evals, error: evalsError } = await context.supabase
         .from("grant_evaluations")
-        .select("grant_id, fit_score, eligibility_pass, rationale_en, rationale_fr, created_at")
+        .select(
+          "grant_id, fit_score, eligibility_pass, rationale_en, rationale_fr, created_at, rule_verdict:rule_snapshot->>verdict",
+        )
         .eq("user_id", context.userId)
         .in("grant_id", chunk);
       if (evalsError) throw new Error(`grant_evaluations: ${evalsError.message}`);
@@ -364,6 +370,7 @@ export const listGrants = createServerFn({ method: "GET" })
           rationale_en: evaluation.rationale_en ?? "",
           rationale_fr: evaluation.rationale_fr ?? "",
           created_at: evaluation.created_at,
+          rule_verdict: (evaluation as { rule_verdict?: string | null }).rule_verdict ?? null,
         });
       }
     }
@@ -1097,7 +1104,7 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
     for (const chunk of chunkIds(ids)) {
       const { data: existing, error: existingError } = await context.supabase
         .from("grant_evaluations")
-        .select("grant_id, evaluated_at")
+        .select("grant_id, evaluated_at, model, prompt_version")
         .eq("user_id", context.userId)
         .in("grant_id", chunk);
       if (existingError) throw new Error(`grant_evaluations: ${existingError.message}`);
@@ -1106,7 +1113,13 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
       const profileChangedAt = rulesChangedAt;
       for (const e of existing ?? []) {
         const at = new Date((e as { evaluated_at?: string | null }).evaluated_at ?? 0).getTime();
-        if (at >= profileChangedAt) done.add(e.grant_id);
+        // Deterministic verdicts written by an older evaluator version are
+        // re-run too (0 tokens); model-written ones are kept.
+        const meta = e as { model?: string | null; prompt_version?: string | null };
+        const outdated =
+          meta.model === "rules-engine-deterministic" &&
+          meta.prompt_version !== EVALUATOR_PROMPT_VERSION;
+        if (at >= profileChangedAt && !outdated) done.add(e.grant_id);
       }
     }
     const todo = ids.filter((id) => !done.has(id)).slice(0, data.limit);

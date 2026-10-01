@@ -413,7 +413,12 @@ function contrastSentence(check: FullCheck, org: string): string {
  * and what the organization is, then what to do. Matches the tone of the
  * model-written rationales so every verdict reads the same way.
  */
-export function narrateEvaluation({ orgName, grantTitle, checks, mode = "rules" }: NarrateInput): string {
+export function narrateEvaluation({
+  orgName,
+  grantTitle,
+  checks,
+  mode = "rules",
+}: NarrateInput): string {
   const org = orgName?.trim() || "Your organization";
   const program = grantTitle?.trim() ? `“${grantTitle.trim()}”` : "this program";
   const failed = checks.filter((c) => c.status === "fail");
@@ -439,4 +444,46 @@ export function narrateEvaluation({ orgName, grantTitle, checks, mode = "rules" 
     ? ` If that is not accurate, ${lower(trimDot(fix.fix))} and the grant will be re-checked.`
     : ` ${fix.fix}`;
   return `${opening}${more}${next}`;
+}
+
+const UNCLEAR_LABEL: Array<{ match: RegExp; text: string }> = [
+  { match: /sop_filter_1_legal|legal eligibility/i, text: "which types of organization can apply" },
+  { match: /jurisdiction_required|required jurisdiction/i, text: "where applicants must be based" },
+  { match: /sectors_required|required sectors/i, text: "which sectors it funds" },
+  { match: /amount/i, text: "how much it awards" },
+  { match: /deadline|runway/i, text: "when applications close" },
+];
+
+/**
+ * Explains a "not yet" verdict that no rule failed: either the call leaves a
+ * hard requirement unstated (so it is unclear, not a rejection), or the
+ * overall match is below the pass mark.
+ */
+export function narrateNotPassing({
+  orgName,
+  checks,
+  unclear,
+  fit,
+  threshold,
+}: {
+  orgName?: string | null;
+  checks: FullCheck[];
+  unclear: boolean;
+  fit: number;
+  threshold: number;
+}): string {
+  const org = orgName?.trim() || "Your organization";
+  if (unclear) {
+    const missing = [
+      ...new Set(
+        checks
+          .filter((c) => c.status === "warn" || c.status === "skip")
+          .map((c) => UNCLEAR_LABEL.find((u) => u.match.test(`${c.id ?? ""} ${c.label}`))?.text)
+          .filter((t): t is string => !!t),
+      ),
+    ];
+    const what = missing.length ? missing.join(" and ") : "some of its eligibility conditions";
+    return `Eligibility is not confirmed yet: the call does not clearly state ${what}, so it cannot be marked as a fit for ${org}. Check those points on the official page or with the program officer before investing time.`;
+  }
+  return `The overall match is ${fit}/100, below the ${threshold} needed to recommend it: no rule rules ${org} out, but too little of its profile (sectors, capabilities, priorities) lines up with what this call funds.`;
 }
