@@ -61,9 +61,19 @@ function normalizeUrl(url: string): string {
   return url.replace(/#.*$/, "").replace(/\/+$/, "").toLowerCase();
 }
 
+// Applicant guides and eligibility PDFs hold the deadlines and criteria the
+// landing page leaves out; brochures and reports do not.
+const GUIDE_DOCUMENT =
+  /(?:applicant|application|program|funding)[-_ ]?guide|guidelines?|eligibility|criteria|call[-_ ]for[-_ ]proposals|terms[-_ ]of[-_ ]reference/i;
+const NON_GUIDE_DOCUMENT =
+  /annual[-_ ]report|aoda|statement|brochure|newsletter|press|backgrounder|presentation|poster/i;
+
 function scoreCandidate(text: string): number {
   const hay = text.toLowerCase();
-  return KEYWORDS.reduce((score, keyword) => (hay.includes(keyword) ? score + 1 : score), 0);
+  const base = KEYWORDS.reduce((score, keyword) => (hay.includes(keyword) ? score + 1 : score), 0);
+  if (!/\.pdf\b/.test(hay)) return base;
+  if (NON_GUIDE_DOCUMENT.test(hay)) return 0;
+  return GUIDE_DOCUMENT.test(hay) ? base + 3 : base;
 }
 
 function isSameHost(url: string, baseUrl: string): boolean {
