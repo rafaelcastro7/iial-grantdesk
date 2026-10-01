@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, PencilLine, SearchX, UserRound, X } from "lucide-react";
+import { Check, ChevronDown, PencilLine, SearchX, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,7 @@ function day(iso?: string) {
  * completed by hand; enrichment never overwrites a hand-entered value.
  */
 export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FieldKey | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -137,77 +138,101 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
     }
   };
 
+  const missingCount = FIELDS.filter(({ key, kind }) => !display(kind, values[key])).length;
+
   return (
-    <section className="rounded-md border bg-background p-4">
-      <h2 className="text-sm font-semibold">Grant facts</h2>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Found automatically, searched without success, or completed by a person. Hand-entered values
-        are never overwritten by the automatic search.
-      </p>
-      <ul className="mt-3 divide-y">
-        {FIELDS.map(({ key, label, kind, searchKey }) => {
-          const shown = display(kind, values[key]);
-          const byPerson = manual[key];
-          const notFound = !shown && status[searchKey]?.status === "not_found";
-          return (
-            <li key={key} className="py-2.5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-medium text-muted-foreground">{label}</div>
-                  {editing === key ? (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <Input
-                        autoFocus
-                        aria-label={label}
-                        className="h-8 w-64 max-w-full"
-                        type={kind === "date" ? "date" : "text"}
-                        inputMode={kind === "amount" ? "numeric" : undefined}
-                        placeholder={kind === "list" ? "Comma-separated" : undefined}
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                      />
-                      <Button size="sm" disabled={saving} onClick={() => submit(key, kind)}>
-                        <Check className="mr-1 h-3.5 w-3.5" /> Save
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
-                        <X className="mr-1 h-3.5 w-3.5" /> Cancel
-                      </Button>
-                      {error && <span className="text-xs text-rose-600">{error}</span>}
-                    </div>
-                  ) : (
-                    <div className="mt-0.5 text-sm">
-                      {shown ?? (
-                        <span className="text-muted-foreground">
-                          {notFound
-                            ? "Not found"
-                            : grant.enriched_at
-                              ? "Not published"
-                              : "Not searched yet"}
-                        </span>
+    <section className="rounded-md border bg-background">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={`grant-facts-${grant.id}`}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left"
+      >
+        <div>
+          <h2 className="text-sm font-semibold">Grant facts</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {missingCount === 0
+              ? "All key facts are filled in."
+              : `${missingCount} of ${FIELDS.length} missing — open to review or complete them.`}
+          </p>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div id={`grant-facts-${grant.id}`} className="border-t px-4 pb-4">
+          <p className="mt-3 text-xs text-muted-foreground">
+            Hand-entered values are never overwritten by the automatic search.
+          </p>
+          <ul className="mt-2 divide-y">
+            {FIELDS.map(({ key, label, kind, searchKey }) => {
+              const shown = display(kind, values[key]);
+              const byPerson = manual[key];
+              const notFound = !shown && status[searchKey]?.status === "not_found";
+              return (
+                <li key={key} className="py-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+                      {editing === key ? (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <Input
+                            autoFocus
+                            aria-label={label}
+                            className="h-8 w-64 max-w-full"
+                            type={kind === "date" ? "date" : "text"}
+                            inputMode={kind === "amount" ? "numeric" : undefined}
+                            placeholder={kind === "list" ? "Comma-separated" : undefined}
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                          />
+                          <Button size="sm" disabled={saving} onClick={() => submit(key, kind)}>
+                            <Check className="mr-1 h-3.5 w-3.5" /> Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                            <X className="mr-1 h-3.5 w-3.5" /> Cancel
+                          </Button>
+                          {error && <span className="text-xs text-rose-600">{error}</span>}
+                        </div>
+                      ) : (
+                        <div className="mt-0.5 text-sm">
+                          {shown ?? (
+                            <span className="text-muted-foreground">
+                              {notFound
+                                ? "Not found"
+                                : grant.enriched_at
+                                  ? "Not published"
+                                  : "Not searched yet"}
+                            </span>
+                          )}
+                        </div>
                       )}
+                      {byPerson ? (
+                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-sky-700 dark:text-sky-400">
+                          <UserRound className="h-3 w-3" /> Entered by a person on{" "}
+                          {day(byPerson.at)}
+                        </div>
+                      ) : notFound ? (
+                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
+                          <SearchX className="h-3 w-3" /> Searched the official sources on{" "}
+                          {day(status[searchKey]?.checked_at)} and did not find it — you can add it.
+                        </div>
+                      ) : null}
                     </div>
-                  )}
-                  {byPerson ? (
-                    <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-sky-700 dark:text-sky-400">
-                      <UserRound className="h-3 w-3" /> Entered by a person on {day(byPerson.at)}
-                    </div>
-                  ) : notFound ? (
-                    <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
-                      <SearchX className="h-3 w-3" /> Searched the official sources on{" "}
-                      {day(status[searchKey]?.checked_at)} and did not find it — you can add it.
-                    </div>
-                  ) : null}
-                </div>
-                {editing !== key && (
-                  <Button size="sm" variant="outline" onClick={() => start(key, kind)}>
-                    <PencilLine className="mr-1 h-3.5 w-3.5" /> {shown ? "Edit" : "Add"}
-                  </Button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                    {editing !== key && (
+                      <Button size="sm" variant="outline" onClick={() => start(key, kind)}>
+                        <PencilLine className="mr-1 h-3.5 w-3.5" /> {shown ? "Edit" : "Add"}
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
