@@ -165,6 +165,27 @@ export function evaluationVerdict(ev: {
 }
 
 /**
+ * Whether a proposal may be drafted for this user's evaluation. The one rule
+ * shared by the Draft button and the strategist on the server.
+ */
+export function draftGate(
+  ev:
+    | {
+        eligibility_pass: boolean;
+        model?: string | null;
+        rule_snapshot?: unknown;
+        rule_verdict?: string | null;
+      }
+    | null
+    | undefined,
+): "ok" | "not_evaluated" | "not_eligible" {
+  if (!ev) return "not_evaluated";
+  const rule_verdict =
+    ev.rule_verdict ?? (ev.rule_snapshot as { verdict?: string } | null)?.verdict ?? null;
+  return evaluationVerdict({ ...ev, rule_verdict }) === "eligible" ? "ok" : "not_eligible";
+}
+
+/**
  * True when the verdict comes from the AI review (or a hard rule failure,
  * which needs no AI). A rules-only pre-check has no real fit score: with few
  * evaluable rules it reads 100/100, so callers hide the score until then.

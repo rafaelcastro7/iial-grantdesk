@@ -17,8 +17,8 @@ export function useModuleFlags() {
   });
 }
 
-/** Consultants see Home (/dashboard), Grant Radar (/grants) and Fit insights (/insights). */
-export const CONSULTANT_PATHS = ["/dashboard", "/grants", "/insights"];
+/** Consultants see Home, Grant Radar, Fit insights and the proposals they draft. */
+export const CONSULTANT_PATHS = ["/dashboard", "/grants", "/insights", "/proposals"];
 export function isConsultantPath(path: string) {
   return CONSULTANT_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 }
@@ -37,8 +37,8 @@ export async function fetchIsConsultant(): Promise<boolean> {
 
 export function useIsConsultant() {
   return (
-    useQuery({ queryKey: ["is-consultant"], staleTime: 60_000, queryFn: fetchIsConsultant })
-      .data ?? false
+    useQuery({ queryKey: ["is-consultant"], staleTime: 60_000, queryFn: fetchIsConsultant }).data ??
+    false
   );
 }
 

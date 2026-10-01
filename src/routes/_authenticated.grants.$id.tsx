@@ -326,6 +326,12 @@ function toUserFacingActionError(error: unknown): string {
   if (raw.includes("grant_not_enriched_yet")) {
     return "Fetch details first. The evaluator needs the enriched grant facts before it can validate fit rules.";
   }
+  if (raw.includes("not_eligible")) {
+    return "Drafting is only available for grants your fit check found eligible.";
+  }
+  if (raw.includes("not_evaluated")) {
+    return "Check fit first: drafting unlocks once this grant is assessed as eligible.";
+  }
   if (raw.includes("org_profile_missing")) {
     return "Complete the organization profile before evaluating grants. Fit rules depend on your sectors, jurisdictions, budget, and applicant profile.";
   }

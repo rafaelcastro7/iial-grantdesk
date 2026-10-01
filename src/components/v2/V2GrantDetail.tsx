@@ -53,6 +53,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import {
   FUNDING_KIND_LABEL,
+  draftGate,
   evaluationVerdict,
   fundingKindOf,
   grantCurrency,
@@ -266,8 +267,9 @@ export function V2GrantDetail({
       ? "We couldn't read this grant's page. Open the official page to check it by hand."
       : "Fetch details first so there is text to assess.";
   const canDraft =
-    ["scored", "shortlisted", "in_proposal"].includes(grant.status) ||
-    evaluation?.eligibility_pass === true;
+    // Same verdict the server checks: grants.status is shared by every user
+    // and is "scored" even after a "no", so it must not unlock drafting.
+    draftGate(evaluation) === "ok";
   const draftBlockedReason = canDraft
     ? null
     : evalVerdict === "not_eligible"

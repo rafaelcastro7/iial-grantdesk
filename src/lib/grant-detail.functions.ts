@@ -107,11 +107,19 @@ export const getGrantDetail = createServerFn({ method: "GET" })
 
     // Lets the "Draft proposal" CTA become "View proposal" instead of
     // silently creating a duplicate proposal row on a second click.
-    const { data: existingProposal } = await context.supabase
+    // Per organization, like the strategist's guard: a teammate's live
+    // proposal for this grant is opened instead of drafting a second one.
+    const { getOrgProfileForUser } = await import("@/lib/org-profile-query");
+    const { data: myOrg } = await getOrgProfileForUser(context.supabase, context.userId);
+    const myOrgId = (myOrg as { org_id?: string | null } | null)?.org_id ?? null;
+    let proposalQuery = context.supabase
       .from("proposals")
       .select("id, status")
-      .eq("grant_id", data.id)
-      .eq("user_id", context.userId)
+      .eq("grant_id", data.id);
+    proposalQuery = myOrgId
+      ? proposalQuery.or(`user_id.eq.${context.userId},org_id.eq.${myOrgId}`)
+      : proposalQuery.eq("user_id", context.userId);
+    const { data: existingProposal } = await proposalQuery
       .not("status", "in", "(rejected,withdrawn)")
       .order("created_at", { ascending: false })
       .limit(1)

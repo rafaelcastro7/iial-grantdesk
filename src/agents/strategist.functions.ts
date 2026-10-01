@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PROMPTS, StrategistOutput } from "@/agents/schemas";
 import { resolveModel } from "@/agents/model-router.server";
 import { getOrgProfileForUser } from "@/lib/org-profile-query";
+import { draftGate } from "@/lib/grant-radar";
 
 // Local models sometimes wrap JSON in ```fences``` or add a sentence before it.
 // Strip fences and slice to the outermost object so a strict schema parse does
@@ -174,23 +175,43 @@ export const runStrategist = createServerFn({ method: "POST" })
     if (te) throw new Error(te.message);
     if (!tpl) throw new Error("template_not_found");
 
-    // Idempotency guard: a second "Draft proposal" click (no unique DB
-    // constraint exists on grant_id/user_id) used to insert a second,
-    // orphaned proposals row and burn a real LLM call. Reuse the existing
-    // non-dead proposal instead.
-    const { data: existing, error: ee } = await context.supabase
-      .from("proposals")
-      .select("id")
-      .eq("grant_id", data.grantId)
-      .eq("user_id", context.userId)
-      .not("status", "in", "(rejected,withdrawn)")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (ee) throw new Error(ee.message);
+    // Idempotency guard, per organization: a teammate's live proposal for
+    // the same grant is reused instead of creating a second one (and a
+    // second LLM call). Checked again right before insert (see below).
+    const orgId = (org as { org_id?: string | null }).org_id ?? null;
+    const findExisting = async () => {
+      let q = context.supabase
+        .from("proposals")
+        .select("id")
+        .eq("grant_id", data.grantId)
+        .not("status", "in", "(rejected,withdrawn)");
+      q = orgId
+        ? q.or(`user_id.eq.${context.userId},org_id.eq.${orgId}`)
+        : q.eq("user_id", context.userId);
+      const { data: row, error } = await q
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return row;
+    };
+    const existing = await findExisting();
     if (existing) {
       return { proposalId: existing.id, runId, reused: true };
     }
+
+    // Drafting is only for grants this user's evaluation found eligible, with
+    // the same reading as the radar and the detail page. Checked on the
+    // server so no caller can spend an AI call on an ineligible grant.
+    const { data: ev, error: eve } = await context.supabase
+      .from("grant_evaluations")
+      .select("eligibility_pass, model, rule_snapshot")
+      .eq("user_id", context.userId)
+      .eq("grant_id", data.grantId)
+      .maybeSingle();
+    if (eve) throw new Error(eve.message);
+    const gate = draftGate(ev ? { ...ev, eligibility_pass: !!ev.eligibility_pass } : null);
+    if (gate !== "ok") throw new Error(gate);
 
     // A throwing LLM call (e.g. Ollama timeout on a cold model) must still
     // leave a failed agent_runs row — same observability fix as the writer.
@@ -279,6 +300,10 @@ export const runStrategist = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle();
 
+    // A second click may have finished while the model was writing.
+    const raced = await findExisting();
+    if (raced) return { proposalId: raced.id, runId, reused: true };
+
     // Persist proposal + sections.
     const { data: proposal, error: pe } = await context.supabase
       .from("proposals")
@@ -307,7 +332,12 @@ export const runStrategist = createServerFn({ method: "POST" })
       critic_notes: { angle: s.angle, must_cover: s.must_cover },
     }));
     const { error: ise } = await context.supabase.from("proposal_sections").insert(sectionRows);
-    if (ise) throw new Error(ise.message);
+    if (ise) {
+      // Without sections the proposal is an empty shell that the guard above
+      // would keep reopening forever; remove it so a retry starts clean.
+      await context.supabase.from("proposals").delete().eq("id", proposal.id);
+      throw new Error(ise.message);
+    }
 
     // Transition grant: scored → shortlisted → in_proposal (best-effort).
     await context.supabase

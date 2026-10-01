@@ -430,6 +430,9 @@ function GrantsPage() {
         if (e instanceof Error && e.message.includes("org_profile_missing")) {
           throw new Error("Complete the IIAL organization profile before starting a proposal.");
         }
+        if (e instanceof Error && /not_eligible|not_evaluated/.test(e.message)) {
+          throw new Error("Drafting is only available for grants your fit check found eligible.");
+        }
         throw e;
       }
     });
