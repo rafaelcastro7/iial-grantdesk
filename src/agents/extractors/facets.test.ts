@@ -37,3 +37,14 @@ describe("extractGrantFacets", () => {
     expect(extractGrantFacets("Applications close in October.")).toEqual([]);
   });
 });
+
+describe("facet context", () => {
+  it("ignores populations and uses outside beneficiary or cost language", () => {
+    const rows = extractGrantFacets(
+      "AST met its equity targets in hiring. Of researchers and technicians, 15% were women. " +
+        "Evaluate whether the investigator has background, training, and expertise.",
+    );
+    expect(rows.find((r) => r.value === "women")).toBeUndefined();
+    expect(rows.find((r) => r.value === "training")).toBeUndefined();
+  });
+});

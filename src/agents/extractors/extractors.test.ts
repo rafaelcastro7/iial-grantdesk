@@ -139,3 +139,36 @@ describe("extractSectors", () => {
     expect(extractSectors("Instructions for filling out the contact form.")).toEqual([]);
   });
 });
+
+describe("eligibility context", () => {
+  it("ignores applicant words outside eligibility language", () => {
+    const text =
+      "For projects with multiple internships, each intern is responsible for their individual steps. " +
+      "View our researcher profiles to learn about their projects.";
+    expect(extractEligibility(text).map((m) => m.tag)).not.toContain("individual");
+  });
+  it("tags applicant types stated as eligibility", () => {
+    const text = "Eligible applicants include not-for-profit organizations and municipalities.";
+    const tags = extractEligibility(text).map((m) => m.tag);
+    expect(tags).toEqual(expect.arrayContaining(["non_profit", "government"]));
+  });
+});
+
+describe("sector precision", () => {
+  const filler = " Lorem ipsum dolor sit amet.".repeat(40);
+  it("ignores a single passing mention deep in the page", () => {
+    const text = `Funding for Indigenous entrepreneurs.${filler} We promote a culture of entrepreneurship and our health.`;
+    const sectors = extractSectors(text).map((m) => m.sector);
+    expect(sectors).not.toContain("arts_culture");
+    expect(sectors).not.toContain("health");
+  });
+  it("does not read higher-education applicant boilerplate as the education sector", () => {
+    const text = `Eligible: public and private institutions of higher education.${filler}`;
+    expect(extractSectors(text).map((m) => m.sector)).not.toContain("education");
+  });
+  it("keeps a sector named in the lead", () => {
+    expect(
+      extractSectors("Health research grants for clinical trials.").map((m) => m.sector),
+    ).toContain("health");
+  });
+});

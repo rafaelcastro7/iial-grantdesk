@@ -30,13 +30,21 @@ const SECTOR_KEYWORDS: Record<string, RegExp[]> = {
     /\bbiotech\b/i,
   ],
   aerospace: [/\baerospace\b/i, /\baéronautique\b/i, /\baviation\b/i],
-  arts_culture: [/\barts?\b/i, /\bculture\b/i, /\bcréation\s+(?:culturelle|artistique)\b/i],
+  // Bare "culture"/"art" matched "a culture of entrepreneurship" and nav menus.
+  arts_culture: [
+    /\barts?\s+(?:and|&)\s+culture\b/i,
+    /\bcultural\s+(?:sector|organi[sz]ations?|industr(?:y|ies)|heritage)\b/i,
+    /\bartists?\b/i,
+    /\bmuseums?\b/i,
+    /\bcréation\s+(?:culturelle|artistique)\b/i,
+  ],
   tourism: [/\btourism\b/i, /\btourisme\b/i, /\bhospitality\b/i, /\bhôtellerie\b/i],
   construction: [/\bconstruction\b/i, /\bbâtiment\b/i],
   retail: [/\bretail\b/i, /\bcommerce\s+de\s+détail\b/i, /\be-?commerce\b/i],
   finance: [/\bfintech\b/i, /\bfinancial\s+services\b/i, /\bservices?\s+financiers?\b/i],
   education: [
-    /\beducation\b/i,
+    // "institutions of higher education" is US applicant-type boilerplate.
+    /(?<!higher\s)\beducation\b/i,
     new RegExp(String.raw`${NOT_LETTER_BEFORE}éducation\b`, "i"),
     /\bschools?\b/i,
     new RegExp(String.raw`${NOT_LETTER_BEFORE}écoles?\b`, "i"),
@@ -51,22 +59,32 @@ export type SectorMatch = {
   matchOffset: number;
 };
 
+// A single passing mention deep in a page ("...environment and our health")
+// is not the program's sector. Keep a sector when it is named near the top
+// (title/summary) or repeated.
+const LEAD_CHARS = 800;
+const MIN_MENTIONS = 2;
+
 export function extractSectors(text: string): SectorMatch[] {
   if (!text) return [];
   const out: SectorMatch[] = [];
-  const seen = new Set<string>();
   for (const [sector, patterns] of Object.entries(SECTOR_KEYWORDS)) {
-    for (const re of patterns) {
-      const m = re.exec(text);
-      if (m && !seen.has(sector)) {
-        out.push({
-          sector,
-          snippet: windowAround(text, m.index, m[0].length),
-          matchOffset: m.index,
-        });
-        seen.add(sector);
-        break;
+    let first: RegExpExecArray | null = null;
+    let mentions = 0;
+    for (const pattern of patterns) {
+      const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+      const re = new RegExp(pattern.source, flags);
+      for (let hit = re.exec(text); hit; hit = re.exec(text)) {
+        mentions++;
+        if (!first || hit.index < first.index) first = hit;
       }
+    }
+    if (first && (first.index < LEAD_CHARS || mentions >= MIN_MENTIONS)) {
+      out.push({
+        sector,
+        snippet: windowAround(text, first.index, first[0].length),
+        matchOffset: first.index,
+      });
     }
   }
   return out;

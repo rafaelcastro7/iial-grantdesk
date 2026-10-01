@@ -74,13 +74,11 @@ const RULES: Rule[] = [
   {
     tag: "individual",
     patterns: [
+      // Students/researchers usually describe a project team, not an
+      // individual applicant, so they no longer imply "individuals may apply".
       /\bindividuals?\b/i,
       /\bcitizens?\b/i,
-      /\bstudents?\b/i,
-      /\bresearchers?\b/i,
       /\bindividus?\b/i,
-      new RegExp(String.raw`${NOT_LETTER_BEFORE}étudiants?\b`, "i"),
-      /\bchercheurs?\b/i,
     ],
   },
   {
@@ -127,14 +125,40 @@ export type EligibilityMatch = {
   matchOffset: number;
 };
 
+// Applicant-type tags only count when the mention sits in eligibility
+// language. Confirmed live: "individual steps", "university researchers
+// collaborating" and canada.ca menu items were tagging almost every grant as
+// open to individuals, universities, municipalities and Indigenous groups.
+const TOPIC_TAGS = new Set(["clean_tech", "ai_ml"]);
+const ELIGIBILITY_CONTEXT =
+  /\b(?:eligib\w*|supports?|helps?|who\s+can\s+apply|who\s+may\s+apply|applicants?|apply|open\s+to|recipients?|must\s+be|qualif\w*|available\s+to|intended\s+for|admissib\w*|peuvent\s+(?:présenter|soumettre|faire)|demandeurs?|bénéficiaires?)\b/i;
+const CONTEXT_WINDOW = 160;
+
+function inEligibilityContext(text: string, index: number, length: number): boolean {
+  const window = text.slice(
+    Math.max(0, index - CONTEXT_WINDOW),
+    Math.min(text.length, index + length + CONTEXT_WINDOW),
+  );
+  return ELIGIBILITY_CONTEXT.test(window);
+}
+
 export function extractEligibility(text: string): EligibilityMatch[] {
   if (!text) return [];
   const out: EligibilityMatch[] = [];
   const seen = new Set<string>();
   for (const rule of RULES) {
-    for (const re of rule.patterns) {
-      const m = re.exec(text);
-      if (m && !seen.has(rule.tag)) {
+    for (const pattern of rule.patterns) {
+      if (seen.has(rule.tag)) break;
+      const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+      const re = new RegExp(pattern.source, flags);
+      let m: RegExpExecArray | null = null;
+      for (let hit = re.exec(text); hit; hit = re.exec(text)) {
+        if (TOPIC_TAGS.has(rule.tag) || inEligibilityContext(text, hit.index, hit[0].length)) {
+          m = hit;
+          break;
+        }
+      }
+      if (m) {
         out.push({
           tag: rule.tag,
           snippet: windowAround(text, m.index, m[0].length),

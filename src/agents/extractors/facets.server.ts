@@ -100,6 +100,32 @@ function assertionAround(text: string, start: number, length: number): "supports
     : "supports";
 }
 
+// A facet only counts when its mention sits in the right kind of sentence.
+// Confirmed live: staff-equity reports ("targets for women"), menus ("Youth"
+// link) and reviewer instructions ("background, training, and expertise")
+// were read as target populations and funding uses.
+const BENEFICIARY_CONTEXT =
+  /\b(?:eligib\w*|applicants?|apply|open\s+to|recipients?|support\w*|serv(?:e|es|ing)|targeted\s+(?:at|to)|targeting|aimed|priorit\w*|led\s+by|owned|intended|participants?|underrepresented|admissib\w*|demandeurs?|bénéficiaires?)\b/i;
+const COST_CONTEXT =
+  /\b(?:eligible\s+(?:costs?|expenses?)|costs?|expenses?|cover\w*|reimburs\w*|pay\w*|funds?|funded|fund(?:ing)?\s+(?:for|to)|purchase|dépenses?|coûts?|frais)\b/i;
+const CONTEXT_BY_FIELD: Partial<Record<FacetExtraction["field"], RegExp>> = {
+  applicant_types: BENEFICIARY_CONTEXT,
+  populations_served: BENEFICIARY_CONTEXT,
+  funding_uses: COST_CONTEXT,
+};
+
+function inFieldContext(
+  field: FacetExtraction["field"],
+  text: string,
+  index: number,
+  length: number,
+) {
+  const context = CONTEXT_BY_FIELD[field];
+  if (!context) return true;
+  const window = text.slice(Math.max(0, index - 140), Math.min(text.length, index + length + 140));
+  return context.test(window);
+}
+
 /** Conservative deterministic extraction. A missing match remains unknown. */
 export function extractGrantFacets(text: string): FacetExtraction[] {
   if (!text) return [];
@@ -107,7 +133,15 @@ export function extractGrantFacets(text: string): FacetExtraction[] {
   const seen = new Set<string>();
   for (const rule of RULES) {
     for (const pattern of rule.patterns) {
-      const match = pattern.exec(text);
+      const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+      const re = new RegExp(pattern.source, flags);
+      let match: RegExpExecArray | null = null;
+      for (let hit = re.exec(text); hit; hit = re.exec(text)) {
+        if (inFieldContext(rule.field, text, hit.index, hit[0].length)) {
+          match = hit;
+          break;
+        }
+      }
       if (!match) continue;
       const assertion = assertionAround(text, match.index, match[0].length);
       const key = `${rule.field}:${rule.value}:${assertion}`;
