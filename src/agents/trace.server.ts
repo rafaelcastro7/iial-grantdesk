@@ -21,7 +21,10 @@ export type TraceInput = {
 export async function traceStep(input: TraceInput): Promise<void> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = input.db ?? supabaseAdmin;
+    // Signed-in users may only READ agent_trace_steps (RLS), so a user-scoped
+    // client's insert failed silently and the live trace panel waited for a
+    // first event forever. Trace writes always use the server client.
+    const db = supabaseAdmin ?? input.db;
     await db.from("agent_trace_steps").insert({
       run_id: input.runId,
       grant_id: input.grantId ?? null,

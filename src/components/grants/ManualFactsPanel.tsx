@@ -132,7 +132,14 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
       await qc.invalidateQueries({ queryKey: ["grant-detail", grant.id] });
       setEditing(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      // The database function arrives with a migration; until it is applied the
+      // API reports it missing from the schema cache.
+      setError(
+        /set_grant_manual_field|schema cache|Could not find the function/i.test(message)
+          ? "Editing is not available yet: the database update that enables it has not been applied. Ask an admin to apply pending migrations in Lovable."
+          : message,
+      );
     } finally {
       setSaving(false);
     }

@@ -3,11 +3,18 @@
 import { useEffect, useState } from "react";
 import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { createFileRoute, Link, notFound, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  notFound,
+  Outlet,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { useTranslation } from "react-i18next";
 import { Activity, ArrowLeft, Building2, Calendar, DollarSign, Globe, Tag } from "lucide-react";
-import { runEvaluator } from "@/agents/evaluator.functions";
+import { startEvaluator } from "@/agents/evaluator.functions";
 import { runStrategist } from "@/agents/strategist.functions";
 import { AgentTracePanel } from "@/components/grants/AgentTracePanel";
 import { GrantDetailExpress, ValueBlock } from "@/components/grants/GrantDetailExpress";
@@ -93,7 +100,7 @@ function GrantDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const isAdmin = useIsAdmin();
-  const evaluate = useServerFn(runEvaluator);
+  const startEval = useServerFn(startEvaluator);
   const enrichOne = useServerFn(enrichGrant);
   const strategize = useServerFn(runStrategist);
   const curate = useServerFn(markGrantsCurated);
@@ -158,6 +165,22 @@ function GrantDetailPage() {
     setTraceRun(null);
     patchSearch({ run: undefined, agent: undefined, step: undefined });
   };
+
+  // The evaluation runs on the server in the background (it finishes even if
+  // this tab is closed); here we open its live trace at once and wait for the
+  // new verdict to be saved.
+  async function evaluate() {
+    const started = await startEval({ data: { grantId: id } });
+    setTraceFromRun(started, "evaluator", true);
+    const startedAt = new Date(started.startedAt).getTime() - 5_000;
+    for (let attempt = 0; attempt < 120; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      const detail = await getGrantDetail({ data: { id } });
+      const evaluatedAt = (detail.evaluation as { evaluated_at?: string } | null)?.evaluated_at;
+      if (evaluatedAt && new Date(evaluatedAt).getTime() >= startedAt) return started;
+    }
+    return started;
+  }
 
   function setTraceFromRun(result: unknown, agent: string, openTrace: boolean) {
     if (!openTrace) return;
@@ -295,7 +318,7 @@ function GrantDetailPage() {
           shareUrl={shareUrl}
           traceRun={traceRun}
           onDraft={onDraft}
-          onEvaluate={() => run("eval", "evaluator", () => evaluate({ data: { grantId: id } }))}
+          onEvaluate={() => run("eval", "evaluator", () => evaluate())}
           onFetchDetails={() =>
             run("enrich", "enricher", () => enrichOne({ data: { grantId: id } }))
           }
@@ -407,7 +430,7 @@ function GrantDetailPage() {
             onFetchDetails={() =>
               run("enrich", "enricher", () => enrichOne({ data: { grantId: id } }))
             }
-            onEvaluate={() => run("eval", "evaluator", () => evaluate({ data: { grantId: id } }))}
+            onEvaluate={() => run("eval", "evaluator", () => evaluate())}
             onDraft={onDraft}
             onShowAdvanced={() => switchView("advanced")}
           />
@@ -722,9 +745,7 @@ function GrantDetailPage() {
                   size="sm"
                   variant="secondary"
                   disabled={busy === "eval"}
-                  onClick={() =>
-                    run("eval", "evaluator", () => evaluate({ data: { grantId: id } }))
-                  }
+                  onClick={() => run("eval", "evaluator", () => evaluate())}
                 >
                   {busy === "eval"
                     ? t("app.loading")

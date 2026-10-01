@@ -1,13 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useSuspenseQuery, useQuery, queryOptions, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import {
-  listGrants,
-  discoverAllFunders,
-  enrichGrant,
-} from "@/lib/grants.functions";
-import { runEvaluator } from "@/agents/evaluator.functions";
+  useSuspenseQuery,
+  useQuery,
+  queryOptions,
+  useQueryClient,
+  useMutation,
+} from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listGrants, discoverAllFunders, enrichGrant } from "@/lib/grants.functions";
+import { startEvaluator } from "@/agents/evaluator.functions";
+import { getGrantDetail } from "@/lib/grant-detail.functions";
 import { runStrategist } from "@/agents/strategist.functions";
 import { useIsAdmin, useIsConsultant } from "@/lib/use-platform";
 import { Button } from "@/components/ui/button";
@@ -82,7 +85,8 @@ export const Route = createFileRoute("/_authenticated/grants/")({
       { title: "Grant radar - GrantDesk" },
       {
         name: "description",
-        content: "Grant opportunities ranked by eligibility, time to deadline, fit and amount, grouped by country.",
+        content:
+          "Grant opportunities ranked by eligibility, time to deadline, fit and amount, grouped by country.",
       },
       { property: "og:title", content: "Grant radar - GrantDesk" },
       {
@@ -105,7 +109,20 @@ function GrantsPage() {
   const isConsultant = useIsConsultant();
   const qc = useQueryClient();
   const fetchGrants = useServerFn(listGrants);
-  const evaluate = useServerFn(runEvaluator);
+  const startEval = useServerFn(startEvaluator);
+  // Evaluations run in the background on the server (they finish even if the
+  // tab is closed); wait here until the new verdict is saved.
+  const evaluate = async ({ data }: { data: { grantId: string } }) => {
+    const started = await startEval({ data });
+    const since = new Date(started.startedAt).getTime() - 5_000;
+    for (let attempt = 0; attempt < 120; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      const detail = await getGrantDetail({ data: { id: data.grantId } });
+      const at = (detail.evaluation as { evaluated_at?: string } | null)?.evaluated_at;
+      if (at && new Date(at).getTime() >= since) return started;
+    }
+    return started;
+  };
   const strategize = useServerFn(runStrategist);
   const discoverAll = useServerFn(discoverAllFunders);
   const enrichOne = useServerFn(enrichGrant);
@@ -118,7 +135,9 @@ function GrantsPage() {
   const [filters, setFilters] = useState<RadarFilterState>(() =>
     readJson(FILTERS_KEY, DEFAULT_RADAR_FILTERS),
   );
-  const [facets, setFacets] = useState<GrantFacetSelection>(() => readJson(FACETS_KEY, DEFAULT_FACETS));
+  const [facets, setFacets] = useState<GrantFacetSelection>(() =>
+    readJson(FACETS_KEY, DEFAULT_FACETS),
+  );
   const [includeHardBlocked, setIncludeHardBlocked] = useState(true);
   const [includeDismissed, setIncludeDismissed] = useState(false);
   const [searchProfileId, setSearchProfileId] = useState<string | null>(
@@ -146,7 +165,16 @@ function GrantsPage() {
   // Country is filtered on the server: a page of 100 filtered locally for a
   // smaller country would show almost nothing.
   const { data } = useSuspenseQuery({
-    queryKey: ["grants", "all", serverSearch, searchProfileId ?? "general", filters.country, facets, includeHardBlocked, includeDismissed],
+    queryKey: [
+      "grants",
+      "all",
+      serverSearch,
+      searchProfileId ?? "general",
+      filters.country,
+      facets,
+      includeHardBlocked,
+      includeDismissed,
+    ],
     queryFn: () =>
       fetchGrants({
         data: {
@@ -158,7 +186,9 @@ function GrantsPage() {
           populationsServed: one(facets.population),
           fundingUses: one(facets.fundingUse),
           funderTypes: one(facets.funderType),
-          deadlineKinds: one<"confirmed" | "predicted" | "rolling" | "closed" | "unknown">(facets.deadlineKind),
+          deadlineKinds: one<"confirmed" | "predicted" | "rolling" | "closed" | "unknown">(
+            facets.deadlineKind,
+          ),
           evidenceStates: one<"known" | "unknown" | "conflicting">(facets.evidenceState),
           includeHardBlocked,
           includeDismissed,
@@ -188,7 +218,11 @@ function GrantsPage() {
   };
   const [hideIneligible, setHideIneligible] = useState(false);
   const [evaluatingAll, setEvaluatingAll] = useState(false);
-  const [evalProgress, setEvalProgress] = useState<{ current: number; total: number; lastTitle?: string } | null>(null);
+  const [evalProgress, setEvalProgress] = useState<{
+    current: number;
+    total: number;
+    lastTitle?: string;
+  } | null>(null);
   const checkProfile = useMemo(
     () =>
       radarProfiles.find((p) => p.clientId === checkClientId) ??
@@ -452,7 +486,10 @@ function GrantsPage() {
               evalProgress={evalProgress}
             />
             <OrgRulesDriftBanner />
-            <GrantSearchProfileBar selectedProfileId={searchProfileId} onSelect={setSearchProfileId} />
+            <GrantSearchProfileBar
+              selectedProfileId={searchProfileId}
+              onSelect={setSearchProfileId}
+            />
           </>
         }
         reviewProgress={

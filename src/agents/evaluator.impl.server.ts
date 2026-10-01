@@ -13,6 +13,8 @@ export async function evaluateGrantImpl(opts: {
   grantId: string;
   userId: string;
   userSupabase: SupabaseClient;
+  /** Pre-assigned run id, so a caller can return it before the run finishes. */
+  runId?: string;
 }) {
   const { grantId, userId, userSupabase } = opts;
   const { assertAgentEnabled } = await import("@/lib/admin-agents.functions");
@@ -21,7 +23,7 @@ export async function evaluateGrantImpl(opts: {
   const { newRunId } = await import("@/lib/otel");
   const { traceStep } = await import("@/agents/trace.server");
 
-  const runId = newRunId();
+  const runId = opts.runId ?? newRunId();
   const t0 = Date.now();
   const trace = (
     step: string,
