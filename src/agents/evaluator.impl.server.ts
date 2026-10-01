@@ -22,6 +22,8 @@ export async function evaluateGrantImpl(opts: {
   rulesOnly?: boolean;
   /** Force fresh evaluation, bypassing cache. */
   force?: boolean;
+  /** AI review with free-tier providers only (automatic background reviews). */
+  freeOnly?: boolean;
 }) {
   const { grantId, userId, userSupabase } = opts;
   const { assertAgentEnabled } = await import("@/lib/admin-agents.functions");
@@ -267,6 +269,7 @@ export async function evaluateGrantImpl(opts: {
         temperature: 0.1,
         maxOutputTokens: 1024,
         responseFormat: "json",
+        freeOnly: opts.freeOnly,
         validate: (text) => {
           try {
             const raw = normalizeEvaluatorRaw(JSON.parse(text), !rulesResult.hard_fail);

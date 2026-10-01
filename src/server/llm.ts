@@ -27,7 +27,18 @@ export type LlmRequest = {
   validate?: (text: string) => boolean;
   /** Do not wait out a rate limit; report it instead. */
   noWait?: boolean;
+  /**
+   * Free-tier providers only: never fall through to the paid Lovable AI
+   * Gateway. Used by automatic background reviews.
+   */
+  freeOnly?: boolean;
 };
+
+/** True when at least one free-tier provider (Groq, Cerebras) has a key. */
+export function hasFreeProvider(): boolean {
+  const env = serverEnv();
+  return EXTERNAL_PROVIDERS.some((provider) => Boolean(env[provider.envKey]));
+}
 
 export type LlmResponse = {
   text: string;
@@ -327,7 +338,7 @@ export async function callLlm(
     }
   }
 
-  if (env.LOVABLE_API_KEY) {
+  if (env.LOVABLE_API_KEY && !request.freeOnly) {
     const maxTries = request.noWait ? 1 : 3;
 
     for (let attempt = 0; attempt < maxTries; attempt++) {

@@ -1121,11 +1121,21 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
       new Date((rulesRow as { updated_at?: string | null } | null)?.updated_at ?? 0).getTime(),
     );
 
+    // With a free-tier AI provider configured, the automatic pass gives every
+    // grant its final AI review instead of a rules-only pre-check, without
+    // ever touching the paid gateway (freeOnly). Small batches: background
+    // work on Workers only survives ~30 s after the response.
+    const { hasFreeProvider } = await import("@/server/llm");
+    const aiMode = data.rulesOnly && hasFreeProvider();
+    const batchLimit = aiMode ? Math.min(data.limit, 4) : data.limit;
+
     const done = new Set<string>();
     for (const chunk of chunkIds(ids)) {
       const { data: existing, error: existingError } = await context.supabase
         .from("grant_evaluations")
-        .select("grant_id, evaluated_at, model, prompt_version")
+        .select(
+          "grant_id, evaluated_at, model, prompt_version, hard_fail:rule_snapshot->>hard_fail",
+        )
         .eq("user_id", context.userId)
         .in("grant_id", chunk);
       if (existingError) throw new Error(`grant_evaluations: ${existingError.message}`);
@@ -1134,19 +1144,21 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
       const profileChangedAt = rulesChangedAt;
       for (const e of existing ?? []) {
         const at = new Date((e as { evaluated_at?: string | null }).evaluated_at ?? 0).getTime();
-        const meta = e as { model?: string | null; prompt_version?: string | null };
+        const meta = e as {
+          model?: string | null;
+          prompt_version?: string | null;
+          hard_fail?: string | null;
+        };
         const isDeterministic = meta.model === "rules-engine-deterministic";
         const outdated = isDeterministic && meta.prompt_version !== EVALUATOR_PROMPT_VERSION;
-        if (at >= profileChangedAt && !outdated) {
-          if (!data.rulesOnly && isDeterministic) {
-            // Needs exhaustive evaluation with model
-          } else {
-            done.add(e.grant_id);
-          }
-        }
+        // Still waiting for the AI review: a rules-only verdict that no hard
+        // rule decided (a hard fail is already final at 0 tokens).
+        const awaitingAi =
+          isDeterministic && meta.hard_fail !== "true" && (aiMode || !data.rulesOnly);
+        if (at >= profileChangedAt && !outdated && !awaitingAi) done.add(e.grant_id);
       }
     }
-    const todo = ids.filter((id) => !done.has(id)).slice(0, data.limit);
+    const todo = ids.filter((id) => !done.has(id)).slice(0, batchLimit);
 
     const remaining = ids.length - done.size - todo.length;
     if (todo.length === 0) return { ok: true, evaluated: 0, skipped: 0, queued: 0, remaining: 0 };
@@ -1161,7 +1173,8 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
             grantId,
             userId: context.userId,
             userSupabase: context.supabase,
-            rulesOnly: data.rulesOnly,
+            rulesOnly: aiMode ? false : data.rulesOnly,
+            freeOnly: aiMode,
           });
           evaluated++;
         } catch (err) {

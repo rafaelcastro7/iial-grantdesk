@@ -22,6 +22,8 @@ export type LlmCallOptions = {
   // failure instead of returning unusable content. Pass the caller's Zod
   // parse (see critic.functions.ts).
   validate?: (text: string) => boolean;
+  /** Free-tier providers only; never the paid gateway. */
+  freeOnly?: boolean;
 };
 
 export type LlmCallResult = {
@@ -63,6 +65,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult> {
       maxTokens: opts.maxOutputTokens,
       temperature: opts.temperature,
       validate: opts.validate,
+      freeOnly: opts.freeOnly,
     });
     text = result.text;
     ok = true;
