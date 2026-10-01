@@ -25,10 +25,34 @@ export const previewExternalUrl = createServerFn({ method: "POST" })
       return { ok: false as const, url: data.url, error: "url_not_allowed" };
     }
     const { scrapeWithFallback } = await import("@/lib/web-fetch.server");
-    const page = await scrapeWithFallback(data.url, { minContentChars: 80, skipFirecrawl: true });
+    const { looksLikeErrorPage, stripBoilerplate } =
+      await import("@/agents/extractors/boilerplate.shared");
+    let page = await scrapeWithFallback(data.url, { minContentChars: 80, skipFirecrawl: true });
+    // Never show a "page not found" body: fall back to the last good archived
+    // copy, otherwise report the page as unavailable.
+    if (page.ok && looksLikeErrorPage(page.markdown)) {
+      const { lastGoodArchivedPage } = await import("@/lib/web-fetch.server");
+      const archived = await lastGoodArchivedPage(data.url);
+      page =
+        archived && !looksLikeErrorPage(archived.markdown)
+          ? { ...page, url: archived.url, markdown: archived.markdown, via: "wayback" }
+          : {
+              ok: false,
+              url: data.url,
+              error: "page_not_found",
+              via: page.via,
+              attempts: page.attempts,
+            };
+    }
     if (!page.ok) {
       return { ok: false as const, url: data.url, error: page.error };
     }
+    // Readable text only: no menus, images or inline data URIs.
+    const cleaned = stripBoilerplate(page.markdown)
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
     let hostname = data.url;
     try {
       hostname = new URL(page.url).hostname;
@@ -39,8 +63,8 @@ export const previewExternalUrl = createServerFn({ method: "POST" })
       ok: true as const,
       url: page.url,
       title: page.title?.trim() || hostname,
-      markdown: page.markdown.slice(0, MAX_PREVIEW_CHARS),
-      truncated: page.markdown.length > MAX_PREVIEW_CHARS,
+      markdown: cleaned.slice(0, MAX_PREVIEW_CHARS),
+      truncated: cleaned.length > MAX_PREVIEW_CHARS,
       via: page.via,
     };
   });

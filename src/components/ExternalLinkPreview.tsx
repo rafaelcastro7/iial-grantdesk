@@ -7,7 +7,7 @@
 // (via the same scrape-fallback chain the Discoverer/Enricher use) with a
 // prominent, honest "Open original site" action for whatever reader-mode
 // can't capture (forms, logins, interactive pages).
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ExternalLink as ExternalLinkIcon, Globe, AlertTriangle } from "lucide-react";
@@ -36,6 +36,37 @@ function hostnameOf(url: string): string {
 // text (no dangerouslySetInnerHTML) — a short heading-detection pass is
 // enough to give the preview real typographic hierarchy without pulling in
 // a markdown-to-HTML renderer this codebase doesn't otherwise use.
+// Inline markdown -> React nodes: **bold**, [text](https://...) links.
+// Built from strings only (no innerHTML), and only http(s) links render.
+function renderInline(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|\[([^\]]+)\]\([^)]*\)/g;
+  let last = 0;
+  let key = 0;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    if (m[1]) nodes.push(<strong key={key++}>{m[1]}</strong>);
+    else if (m[2] && m[3])
+      nodes.push(
+        <a
+          key={key++}
+          href={m[3]}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-primary underline underline-offset-2"
+        >
+          {m[2]}
+        </a>,
+      );
+    else if (m[4]) nodes.push(m[4]);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
+
+const LIST_ITEM = /^\s*(?:[-*•]|\d+[.)])\s+/;
+
 function PreviewBody({ markdown }: { markdown: string }) {
   const blocks = markdown
     .split(/\n{2,}/)
@@ -43,29 +74,37 @@ function PreviewBody({ markdown }: { markdown: string }) {
     .filter(Boolean);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
       {blocks.map((block, i) => {
-        const headingMatch = block.match(/^(#{1,3})\s+(.*)/);
+        const headingMatch = block.match(/^(#{1,4})\s+(.*)/);
         if (headingMatch) {
-          const level = headingMatch[1].length;
           return (
-            <p
+            <h4
               key={i}
               className={
-                level === 1
-                  ? "text-base font-semibold text-foreground"
-                  : "text-sm font-semibold text-foreground"
+                headingMatch[1].length <= 2
+                  ? "pt-1 text-base font-semibold text-foreground"
+                  : "pt-1 text-sm font-semibold text-foreground"
               }
             >
-              {headingMatch[2]}
-            </p>
+              {renderInline(headingMatch[2].replace(/\*\*/g, ""))}
+            </h4>
           );
         }
-        return (
-          <p key={i} className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-            {block.replace(/^#+\s*/, "")}
-          </p>
-        );
+        const lines = block
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+        if (lines.length > 0 && lines.every((line) => LIST_ITEM.test(line))) {
+          return (
+            <ul key={i} className="list-disc space-y-1 pl-5">
+              {lines.map((line, j) => (
+                <li key={j}>{renderInline(line.replace(LIST_ITEM, ""))}</li>
+              ))}
+            </ul>
+          );
+        }
+        return <p key={i}>{renderInline(lines.join(" "))}</p>;
       })}
     </div>
   );
