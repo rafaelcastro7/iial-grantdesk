@@ -114,7 +114,9 @@ export async function enrichGrantImpl(
   const hasAmountMin = g.amount_cad_min != null;
   const hasAmountMax = g.amount_cad_max != null;
   const hasAmount = hasAmountMin || hasAmountMax;
-  const hasDeadline = !!g.deadline;
+  // A deadline already in the past belongs to an earlier cycle: treat it as
+  // missing so this run looks for the current one.
+  const hasDeadline = !!g.deadline && g.deadline >= new Date().toISOString().slice(0, 10);
   const hasSectors = Array.isArray(g.sectors) && g.sectors.length > 0;
   const eligObj = (g.eligibility ?? {}) as Record<string, unknown>;
   const hasEligibility = Object.keys(eligObj).length > 0;

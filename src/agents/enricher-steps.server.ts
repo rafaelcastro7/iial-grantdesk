@@ -2,6 +2,7 @@
 // in isolation. No IO here: callers apply the returned decisions to the patch
 // and record evidence themselves.
 import { z } from "zod";
+import { isPlausibleAwardAmount } from "@/agents/extractors/amounts.server";
 
 export type SourcePage = { url: string; markdown: string };
 
@@ -56,17 +57,24 @@ export function evaluateLlmFields(opts: {
 
     if (field === "amount_cad_max" || field === "amount_cad_min") {
       const n = Number(payload.value);
-      if (Number.isFinite(n) && n > 0) {
-        accepted.push({ field, value: n, quote: payload.quote, page });
-      } else {
+      if (!Number.isFinite(n) || n <= 0) {
         rejected.push(`${field}(not_number)`);
+      } else if (!isPlausibleAwardAmount(n, payload.quote)) {
+        // A program budget or envelope, not what one applicant can receive.
+        rejected.push(`${field}(not_an_award_amount)`);
+      } else {
+        accepted.push({ field, value: n, quote: payload.quote, page });
       }
     } else if (field === "deadline") {
       const s = String(payload.value);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-        accepted.push({ field, value: s, quote: payload.quote, page });
-      } else {
+      const today = new Date().toISOString().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
         rejected.push(`${field}(bad_date)`);
+      } else if (s < today) {
+        // A past cycle's date: storing it shows a closed call as current.
+        rejected.push(`${field}(past_date)`);
+      } else {
+        accepted.push({ field, value: s, quote: payload.quote, page });
       }
     } else if (field === "eligibility") {
       if (payload.value && typeof payload.value === "object" && !Array.isArray(payload.value)) {

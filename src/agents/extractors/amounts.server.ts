@@ -78,6 +78,19 @@ function parseOne(raw: string): number | null {
   return value;
 }
 
+/**
+ * Same guards as the deterministic extractor, for an amount another step (the
+ * LLM) proposes with a supporting quote: no budgets or envelopes, nothing
+ * absurd, and a large figure only when the quote ties it to one applicant.
+ */
+export function isPlausibleAwardAmount(value: number, quote: string | null | undefined): boolean {
+  if (!Number.isFinite(value) || value <= 0 || value > 1_000_000_000) return false;
+  const q = quote ?? "";
+  if (q && NON_AWARD_CONTEXT.test(q) && !PER_APPLICANT.test(q)) return false;
+  if (value >= PROGRAM_ENVELOPE_CAD && !PER_APPLICANT.test(q)) return false;
+  return true;
+}
+
 export function extractAmounts(text: string): AmountMatch | null {
   if (!text) return null;
 
