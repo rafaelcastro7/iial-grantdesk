@@ -49,6 +49,7 @@ export type SharedReport = {
   evaluation: {
     fit_score: number;
     eligibility_pass: boolean;
+    rule_verdict?: string | null;
     rationale_en: string;
     axis_breakdown: AxisScore[] | null;
     created_at: string;
@@ -93,7 +94,9 @@ export const getSharedReport = createServerFn({ method: "GET" })
         .maybeSingle(),
       supabaseAdmin
         .from("grant_evaluations")
-        .select("fit_score, eligibility_pass, rationale_en, axis_breakdown, created_at")
+        .select(
+          "fit_score, eligibility_pass, rationale_en, axis_breakdown, created_at, rule_verdict:rule_snapshot->>verdict",
+        )
         .eq("grant_id", s.grant_id)
         .eq("user_id", s.user_id)
         .maybeSingle(),

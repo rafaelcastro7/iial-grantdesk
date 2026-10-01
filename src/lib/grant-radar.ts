@@ -294,7 +294,9 @@ export function toRadarItem<T extends RadarGrant>(
   const daysLeft = daysUntil(g.deadline, opts.now);
   const timing = timingOf(daysLeft, opts.leadTimeWeeks);
   const amount = grantAmount(g);
-  const fitRaw = g.evaluation?.fit_score ?? g.fit_score ?? null;
+  // Per-user only: grants.fit_score is a global column (another member's
+  // last score), so an unevaluated grant shows no fit rather than theirs.
+  const fitRaw = g.evaluation?.fit_score ?? null;
   const fit = fitRaw != null ? (fitRaw <= 1 ? Math.round(fitRaw * 100) : Math.round(fitRaw)) : null;
   const parked = timing === "closed" || timing === "too_soon" || verdict === "not_eligible";
   return {

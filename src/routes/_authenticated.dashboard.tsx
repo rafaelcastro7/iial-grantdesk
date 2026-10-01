@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type ComponentType } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgProfile } from "@/lib/org.functions";
-import { listGrants } from "@/lib/grants.functions";
+import { autoEvaluatePending, listGrants } from "@/lib/grants.functions";
+import { getVerdictSummary } from "@/lib/fit-insights.functions";
+import { evaluationVerdict } from "@/lib/grant-radar";
 import { getFunderDashboardStats } from "@/lib/funder-dashboard.functions";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -85,10 +87,35 @@ function Dashboard() {
   const fetchOrg = useServerFn(getOrgProfile);
   const { data: org } = useQuery({ queryKey: ["org", "self"], queryFn: () => fetchOrg() });
   const fetchGrants = useServerFn(listGrants);
+  // Under the "grants" key so every evaluation, dismissal or profile change
+  // (which all invalidate ["grants"]) refreshes the dashboard too.
   const { data: grantData } = useQuery({
-    queryKey: ["dashboard", "grants"],
+    queryKey: ["grants", "dashboard"],
     queryFn: () => fetchGrants({ data: { limit: 100 } }),
   });
+  // Counts come from the shared verdict summary (same as Fit insights), not
+  // from the first page of grants.
+  const fetchSummary = useServerFn(getVerdictSummary);
+  const { data: summary } = useQuery({
+    queryKey: ["grants", "verdict-summary"],
+    queryFn: () => fetchSummary(),
+  });
+  // Re-check stale verdicts on arrival (rules only, 0 tokens), like the radar.
+  const qc = useQueryClient();
+  const autoEval = useServerFn(autoEvaluatePending);
+  useEffect(() => {
+    let cancelled = false;
+    void autoEval({ data: { limit: 100, background: false } })
+      .then((r) => {
+        if (!cancelled && ((r as { evaluated?: number }).evaluated ?? 0) > 0) {
+          void qc.invalidateQueries({ queryKey: ["grants"] });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [autoEval, qc]);
   // Coverage trust signal — "how many funders are we watching" is table
   // stakes on every competing grant-search product (Instrumentl, Candid);
   // without it, "56 grants" has no context for whether that's a small slice
@@ -115,8 +142,8 @@ function Dashboard() {
   const grants = (grantData?.grants ?? []).filter((g) => isActiveGrantStatus(g.status));
   const now = Date.now();
 
-  const eligible = grants.filter((g) => g.evaluation?.eligibility_pass).length;
-  const scored = grants.filter((g) => g.evaluation).length;
+  const eligible = summary?.eligible ?? 0;
+  const scored = summary?.checked ?? 0;
   const withDeadline = grants.filter((g) => !!g.deadline).length;
   const closingSoon = grants.filter((g) => {
     if (!g.deadline) return false;
@@ -143,7 +170,8 @@ function Dashboard() {
     )
     .sort(
       (a, b) =>
-        (b.evaluation!.eligibility_pass ? 1 : 0) - (a.evaluation!.eligibility_pass ? 1 : 0) ||
+        VERDICT_RANK[evaluationVerdict(b.evaluation!)] -
+          VERDICT_RANK[evaluationVerdict(a.evaluation!)] ||
         b.evaluation!.fit_score - a.evaluation!.fit_score,
     )
     .slice(0, 5);
@@ -367,8 +395,17 @@ type MatchGrant = {
   title: string;
   deadline: string | null;
   funder: { name: string } | { name: string }[] | null;
-  evaluation: { fit_score: number; eligibility_pass: boolean } | null;
+  evaluation: { fit_score: number; eligibility_pass: boolean; rule_verdict?: string | null } | null;
 };
+
+const VERDICT_RANK = { eligible: 2, needs_input: 1, not_eligible: 0 } as const;
+
+/** Badge text shared by both match rows; same reading as the radar. */
+function matchLabel(evaluation: MatchGrant["evaluation"]): string {
+  if (!evaluation) return "Needs fit check";
+  const v = evaluationVerdict(evaluation);
+  return v === "eligible" ? "Eligible" : v === "needs_input" ? "Confirm eligibility" : "Not a fit";
+}
 
 function DashboardV2({
   closingSoon,
@@ -679,7 +716,7 @@ function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
               : "text-muted-foreground",
           )}
         >
-          {eligible ? "Eligible" : grant.evaluation ? "Eligibility risk" : "Needs fit check"}
+          {matchLabel(grant.evaluation)}
         </Badge>
       </div>
       <div className="flex items-center gap-2 md:justify-end">
@@ -777,7 +814,7 @@ function MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
         </span>
       ) : (
         <span className="hidden text-xs text-muted-foreground sm:inline">
-          {grant.evaluation ? "Eligibility risk" : "Check eligibility"}
+          {matchLabel(grant.evaluation)}
         </span>
       )}
       {fit != null && (

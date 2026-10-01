@@ -282,7 +282,7 @@ function GrantsPage() {
           await new Promise((resolve) => setTimeout(resolve, 5_000));
           await qc.invalidateQueries({ queryKey: ["grants"] });
         }
-        await qc.invalidateQueries({ queryKey: ["fit-insights"] });
+        await qc.invalidateQueries({ queryKey: ["grants", "fit-insights"] });
         if (!result.remaining) break;
       }
     })().catch(() => {

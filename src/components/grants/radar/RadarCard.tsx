@@ -99,9 +99,7 @@ export function RadarCard({
               {VERDICT_LABELS[item.verdict]}
             </span>
             {item.fit != null && !simple && (
-              <span className="text-xs font-medium text-muted-foreground">
-                Fit {item.fit > 1 ? Math.round(item.fit) : Math.round(item.fit * 100)}%
-              </span>
+              <span className="text-xs font-medium text-muted-foreground">Fit {item.fit}%</span>
             )}
             {g.isNewSinceLastReview && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">

@@ -89,7 +89,15 @@ function ReportBody({ report }: { report: SharedReport }) {
           <Fact label="Fit score" value={fitPct != null ? `${fitPct}/100` : "Not scored"} />
           <Fact
             label="Eligible"
-            value={evaluation ? (evaluation.eligibility_pass ? "Yes" : "No") : "—"}
+            value={
+              evaluation
+                ? evaluation.eligibility_pass
+                  ? "Yes"
+                  : evaluation.rule_verdict === "needs_input"
+                    ? "Unclear"
+                    : "No"
+                : "—"
+            }
           />
           <Fact
             label="Amount"

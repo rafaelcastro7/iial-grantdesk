@@ -408,9 +408,12 @@ export const listGrantsForOrganization = createServerFn({ method: "GET" })
         `id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max,
          deadline, sectors, language, url, status, created_at,
          funder:funders(id, name, name_fr, jurisdiction),
-         evaluation:grant_evaluations!left(fit_score, rationale_en, rationale_fr, eligibility_pass, created_at)`,
+         evaluation:grant_evaluations!left(fit_score, rationale_en, rationale_fr, eligibility_pass, created_at, rule_verdict:rule_snapshot->>verdict)`,
       )
       .eq("org_id", data.orgId)
+      // Evaluations are per user: without this the card showed whichever
+      // member's verdict came back first.
+      .eq("evaluation.user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(data.limit);
 
@@ -423,10 +426,24 @@ export const listGrantsForOrganization = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     // Filter by min fit score if provided
-    let filtered = (grants ?? []).map((g) => ({
-      ...g,
-      evaluation: Array.isArray(g.evaluation) ? (g.evaluation[0] ?? null) : g.evaluation,
-    }));
+    // Stored fit is 0..1; this page and its filter work in 0..100.
+    let filtered = (grants ?? []).map((g) => {
+      const raw = Array.isArray(g.evaluation) ? (g.evaluation[0] ?? null) : g.evaluation;
+      const ev = raw as { fit_score?: number | null } | null;
+      return {
+        ...g,
+        evaluation:
+          raw && ev
+            ? {
+                ...raw,
+                fit_score:
+                  ev.fit_score == null
+                    ? null
+                    : Math.round(ev.fit_score <= 1 ? ev.fit_score * 100 : ev.fit_score),
+              }
+            : null,
+      };
+    });
     if (data.minFitScore !== undefined) {
       filtered = filtered.filter((g) => (g.evaluation?.fit_score ?? 0) >= data.minFitScore!);
     }

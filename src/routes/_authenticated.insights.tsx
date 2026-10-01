@@ -20,7 +20,7 @@ function FitInsightsPage() {
   const [applied, setApplied] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<string | null>(null);
   const { data, isLoading, error } = useQuery({
-    queryKey: ["fit-insights"],
+    queryKey: ["grants", "fit-insights"],
     queryFn: () => fetchInsights(),
   });
   // Re-check stale verdicts here too (rules only, 0 tokens), so the counts
@@ -31,7 +31,7 @@ function FitInsightsPage() {
     void recheck({ data: { limit: 100, background: false } })
       .then((r) => {
         if (!cancelled && ((r as { evaluated?: number }).evaluated ?? 0) > 0) {
-          void qc.invalidateQueries({ queryKey: ["fit-insights"] });
+          void qc.invalidateQueries({ queryKey: ["grants", "fit-insights"] });
         }
       })
       .catch(() => {});
@@ -55,7 +55,7 @@ function FitInsightsPage() {
       );
       await qc.invalidateQueries({ queryKey: ["grants"] });
       await qc.invalidateQueries({ queryKey: ["org", "self"] });
-      await qc.invalidateQueries({ queryKey: ["fit-insights"] });
+      await qc.invalidateQueries({ queryKey: ["grants", "fit-insights"] });
     },
   });
 
@@ -72,9 +72,10 @@ function FitInsightsPage() {
 
       {data && (
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             <Stat label="Grants checked" value={data.evaluated} />
             <Stat label="You can apply" value={data.passing} tone="good" />
+            <Stat label="Needs input" value={data.needsInput ?? 0} />
             <Stat label="Not a fit" value={data.failing} tone="bad" />
           </div>
 

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { PROMPTS } from "@/agents/schemas";
+import { evaluationVerdict } from "@/lib/grant-radar";
 
 const EVALUATOR_PROMPT_VERSION = PROMPTS.evaluator.version;
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -431,8 +432,11 @@ export const listGrants = createServerFn({ method: "GET" })
         const lexicalRelevance = rankById.get(grant.id)?.relevance ?? 0;
         const profileRelevance = profileMatch ? profileMatch.score / 100 : 0;
         const evaluation = evalsByGrant.get(grant.id) ?? null;
+        // Same reading as the radar: an evaluation that is only unclear
+        // (rules verdict needs_input) does not block the grant.
         const hardBlocked =
-          profileMatch?.hardBlocked === true || evaluation?.eligibility_pass === false;
+          profileMatch?.hardBlocked === true ||
+          (evaluation != null && evaluationVerdict(evaluation) === "not_eligible");
         // The product is a Canadian grant operation: with the catalog now
         // holding more US federal opportunities than Canadian ones, an
         // unweighted ranking buries domestic programs. Boost Canadian grants

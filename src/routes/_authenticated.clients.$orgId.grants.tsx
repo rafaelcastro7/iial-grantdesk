@@ -3,6 +3,7 @@ import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-
 import { useServerFn } from "@tanstack/react-start";
 import { useTranslation } from "react-i18next";
 import { listGrantsForOrganization } from "@/lib/clients.functions";
+import { evaluationVerdict } from "@/lib/grant-radar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -239,10 +240,11 @@ interface GrantRow {
     jurisdiction?: string | null;
   } | null;
   evaluation?: {
-    fit_score: number;
+    fit_score: number | null;
     rationale_en?: string | null;
     rationale_fr?: string | null;
     eligibility_pass?: boolean | null;
+    rule_verdict?: string | null;
     created_at: string;
   } | null;
 }
@@ -312,11 +314,15 @@ function GrantCard({ grant }: { grant: GrantRow }) {
           <Button variant="outline" size="sm" className="flex-1" asChild>
             <a href={`/grants/${grant.id}`}>{t("clients.grants.viewDetails")}</a>
           </Button>
-          {grant.evaluation?.eligibility_pass === false && (
-            <Badge variant="destructive" className="text-xs">
-              {t("clients.grants.notEligible")}
-            </Badge>
-          )}
+          {grant.evaluation &&
+            evaluationVerdict({
+              eligibility_pass: !!grant.evaluation.eligibility_pass,
+              rule_verdict: grant.evaluation.rule_verdict,
+            }) === "not_eligible" && (
+              <Badge variant="destructive" className="text-xs">
+                {t("clients.grants.notEligible")}
+              </Badge>
+            )}
         </div>
       </CardContent>
     </Card>

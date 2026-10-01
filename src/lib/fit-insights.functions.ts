@@ -30,26 +30,27 @@ const splitValues = (raw: string) =>
     .map((v) => v.trim())
     .filter((v) => v && v !== "none");
 
+/** Verdict counts shared by the dashboard and Fit insights (one source). */
+export const getVerdictSummary = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { loadUserVerdicts, summarizeVerdicts } = await import("@/lib/verdict-summary.server");
+    return summarizeVerdicts(await loadUserVerdicts(context.supabase as never, context.userId));
+  });
+
 export const getFitInsights = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: evals, error } = await context.supabase
-      .from("grant_evaluations")
-      .select("grant_id, fit_score, eligibility_pass, rule_snapshot")
-      .eq("user_id", context.userId)
-      .limit(1000);
-    if (error) throw new Error(error.message);
-    const rows = evals ?? [];
-    const ids = rows.map((r) => r.grant_id);
-    const titles = new Map<string, string>();
-    for (let i = 0; i < ids.length; i += 200) {
-      const { data } = await context.supabase
-        .from("grants")
-        .select("id, title")
-        .in("id", ids.slice(i, i + 200));
-      for (const g of data ?? []) titles.set(g.id, g.title);
-    }
+    const { loadUserVerdicts, summarizeVerdicts } = await import("@/lib/verdict-summary.server");
+    const verdictRows = await loadUserVerdicts(context.supabase as never, context.userId);
+    const summary = summarizeVerdicts(verdictRows);
+    const titles = new Map(verdictRows.map((r) => [r.grantId, r.title]));
     const ref = (id: string): GrantRef => ({ id, title: titles.get(id) ?? "Untitled grant" });
+    // Only real rejections explain "why not": an unclear verdict has no
+    // failed rule to fix.
+    const rows = verdictRows
+      .filter((r) => r.verdict === "not_eligible")
+      .map((r) => ({ grant_id: r.grantId, rule_snapshot: r.ruleSnapshot }));
 
     const reasons = new Map<string, FitReason>();
     const suggestions = new Map<string, ProfileSuggestion>();
@@ -65,12 +66,7 @@ export const getFitInsights = createServerFn({ method: "GET" })
       suggestions.set(key, cur);
     };
 
-    let passing = 0;
     for (const row of rows) {
-      if (row.eligibility_pass) {
-        passing++;
-        continue;
-      }
       const checks = ((row.rule_snapshot as { checks?: Check[] } | null)?.checks ?? []).filter(
         (c) => c.status === "fail",
       );
@@ -142,9 +138,10 @@ export const getFitInsights = createServerFn({ method: "GET" })
     }
 
     return {
-      evaluated: rows.length,
-      passing,
-      failing: rows.length - passing,
+      evaluated: summary.checked,
+      passing: summary.eligible,
+      needsInput: summary.needsInput,
+      failing: summary.notEligible,
       reasons: [...reasons.values()].sort((a, b) => b.count - a.count),
       suggestions: [...suggestions.values()]
         .sort((a, b) => b.unlocks - a.unlocks || b.grants.length - a.grants.length)

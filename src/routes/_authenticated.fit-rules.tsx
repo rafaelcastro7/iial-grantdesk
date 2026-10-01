@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useRecheckFit } from "@/lib/use-recheck-fit";
 import { getFitRules, saveFitRules, previewFitRules } from "@/lib/fit-rules.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,6 +144,7 @@ function detectStrictness(r: FitRules): StrictnessId | "custom" {
 // ─── Component ───────────────────────────────────────────────────────────────
 function FitRulesPage() {
   const qc = useQueryClient();
+  const recheckAfterChange = useRecheckFit();
   const { data } = useSuspenseQuery(rulesQO);
   const save = useServerFn(saveFitRules);
   const preview = useServerFn(previewFitRules);
@@ -158,6 +160,7 @@ function FitRulesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fit-rules"] });
       qc.invalidateQueries({ queryKey: ["org-rules-drift"] });
+      recheckAfterChange();
     },
   });
   const prev = useMutation({ mutationFn: () => preview({ data: { rules: r, limit: 20 } }) });
@@ -788,7 +791,10 @@ function FitRulesPage() {
           <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
             <div className="text-sm">
               <span className="font-medium">Unsaved changes</span>
-              <span className="text-muted-foreground"> — re-evaluate any grant to apply.</span>
+              <span className="text-muted-foreground">
+                {" "}
+                — saving re-checks every grant automatically.
+              </span>
             </div>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setR(data.rules)}>

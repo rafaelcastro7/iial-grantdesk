@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useRecheckFit } from "@/lib/use-recheck-fit";
 import { useTranslation } from "react-i18next";
 import { getOrgProfile, saveOrgProfile } from "@/lib/org.functions";
 import { parseCSV, bnErrorMessage } from "@/lib/csv.shared";
@@ -20,7 +21,10 @@ import { AppTopBar } from "@/components/AppSidebar";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
 import { useUiVersion } from "@/components/v2/ui-version";
 import { PageTransition } from "@/components/PageTransition";
-import { GrantReadinessProfileForm, optionalNumber } from "@/components/org/GrantReadinessProfileForm";
+import {
+  GrantReadinessProfileForm,
+  optionalNumber,
+} from "@/components/org/GrantReadinessProfileForm";
 import "@/i18n";
 
 const orgQueryOptions = queryOptions({
@@ -78,6 +82,7 @@ function OrgPage() {
   const { t } = useTranslation();
   const { version } = useUiVersion();
   const qc = useQueryClient();
+  const recheckAfterChange = useRecheckFit();
   const { data } = useSuspenseQuery(orgQueryOptions);
   const save = useServerFn(saveOrgProfile);
   const mut = useMutation({
@@ -109,6 +114,7 @@ function OrgPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["org"] });
       qc.invalidateQueries({ queryKey: ["org-rules-drift"] });
+      recheckAfterChange();
       toast.success(t("org.saved"));
     },
     onError: (error) => {

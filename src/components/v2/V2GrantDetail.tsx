@@ -255,11 +255,13 @@ export function V2GrantDetail({
     evaluation?.eligibility_pass === true;
   const draftBlockedReason = canDraft
     ? null
-    : evaluation && evaluation.eligibility_pass === false
+    : evalVerdict === "not_eligible"
       ? "Drafting is off: assessed as not eligible for your organization. Update profile if wrong."
-      : evaluation
-        ? "Drafting is unavailable until eligibility passes."
-        : "Check fit first to unlock drafting.";
+      : evalVerdict === "needs_input"
+        ? "Drafting unlocks once eligibility is confirmed: check the open points on the official page."
+        : evaluation
+          ? "Drafting is unavailable until eligibility passes."
+          : "Check fit first to unlock drafting.";
 
   const actionDisabled = busy != null;
   const [detailMode, setDetailMode] = useDetailMode();
@@ -540,7 +542,9 @@ export function V2GrantDetail({
                     ? "text-emerald-600 dark:text-emerald-400"
                     : fitScore == null
                       ? "text-muted-foreground"
-                      : "text-rose-600 dark:text-rose-400",
+                      : evalVerdict === "needs_input"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-rose-600 dark:text-rose-400",
                 )}
               >
                 {fitScore == null ? "—" : `${fitScore}/100`}
@@ -916,6 +920,9 @@ export function V2GrantDetail({
                   ? {
                       fit_score: evaluation.fit_score,
                       eligibility_pass: evaluation.eligibility_pass,
+                      rule_verdict:
+                        (evaluation.rule_snapshot as { verdict?: string } | null | undefined)
+                          ?.verdict ?? null,
                       rationale_en: humanizeRationale(evaluation.rationale_en) ?? "",
                       rationale_fr: evaluation.rationale_fr ?? "",
                       created_at: evaluation.created_at,

@@ -29,6 +29,8 @@ interface Props {
   evaluation: {
     fit_score: number;
     eligibility_pass: boolean;
+    /** Rules verdict; "needs_input" means unclear, not a rejection. */
+    rule_verdict?: string | null;
     rationale_en: string;
     rationale_fr: string;
     created_at: string;
@@ -271,7 +273,9 @@ export function FitEvaluation(props: Props) {
                     "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
                     e.eligibility_pass
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                      : "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400",
+                      : e.rule_verdict === "needs_input"
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                        : "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400",
                   )}
                 >
                   {e.eligibility_pass ? (
@@ -279,7 +283,11 @@ export function FitEvaluation(props: Props) {
                   ) : (
                     <ShieldAlert className="h-3 w-3" />
                   )}
-                  {e.eligibility_pass ? L.eligiblePass : L.eligibleFail}
+                  {e.eligibility_pass
+                    ? L.eligiblePass
+                    : e.rule_verdict === "needs_input"
+                      ? "Eligibility unclear"
+                      : L.eligibleFail}
                 </span>
               </div>
               {thinCoverage && cov && (
