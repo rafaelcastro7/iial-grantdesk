@@ -35,6 +35,7 @@ import { MAX_ENRICH_ATTEMPTS, isTerminalGrantStatus } from "@/agents/pipeline-st
 import { EvaluationDetail } from "@/components/grants/EvaluationDetail";
 import { EvidenceChip } from "@/components/grants/EvidencePanel";
 import { FetchTrailPanel } from "@/components/grants/FetchTrailPanel";
+import { DismissGrantControl } from "@/components/grants/DismissGrantControl";
 import { EligibilityIssues } from "@/components/grants/EligibilityIssues";
 import { FitEvaluation } from "@/components/grants/FitEvaluation";
 import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
@@ -46,6 +47,7 @@ import { ValueBlock } from "@/components/grants/GrantDetailExpress";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
+import { FUNDING_KIND_LABEL, fundingKindOf } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 
@@ -323,6 +325,14 @@ export function V2GrantDetail({
                 <Badge variant="secondary" className="rounded-md">
                   {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
                 </Badge>
+                {fundingKindOf(grant) !== "grant" && (
+                  <Badge
+                    variant="outline"
+                    className="rounded-md border-amber-500/50 text-amber-800 dark:text-amber-300"
+                  >
+                    {FUNDING_KIND_LABEL[fundingKindOf(grant)]} — not a grant
+                  </Badge>
+                )}
                 {duplicateGroupSize > 1 && (
                   <Badge variant="outline" className="rounded-md text-amber-700">
                     {duplicateGroupSize} similar records
@@ -474,6 +484,12 @@ export function V2GrantDetail({
                     )}
                   </div>
                 )}
+                <DismissGrantControl
+                  grantId={grant.id}
+                  defaultReason={
+                    fundingKindOf(grant) === "loan" ? "loan_not_grant" : "outside_field"
+                  }
+                />
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-2 text-xs">

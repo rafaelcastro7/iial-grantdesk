@@ -22,6 +22,7 @@ import {
   timingLabel,
   type RadarItem,
 } from "@/lib/grant-radar";
+import { FUNDING_KIND_LABEL, fundingKindOf } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
 
 export type RadarActions = {
@@ -105,6 +106,11 @@ export function RadarCard({
             {g.isNewSinceLastReview && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
                 New
+              </span>
+            )}
+            {fundingKindOf(g) !== "grant" && (
+              <span className="rounded-full border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                {FUNDING_KIND_LABEL[fundingKindOf(g)]}
               </span>
             )}
           </div>

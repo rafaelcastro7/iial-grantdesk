@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRadar,
+  fundingKindOf,
   lexicalFallbackTokens,
   nextActionOf,
   priorityOf,
@@ -225,5 +226,29 @@ describe("confirmed eligibility", () => {
     );
     expect(r.items[0].grant.id).toBe("confirmed");
     expect(r.counts.eligible).toBe(1);
+  });
+});
+
+describe("fundingKindOf", () => {
+  it("tells loans, tax credits and grants apart", () => {
+    expect(fundingKindOf({ title: "BDC Financing — Equipment Purchase Loan" })).toBe("loan");
+    expect(
+      fundingKindOf({
+        title: "Canada Small Business Financing Program",
+        summary: "Help for small businesses to get loans from financial institutions",
+      }),
+    ).toBe("loan");
+    expect(
+      fundingKindOf({
+        title: "Scientific Research and Experimental Development Tax Incentive Program",
+      }),
+    ).toBe("tax_credit");
+    expect(
+      fundingKindOf({
+        title: "NRC IRAP Financial Assistance",
+        summary: "Get a non-repayable contribution to develop technologies.",
+      }),
+    ).toBe("grant");
+    expect(fundingKindOf({ title: "Alliance grants" })).toBe("grant");
   });
 });

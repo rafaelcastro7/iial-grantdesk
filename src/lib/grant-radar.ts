@@ -527,3 +527,31 @@ export function scoreLexicalFallback(
   const weight = (matched.length + titleHits) / (tokens.length * 2);
   return { relevance: Math.round((0.4 + 0.4 * weight) * 1000) / 1000, matched };
 }
+
+// ---- Funding instrument (grant vs loan vs tax credit) ----
+
+export type FundingKind = "grant" | "loan" | "tax_credit";
+
+const LOAN =
+  /\b(?:loans?|line of credit|repayable contribution|interest[- ]bearing|financing program|equipment financing)\b/i;
+const NON_REPAYABLE = /\bnon[- ]repayable\b/i;
+const TAX_CREDIT = /\btax (?:credits?|incentives?|deductions?)\b/i;
+
+/**
+ * What kind of money this is, from the title and summary. Loans must be paid
+ * back and tax credits reduce taxes, so consultants should not read them as
+ * grants. Non-repayable contributions stay grants.
+ */
+export function fundingKindOf(g: { title?: string | null; summary?: string | null }): FundingKind {
+  const text = `${g.title ?? ""} ${g.summary ?? ""}`;
+  if (TAX_CREDIT.test(text) && !/\bgrants?\b/i.test(g.title ?? "")) return "tax_credit";
+  if (LOAN.test(g.title ?? "")) return "loan";
+  if (LOAN.test(text) && !NON_REPAYABLE.test(text)) return "loan";
+  return "grant";
+}
+
+export const FUNDING_KIND_LABEL: Record<FundingKind, string> = {
+  grant: "Grant",
+  loan: "Loan",
+  tax_credit: "Tax credit",
+};

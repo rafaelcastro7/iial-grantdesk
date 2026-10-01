@@ -403,6 +403,17 @@ export const listGrants = createServerFn({ method: "GET" })
       return !selectedStates?.length || selectedStates.includes(grantFacetEvidenceState(facets));
     };
 
+    // Grants this consultant marked as not relevant (tolerates the table
+    // not existing yet: no dismissals).
+    const dismissedIds = new Set<string>();
+    {
+      const { data: dismissed } = await context.supabase
+        .from("grant_dismissals" as never)
+        .select("grant_id")
+        .eq("user_id" as never, context.userId as never);
+      for (const row of (dismissed ?? []) as Array<{ grant_id: string }>)
+        dismissedIds.add(row.grant_id);
+    }
     const rankedCandidates = (rows ?? [])
       .map((grant) => {
         const profileMatch = searchProfile ? scoreGrantForProfile(grant, searchProfile) : null;
@@ -504,9 +515,11 @@ export const listGrants = createServerFn({ method: "GET" })
         };
       })
       .filter(
-        ({ hardBlocked, feedbackAction }) =>
+        ({ grant, hardBlocked, feedbackAction }) =>
           (data.includeDismissed ||
-            (feedbackAction !== "hidden" && feedbackAction !== "rejected")) &&
+            (feedbackAction !== "hidden" &&
+              feedbackAction !== "rejected" &&
+              !dismissedIds.has(grant.id))) &&
           (data.includeHardBlocked || !hardBlocked),
       );
 
@@ -1632,6 +1645,55 @@ export const setGrantManualField = createServerFn({ method: "POST" })
         p_note: data.note ?? null,
       } as never,
     );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const DISMISS_REASONS = [
+  "loan_not_grant",
+  "outside_field",
+  "too_small",
+  "not_eligible",
+  "other",
+] as const;
+
+/** Consultant marks a grant as not relevant; it leaves their list. */
+export const dismissGrant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z
+      .object({
+        grantId: z.string().uuid(),
+        reason: z.enum(DISMISS_REASONS),
+        note: z.string().max(500).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("grant_dismissals" as never).upsert(
+      {
+        user_id: context.userId,
+        grant_id: data.grantId,
+        reason: data.reason,
+        note: data.note ?? null,
+        created_at: new Date().toISOString(),
+      } as never,
+      { onConflict: "user_id,grant_id" },
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Undo a dismissal. */
+export const restoreGrant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ grantId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("grant_dismissals" as never)
+      .delete()
+      .eq("user_id" as never, context.userId as never)
+      .eq("grant_id" as never, data.grantId as never);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
