@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Lightbulb, Plus, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { applyProfileSuggestion, getFitInsights } from "@/lib/fit-insights.functions";
+import { autoEvaluatePending } from "@/lib/grants.functions";
 
 export const Route = createFileRoute("/_authenticated/insights")({
   component: FitInsightsPage,
@@ -21,6 +22,22 @@ function FitInsightsPage() {
     queryKey: ["fit-insights"],
     queryFn: () => fetchInsights(),
   });
+  // Re-check stale verdicts here too (rules only, 0 tokens), so the counts
+  // reflect the current profile without a visit to the radar first.
+  const recheck = useServerFn(autoEvaluatePending);
+  useEffect(() => {
+    let cancelled = false;
+    void recheck({ data: { limit: 100, background: false } })
+      .then((r) => {
+        if (!cancelled && ((r as { evaluated?: number }).evaluated ?? 0) > 0) {
+          void qc.invalidateQueries({ queryKey: ["fit-insights"] });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [recheck, qc, applied.size]);
   const mutation = useMutation({
     mutationFn: (s: { kind: string; value: string }) =>
       apply({ data: s as { kind: "add_sector"; value: string } }),
@@ -115,14 +132,8 @@ function FitInsightsPage() {
               )}
               {applied.size > 0 && (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Profile updated. Open the{" "}
-                  <Link
-                    to="/grants"
-                    className="font-medium text-primary underline-offset-4 hover:underline"
-                  >
-                    grant radar
-                  </Link>{" "}
-                  to re-check every grant automatically.
+                  Profile updated. Every grant is being re-checked; the counts above refresh
+                  when it finishes.
                 </p>
               )}
             </CardContent>

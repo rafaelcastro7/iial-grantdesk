@@ -1061,16 +1061,37 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
       return { ok: true, evaluated: 0, skipped: 0, reason: "evaluator_disabled" as const };
     }
 
-    const { data: candidates } = await context.supabase
-      .from("grants")
-      .select("id, status, summary")
-      .or("status.in.(active,enriched,scored,shortlisted),summary.neq.''")
-      .limit(data.limit * 3);
+    // Page through the whole catalog: a fixed cap left grants past it with
+    // verdicts that were never refreshed after a profile change.
+    const candidates: { id: string; status: string | null; summary: string | null }[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: page, error: pageError } = await context.supabase
+        .from("grants")
+        .select("id, status, summary")
+        .or("status.in.(active,enriched,scored,shortlisted),summary.neq.''")
+        .order("id")
+        .range(from, from + 999);
+      if (pageError) throw new Error(`grants: ${pageError.message}`);
+      candidates.push(...((page ?? []) as typeof candidates));
+      if (!page || page.length < 1000) break;
+    }
 
-    const ids = (candidates ?? [])
+    const ids = candidates
       .filter((g) => g.status !== "discovered" || Boolean((g.summary ?? "").trim()))
       .map((g) => g.id);
     if (ids.length === 0) return { ok: true, evaluated: 0, skipped: 0 };
+
+    // Saved fit rules override the profile in the evaluator, so a change to
+    // either one makes earlier verdicts stale.
+    const { data: rulesRow } = await context.supabase
+      .from("fit_rules")
+      .select("updated_at")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const rulesChangedAt = Math.max(
+      new Date((org as { updated_at?: string | null }).updated_at ?? 0).getTime(),
+      new Date((rulesRow as { updated_at?: string | null } | null)?.updated_at ?? 0).getTime(),
+    );
 
     const done = new Set<string>();
     for (const chunk of chunkIds(ids)) {
@@ -1082,9 +1103,7 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
       if (existingError) throw new Error(`grant_evaluations: ${existingError.message}`);
       // A verdict older than the last profile change is stale: re-check it so
       // a profile fix (e.g. adding an applicant type) re-evaluates the list.
-      const profileChangedAt = new Date(
-        (org as { updated_at?: string | null }).updated_at ?? 0,
-      ).getTime();
+      const profileChangedAt = rulesChangedAt;
       for (const e of existing ?? []) {
         const at = new Date((e as { evaluated_at?: string | null }).evaluated_at ?? 0).getTime();
         if (at >= profileChangedAt) done.add(e.grant_id);
@@ -1092,7 +1111,8 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
     }
     const todo = ids.filter((id) => !done.has(id)).slice(0, data.limit);
 
-    if (todo.length === 0) return { ok: true, evaluated: 0, skipped: 0 };
+    const remaining = ids.length - done.size - todo.length;
+    if (todo.length === 0) return { ok: true, evaluated: 0, skipped: 0, queued: 0, remaining: 0 };
 
     const { evaluateGrantImpl } = await import("@/agents/evaluator.impl.server");
     let evaluated = 0;
@@ -1116,10 +1136,10 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
     if (data.background) {
       const { runInBackground } = await import("@/lib/background.server");
       runInBackground(work);
-      return { ok: true, evaluated: 0, skipped: 0, queued: todo.length };
+      return { ok: true, evaluated: 0, skipped: 0, queued: todo.length, remaining };
     }
     await work();
-    return { ok: true, evaluated, skipped, queued: 0 };
+    return { ok: true, evaluated, skipped, queued: 0, remaining };
   });
 
 // List recent agent_runs (and recent grant_events) for the live event panel.

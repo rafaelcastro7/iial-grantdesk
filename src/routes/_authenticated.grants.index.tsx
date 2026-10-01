@@ -267,19 +267,27 @@ function GrantsPage() {
     if (autoEvalStarted.current || !hasGrants) return;
     autoEvalStarted.current = true;
     let cancelled = false;
-    void autoEval({ data: { limit: 100 } })
-      .then(async (result) => {
-        const queued = (result as { queued?: number }).queued ?? 0;
-        if (queued === 0) return;
+    void (async () => {
+      // Batches of 100 until nothing is stale, so a profile change reaches
+      // every grant, not only the first batch. Rules-only: 0 tokens.
+      for (let batch = 0; batch < 20 && !cancelled; batch++) {
+        const result = (await autoEval({ data: { limit: 100 } })) as {
+          queued?: number;
+          remaining?: number;
+        };
+        const queued = result.queued ?? 0;
+        if (queued === 0) break;
         // Refresh while the server works through the queue.
         for (let i = 0; i < Math.min(24, Math.ceil(queued / 2) + 2) && !cancelled; i++) {
           await new Promise((resolve) => setTimeout(resolve, 5_000));
           await qc.invalidateQueries({ queryKey: ["grants"] });
         }
-      })
-      .catch(() => {
-        // Pre-check is best-effort; the page works without it.
-      });
+        await qc.invalidateQueries({ queryKey: ["fit-insights"] });
+        if (!result.remaining) break;
+      }
+    })().catch(() => {
+      // Pre-check is best-effort; the page works without it.
+    });
     return () => {
       cancelled = true;
     };
@@ -370,12 +378,12 @@ function GrantsPage() {
       (item) => item.verdict === "needs_input" || item.fit == null,
     );
     if (candidateItems.length === 0) {
-      setInfo("Todas las convocatorias visibles ya están evaluadas.");
+      setInfo("Every listed grant is already checked.");
       return;
     }
     setEvaluatingAll(true);
     setError(null);
-    setInfo(`Iniciando evaluación completa de ${candidateItems.length} convocatorias...`);
+    setInfo(`Checking ${candidateItems.length} grants…`);
     let count = 0;
     try {
       for (const item of candidateItems) {
@@ -386,7 +394,7 @@ function GrantsPage() {
         try {
           await evaluate({ data: { grantId: g.id } });
         } catch (err) {
-          console.warn(`Error evaluando convocatoria "${g.title}":`, err);
+          console.warn(`Could not check "${g.title}":`, err);
         } finally {
           setEvaluatingIds((s) => {
             const n = new Set(s);
@@ -396,7 +404,7 @@ function GrantsPage() {
         }
       }
       await refresh();
-      setInfo(`Evaluación finalizada: ${count} convocatorias procesadas.`);
+      setInfo(`Done: ${count} grants checked.`);
     } catch (e) {
       fail(e);
     } finally {

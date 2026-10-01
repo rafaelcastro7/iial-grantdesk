@@ -168,8 +168,14 @@ export async function evaluateGrantImpl(opts: {
     .update(
       JSON.stringify({
         grant: stableGrant,
-        org: effectiveOrg,
-        rules,
+        // Timestamps change on every save even when nothing material did;
+        // keeping them would bust the cache and re-bill the model.
+        org: (({ updated_at: _u, created_at: _c, ...rest }) => rest)(
+          (effectiveOrg ?? {}) as Record<string, unknown>,
+        ),
+        rules: (({ updated_at: _u, created_at: _c, ...rest }) => rest)(
+          (rules ?? {}) as Record<string, unknown>,
+        ),
         v: PROMPTS.evaluator.version,
         // A rules-only verdict must not satisfy a later full "Check fit".
         mode: opts.rulesOnly ? "rules" : "full",
@@ -188,6 +194,12 @@ export async function evaluateGrantImpl(opts: {
       "Inputs unchanged since last evaluation - reusing verdict (0 tokens)",
       "done",
     );
+    // Mark the verdict as current, or the stale check keeps re-queuing it.
+    await userSupabase
+      .from("grant_evaluations")
+      .update({ evaluated_at: new Date().toISOString() } as never)
+      .eq("user_id", userId)
+      .eq("grant_id", g.id);
     return {
       ok: true,
       runId: (prior.run_id as string | null) ?? runId,
