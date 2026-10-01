@@ -106,25 +106,6 @@ export async function checkAiProviders(): Promise<ProviderStatus[]> {
     })();
 
   checks.push(
-    (async (): Promise<ProviderStatus> => {
-      const key = env.GEMINI_API_KEY;
-      if (!key) return { ...base("gemini", "free tier"), state: "not_configured", detail: null };
-      const r = await probe(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: "ok" }] }],
-            generationConfig: { maxOutputTokens: 1 },
-          }),
-        },
-      );
-      if ("error" in r) return { ...base("gemini", "free tier"), state: "error", detail: r.error };
-      return { ...base("gemini", "free tier"), ...classify(r.status, r.body) };
-    })(),
-  );
-  checks.push(
     openAiStyle(
       "groq",
       "https://api.groq.com/openai/v1/chat/completions",

@@ -3,7 +3,7 @@
 /**
  * Reports where agent prompts actually go, so the UI can say so honestly.
  *
- * Agent calls try the external providers first (Cerebras, Groq, Gemini) and
+ * Agent calls try the external providers first (Groq, Cerebras) and
  * fall back to the Lovable AI Gateway. The status is derived from
  * configuration rather than hardcoded, and returns provider names only —
  * never key material.
@@ -26,7 +26,6 @@ export const getLlmRouteStatus = createServerFn({ method: "GET" })
   .handler(async (): Promise<LlmRouteStatus> => {
     const providers: string[] = [];
     // Same order as callLlm in src/server/llm.ts: free tier first, Lovable last.
-    if (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_KEY) providers.push("Gemini");
     if (process.env.GROQ_API_KEY) providers.push("Groq");
     if (process.env.CEREBRAS_API_KEY) providers.push("Cerebras");
     providers.push(process.env.LOVABLE_API_KEY ? "Lovable AI" : "Lovable AI (key missing)");
