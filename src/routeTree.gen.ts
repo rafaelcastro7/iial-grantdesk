@@ -21,6 +21,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedFinancialRouteImport } from './routes/_authenticated.financial'
 import { Route as AuthenticatedFitRulesRouteImport } from './routes/_authenticated.fit-rules'
 import { Route as AuthenticatedImpactRouteImport } from './routes/_authenticated.impact'
+import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated.insights'
 import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated.manual'
 import { Route as AuthenticatedOpsRouteImport } from './routes/_authenticated.ops'
 import { Route as AuthenticatedOrgRouteImport } from './routes/_authenticated.org'
@@ -125,6 +126,11 @@ const AuthenticatedFitRulesRoute = AuthenticatedFitRulesRouteImport.update({
 const AuthenticatedImpactRoute = AuthenticatedImpactRouteImport.update({
   id: '/impact',
   path: '/impact',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedManualRoute = AuthenticatedManualRouteImport.update({
@@ -393,6 +399,7 @@ export interface FileRoutesByFullPath {
   '/financial': typeof AuthenticatedFinancialRoute
   '/fit-rules': typeof AuthenticatedFitRulesRoute
   '/impact': typeof AuthenticatedImpactRoute
+  '/insights': typeof AuthenticatedInsightsRoute
   '/manual': typeof AuthenticatedManualRoute
   '/ops': typeof AuthenticatedOpsRoute
   '/org': typeof AuthenticatedOrgRoute
@@ -450,6 +457,7 @@ export interface FileRoutesByTo {
   '/financial': typeof AuthenticatedFinancialRoute
   '/fit-rules': typeof AuthenticatedFitRulesRoute
   '/impact': typeof AuthenticatedImpactRoute
+  '/insights': typeof AuthenticatedInsightsRoute
   '/manual': typeof AuthenticatedManualRoute
   '/ops': typeof AuthenticatedOpsRoute
   '/org': typeof AuthenticatedOrgRoute
@@ -510,6 +518,7 @@ export interface FileRoutesById {
   '/_authenticated/financial': typeof AuthenticatedFinancialRoute
   '/_authenticated/fit-rules': typeof AuthenticatedFitRulesRoute
   '/_authenticated/impact': typeof AuthenticatedImpactRoute
+  '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/manual': typeof AuthenticatedManualRoute
   '/_authenticated/ops': typeof AuthenticatedOpsRoute
   '/_authenticated/org': typeof AuthenticatedOrgRoute
@@ -570,6 +579,7 @@ export interface FileRouteTypes {
     | '/financial'
     | '/fit-rules'
     | '/impact'
+    | '/insights'
     | '/manual'
     | '/ops'
     | '/org'
@@ -627,6 +637,7 @@ export interface FileRouteTypes {
     | '/financial'
     | '/fit-rules'
     | '/impact'
+    | '/insights'
     | '/manual'
     | '/ops'
     | '/org'
@@ -686,6 +697,7 @@ export interface FileRouteTypes {
     | '/_authenticated/financial'
     | '/_authenticated/fit-rules'
     | '/_authenticated/impact'
+    | '/_authenticated/insights'
     | '/_authenticated/manual'
     | '/_authenticated/ops'
     | '/_authenticated/org'
@@ -834,6 +846,13 @@ declare module '@tanstack/react-router' {
       path: '/impact'
       fullPath: '/impact'
       preLoaderRoute: typeof AuthenticatedImpactRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/insights': {
+      id: '/_authenticated/insights'
+      path: '/insights'
+      fullPath: '/insights'
+      preLoaderRoute: typeof AuthenticatedInsightsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/manual': {
@@ -1224,6 +1243,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedFinancialRoute: typeof AuthenticatedFinancialRoute
   AuthenticatedFitRulesRoute: typeof AuthenticatedFitRulesRoute
   AuthenticatedImpactRoute: typeof AuthenticatedImpactRoute
+  AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedManualRoute: typeof AuthenticatedManualRoute
   AuthenticatedOpsRoute: typeof AuthenticatedOpsRoute
   AuthenticatedOrgRoute: typeof AuthenticatedOrgRoute
@@ -1256,6 +1276,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFinancialRoute: AuthenticatedFinancialRoute,
   AuthenticatedFitRulesRoute: AuthenticatedFitRulesRoute,
   AuthenticatedImpactRoute: AuthenticatedImpactRoute,
+  AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedManualRoute: AuthenticatedManualRoute,
   AuthenticatedOpsRoute: AuthenticatedOpsRoute,
   AuthenticatedOrgRoute: AuthenticatedOrgRoute,

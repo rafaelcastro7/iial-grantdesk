@@ -21,6 +21,7 @@ import {
   LogOut,
   Menu,
   Radar,
+  Lightbulb,
   RefreshCw,
   Scale,
   Search,
@@ -87,6 +88,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Home,
       },
       { to: "/grants", label: "Grant radar", description: "Discover and qualify", icon: Radar },
+      {
+        to: "/insights",
+        label: "Fit insights",
+        description: "Why grants do not pass",
+        icon: Lightbulb,
+      },
       { to: "/funders", label: "Funders", description: "CRA, history, patterns", icon: Landmark },
     ],
   },
@@ -332,28 +339,30 @@ function V2DesktopNav({
       </nav>
 
       <div className="border-t border-white/10 p-3">
-        {!simple && (<div className="rounded-md border border-white/10 bg-white/[0.055] p-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-white">
-            <Bot className="h-4 w-4 text-brand-green" />
-            AI stack
+        {!simple && (
+          <div className="rounded-md border border-white/10 bg-white/[0.055] p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white">
+              <Bot className="h-4 w-4 text-brand-green" />
+              AI stack
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-white/62">
+              <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">Lovable AI</span>
+              <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">Lovable Cloud</span>
+              <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">RLS</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-help rounded-[6px] bg-white/[0.07] px-2 py-1 underline decoration-dotted underline-offset-2">
+                    {llmRoute.cloudProviders[0] ?? "Lovable AI"}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-64 text-xs">
+                  Agents call the Lovable AI Gateway — always read AI-drafted text before
+                  submitting, never take it as final.
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-white/62">
-            <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">Lovable AI</span>
-            <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">Lovable Cloud</span>
-            <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">RLS</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-help rounded-[6px] bg-white/[0.07] px-2 py-1 underline decoration-dotted underline-offset-2">
-                  {llmRoute.cloudProviders[0] ?? "Lovable AI"}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-64 text-xs">
-                Agents call the Lovable AI Gateway — always read AI-drafted text
-                before submitting, never take it as final.
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>)}
+        )}
 
         <div className="mt-3 flex items-center justify-end gap-2">
           <Tooltip>
@@ -432,33 +441,35 @@ function V2TopBar({
             </kbd>
           </Button>
 
-          {!simple && (<Tooltip>
-            <TooltipTrigger asChild>
-              <Badge
-                variant="outline"
-                className="hidden cursor-help items-center gap-2 rounded-lg border-border/60 bg-card/60 px-2.5 py-1 text-xs font-medium md:inline-flex"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span
-                    className={cn(
-                      "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-                      llmRoute.localOnly ? "bg-emerald-400" : "bg-brand-green",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "relative inline-flex h-2 w-2 rounded-full",
-                      llmRoute.localOnly ? "bg-emerald-500" : "bg-brand-bright",
-                    )}
-                  />
-                </span>
-                Lovable AI
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-72 text-xs">
-              {`Analysis and drafting run through ${llmRoute.cloudProviders.join(", ") || "Lovable AI"}. Eligibility verdicts stay rule-based.`}
-            </TooltipContent>
-          </Tooltip>)}
+          {!simple && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="hidden cursor-help items-center gap-2 rounded-lg border-border/60 bg-card/60 px-2.5 py-1 text-xs font-medium md:inline-flex"
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span
+                      className={cn(
+                        "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                        llmRoute.localOnly ? "bg-emerald-400" : "bg-brand-green",
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "relative inline-flex h-2 w-2 rounded-full",
+                        llmRoute.localOnly ? "bg-emerald-500" : "bg-brand-bright",
+                      )}
+                    />
+                  </span>
+                  Lovable AI
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-72 text-xs">
+                {`Analysis and drafting run through ${llmRoute.cloudProviders.join(", ") || "Lovable AI"}. Eligibility verdicts stay rule-based.`}
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           <ThemeToggle />
           <NotificationBell />
@@ -481,22 +492,24 @@ function V2TopBar({
         </div>
       </div>
 
-      {!simple && (<div className="hidden border-t border-border/55 px-5 py-2 xl:block">
-        <div className="flex items-center gap-2 overflow-hidden text-[11px] text-muted-foreground">
-          {LIFECYCLE.map((stage, index) => {
-            const StageIcon = stage.icon;
-            return (
-              <div key={stage.label} className="flex min-w-0 items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md border bg-card px-2 py-1 font-medium text-foreground">
-                  <StageIcon className="h-3.5 w-3.5 text-primary" />
-                  {stage.label}
-                </span>
-                {index < LIFECYCLE.length - 1 && <ChevronRight className="h-3.5 w-3.5" />}
-              </div>
-            );
-          })}
+      {!simple && (
+        <div className="hidden border-t border-border/55 px-5 py-2 xl:block">
+          <div className="flex items-center gap-2 overflow-hidden text-[11px] text-muted-foreground">
+            {LIFECYCLE.map((stage, index) => {
+              const StageIcon = stage.icon;
+              return (
+                <div key={stage.label} className="flex min-w-0 items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-md border bg-card px-2 py-1 font-medium text-foreground">
+                    <StageIcon className="h-3.5 w-3.5 text-primary" />
+                    {stage.label}
+                  </span>
+                  {index < LIFECYCLE.length - 1 && <ChevronRight className="h-3.5 w-3.5" />}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>)}
+      )}
     </header>
   );
 }
