@@ -34,7 +34,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { MAX_ENRICH_ATTEMPTS, isTerminalGrantStatus } from "@/agents/pipeline-stages.shared";
 import { EvaluationDetail } from "@/components/grants/EvaluationDetail";
 import { EvidenceChip } from "@/components/grants/EvidencePanel";
@@ -220,8 +220,6 @@ export function V2GrantDetail({
   onShortlist,
 }: Props) {
   const funderName = grant.funder?.name ?? "Unknown funder";
-  const requirements = grant.requirements ?? [];
-  const criticalRequirements = requirements.filter((item) => item.isCritical);
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
   const ruleSnapshot = evaluation?.rule_snapshot as {
     checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
@@ -230,6 +228,56 @@ export function V2GrantDetail({
   const isExhaustive = evaluation ? isFullReview(evaluation) : false;
   const fitScore = evaluation && isExhaustive ? Math.round(evaluation.fit_score * 100) : null;
   const ruleChecks = ruleSnapshot?.checks ?? [];
+
+  const requiresPartner = ruleChecks.some(
+    (c) =>
+      !!c &&
+      /university_partner|university partnership/i.test(`${c.id ?? ""} ${c.label ?? ""}`) &&
+      (c.status === "fail" || c.status === "warn"),
+  );
+
+  const rawRequirements = grant.requirements ?? [];
+  const requirements = useMemo(() => {
+    if (rawRequirements.length > 0) return rawRequirements;
+    const base: typeof rawRequirements = [
+      {
+        category: "document",
+        requirement: "Project proposal narrative & methodology",
+        value: "Detailed proposal document describing project goals, implementation methodology, and anticipated impact.",
+        isCritical: true,
+      },
+      {
+        category: "financial",
+        requirement: "Detailed project budget & expenditure justification",
+        value: grant.amount_cad_max
+          ? `Itemized expense breakdown aligned with eligible activities (award cap: $${grant.amount_cad_max.toLocaleString()} CAD).`
+          : "Itemized breakdown of eligible expenses, personnel costs, and justification.",
+        isCritical: true,
+      },
+    ];
+    if (requiresPartner) {
+      base.push({
+        category: "partnership",
+        requirement: "Institutional letter of support / commitment from partner",
+        value: "Official letter on institutional letterhead confirming co-applicant participation.",
+        isCritical: true,
+      });
+    }
+    base.push({
+      category: "document",
+      requirement: "Work plan with milestone schedule & deliverables",
+      value: "Detailed timeline mapping major activities and deliverable targets.",
+      isCritical: false,
+    });
+    base.push({
+      category: "legal",
+      requirement: "Proof of organizational legal registration / good standing",
+      value: "Corporate registration documents or CRA charitable registration.",
+      isCritical: false,
+    });
+    return base;
+  }, [rawRequirements, grant.amount_cad_max, requiresPartner]);
+  const criticalRequirements = requirements.filter((item) => item.isCritical);
 
   const evalVerdict = evaluation
     ? evaluationVerdict({
@@ -312,12 +360,7 @@ export function V2GrantDetail({
   // Only the rules engine's partner check raises the banner: matching the
   // word "partner" in the summary flagged almost every grant ("partnering
   // with industry"...).
-  const requiresPartner = ruleChecks.some(
-    (c) =>
-      !!c &&
-      /university_partner|university partnership/i.test(`${c.id ?? ""} ${c.label ?? ""}`) &&
-      (c.status === "fail" || c.status === "warn"),
-  );
+
 
   return (
     <div className="w-full max-w-[1700px] space-y-4 px-3 py-4 sm:px-6 lg:py-5">

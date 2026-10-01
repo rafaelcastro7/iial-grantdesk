@@ -268,3 +268,103 @@ export function formatGrantRequirements(
 
   return lines.join("\n");
 }
+
+/**
+ * Synthesizes or infers baseline application requirements for a grant based on its known attributes.
+ * Ensures the user NEVER sees an empty "No requirements" screen.
+ */
+export function synthesizeRequirementsForGrant(grant: {
+  title?: string | null;
+  summary?: string | null;
+  eligibility_note?: string | null;
+  eligibility?: unknown;
+  funding_uses?: string[] | null;
+  amount_cad_max?: number | null;
+  cost_share_pct?: number | null;
+  applicant_types?: string[] | null;
+  funder_name?: string | null;
+}): GrantRequirement[] {
+  // First, extract any deterministic requirements from available narrative text
+  const narrative = [
+    grant.title,
+    grant.summary,
+    grant.eligibility_note,
+    typeof grant.eligibility === "object" && grant.eligibility ? JSON.stringify(grant.eligibility) : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const extracted = narrative ? analyzeGrantRequirements(narrative).requirements : [];
+  const reqMap = new Map<string, GrantRequirement>();
+
+  for (const r of extracted) {
+    reqMap.set(r.requirement.toLowerCase(), r);
+  }
+
+  // Synthesize standard RFP core deliverables if not already present
+  if (!reqMap.has("project proposal narrative required") && !reqMap.has("work plan / project plan required")) {
+    reqMap.set("project proposal narrative", {
+      category: "document",
+      requirement: "Project proposal narrative & methodology",
+      value: "Detailed proposal document describing project goals, implementation methodology, and anticipated impact.",
+      isCritical: true,
+    });
+  }
+
+  if (!reqMap.has("detailed project budget required")) {
+    reqMap.set("detailed project budget", {
+      category: "financial",
+      requirement: "Detailed project budget & cost justification",
+      value: grant.amount_cad_max
+        ? `Itemized expense breakdown aligned with eligible activities (award cap: $${grant.amount_cad_max.toLocaleString()} CAD).`
+        : "Itemized breakdown of eligible expenses, personnel costs, and justification.",
+      isCritical: true,
+    });
+  }
+
+  // Cost-share / matching funds requirement
+  const costShare = grant.cost_share_pct;
+  if (costShare != null && costShare > 0 && !reqMap.has("matching funds / cost-share required")) {
+    reqMap.set("matching funds", {
+      category: "financial",
+      requirement: `Co-funding commitment proof (~${costShare}% matching required)`,
+      value: "Official documentation or letter of commitment verifying internal or partner cash/in-kind contribution.",
+      isCritical: true,
+    });
+  }
+
+  // Partner requirement check
+  const textBlob = `${grant.title ?? ""} ${grant.summary ?? ""} ${grant.eligibility_note ?? ""}`.toLowerCase();
+  const mentionsPartner = /partner|collaborat|consortium|university|postsecondary/i.test(textBlob);
+  if (mentionsPartner && !Array.from(reqMap.values()).some((r) => r.category === "partnership")) {
+    reqMap.set("partner commitment", {
+      category: "partnership",
+      requirement: "Institutional letter of support / commitment from partner",
+      value: "Signed letter of support or MOU detailing partner roles, responsibilities, and resource allocation.",
+      isCritical: true,
+    });
+  }
+
+  // Work plan & milestones
+  if (!reqMap.has("work plan / project plan required") && !reqMap.has("work plan with milestone schedule")) {
+    reqMap.set("work plan", {
+      category: "document",
+      requirement: "Work plan with milestone schedule & deliverables",
+      value: "Clear timeline identifying key activity milestones, deliverable deadlines, and completion criteria.",
+      isCritical: false,
+    });
+  }
+
+  // Governance & organizational standing
+  if (!reqMap.has("proof of incorporation / registration required")) {
+    reqMap.set("incorporation", {
+      category: "legal",
+      requirement: "Proof of organizational legal registration / good standing",
+      value: "Documentation confirming eligible entity type (letters patent, business number, or CRA registration).",
+      isCritical: false,
+    });
+  }
+
+  return Array.from(reqMap.values());
+}
+

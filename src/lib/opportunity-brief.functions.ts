@@ -205,15 +205,41 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
       recommendedPartnerAction = "Confirm directly with the funder program officer whether independent non-profit/SME applications are accepted.";
     }
 
-    // Extract requirements from database
-    type RequirementRow = { requirement?: string; category?: string; isCritical?: boolean };
-    const extractedRequirements = (
+    // Extract requirements from database or synthesize baseline if empty
+    type RequirementRow = { requirement?: string; category?: string; isCritical?: boolean; value?: string };
+    let rawRequirements = (
       Array.isArray((g as { requirements?: unknown }).requirements)
         ? ((g as { requirements: RequirementRow[] }).requirements ?? [])
         : []
-    )
-      .filter((r) => typeof r.requirement === "string" && r.requirement.trim())
-      .map((r) => (r.isCritical ? `${r.requirement} (critical)` : r.requirement!));
+    ).filter((r) => typeof r.requirement === "string" && r.requirement.trim());
+
+    if (rawRequirements.length === 0) {
+      const { synthesizeRequirementsForGrant } = await import(
+        "@/agents/grant-requirements-analyzer.server"
+      );
+      rawRequirements = synthesizeRequirementsForGrant({
+        title: g.title,
+        summary: g.summary,
+        eligibility_note: g.eligibility_note,
+        eligibility: g.eligibility,
+        funding_uses: g.funding_uses,
+        amount_cad_max: max_amount_cad,
+        cost_share_pct: rr.cost_share_pct,
+        applicant_types: g.applicant_types,
+        funder_name: funderName,
+      });
+      if (rawRequirements.length > 0) {
+        supabase
+          .from("grants")
+          .update({ requirements: rawRequirements } as never)
+          .eq("id", grantId)
+          .then();
+      }
+    }
+
+    const extractedRequirements = rawRequirements.map((r) =>
+      r.isCritical ? `${r.requirement} (critical)` : r.requirement!,
+    );
 
     // Narrative parts via LLM Strategist
     const { callLlm } = await import("@/agents/llm.server");
