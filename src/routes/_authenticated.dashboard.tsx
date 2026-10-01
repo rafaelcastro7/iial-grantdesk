@@ -80,6 +80,7 @@ function Dashboard() {
   const { t } = useTranslation();
   const { version } = useUiVersion();
   const [email, setEmail] = useState<string | null>(null);
+  const [personName, setPersonName] = useState<string | null>(null);
 
   const fetchOrg = useServerFn(getOrgProfile);
   const { data: org } = useQuery({ queryKey: ["org", "self"], queryFn: () => fetchOrg() });
@@ -101,11 +102,13 @@ function Dashboard() {
 
   const p = org?.profile;
   const profileComplete = !!(p?.org_name && p.sectors?.length && p.jurisdictions?.length);
-  const orgName = p?.org_name?.trim() || null;
 
   useEffect(() => {
     syncClientLocale();
-    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    supabase.auth.getUser().then(({ data }) => {
+      setEmail(data.user?.email ?? null);
+      setPersonName(firstNameOf(data.user?.user_metadata, data.user?.email));
+    });
   }, []);
 
   const loading = grantData === undefined;
@@ -183,7 +186,8 @@ function Dashboard() {
             to: "/grants",
           };
 
-  const greeting = orgName ? `Welcome back, ${orgName}` : "Welcome back";
+  // Greet the person, not the organization ("Welcome back, Rocio").
+  const greeting = personName ? `Welcome back, ${personName}` : "Welcome back";
 
   if (version === "v2") {
     return (
@@ -784,4 +788,14 @@ function MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
       )}
     </Link>
   );
+}
+
+/** First name from the sign-up metadata, else from the email (rocio.diaz@x -> Rocio). */
+function firstNameOf(meta: Record<string, unknown> | undefined, email: string | null | undefined) {
+  const fromMeta = [meta?.first_name, meta?.full_name, meta?.name].find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  );
+  const raw = fromMeta?.trim().split(/\s+/)[0] ?? email?.split("@")[0].split(/[._+\-\d]/)[0] ?? "";
+  if (raw.length < 2) return null;
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
 }
