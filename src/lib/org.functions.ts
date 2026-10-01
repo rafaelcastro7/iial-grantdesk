@@ -16,8 +16,8 @@ export const getOrgProfile = createServerFn({ method: "GET" })
 const OrgInput = z
   .object({
     org_name: z.string().min(1).max(200),
-    sectors: z.array(z.string().min(1).max(80)).max(20),
-    jurisdictions: z.array(z.string().min(2).max(4)).min(1).max(20),
+    sectors: z.array(z.string().min(1).max(80)).max(60),
+    jurisdictions: z.array(z.string().min(2).max(8)).min(1).max(80),
     stage: z.enum(["startup", "sme", "nonprofit", "research", "public_sector"]),
     annual_budget_cad: z.number().nonnegative().nullable(),
     focus_areas: z.string().max(2000).nullable(),
@@ -25,7 +25,7 @@ const OrgInput = z
     business_number: z.string().max(80).nullable(),
     website: z.string().max(500).nullable(),
     mission: z.string().max(4000).nullable(),
-    applicant_types: z.array(z.string().min(1).max(80)).max(20),
+    applicant_types: z.array(z.string().min(1).max(80)).max(30),
     activities: z.array(z.string().min(1).max(120)).max(30),
     capabilities: z.array(z.string().min(1).max(120)).max(30),
     populations_served: z.array(z.string().min(1).max(120)).max(30),

@@ -28,6 +28,7 @@ function FitInsightsPage() {
       setApplied((prev) => new Set(prev).add(`${s.kind}:${s.value}`));
       await qc.invalidateQueries({ queryKey: ["grants"] });
       await qc.invalidateQueries({ queryKey: ["org", "self"] });
+      await qc.invalidateQueries({ queryKey: ["fit-insights"] });
     },
   });
 
