@@ -98,14 +98,48 @@ function jinaHeaders(): HeadersInit {
   return h;
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  quot: '"',
+  apos: "'",
+  lt: "<",
+  gt: ">",
+  ndash: "–",
+  mdash: "—",
+  rsquo: "’",
+  lsquo: "‘",
+};
+
+// "$10&nbsp;million" was read as $10 because entities stayed encoded.
+function decodeEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, code: string) => {
+    if (code[0] === "#") {
+      const hex = code[1] === "x" || code[1] === "X";
+      const n = hex ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+      return Number.isFinite(n) ? String.fromCodePoint(n === 160 ? 32 : n) : match;
+    }
+    return HTML_ENTITIES[code.toLowerCase()] ?? match;
+  });
+}
+
 function htmlToMarkdown(html: string, max = 40_000): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+  return decodeEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      // Site chrome was flattened into the body and read as program facts
+      // ("Travel and tourism", "Health" from the canada.ca mega-menu).
+      .replace(/<(nav|header|footer|aside)\b[\s\S]*?<\/\1>/gi, " ")
+      // Keep block boundaries so line-based cleanup and snippets still work.
+      .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>|<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .replace(/[ \t ]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, max);
 }
@@ -125,8 +159,7 @@ function titleFromHtml(html: string): string | undefined {
 type EngineCtx = { httpStatus?: number; urlUsed?: string };
 
 type EngineOutcome =
-  | { ok: true; markdown: string; title?: string }
-  | { ok: false; error: string; bytes?: number };
+  { ok: true; markdown: string; title?: string } | { ok: false; error: string; bytes?: number };
 
 async function runEngine(
   engine: FetchVia,
@@ -525,4 +558,46 @@ export async function searchWeb(query: string, limit = 10): Promise<SearchHit[]>
   const r = await localWebSearch(query, limit);
   if (!r.ok) throw new Error(r.error);
   return r.hits;
+}
+
+export type ArchivedPage = { url: string; markdown: string; capturedAt: string };
+
+/**
+ * Latest Wayback capture that returned HTTP 200. Used when the live page is
+ * a soft-404 (HTTP 200 with a "page not found" body): `wayback/available`
+ * returns the newest capture, which is often that same error page.
+ */
+export async function lastGoodArchivedPage(
+  url: string,
+  minChars = 300,
+): Promise<ArchivedPage | null> {
+  const target = url.replace(/^https?:\/\//i, "").replace(/#.*$/, "");
+  const cdx =
+    // Slashes must stay literal: an encoded path makes CDX ~4x slower.
+    `https://web.archive.org/cdx/search/cdx?url=${encodeURI(target).replace(/&/g, "%26")}` +
+    `&filter=statuscode:200&output=json&limit=-3&fl=timestamp,original`;
+  try {
+    // CDX answers 503 intermittently; a short retry recovers most of them.
+    let rows: string[][] | null = null;
+    for (let attempt = 0; attempt < 3 && !rows; attempt++) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt));
+      const res = await fetch(cdx, { signal: AbortSignal.timeout(40_000) }).catch(() => null);
+      if (res?.ok) rows = (await res.json().catch(() => null)) as string[][] | null;
+    }
+    if (!rows) return null;
+    // Newest first; skip the header row.
+    for (const [timestamp, original] of rows.slice(1).reverse()) {
+      // id_ returns the original HTML without the Wayback toolbar.
+      const snapshotUrl = `https://web.archive.org/web/${timestamp}id_/${original}`;
+      const page = await fetch(snapshotUrl, { signal: AbortSignal.timeout(20_000) });
+      if (!page.ok) continue;
+      const markdown = htmlToMarkdown((await page.text()).slice(0, 500_000), 40_000);
+      if (markdown.length < minChars) continue;
+      const capturedAt = `${timestamp.slice(0, 4)}-${timestamp.slice(4, 6)}-${timestamp.slice(6, 8)}`;
+      return { url: `https://web.archive.org/web/${timestamp}/${original}`, markdown, capturedAt };
+    }
+  } catch {
+    // Archive unavailable: caller falls back to stored text.
+  }
+  return null;
 }

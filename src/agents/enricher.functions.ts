@@ -155,10 +155,34 @@ export async function enrichGrantImpl(
   const rawScrape = await scrapeWithFallback(g.url);
   // A soft-404 (HTTP 200 + "page not found" body) is a failed scrape: its site
   // menus were being read as grant facts. Fall back to the stored text instead.
-  const scraped =
-    rawScrape.ok && looksLikeErrorPage(rawScrape.markdown)
+  const softNotFound = rawScrape.ok && looksLikeErrorPage(rawScrape.markdown);
+  // A moved/removed page usually still has an archived copy from when it was
+  // live; that beats the short stored summary. The evidence cites the archive
+  // URL so a reviewer can see the facts are from a past capture.
+  const archived = softNotFound
+    ? await (await import("@/lib/web-fetch.server")).lastGoodArchivedPage(g.url)
+    : null;
+  const usableArchive = archived && !looksLikeErrorPage(archived.markdown) ? archived : null;
+  const scraped = usableArchive
+    ? {
+        ...rawScrape,
+        ok: true as const,
+        url: usableArchive.url,
+        markdown: usableArchive.markdown,
+        via: "wayback" as const,
+      }
+    : softNotFound
       ? { ...rawScrape, ok: false as const, error: "soft_404_error_page", markdown: "" }
       : rawScrape;
+  const sourceUrl = usableArchive ? usableArchive.url : g.url;
+  if (usableArchive) {
+    await trace(
+      "scrape",
+      `Live page is a 404; using archived capture from ${usableArchive.capturedAt}`,
+      "warn",
+      { archive_url: usableArchive.url },
+    );
+  }
   const fetchAttempts = scraped.attempts ?? [];
 
   let sourceMarkdown = scraped.ok ? scraped.markdown : "";
@@ -215,7 +239,7 @@ export async function enrichGrantImpl(
   const patch: Record<string, unknown> = {};
   const methodCounts = { regex: 0, chrono: 0, rule: 0, llm: 0 };
   const pages: Array<{ url: string; markdown: string }> = [
-    { url: g.url, markdown: sourceMarkdown },
+    { url: sourceUrl, markdown: sourceMarkdown },
   ];
   if (/^https?:\/\/(?:www\.)?grants\.gov\/search-results-detail\//i.test(g.url)) {
     try {
