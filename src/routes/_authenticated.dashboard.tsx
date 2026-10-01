@@ -20,7 +20,6 @@ import { useUiVersion } from "@/components/v2/ui-version";
 import {
   Activity,
   ArrowRight,
-  BrainCircuit,
   CalendarClock,
   CheckCircle2,
   Clock3,
@@ -404,7 +403,7 @@ function DashboardV2({
     <PageTransition>
       <div className="min-h-screen text-foreground">
         <section className="mx-auto max-w-[1500px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_360px]">
+          <div className="grid gap-4">
             <section className="overflow-hidden rounded-md border bg-card shadow-sm">
               <div className="grid min-h-[300px] lg:grid-cols-[minmax(0,1.35fr)_360px]">
                 <div className="flex flex-col justify-between p-5 sm:p-6">
@@ -467,39 +466,6 @@ function DashboardV2({
                 </aside>
               </div>
             </section>
-
-            <aside className="rounded-md border bg-sidebar p-5 text-sidebar-foreground shadow-sm">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <BrainCircuit className="h-4 w-4 text-brand-green" />
-                AI-assisted workflow
-              </div>
-              <p className="mt-3 text-sm leading-6 text-sidebar-foreground/70">
-                Eligibility is decided by auditable rules. Drafting and analysis use the configured
-                provider chain: free-tier providers first when configured, Lovable AI as the paid
-                floor.
-              </p>
-              <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-                {[
-                  ["AI", "Free tier first"],
-                  ["Database", "Lovable Cloud"],
-                  ["Security", "RLS"],
-                  ["Fallback", "Lovable AI"],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="rounded-md border border-sidebar-border bg-sidebar-accent p-3"
-                  >
-                    <div className="text-sidebar-foreground/55">{label}</div>
-                    <div className="mt-1 font-semibold">{value}</div>
-                  </div>
-                ))}
-              </div>
-              {email && (
-                <div className="mt-5 truncate text-xs text-sidebar-foreground/55">
-                  Signed in as {email}
-                </div>
-              )}
-            </aside>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
