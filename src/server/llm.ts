@@ -3,7 +3,7 @@ import { serverEnv } from "@/lib/env.server";
 /**
  * Language model access.
  *
- * Provider chain: configured free-tier providers (Gemini, Groq, Cerebras)
+ * Provider chain: configured free-tier providers (Groq, Cerebras)
  * first, then the Lovable AI Gateway as the paid floor. What survives from the
  * original design is the part that mattered —
  * a caller asks for a *role*, gets back the text plus a record of what was
@@ -180,49 +180,9 @@ function openAiCompatible(url: string, model: string): ExternalProvider["call"] 
   };
 }
 
-/** Gemini generateContent (non-streamed; these calls are short gap-fills). */
-async function callGemini(request: LlmRequest, apiKey: string): Promise<string> {
-  const model = "gemini-2.5-flash";
-  const system = request.messages.find((m) => m.role === "system")?.content;
-  const turns = request.messages.filter((m) => m.role !== "system");
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
-        contents: turns.map((m) => ({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }],
-        })),
-        generationConfig: {
-          temperature: request.temperature ?? 0.2,
-          ...(request.maxTokens ? { maxOutputTokens: request.maxTokens } : {}),
-          ...(request.json ? { responseMimeType: "application/json" } : {}),
-        },
-      }),
-    },
-  );
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`HTTP ${response.status}: ${detail.slice(0, 300)}`);
-  }
-  const data = (await response.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const text = data.candidates?.[0]?.content?.parts
-    ?.map((p) => p.text ?? "")
-    .join("")
-    .trim();
-  if (!text) throw new Error("the model returned an empty answer");
-  return text;
-}
-
 const EXTERNAL_PROVIDERS: (ExternalProvider & {
-  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GEMINI_API_KEY";
+  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY";
 })[] = [
-  { name: "gemini", model: "gemini-2.5-flash", envKey: "GEMINI_API_KEY", call: callGemini },
   {
     name: "groq",
     model: "qwen/qwen3.8-27b",
