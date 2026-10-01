@@ -289,9 +289,11 @@ export function V2GrantDetail({
           : "neutral";
 
   // Check if partner or special condition mentioned in rationale / summary
-  const partnerCheck = ruleChecks.find(
-    (c) => c.ruleName.includes("partner") || c.ruleName.includes("university"),
-  );
+  const partnerCheck = ruleChecks.find((c) => {
+    if (!c) return false;
+    const text = `${c.id ?? ""} ${c.label ?? ""} ${c.detail ?? ""}`.toLowerCase();
+    return text.includes("partner") || text.includes("university");
+  });
   const requiresPartner =
     partnerCheck != null ||
     (grant.summary ?? "").toLowerCase().includes("partner") ||
