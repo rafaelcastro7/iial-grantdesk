@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "sdk_version": "3.0.4",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://qcuzwryknrniujjfvvvr.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "grantdesk-integration",
+      "version": "0.1.0",
+      "title": "Grantdesk Integration"
+    },
+    "tools": [
+      {
+        "name": "search_grants",
+        "title": "Search grants",
+        "description": "Search the grant catalog by keyword, country and minimum amount (CAD).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Keyword matched against title and summary."
+            },
+            "country": {
+              "type": "string",
+              "description": "Country name or code, e.g. Canada."
+            },
+            "minAmountCad": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Minimum maximum-award in CAD."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_grant",
+        "title": "Get grant details",
+        "description": "Get full details of one grant: eligibility, amounts, deadline and requirements.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Grant id from search_grants."
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
