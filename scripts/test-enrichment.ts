@@ -1,3 +1,4 @@
+// Credentials come from GRANTDESK_EMAIL / GRANTDESK_PASSWORD (e.g. in .env.local); never hardcode them.
 import { enrichGrantImpl } from "../src/agents/enricher.functions";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,8 +12,8 @@ async function main() {
 
   const rocioClient = createClient(SUPABASE_URL, KEY);
   const { data: authData, error: authErr } = await rocioClient.auth.signInWithPassword({
-    email: "rocio@iial.ca",
-    password: "Rocio-IIAL-GrantDesk-2026!",
+    email: process.env.GRANTDESK_EMAIL ?? "",
+    password: process.env.GRANTDESK_PASSWORD ?? "",
   });
 
   if (authErr) {

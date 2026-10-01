@@ -51,7 +51,12 @@ import { ValueBlock } from "@/components/grants/GrantDetailExpress";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
-import { FUNDING_KIND_LABEL, evaluationVerdict, fundingKindOf } from "@/lib/grant-radar";
+import {
+  FUNDING_KIND_LABEL,
+  evaluationVerdict,
+  fundingKindOf,
+  isFullReview,
+} from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 
@@ -86,6 +91,7 @@ type Evaluation = {
   created_at: string;
   axis_breakdown?: unknown;
   rule_snapshot?: unknown;
+  model?: string | null;
 } | null;
 
 type GrantEvent = {
@@ -211,18 +217,12 @@ export function V2GrantDetail({
   const requirements = grant.requirements ?? [];
   const criticalRequirements = requirements.filter((item) => item.isCritical);
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
-  const fitScore = evaluation ? Math.round(evaluation.fit_score * 100) : null;
   const ruleSnapshot = evaluation?.rule_snapshot as {
     checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
-    is_exhaustive?: boolean;
-    hard_fail?: boolean;
   } | null;
-  const isExhaustive =
-    Boolean(
-      (evaluation?.model != null && evaluation.model !== "rules-engine-deterministic") ||
-      ruleSnapshot?.hard_fail === true ||
-      ruleSnapshot?.is_exhaustive === true
-    );
+  // Same rule as the radar: a rules-only pre-check shows its verdict but no score.
+  const isExhaustive = evaluation ? isFullReview(evaluation) : false;
+  const fitScore = evaluation && isExhaustive ? Math.round(evaluation.fit_score * 100) : null;
   const ruleChecks = ruleSnapshot?.checks ?? [];
 
   const evalVerdict = evaluation
@@ -476,7 +476,7 @@ export function V2GrantDetail({
               ) : (
                 <SearchCheck className="h-4 w-4" />
               )}
-              {evaluation ? (isExhaustive ? "Re-check fit" : "Run exhaustive fit") : "Check fit"}
+              {evaluation ? (isExhaustive ? "Re-check fit" : "Run full AI review") : "Check fit"}
             </Button>
 
             {existingProposalId ? (
@@ -536,7 +536,7 @@ export function V2GrantDetail({
           <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {isExhaustive ? "Fit Score & Verdict" : "Pre-check (AI Pending)"}
+                Fit score &amp; verdict
               </span>
               <span className={cn("h-2.5 w-2.5 rounded-full", verdict.dot)} />
             </div>
@@ -565,20 +565,18 @@ export function V2GrantDetail({
                 }
                 className="rounded-md font-semibold text-xs"
               >
-                {!isExhaustive && evaluation
-                  ? "Pre-checked"
-                  : evalVerdict === "eligible"
-                    ? "Eligible"
-                    : evalVerdict === "needs_input"
-                      ? "Needs Input"
-                      : evalVerdict === "not_eligible"
-                        ? "Ineligible"
-                        : "Unchecked"}
+                {evalVerdict === "eligible"
+                  ? "Eligible"
+                  : evalVerdict === "needs_input"
+                    ? "Needs Input"
+                    : evalVerdict === "not_eligible"
+                      ? "Ineligible"
+                      : "Unchecked"}
               </Badge>
             </div>
             <p className="mt-1 text-xs font-medium text-foreground truncate" title={verdict.label}>
               {!isExhaustive && evaluation
-                ? "Preliminary rule screen · Run check for full AI review"
+                ? "Rules pre-check · score shown after the AI review"
                 : verdict.label}
             </p>
           </div>

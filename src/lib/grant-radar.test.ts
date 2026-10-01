@@ -146,6 +146,7 @@ describe("grant radar eligibility pre-check", () => {
         eligibility_pass: false,
         fit_score: 0.33,
         rationale_en: "SOP F4 - Strategic fit: FAIL",
+        model: "openai/gpt-oss-20b",
       },
     };
     const rHidden = buildRadar([evaluatedGrant], { ...opts, rules, hideIneligible: true });

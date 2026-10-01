@@ -137,10 +137,12 @@ export function RadarWorkspace({
         {!simple && reviewProgress}
 
         <div
-          className={`grid border-b md:divide-x ${simple ? "grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}
+          className={`grid border-b md:divide-x ${simple ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 md:grid-cols-5"}`}
         >
+          {/* These three always add up to the grants listed below. */}
           <Stat label="You can apply" value={counts.eligible} tone="text-eligible" />
           <Stat label="Need a check" value={counts.needsInput} tone="text-needs-input" />
+          <Stat label="Not a fit" value={counts.notEligible} tone="text-destructive" />
           <Stat label="Closing in your window" value={counts.closingSoon} tone="text-foreground" />
           {!simple && (
             <Stat

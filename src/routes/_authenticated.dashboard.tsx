@@ -225,6 +225,8 @@ function Dashboard() {
       nextStep={nextStep}
       now={now}
       scored={scored}
+      needsInput={summary?.needsInput ?? 0}
+      notEligible={summary?.notEligible ?? 0}
       topMatches={topMatches}
       withDeadline={withDeadline}
     />
@@ -261,6 +263,8 @@ function DashboardV2({
   nextStep,
   now,
   scored,
+  needsInput,
+  notEligible,
   topMatches,
   withDeadline,
 }: {
@@ -276,6 +280,8 @@ function DashboardV2({
   nextStep: NextStep;
   now: number;
   scored: number;
+  needsInput: number;
+  notEligible: number;
   topMatches: MatchGrant[];
   withDeadline: number;
 }) {
@@ -368,7 +374,11 @@ function DashboardV2({
               icon={ShieldCheck}
               label="Eligible"
               value={loading ? "-" : eligible}
-              detail={scored ? `${scored} fit checks` : "Run fit checks"}
+              detail={
+                scored
+                  ? `of ${scored} open grants checked · ${needsInput} need a check · ${notEligible} not a fit`
+                  : "Run fit checks"
+              }
               tone="success"
               to="/grants"
             />

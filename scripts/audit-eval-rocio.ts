@@ -1,3 +1,4 @@
+// Credentials come from GRANTDESK_EMAIL / GRANTDESK_PASSWORD (e.g. in .env.local); never hardcode them.
 import { createClient } from "@supabase/supabase-js";
 import { evaluateGrantImpl } from "../src/agents/evaluator.impl.server";
 import { buildRadar, type RadarGrant } from "../src/lib/grant-radar";
@@ -13,8 +14,8 @@ async function runAudit() {
   // 1. Iniciar sesión como Rocío
   const rocioClient = createClient(SUPABASE_URL, KEY);
   const { data: authData, error: authErr } = await rocioClient.auth.signInWithPassword({
-    email: "rocio@iial.ca",
-    password: "Rocio-IIAL-GrantDesk-2026!",
+    email: process.env.GRANTDESK_EMAIL ?? "",
+    password: process.env.GRANTDESK_PASSWORD ?? "",
   });
 
   if (authErr) {

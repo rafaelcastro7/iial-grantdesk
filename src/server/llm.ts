@@ -185,7 +185,7 @@ function openAiCompatible(url: string, model: string): ExternalProvider["call"] 
 }
 
 const EXTERNAL_PROVIDERS: (ExternalProvider & {
-  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GOOGLE_AI_STUDIO_KEY";
+  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY";
 })[] = [
   {
     name: "groq-gpt-20b",
@@ -197,7 +197,10 @@ const EXTERNAL_PROVIDERS: (ExternalProvider & {
     name: "groq-gpt-120b",
     model: "openai/gpt-oss-120b",
     envKey: "GROQ_API_KEY",
-    call: openAiCompatible("https://api.groq.com/openai/v1/chat/completions", "openai/gpt-oss-120b"),
+    call: openAiCompatible(
+      "https://api.groq.com/openai/v1/chat/completions",
+      "openai/gpt-oss-120b",
+    ),
   },
   {
     name: "groq",
@@ -309,7 +312,7 @@ export async function callLlm(
           break;
         }
         if (/\b429\b|rate limit/i.test(message)) {
-          const matchWait = message.match(/try again in ([\d\.]+)s/i);
+          const matchWait = message.match(/try again in ([\d.]+)s/i);
           const waitSec = matchWait ? parseFloat(matchWait[1]) : 3;
           const waitMs = Math.min(Math.max(Math.ceil(waitSec * 1000) + 1200, 2500), 12000);
           if (tryIdx < 2) {

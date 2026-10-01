@@ -368,7 +368,10 @@ export const listGrants = createServerFn({ method: "GET" })
         .in("grant_id", chunk);
       if (evalsError) throw new Error(`grant_evaluations: ${evalsError.message}`);
       for (const evaluation of evals ?? []) {
-        const snap = evaluation.rule_snapshot as { hard_fail?: boolean; is_exhaustive?: boolean } | null;
+        const snap = evaluation.rule_snapshot as {
+          hard_fail?: boolean;
+          is_exhaustive?: boolean;
+        } | null;
         const isExhaustive =
           snap?.is_exhaustive === true ||
           (evaluation.model != null && evaluation.model !== "rules-engine-deterministic") ||
@@ -1133,9 +1136,7 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
         const at = new Date((e as { evaluated_at?: string | null }).evaluated_at ?? 0).getTime();
         const meta = e as { model?: string | null; prompt_version?: string | null };
         const isDeterministic = meta.model === "rules-engine-deterministic";
-        const outdated =
-          isDeterministic &&
-          meta.prompt_version !== EVALUATOR_PROMPT_VERSION;
+        const outdated = isDeterministic && meta.prompt_version !== EVALUATOR_PROMPT_VERSION;
         if (at >= profileChangedAt && !outdated) {
           if (!data.rulesOnly && isDeterministic) {
             // Needs exhaustive evaluation with model

@@ -36,7 +36,10 @@ export const getGrantDetail = createServerFn({ method: "GET" })
       )
       .eq("id", data.id)
       .maybeSingle();
-    Object.assign(grant as Record<string, unknown>, (facets as unknown as Record<string, unknown> | null) ?? {});
+    Object.assign(
+      grant as Record<string, unknown>,
+      (facets as unknown as Record<string, unknown> | null) ?? {},
+    );
     // Separate from the history read so one missing column cannot hide the other.
     const { data: provenance } = await context.supabase
       .from("grants")
@@ -72,7 +75,7 @@ export const getGrantDetail = createServerFn({ method: "GET" })
     const { data: evaluation } = await context.supabase
       .from("grant_evaluations")
       .select(
-        "fit_score, eligibility_pass, rationale_en, rationale_fr, axis_breakdown, rule_snapshot, created_at, evaluated_at",
+        "fit_score, eligibility_pass, rationale_en, rationale_fr, axis_breakdown, rule_snapshot, created_at, evaluated_at, model",
       )
       .eq("user_id", context.userId)
       .eq("grant_id", data.id)

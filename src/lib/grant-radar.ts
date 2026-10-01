@@ -41,6 +41,8 @@ export type RadarGrant = {
     fit_score?: number | null;
     /** Rules engine verdict stored with the evaluation ("needs_input" = unclear, not a no). */
     rule_verdict?: string | null;
+    model?: string | null;
+    is_exhaustive?: boolean | null;
   } | null;
   summary?: string | null;
   amount_min?: number | null;
@@ -154,6 +156,22 @@ export function evaluationVerdict(ev: {
 }): RadarVerdict {
   if (ev.eligibility_pass) return "eligible";
   return ev.rule_verdict === "needs_input" ? "needs_input" : "not_eligible";
+}
+
+/**
+ * True when the verdict comes from the AI review (or a hard rule failure,
+ * which needs no AI). A rules-only pre-check has no real fit score: with few
+ * evaluable rules it reads 100/100, so callers hide the score until then.
+ */
+export function isFullReview(ev: {
+  model?: string | null;
+  is_exhaustive?: boolean | null;
+  rule_snapshot?: unknown;
+}): boolean {
+  if (ev.is_exhaustive === true) return true;
+  const snap = ev.rule_snapshot as { is_exhaustive?: boolean; hard_fail?: boolean } | null;
+  if (snap?.is_exhaustive === true || snap?.hard_fail === true) return true;
+  return ev.model != null && ev.model !== "rules-engine-deterministic";
 }
 
 export function verdictOf(g: RadarGrant): RadarVerdict {
@@ -296,7 +314,8 @@ export function toRadarItem<T extends RadarGrant>(
   const amount = grantAmount(g);
   // Per-user only: grants.fit_score is a global column (another member's
   // last score), so an unevaluated grant shows no fit rather than theirs.
-  const fitRaw = g.evaluation?.fit_score ?? null;
+  const fitRaw =
+    g.evaluation && isFullReview(g.evaluation) ? (g.evaluation.fit_score ?? null) : null;
   const fit = fitRaw != null ? (fitRaw <= 1 ? Math.round(fitRaw * 100) : Math.round(fitRaw)) : null;
   const parked = timing === "closed" || timing === "too_soon" || verdict === "not_eligible";
   return {

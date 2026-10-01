@@ -1,3 +1,4 @@
+// Credentials come from GRANTDESK_EMAIL / GRANTDESK_PASSWORD (e.g. in .env.local); never hardcode them.
 import * as dotenv from "dotenv";
 dotenv.config();
 import { createClient } from "@supabase/supabase-js";
@@ -9,8 +10,8 @@ async function evaluateAllCatalogGrants() {
   const sb = createClient(url, key, { auth: { persistSession: false } });
 
   const { data: auth, error: authErr } = await sb.auth.signInWithPassword({
-    email: "rocio@iial.ca",
-    password: "Rocio-IIAL-GrantDesk-2026!",
+    email: process.env.GRANTDESK_EMAIL ?? "",
+    password: process.env.GRANTDESK_PASSWORD ?? "",
   });
   if (authErr) throw authErr;
   console.log(`[Auth] Logged in as ${auth.user.email} (${auth.user.id})`);

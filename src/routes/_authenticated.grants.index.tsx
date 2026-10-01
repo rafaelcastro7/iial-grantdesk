@@ -37,7 +37,7 @@ import {
   DEFAULT_RADAR_FILTERS,
   type RadarFilterState,
 } from "@/components/grants/radar/RadarToolbar";
-import { buildRadar } from "@/lib/grant-radar";
+import { buildRadar, isFullReview } from "@/lib/grant-radar";
 import { listRadarProfiles } from "@/lib/radar.functions";
 import { EligibilityCheckBar } from "@/components/grants/radar/EligibilityCheckBar";
 import { StrictReviewProgress } from "@/components/grants/StrictReviewProgress";
@@ -363,7 +363,7 @@ function GrantsPage() {
     run(grantId, async () => {
       setEvaluatingIds((s) => new Set(s).add(grantId));
       try {
-        await evaluate({ data: { grantId, force: true } });
+        await evaluate({ data: { grantId } });
       } finally {
         setEvaluatingIds((s) => {
           const n = new Set(s);
@@ -374,22 +374,24 @@ function GrantsPage() {
     });
 
   const onEvaluateAllListed = async () => {
-    // Pick grants that have no evaluation or only had a rules-only pre-check
-    const candidateItems = radar.items.filter((item) => {
+    // Only grants still waiting for the AI review: never evaluated, or only
+    // pre-checked by the rules and not already ruled out by them. Grants that
+    // already have an AI verdict are skipped (re-running them spends tokens
+    // for the same answer); use "Re-check fit" on a single grant for that.
+    const targets = radar.items.filter((item) => {
       const ev = item.grant.evaluation;
       if (!ev) return true;
-      const meta = ev as { is_exhaustive?: boolean; model?: string };
-      return meta.is_exhaustive === false || meta.model === "rules-engine-deterministic";
+      return (
+        !isFullReview(ev as Parameters<typeof isFullReview>[0]) && item.verdict !== "not_eligible"
+      );
     });
-    // If all are already evaluated exhaustively, re-evaluate all listed opportunities
-    const targets = candidateItems.length > 0 ? candidateItems : radar.items;
     if (targets.length === 0) {
-      setInfo("No listed grants to evaluate.");
+      setInfo("Every listed grant already has an AI review.");
       return;
     }
     setEvaluatingAll(true);
     setError(null);
-    setInfo(`Evaluating ${targets.length} grants exhaustively…`);
+    setInfo(`Running the AI review on ${targets.length} grants…`);
     let count = 0;
     try {
       for (const item of targets) {
@@ -398,7 +400,7 @@ function GrantsPage() {
         setEvalProgress({ current: count, total: targets.length, lastTitle: g.title });
         setEvaluatingIds((s) => new Set(s).add(g.id));
         try {
-          await evaluate({ data: { grantId: g.id, force: true } });
+          await evaluate({ data: { grantId: g.id } });
         } catch (err) {
           console.warn(`Could not check "${g.title}":`, err);
         } finally {
@@ -410,7 +412,7 @@ function GrantsPage() {
         }
       }
       await refresh();
-      setInfo(`Done: ${count} grants exhaustively evaluated.`);
+      setInfo(`Done: ${count} grants reviewed.`);
     } catch (e) {
       fail(e);
     } finally {
