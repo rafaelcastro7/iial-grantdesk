@@ -5,4 +5,4 @@ SET applicant_types = ARRAY(
       SELECT DISTINCT unnest(COALESCE(applicant_types, '{}'::text[]) || ARRAY['nonprofit', 'academic']::text[])
     ),
     updated_at = now()
-WHERE org_id = '00000000-0000-0000-0000-000000000001';
+WHERE org_id = '7a1c0d2e-0000-4a11-9a11-11a1c0d2e001';
