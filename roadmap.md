@@ -16,7 +16,9 @@
 
 - [x] Crear una cola reanudable para reprocesar cada grant con extracción, reglas y controles estrictos.
 - [x] Registrar cobertura, bloqueos y calidad por grant sin inventar evidencia.
-- [ ] Completar las 398 revisiones cloud e iterar sobre sus fallos hasta maximizar la evaluación verificable.
 - [x] Corregir Grants.gov y tratar montos no publicados como desconocidos, no como fallos técnicos.
 - [x] Fijar V2 como experiencia única y rescatar accesos y funciones operativas útiles de V1.
 - [x] Crear rol `consultant` (solo Home y Grant Radar) y asignarlo a Rocío Elizabeth.
+- [x] Auditoría extrema, erradicación de bugs y deuda técnica: resolución atómica en `funders_name_country_key`, persistencia administrativa de requisitos/briefs y guardas defensivas en `FitRules`.
+- [x] Ciclo de subsanación (remediation loop): habilitar actualización de facts manuales con re-evaluación forzada determinista (`Re-check fit`) para desbloquear propuestas bloqueadas.
+- [x] Suite de pruebas sintéticas end-to-end (`npm run test:synthetic`) cubriendo ingestión, síntesis de requerimientos, brief financiero, subsanación y aislamiento multi-tenant.

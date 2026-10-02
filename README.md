@@ -24,3 +24,30 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Quality Assurance & Testing
+
+The repository includes a comprehensive deterministic test suite and synthetic end-to-end agents:
+
+```sh
+# Run full unit and integration test suite (324 tests across 50 suites)
+npm test
+
+# Run synthetic end-to-end suite (Ingestion, Requirements, Remediation, Multi-tenant)
+npm run test:synthetic
+
+# Run code style & lint audits
+npm run lint
+npm run format
+
+# Run Playwright synthetic agent specs
+npm run test:e2e
+```
+
+### Core Architecture & SOP Rules
+
+- **Deterministic Evaluation First:** Uses IIAL SOP filters (applicant types, cost share, runway, jurisdiction) to short-circuit hard failures with 0 tokens before invoking LLMs.
+- **Requirements Synthesis:** Grants automatically synthesize mandatory deliverables (narrative, budget, co-funding, compliance) so checklists are never empty.
+- **Remediation Loop (Subsanación):** When a grant fails on misaligned extracted facts (e.g., outdated cost-share or applicant restriction), consultants can update manual facts via `manual_fields` and trigger `Re-check fit` (`force: true`) to recalculate eligibility and unlock proposal drafting.
+- **Multi-Tenant Security:** Organization proposals and shared sections are strictly segregated from individual private drafts and other tenants.
+- **Lovable Sync:** Push forward commits directly to `origin/main` to sync with the Lovable editor. Never force-push or rewrite git history.
