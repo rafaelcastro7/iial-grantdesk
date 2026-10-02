@@ -390,6 +390,59 @@ export async function localWebSearch(
   }
 }
 
+/**
+ * Resilient, zero-token web search fallback using DuckDuckGo HTML endpoint.
+ * Activates seamlessly when SearXNG local service is unavailable or in cloud environments.
+ */
+export async function duckDuckGoWebSearch(
+  query: string,
+  limit = 10,
+  timeoutMs = 12_000,
+): Promise<{ ok: true; hits: SearchHit[] } | { ok: false; error: string }> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": CHROME_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return { ok: false, error: `duckduckgo_${res.status}` };
+    const html = await res.text();
+    const hits: SearchHit[] = [];
+    const linkRegex = /<a class="result__url"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+    const snippetRegex = /<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+    let match: RegExpExecArray | null;
+    while ((match = linkRegex.exec(html)) !== null && hits.length < limit) {
+      let rawUrl = match[1];
+      if (rawUrl.includes("uddg=")) {
+        try {
+          const u = new URL(`https://duckduckgo.com${rawUrl}`);
+          rawUrl = decodeURIComponent(u.searchParams.get("uddg") || rawUrl);
+        } catch {
+          // ignore parsing error
+        }
+      }
+      if (!rawUrl.startsWith("http")) continue;
+      const snippetMatch = snippetRegex.exec(html);
+      const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, "").trim() : "";
+      hits.push({
+        url: rawUrl,
+        title: match[2].replace(/<[^>]+>/g, "").trim(),
+        snippet: snippet.slice(0, 500),
+      });
+    }
+    return { ok: true, hits };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 export async function scrapeWithFallback(
   url: string,
   opts: {
@@ -556,8 +609,15 @@ export async function scrapeWithFallback(
 
 export async function searchWeb(query: string, limit = 10): Promise<SearchHit[]> {
   const r = await localWebSearch(query, limit);
-  if (!r.ok) throw new Error(r.error);
-  return r.hits;
+  if (r.ok && r.hits.length > 0) return r.hits;
+
+  // Zero-token resilient fallback when local SearXNG is unavailable or yields 0 hits
+  const ddg = await duckDuckGoWebSearch(query, limit);
+  if (ddg.ok && ddg.hits.length > 0) return ddg.hits;
+
+  if (r.ok) return r.hits;
+  if (ddg.ok) return ddg.hits;
+  throw new Error(r.error || ddg.error || "web_search_failed");
 }
 
 export type ArchivedPage = { url: string; markdown: string; capturedAt: string };

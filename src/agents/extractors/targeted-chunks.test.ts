@@ -58,4 +58,23 @@ describe("extractTargetedMarkdown", () => {
     expect(result.length).toBeLessThanOrEqual(300);
     expect(result).toContain("General information");
   });
+
+  it("extracts cost-share and mandatory deliverables sections specifically", () => {
+    const lead = "# Clean Tech Accelerator Fund\n\nSupporting renewable technologies.";
+    const filler = "Past recipients from 2018 to 2024.\n\n".repeat(60);
+    const costShareSection =
+      "## Cost-sharing\n\nApplicants must provide at least 25% cash-matching contribution.";
+    const deliverablesSection =
+      "## Mandatory Application Requirements\n\nProposal narrative, audited financial statements, and partner letters of commitment are mandatory.";
+
+    const fullDoc = `${lead}\n\n${filler}\n\n${costShareSection}\n\n${deliverablesSection}`;
+    const result = extractTargetedMarkdown(fullDoc, ["cost_share_pct", "requirements"], {
+      maxChars: 1500,
+    });
+
+    expect(result).toContain("Clean Tech Accelerator Fund");
+    expect(result).toContain("25% cash-matching contribution");
+    expect(result).toContain("Mandatory Application Requirements");
+    expect(result).not.toContain("Past recipients from 2018 to 2024");
+  });
 });

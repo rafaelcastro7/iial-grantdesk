@@ -18,11 +18,23 @@ const KEYWORD_PATTERNS: Record<string, RegExp> = {
     /(?:amount|budget|funding|grant\s+size|maximum|minimum|contribution|up\s+to\s+\$|\$[\d,]+|subvention|fonds|montant|valeur)/i,
   amount_cad_max:
     /(?:amount|budget|funding|grant\s+size|maximum|minimum|contribution|up\s+to\s+\$|\$[\d,]+|subvention|fonds|montant|valeur)/i,
+  amount:
+    /(?:amount|budget|funding|grant\s+size|maximum|minimum|contribution|up\s+to\s+\$|\$[\d,]+|subvention|fonds|montant|valeur)/i,
   deadline:
     /(?:deadline|closing\s+date|due\s+date|cutoff|intake|submission\s+date|date\s+limite|échéance|date\s+de\s+clôture|rolling)/i,
   eligibility:
     /(?:eligib|who\s+can\s+apply|applicant|non-profit|nonprofit|charit|indigenous|registered|admissib|qui\s+peut\s+postuler|critères)/i,
   sectors: /(?:sector|industry|priority|focus\s+area|stream|domain|secteur|priorité)/i,
+  cost_share_pct:
+    /(?:cost[- ]?share|match|matching|contribution|co[- ]funding|funder\s+covers|partage\s+des\s+coûts|fonds\s+de\s+contrepartie)/i,
+  cost_share:
+    /(?:cost[- ]?share|match|matching|contribution|co[- ]funding|funder\s+covers|partage\s+des\s+coûts|fonds\s+de\s+contrepartie)/i,
+  matching:
+    /(?:cost[- ]?share|match|matching|contribution|co[- ]funding|funder\s+covers|partage\s+des\s+coûts|fonds\s+de\s+contrepartie)/i,
+  applicant_types:
+    /(?:applicant\s+type|eligible\s+entities|organization|institution|municipality|first\s+nation|sme|business|type\s+de\s+candidat|organisme\s+admissible)/i,
+  requirements:
+    /(?:requirements?|mandatory|deliverables?|proposal|guidelines?|exigences?|livrables?|guide\s+du\s+candidat|checklist)/i,
 };
 
 export interface TargetedChunkOptions {
@@ -55,9 +67,24 @@ export function extractTargetedMarkdown(
     return markdown.slice(0, maxChars);
   }
 
-  // 2. Identify the active regexes based on what fields are still missing
+  // 2. Identify active regexes based on needed fields (with fallback alias expansion)
   const activePatterns = needs
-    .map((field) => KEYWORD_PATTERNS[field])
+    .flatMap((field) => {
+      const direct = KEYWORD_PATTERNS[field];
+      if (direct) return [direct];
+      const lower = field.toLowerCase();
+      if (lower.includes("amount")) return [KEYWORD_PATTERNS.amount_cad_max];
+      if (lower.includes("cost") || lower.includes("share") || lower.includes("match")) {
+        return [KEYWORD_PATTERNS.cost_share_pct];
+      }
+      if (lower.includes("applicant") || lower.includes("type")) {
+        return [KEYWORD_PATTERNS.applicant_types];
+      }
+      if (lower.includes("require") || lower.includes("deliver")) {
+        return [KEYWORD_PATTERNS.requirements];
+      }
+      return [];
+    })
     .filter((pat): pat is RegExp => pat !== undefined);
 
   if (activePatterns.length === 0) {
