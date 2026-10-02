@@ -21,7 +21,10 @@ async function client() {
 }
 
 const CASES: Array<{ q: string; expect: RegExp }> = [
-  { q: "clean technology innovation", expect: /(clean|energy|climate|technolog|innovat|environment)/i },
+  {
+    q: "clean technology innovation",
+    expect: /(clean|energy|climate|technolog|innovat|environment)/i,
+  },
   { q: "youth education programs", expect: /(youth|education|student|school|learning|training)/i },
   { q: "agriculture food research", expect: /(agri|food|farm|crop|research)/i },
 ];
@@ -54,15 +57,26 @@ describe.skipIf(!live)("live grant search (cloud)", () => {
 describe.skipIf(!live)("live grant analysis (Lovable AI Gateway)", () => {
   it("analyses a real grant for IIAL and returns well-formed JSON", async () => {
     const sb = await client();
-    const { data: g } = await sb.from("grants").select("title,summary").not("summary", "is", null).limit(1).single();
+    const { data: g } = await sb
+      .from("grants")
+      .select("title,summary")
+      .not("summary", "is", null)
+      .limit(1)
+      .single();
     const { callLlm } = await import("@/server/llm");
     const res = await callLlm({
       role: "judge",
       json: true,
       maxTokens: 400,
       messages: [
-        { role: "system", content: 'Return JSON {"fit": "high"|"medium"|"low", "reasons": string[]} only.' },
-        { role: "user", content: `Org: IIAL, Ontario nonprofit, applied research and training.\nGrant: ${g?.title}\n${g?.summary}` },
+        {
+          role: "system",
+          content: 'Return JSON {"fit": "high"|"medium"|"low", "reasons": string[]} only.',
+        },
+        {
+          role: "user",
+          content: `Org: IIAL, Ontario nonprofit, applied research and training.\nGrant: ${g?.title}\n${g?.summary}`,
+        },
       ],
     });
     const parsed = JSON.parse(res.text.replace(/^```json|```$/g, "").trim());

@@ -27,7 +27,9 @@ describe("synthetic eligibility (deterministic)", () => {
   });
 
   it("warns (soft) when the deadline is inside the 4-week lead time", () => {
-    const d = decideEligibility(base({ deadline: "2026-10-07", eligibleApplicantTypes: ["nonprofit"] }));
+    const d = decideEligibility(
+      base({ deadline: "2026-10-07", eligibleApplicantTypes: ["nonprofit"] }),
+    );
     expect(d.checks.find((c) => c.key === "runway")?.status).toBe("fail");
     if (d.verdict === "eligible") expect(d.headline).toMatch(/days left/);
   });
@@ -38,7 +40,9 @@ describe("synthetic eligibility (deterministic)", () => {
   });
 
   it("accepts an in-jurisdiction open call with enough lead time", () => {
-    const d = decideEligibility(base({ deadline: "2027-03-01", eligibleApplicantTypes: ["nonprofit"] }));
+    const d = decideEligibility(
+      base({ deadline: "2027-03-01", eligibleApplicantTypes: ["nonprofit"] }),
+    );
     expect(["eligible", "needs_input"]).toContain(d.verdict);
     expect(d.headline.length).toBeGreaterThan(0);
   });

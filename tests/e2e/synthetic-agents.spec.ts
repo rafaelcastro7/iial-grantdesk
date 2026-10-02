@@ -272,7 +272,8 @@ test("IIAL consultant: full grant lifecycle with go/no-go SOP", async ({ page })
       budget: "1.5M",
       currency: "CAD",
       leadTime: "6",
-      domains: "supply chain, micro-credentials, applied research, smart cities, climate adaptation",
+      domains:
+        "supply chain, micro-credentials, applied research, smart cities, climate adaptation",
       trackRecord:
         "Applied research and professional education delivered with Ontario municipalities and federal partners.",
       fundedPartner: true,
@@ -516,11 +517,7 @@ test("Admin: system health, agent config, and source management", async ({ page 
     // Check monitoring
     await agent.press("Monitoring");
     agent.at("admin/monitoring");
-    agent.need(
-      "rate-limits",
-      "Are rate limits visible?",
-      await textOf(page, /Rate Limits/i),
-    );
+    agent.need("rate-limits", "Are rate limits visible?", await textOf(page, /Rate Limits/i));
 
     // Check discovery config
     await agent.press("Discovery Config");

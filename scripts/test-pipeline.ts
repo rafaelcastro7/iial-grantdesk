@@ -4,7 +4,10 @@ import { buildRadar, type RadarGrant } from "../src/lib/grant-radar";
 import { businessBenefitsFinder } from "../src/server/sources/business-benefits-finder";
 import { grantsGov } from "../src/server/sources/grants-gov";
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://qcuzwryknrniujjfvvvr.supabase.co";
+const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  "https://qcuzwryknrniujjfvvvr.supabase.co";
 const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
 if (!KEY) {
@@ -20,7 +23,11 @@ async function main() {
   console.log("=================================================");
 
   // 1. Verify Database
-  const { count: grantsCount, data: grants, error: gErr } = await supabase
+  const {
+    count: grantsCount,
+    data: grants,
+    error: gErr,
+  } = await supabase
     .from("grants")
     .select("*, funder:funders(name, country, jurisdiction)", { count: "exact" });
 
@@ -107,7 +114,8 @@ async function main() {
       hardBlocked: decision.verdict === "ineligible",
       evaluation: {
         eligibility_pass: decision.verdict === "eligible",
-        fit_score: decision.verdict === "eligible" ? 85 : decision.verdict === "needs_input" ? 65 : 20,
+        fit_score:
+          decision.verdict === "eligible" ? 85 : decision.verdict === "needs_input" ? 65 : 20,
       },
     });
   }
@@ -130,20 +138,32 @@ async function main() {
   });
 
   console.log(`   - Total items in Radar: ${radar.items.length}`);
-  console.log(`   - Country groups:       ${radar.groups.map((g) => `${g.country} (${g.items.length})`).join(", ")}`);
-  console.log(`   - Radar counts:         Eligible: ${radar.counts.eligible}, NeedsInput: ${radar.counts.needsInput}`);
+  console.log(
+    `   - Country groups:       ${radar.groups.map((g) => `${g.country} (${g.items.length})`).join(", ")}`,
+  );
+  console.log(
+    `   - Radar counts:         Eligible: ${radar.counts.eligible}, NeedsInput: ${radar.counts.needsInput}`,
+  );
 
   // 6. Test Live Structured Source Harvesters
   console.log(`\n🌐 LIVE HARVESTERS TEST:`);
   const tBbf0 = Date.now();
   const bbfHarvest = await businessBenefitsFinder.harvest({ limit: 5 });
-  console.log(`   ✅ Innovation Canada (CKAN): Harvested ${bbfHarvest.grants.length} grants, ${bbfHarvest.funders.length} funders in ${Date.now() - tBbf0}ms`);
-  console.log(`      Sample: "${bbfHarvest.grants[0]?.title}" -> Funder: "${bbfHarvest.grants[0]?.funderName}"`);
+  console.log(
+    `   ✅ Innovation Canada (CKAN): Harvested ${bbfHarvest.grants.length} grants, ${bbfHarvest.funders.length} funders in ${Date.now() - tBbf0}ms`,
+  );
+  console.log(
+    `      Sample: "${bbfHarvest.grants[0]?.title}" -> Funder: "${bbfHarvest.grants[0]?.funderName}"`,
+  );
 
   const tGg0 = Date.now();
   const ggHarvest = await grantsGov.harvest({ limit: 5 });
-  console.log(`   ✅ Grants.gov (Search2):     Harvested ${ggHarvest.grants.length} grants, ${ggHarvest.funders.length} funders in ${Date.now() - tGg0}ms`);
-  console.log(`      Sample: "${ggHarvest.grants[0]?.title}" -> Funder: "${ggHarvest.grants[0]?.funderName}"`);
+  console.log(
+    `   ✅ Grants.gov (Search2):     Harvested ${ggHarvest.grants.length} grants, ${ggHarvest.funders.length} funders in ${Date.now() - tGg0}ms`,
+  );
+  console.log(
+    `      Sample: "${ggHarvest.grants[0]?.title}" -> Funder: "${ggHarvest.grants[0]?.funderName}"`,
+  );
 
   console.log("\n=================================================");
   console.log("✨ ALL CHECKS PASSED SUCCESSFULLY!");

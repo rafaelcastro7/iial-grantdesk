@@ -28,7 +28,10 @@ describe("grant coverage", () => {
 
   it("blocks a complete record when a critical requirement is unresolved", () => {
     const result = computeGrantCoverage(
-      { ...complete, requirements: [{ requirement: "Name a university partner", isCritical: true }] },
+      {
+        ...complete,
+        requirements: [{ requirement: "Name a university partner", isCritical: true }],
+      },
       ["summary"],
       true,
     );

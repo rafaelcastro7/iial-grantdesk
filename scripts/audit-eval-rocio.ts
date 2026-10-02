@@ -4,7 +4,8 @@ import { evaluateGrantImpl } from "../src/agents/evaluator.impl.server";
 import { buildRadar, type RadarGrant } from "../src/lib/grant-radar";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://qcuzwryknrniujjfvvvr.supabase.co";
-const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_MYWEgMbOfoqZcOdKPsq7gg_-PXnH2zU";
+const KEY =
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_MYWEgMbOfoqZcOdKPsq7gg_-PXnH2zU";
 
 async function runAudit() {
   console.log("==================================================================");
@@ -67,7 +68,9 @@ async function runAudit() {
       .limit(5);
 
     const count = (directMatches?.length ?? 0) + (funderMatches?.length ?? 0);
-    console.log(`   🔍 Búsqueda "${term}": ${count > 0 ? "✅ ENCUENTRA" : "⚠️ 0"} (${directMatches?.length ?? 0} grants, ${funderMatches?.length ?? 0} funders)`);
+    console.log(
+      `   🔍 Búsqueda "${term}": ${count > 0 ? "✅ ENCUENTRA" : "⚠️ 0"} (${directMatches?.length ?? 0} grants, ${funderMatches?.length ?? 0} funders)`,
+    );
     if (directMatches && directMatches.length > 0) {
       console.log(`      -> Primer resultado: "${directMatches[0].title.slice(0, 60)}"`);
     }
@@ -77,7 +80,9 @@ async function runAudit() {
   console.log("\n📥 CARGANDO CONVOCATORIAS LISTADAS EN BASE DE DATOS:");
   const { data: allGrants, error: gErr } = await rocioClient
     .from("grants")
-    .select("id, title, status, summary, amount_cad_max, deadline, funder:funders(name, country, jurisdiction)")
+    .select(
+      "id, title, status, summary, amount_cad_max, deadline, funder:funders(name, country, jurisdiction)",
+    )
     .order("created_at", { ascending: false });
 
   if (gErr) throw new Error("Error cargando grants: " + gErr.message);
@@ -92,7 +97,9 @@ async function runAudit() {
 
   for (let i = 0; i < allGrants.length; i++) {
     const grant = allGrants[i];
-    process.stdout.write(`   [${i + 1}/${allGrants.length}] Evaluando "${grant.title.slice(0, 45)}"... `);
+    process.stdout.write(
+      `   [${i + 1}/${allGrants.length}] Evaluando "${grant.title.slice(0, 45)}"... `,
+    );
 
     try {
       const evalRes = await evaluateGrantImpl({

@@ -236,14 +236,14 @@ export function V2GrantDetail({
       (c.status === "fail" || c.status === "warn"),
   );
 
-  const rawRequirements = grant.requirements ?? [];
   const requirements = useMemo(() => {
-    if (rawRequirements.length > 0) return rawRequirements;
-    const base: typeof rawRequirements = [
+    if (grant.requirements && grant.requirements.length > 0) return grant.requirements;
+    const base: GrantRequirementRow[] = [
       {
         category: "document",
         requirement: "Project proposal narrative & methodology",
-        value: "Detailed proposal document describing project goals, implementation methodology, and anticipated impact.",
+        value:
+          "Detailed proposal document describing project goals, implementation methodology, and anticipated impact.",
         isCritical: true,
       },
       {
@@ -276,7 +276,7 @@ export function V2GrantDetail({
       isCritical: false,
     });
     return base;
-  }, [rawRequirements, grant.amount_cad_max, requiresPartner]);
+  }, [grant.requirements, grant.amount_cad_max, requiresPartner]);
   const criticalRequirements = requirements.filter((item) => item.isCritical);
 
   const evalVerdict = evaluation
@@ -360,7 +360,6 @@ export function V2GrantDetail({
   // Only the rules engine's partner check raises the banner: matching the
   // word "partner" in the summary flagged almost every grant ("partnering
   // with industry"...).
-
 
   return (
     <div className="w-full max-w-[1700px] space-y-4 px-3 py-4 sm:px-6 lg:py-5">

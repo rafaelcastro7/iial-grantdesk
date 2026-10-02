@@ -97,13 +97,26 @@ const SECTION_WORDS: Record<string, string> = {
 /** Why a drafted section is not usable, or null when it is. */
 export function sectionQualityProblem(text: string, heading?: string | null): string | null {
   const body = (text ?? "").trim();
-  if (/\[(insert|add|placeholder|tbd|your |organization name)|\blorem ipsum\b|\bTBD\b|\bXXX+\b/i.test(body)) {
+  if (
+    /\[(insert|add|placeholder|tbd|your |organization name)|\blorem ipsum\b|\bTBD\b|\bXXX+\b/i.test(
+      body,
+    )
+  ) {
     return "placeholder_text";
   }
   const words = body.split(/\s+/).filter(Boolean).length;
   if (words < 90) return "too_short";
-  if (heading && body.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() ===
-      heading.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()) {
+  if (
+    heading &&
+    body
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim() ===
+      heading
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+  ) {
     return "heading_only";
   }
   return null;

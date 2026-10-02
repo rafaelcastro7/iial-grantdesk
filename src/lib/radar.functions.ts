@@ -24,7 +24,9 @@ export const listRadarProfiles = createServerFn({ method: "GET" })
 
     const { data, error } = await context.supabase
       .from("clients")
-      .select("id, name, client_profiles(jurisdictions, stage, annual_budget, currency, lead_time_weeks)")
+      .select(
+        "id, name, client_profiles(jurisdictions, stage, annual_budget, currency, lead_time_weeks)",
+      )
       .order("name");
     if (error) throw new Error(error.message);
     const clientProfiles = (data ?? []).flatMap((row) => {
@@ -66,7 +68,8 @@ export const listRadarProfiles = createServerFn({ method: "GET" })
     return [
       organizationProfile,
       ...clientProfiles.filter(
-        (profile) => profile.name.trim().toLowerCase() !== organization.org_name.trim().toLowerCase(),
+        (profile) =>
+          profile.name.trim().toLowerCase() !== organization.org_name.trim().toLowerCase(),
       ),
     ];
   });

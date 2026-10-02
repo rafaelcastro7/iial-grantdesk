@@ -52,7 +52,10 @@ test("grant search returns relevant results and opens a grant", async ({ page })
   const errors = trackErrors(page);
   await signIn(page);
   await page.goto("/grants");
-  const box = page.getByRole("searchbox", { name: "Search grants" }).or(page.getByLabel("Search grants")).first();
+  const box = page
+    .getByRole("searchbox", { name: "Search grants" })
+    .or(page.getByLabel("Search grants"))
+    .first();
   await expect(box).toBeVisible({ timeout: 30_000 });
   await box.fill("clean technology");
   await expect(page.locator('[data-search-mode="hybrid"]')).toBeVisible({ timeout: 45_000 });
@@ -71,7 +74,10 @@ test("grant search returns relevant results and opens a grant", async ({ page })
 test("a brand-new user can sign up and reach the dashboard", async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto("/auth");
-  await page.getByRole("button", { name: /sign up|create account|register/i }).first().click();
+  await page
+    .getByRole("button", { name: /sign up|create account|register/i })
+    .first()
+    .click();
   await page.locator("input[type=email]").fill(`e2e+${Date.now()}@example.com`);
   await page.locator("input[type=password]").fill("E2e-Signup-2026!");
   await page.locator("form button[type=submit]").click();

@@ -48,7 +48,12 @@ export function FetchTrailPanel({
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between gap-2 text-sm">
-          <Button variant="ghost" size="sm" onClick={() => setOpen(!open)} className="h-auto px-0 text-left">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setOpen(!open)}
+            className="h-auto px-0 text-left"
+          >
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             Retrieval history
             {attempts.length > 0 && (

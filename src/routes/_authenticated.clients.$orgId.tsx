@@ -26,7 +26,6 @@ export const Route = createFileRoute("/_authenticated/clients/$orgId")({
   component: ClientLayout,
 });
 
-
 function ClientLayout() {
   const { t } = useTranslation();
   const { data } = useSuspenseQuery(clientQueryOptions(Route.useParams().orgId));

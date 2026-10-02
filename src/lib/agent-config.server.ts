@@ -6,12 +6,7 @@ import { PROMPTS } from "@/agents/schemas";
 import { resolveModel, resolveFallback } from "@/agents/model-router.server";
 
 export type AgentName =
-  | "discoverer"
-  | "enricher"
-  | "evaluator"
-  | "strategist"
-  | "writer"
-  | "critic";
+  "discoverer" | "enricher" | "evaluator" | "strategist" | "writer" | "critic";
 
 export type AgentConfig = {
   agent: AgentName;

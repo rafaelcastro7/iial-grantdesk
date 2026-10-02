@@ -40,8 +40,13 @@ export function computeGrantCoverage(
     (grant.applicant_types?.length ?? 0) > 0 ||
     hasObjectValue(grant.eligibility);
   const requirementsReviewed = grant.requirements != null;
-  const hasGroundedCore = ["summary", "deadline", "amount_cad_min", "amount_cad_max", "eligibility"]
-    .some((field) => evidence.has(field));
+  const hasGroundedCore = [
+    "summary",
+    "deadline",
+    "amount_cad_min",
+    "amount_cad_max",
+    "eligibility",
+  ].some((field) => evidence.has(field));
 
   const checks = {
     official_source_checked: !!grant.source_freshness_at,

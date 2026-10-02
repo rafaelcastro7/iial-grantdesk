@@ -6,7 +6,12 @@ import { GRANT_REVIEW_CRITERIA_VERSION } from "@/lib/grant-coverage.shared";
 async function requireAdminOrg(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const [{ data: role }, { data: profile }] = await Promise.all([
-    supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
+    supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle(),
     supabaseAdmin.from("profiles").select("org_id").eq("id", userId).maybeSingle(),
   ]);
   if (!role) throw new Error("forbidden");
@@ -16,7 +21,9 @@ async function requireAdminOrg(userId: string) {
 
 export const startStrictGrantReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ includeTerminal: z.boolean().default(false) }).parse(input ?? {}))
+  .inputValidator((input) =>
+    z.object({ includeTerminal: z.boolean().default(false) }).parse(input ?? {}),
+  )
   .handler(async ({ data, context }) => {
     const { db, orgId } = await requireAdminOrg(context.userId);
     const { data: active } = await db
@@ -30,7 +37,8 @@ export const startStrictGrantReview = createServerFn({ method: "POST" })
     if (active) return { jobId: active.id, queued: active.total_items, existing: true };
 
     let grantsQuery = db.from("grants").select("id, status, deadline, source_freshness_at");
-    if (!data.includeTerminal) grantsQuery = grantsQuery.not("status", "in", "(won,lost,archived,expired)");
+    if (!data.includeTerminal)
+      grantsQuery = grantsQuery.not("status", "in", "(won,lost,archived,expired)");
     const { data: grants, error: grantsError } = await grantsQuery;
     if (grantsError) throw new Error(grantsError.message);
     const rows = grants ?? [];
@@ -75,7 +83,9 @@ export const getStrictGrantReview = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { db, orgId } = await requireAdminOrg(context.userId);
     let query = db.from("grant_review_jobs").select("*").eq("org_id", orgId);
-    query = data.jobId ? query.eq("id", data.jobId) : query.order("created_at", { ascending: false }).limit(1);
+    query = data.jobId
+      ? query.eq("id", data.jobId)
+      : query.order("created_at", { ascending: false }).limit(1);
     const { data: job, error } = await query.maybeSingle();
     if (error) throw new Error(error.message);
     if (!job) return { job: null, states: [] };
@@ -88,7 +98,11 @@ export const getStrictGrantReview = createServerFn({ method: "GET" })
 
 export const processStrictGrantReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ jobId: z.string().uuid(), limit: z.number().int().min(1).max(5).default(2) }).parse(input))
+  .inputValidator((input) =>
+    z
+      .object({ jobId: z.string().uuid(), limit: z.number().int().min(1).max(5).default(2) })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { db, orgId } = await requireAdminOrg(context.userId);
     const { data: job } = await db
@@ -98,7 +112,10 @@ export const processStrictGrantReview = createServerFn({ method: "POST" })
       .eq("org_id", orgId)
       .maybeSingle();
     if (!job) throw new Error("review_job_not_found");
-    await db.from("grant_review_jobs").update({ status: "running", started_at: new Date().toISOString() }).eq("id", job.id);
+    await db
+      .from("grant_review_jobs")
+      .update({ status: "running", started_at: new Date().toISOString() })
+      .eq("id", job.id);
 
     const { data: claimed, error: claimError } = await db.rpc("claim_grant_review_batch", {
       p_job_id: job.id,
@@ -116,19 +133,27 @@ export const processStrictGrantReview = createServerFn({ method: "POST" })
       }
     }
 
-    const { data: queue } = await db.from("grant_review_queue").select("status").eq("job_id", job.id);
+    const { data: queue } = await db
+      .from("grant_review_queue")
+      .select("status")
+      .eq("job_id", job.id);
     const statuses = queue ?? [];
-    const pending = statuses.filter((r) => r.status === "queued" || r.status === "processing").length;
+    const pending = statuses.filter(
+      (r) => r.status === "queued" || r.status === "processing",
+    ).length;
     const completed = statuses.filter((r) => r.status === "completed").length;
     const blocked = statuses.filter((r) => r.status === "blocked").length;
     const failed = statuses.filter((r) => r.status === "failed").length;
-    await db.from("grant_review_jobs").update({
-      completed_items: completed,
-      blocked_items: blocked,
-      failed_items: failed,
-      status: pauseReason ? "paused" : pending === 0 ? "completed" : "running",
-      pause_reason: pauseReason,
-      completed_at: pending === 0 ? new Date().toISOString() : null,
-    }).eq("id", job.id);
+    await db
+      .from("grant_review_jobs")
+      .update({
+        completed_items: completed,
+        blocked_items: blocked,
+        failed_items: failed,
+        status: pauseReason ? "paused" : pending === 0 ? "completed" : "running",
+        pause_reason: pauseReason,
+        completed_at: pending === 0 ? new Date().toISOString() : null,
+      })
+      .eq("id", job.id);
     return { processed: claimed?.length ?? 0, pending, completed, blocked, failed };
   });

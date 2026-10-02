@@ -119,7 +119,8 @@ export function OpportunityBriefPanel({
               <Badge
                 variant="outline"
                 className={`text-[10px] font-semibold py-0.5 px-2 flex items-center gap-1 ${
-                  b.program_snapshot.days_remaining != null && b.program_snapshot.days_remaining <= 14
+                  b.program_snapshot.days_remaining != null &&
+                  b.program_snapshot.days_remaining <= 14
                     ? "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300"
                     : "border-primary/30 bg-primary/5 text-primary"
                 }`}
@@ -130,7 +131,8 @@ export function OpportunityBriefPanel({
             )}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Executive go / no-go decision brief: co-funding requirements, team composition, and proposal assets.
+            Executive go / no-go decision brief: co-funding requirements, team composition, and
+            proposal assets.
           </p>
         </div>
 
@@ -174,7 +176,9 @@ export function OpportunityBriefPanel({
         {m.isPending && !b && (
           <div className="flex items-center gap-2.5 py-6 text-muted-foreground text-xs">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span>Synthesizing executive brief, financial structure, and strategic positioning...</span>
+            <span>
+              Synthesizing executive brief, financial structure, and strategic positioning...
+            </span>
           </div>
         )}
 
@@ -270,7 +274,8 @@ export function OpportunityBriefPanel({
             <section className="rounded-xl border bg-muted/20 p-3.5 sm:p-4">
               <div className="flex items-center justify-between mb-2.5">
                 <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <CircleDollarSign className="h-3.5 w-3.5 text-primary" /> Financial Architecture &amp; Match
+                  <CircleDollarSign className="h-3.5 w-3.5 text-primary" /> Financial Architecture
+                  &amp; Match
                 </h4>
                 {b.money.in_kind_allowed && (
                   <span className="text-[10px] text-muted-foreground font-medium">
@@ -283,7 +288,9 @@ export function OpportunityBriefPanel({
                 <div className="rounded-lg border bg-background/80 p-2.5 shadow-2xs">
                   <dt className="text-[11px] font-medium text-muted-foreground">Max Grant Award</dt>
                   <dd className="font-bold text-foreground mt-0.5 text-xs sm:text-sm">
-                    {b.money.request_amount ? `$${b.money.request_amount.toLocaleString()} CAD` : "Grant amount TBD"}
+                    {b.money.request_amount
+                      ? `$${b.money.request_amount.toLocaleString()} CAD`
+                      : "Grant amount TBD"}
                   </dd>
                 </div>
 
@@ -291,7 +298,9 @@ export function OpportunityBriefPanel({
                   <dt className="text-[11px] font-medium text-muted-foreground">Match Required</dt>
                   <dd
                     className={`font-bold mt-0.5 text-xs sm:text-sm ${
-                      b.money.match_required_pct ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"
+                      b.money.match_required_pct
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-emerald-600 dark:text-emerald-400"
                     }`}
                   >
                     {b.money.match_required_pct !== null && b.money.match_required_pct > 0
@@ -301,7 +310,9 @@ export function OpportunityBriefPanel({
                 </div>
 
                 <div className="rounded-lg border bg-background/80 p-2.5 shadow-2xs">
-                  <dt className="text-[11px] font-medium text-muted-foreground">Est. Total Project</dt>
+                  <dt className="text-[11px] font-medium text-muted-foreground">
+                    Est. Total Project
+                  </dt>
                   <dd className="font-bold text-foreground mt-0.5 text-xs sm:text-sm">
                     {b.money.estimated_total_cad
                       ? `$${b.money.estimated_total_cad.toLocaleString()} CAD`
@@ -312,7 +323,9 @@ export function OpportunityBriefPanel({
                 </div>
 
                 <div className="rounded-lg border bg-background/80 p-2.5 shadow-2xs">
-                  <dt className="text-[11px] font-medium text-muted-foreground">Cash Match Status</dt>
+                  <dt className="text-[11px] font-medium text-muted-foreground">
+                    Cash Match Status
+                  </dt>
                   <dd
                     className={`font-bold mt-0.5 text-xs sm:text-sm flex items-center gap-1 ${
                       b.money.cash_match_verified
@@ -320,7 +333,9 @@ export function OpportunityBriefPanel({
                         : "text-amber-600 dark:text-amber-400"
                     }`}
                   >
-                    {b.money.cash_match_verified ? "Verified / No cash match" : "Pending leadership sign-off"}
+                    {b.money.cash_match_verified
+                      ? "Verified / No cash match"
+                      : "Pending leadership sign-off"}
                   </dd>
                 </div>
               </dl>
@@ -330,7 +345,8 @@ export function OpportunityBriefPanel({
             <section className="rounded-xl border bg-background/90 p-3.5 sm:p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <Target className="h-3.5 w-3.5 text-primary" /> Strategic Positioning &amp; Win Theme
+                  <Target className="h-3.5 w-3.5 text-primary" /> Strategic Positioning &amp; Win
+                  Theme
                 </h4>
               </div>
 
@@ -362,7 +378,8 @@ export function OpportunityBriefPanel({
             <section className="rounded-xl border bg-muted/20 p-3.5 sm:p-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <ListChecks className="h-3.5 w-3.5 text-primary" /> Application Checklist &amp; Deliverables
+                  <ListChecks className="h-3.5 w-3.5 text-primary" /> Application Checklist &amp;
+                  Deliverables
                 </h4>
                 <span className="text-[11px] text-muted-foreground">
                   {b.application_checklist.length} items required
@@ -415,7 +432,9 @@ export function OpportunityBriefPanel({
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
                 <div>
                   <dt className="text-muted-foreground">Funder: </dt>
-                  <dd className="font-semibold text-foreground">{b.program_snapshot.funder ?? "-"}</dd>
+                  <dd className="font-semibold text-foreground">
+                    {b.program_snapshot.funder ?? "-"}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Program: </dt>

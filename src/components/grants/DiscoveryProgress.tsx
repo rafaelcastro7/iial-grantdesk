@@ -29,14 +29,7 @@ type FunderState = {
 };
 
 type ErrorCategory =
-  | "timeout"
-  | "rate_limit"
-  | "http"
-  | "parse"
-  | "auth"
-  | "network"
-  | "llm"
-  | "other";
+  "timeout" | "rate_limit" | "http" | "parse" | "auth" | "network" | "llm" | "other";
 
 function categorizeError(msg: string): { category: ErrorCategory; hint: string; hintFr: string } {
   const m = msg.toLowerCase();

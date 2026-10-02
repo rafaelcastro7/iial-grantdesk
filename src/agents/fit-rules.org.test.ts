@@ -157,6 +157,8 @@ describe("deriveRulesFromOrg", () => {
     expect(result.detected_role).toBe("partner");
     expect(result.detected_partner_type).toBe("university");
     expect(result.verdict).toBe("needs_input");
-    expect(result.checks.find((check) => check.id === "required_university_partner")?.status).toBe("warn");
+    expect(result.checks.find((check) => check.id === "required_university_partner")?.status).toBe(
+      "warn",
+    );
   });
 });

@@ -64,7 +64,8 @@ export function EligibilityCheckBar({
           </p>
           <p className="text-xs text-muted-foreground">
             Every grant is run through the same rules first — territory, status, deadline vs{" "}
-            {selected.leadTimeWeeks ?? 3} weeks of preparation, applicant type, scale and cost share.
+            {selected.leadTimeWeeks ?? 3} weeks of preparation, applicant type, scale and cost
+            share.
           </p>
         </div>
         <dl className="flex gap-2 text-center text-xs">
@@ -73,11 +74,7 @@ export function EligibilityCheckBar({
           <Stat label="Ruled out" value={ruledOut} tone="text-ineligible" />
         </dl>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onToggleHide}
-          >
+          <Button variant="outline" size="sm" onClick={onToggleHide}>
             {hideIneligible ? "Show ruled out" : "Hide ruled out"}
           </Button>
           {onEvaluateAll && (
@@ -93,7 +90,9 @@ export function EligibilityCheckBar({
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>
-                    {evalProgress ? `Evaluando ${evalProgress.current}/${evalProgress.total}...` : "Evaluando..."}
+                    {evalProgress
+                      ? `Evaluando ${evalProgress.current}/${evalProgress.total}...`
+                      : "Evaluando..."}
                   </span>
                 </>
               ) : (

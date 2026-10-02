@@ -31,7 +31,9 @@ async function main() {
   sqlLines.push("-- ==========================================================================");
   sqlLines.push("-- 1. Activar URLs de fuentes en los 134 financiadores");
   sqlLines.push("-- ==========================================================================");
-  sqlLines.push("UPDATE public.funders SET source_url = website WHERE source_url IS NULL AND website IS NOT NULL;");
+  sqlLines.push(
+    "UPDATE public.funders SET source_url = website WHERE source_url IS NULL AND website IS NOT NULL;",
+  );
   sqlLines.push("");
   sqlLines.push("-- ==========================================================================");
   sqlLines.push("-- 2. Poblar convocatorias reales (Innovation Canada + Grants.gov)");
@@ -44,7 +46,10 @@ async function main() {
     let funderId = funderMap.get(g.funderName.toLowerCase().trim());
     if (!funderId) {
       for (const [name, id] of funderMap.entries()) {
-        if (name.includes(g.funderName.toLowerCase().trim()) || g.funderName.toLowerCase().trim().includes(name)) {
+        if (
+          name.includes(g.funderName.toLowerCase().trim()) ||
+          g.funderName.toLowerCase().trim().includes(name)
+        ) {
           funderId = id;
           break;
         }
@@ -55,10 +60,15 @@ async function main() {
     }
     if (!funderId) continue;
 
-    const sourceHash = "init_" + Buffer.from(g.title + (g.externalId || "")).toString("hex").slice(0, 32);
-    const applicantTypes = (g.eligibleApplicantTypes && g.eligibleApplicantTypes.length > 0)
-      ? g.eligibleApplicantTypes
-      : ["small-business", "for-profit", "nonprofit"];
+    const sourceHash =
+      "init_" +
+      Buffer.from(g.title + (g.externalId || ""))
+        .toString("hex")
+        .slice(0, 32);
+    const applicantTypes =
+      g.eligibleApplicantTypes && g.eligibleApplicantTypes.length > 0
+        ? g.eligibleApplicantTypes
+        : ["small-business", "for-profit", "nonprofit"];
 
     sqlLines.push(`INSERT INTO public.grants (
   funder_id, title, summary, url, source_hash, status, country, currency,

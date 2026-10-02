@@ -39,8 +39,7 @@ export async function scrapePfcMembers(): Promise<RawCandidate[]> {
   });
   if (!r.ok) throw new Error(`pfc_scrape_failed:${r.error ?? "unknown"}`);
   const members = (r.json as { members?: unknown })?.members as
-    | Array<{ name?: string; website?: string | null; province?: string | null }>
-    | undefined;
+    Array<{ name?: string; website?: string | null; province?: string | null }> | undefined;
   if (!Array.isArray(members)) throw new Error("pfc_members_invalid_response");
   const tag = "pfc_members:" + new Date().toISOString().slice(0, 7);
   return members

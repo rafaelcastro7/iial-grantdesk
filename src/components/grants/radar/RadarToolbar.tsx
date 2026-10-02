@@ -7,11 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  countryName,
-  type RadarStatusFilter,
-  type RadarVerdictFilter,
-} from "@/lib/grant-radar";
+import { countryName, type RadarStatusFilter, type RadarVerdictFilter } from "@/lib/grant-radar";
 
 export type RadarFilterState = {
   search: string;
@@ -189,7 +185,9 @@ export function RadarToolbar({
           ))}
           <button
             type="button"
-            onClick={() => onChange({ ...DEFAULT_RADAR_FILTERS, leadTimeWeeks: value.leadTimeWeeks })}
+            onClick={() =>
+              onChange({ ...DEFAULT_RADAR_FILTERS, leadTimeWeeks: value.leadTimeWeeks })
+            }
             className="text-xs text-muted-foreground underline-offset-2 hover:underline"
           >
             Clear all

@@ -15,7 +15,15 @@
 import { detectStructuredData } from "@/lib/prompt-safety.server";
 
 export type GrantRequirement = {
-  category: "contact" | "credential" | "financial" | "legal" | "document" | "process" | "partnership" | "other";
+  category:
+    | "contact"
+    | "credential"
+    | "financial"
+    | "legal"
+    | "document"
+    | "process"
+    | "partnership"
+    | "other";
   requirement: string;
   value?: string;
   isCritical: boolean;
@@ -289,7 +297,9 @@ export function synthesizeRequirementsForGrant(grant: {
     grant.title,
     grant.summary,
     grant.eligibility_note,
-    typeof grant.eligibility === "object" && grant.eligibility ? JSON.stringify(grant.eligibility) : "",
+    typeof grant.eligibility === "object" && grant.eligibility
+      ? JSON.stringify(grant.eligibility)
+      : "",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -302,11 +312,15 @@ export function synthesizeRequirementsForGrant(grant: {
   }
 
   // Synthesize standard RFP core deliverables if not already present
-  if (!reqMap.has("project proposal narrative required") && !reqMap.has("work plan / project plan required")) {
+  if (
+    !reqMap.has("project proposal narrative required") &&
+    !reqMap.has("work plan / project plan required")
+  ) {
     reqMap.set("project proposal narrative", {
       category: "document",
       requirement: "Project proposal narrative & methodology",
-      value: "Detailed proposal document describing project goals, implementation methodology, and anticipated impact.",
+      value:
+        "Detailed proposal document describing project goals, implementation methodology, and anticipated impact.",
       isCritical: true,
     });
   }
@@ -328,29 +342,36 @@ export function synthesizeRequirementsForGrant(grant: {
     reqMap.set("matching funds", {
       category: "financial",
       requirement: `Co-funding commitment proof (~${costShare}% matching required)`,
-      value: "Official documentation or letter of commitment verifying internal or partner cash/in-kind contribution.",
+      value:
+        "Official documentation or letter of commitment verifying internal or partner cash/in-kind contribution.",
       isCritical: true,
     });
   }
 
   // Partner requirement check
-  const textBlob = `${grant.title ?? ""} ${grant.summary ?? ""} ${grant.eligibility_note ?? ""}`.toLowerCase();
+  const textBlob =
+    `${grant.title ?? ""} ${grant.summary ?? ""} ${grant.eligibility_note ?? ""}`.toLowerCase();
   const mentionsPartner = /partner|collaborat|consortium|university|postsecondary/i.test(textBlob);
   if (mentionsPartner && !Array.from(reqMap.values()).some((r) => r.category === "partnership")) {
     reqMap.set("partner commitment", {
       category: "partnership",
       requirement: "Institutional letter of support / commitment from partner",
-      value: "Signed letter of support or MOU detailing partner roles, responsibilities, and resource allocation.",
+      value:
+        "Signed letter of support or MOU detailing partner roles, responsibilities, and resource allocation.",
       isCritical: true,
     });
   }
 
   // Work plan & milestones
-  if (!reqMap.has("work plan / project plan required") && !reqMap.has("work plan with milestone schedule")) {
+  if (
+    !reqMap.has("work plan / project plan required") &&
+    !reqMap.has("work plan with milestone schedule")
+  ) {
     reqMap.set("work plan", {
       category: "document",
       requirement: "Work plan with milestone schedule & deliverables",
-      value: "Clear timeline identifying key activity milestones, deliverable deadlines, and completion criteria.",
+      value:
+        "Clear timeline identifying key activity milestones, deliverable deadlines, and completion criteria.",
       isCritical: false,
     });
   }
@@ -360,11 +381,11 @@ export function synthesizeRequirementsForGrant(grant: {
     reqMap.set("incorporation", {
       category: "legal",
       requirement: "Proof of organizational legal registration / good standing",
-      value: "Documentation confirming eligible entity type (letters patent, business number, or CRA registration).",
+      value:
+        "Documentation confirming eligible entity type (letters patent, business number, or CRA registration).",
       isCritical: false,
     });
   }
 
   return Array.from(reqMap.values());
 }
-

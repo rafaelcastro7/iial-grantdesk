@@ -52,17 +52,15 @@ export async function fetchT3010Foundations(limit = 500): Promise<Row[]> {
     financialRows.map((row) => [String(row.BN ?? "").replace(/\D/g, ""), Number(row["5050"] ?? 0)]),
   );
   return [...publicFoundations, ...privateFoundations]
-    .map(
-      (row): Row => ({
-        charity_name: row["Legal Name"] ?? null,
-        bn_registration_number: row.BN ?? null,
-        category_description: row.Designation === "A" ? "Public foundation" : "Private foundation",
-        province: row.Province ?? null,
-        city: row.City ?? null,
-        total_expenditures: expenditures.get(String(row.BN ?? "").replace(/\D/g, "")) ?? null,
-        website: null,
-      }),
-    )
+    .map((row): Row => ({
+      charity_name: row["Legal Name"] ?? null,
+      bn_registration_number: row.BN ?? null,
+      category_description: row.Designation === "A" ? "Public foundation" : "Private foundation",
+      province: row.Province ?? null,
+      city: row.City ?? null,
+      total_expenditures: expenditures.get(String(row.BN ?? "").replace(/\D/g, "")) ?? null,
+      website: null,
+    }))
     .filter((row) => Number(row.total_expenditures ?? 0) > 500_000)
     .sort((a, b) => Number(b.total_expenditures ?? 0) - Number(a.total_expenditures ?? 0))
     .slice(0, limit);

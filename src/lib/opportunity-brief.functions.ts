@@ -115,7 +115,8 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
       for (const c of [...softFails, ...warnings]) conditions.push(explainCondition(c));
     } else {
       verdict = "go";
-      reason = "Recommended: Strong strategic alignment and satisfies all organization eligibility criteria.";
+      reason =
+        "Recommended: Strong strategic alignment and satisfies all organization eligibility criteria.";
     }
 
     // Borderline score advisory
@@ -156,7 +157,8 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
     }
 
     // Financial math
-    const max_amount_cad = (g.amount_cad_max ?? g.amount_cad_min ?? g.amount_max ?? null) as number | null;
+    const max_amount_cad = (g.amount_cad_max ?? g.amount_cad_min ?? g.amount_max ?? null) as
+      number | null;
     const match_required_pct = rr.cost_share_pct;
     const estimated_match_cad =
       max_amount_cad && match_required_pct !== null && match_required_pct > 0
@@ -174,7 +176,8 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
 
     // Partner guidance
     let partnerNote = "";
-    let recommendedPartnerAction = "No external partner required; eligible to submit directly as sole lead applicant.";
+    let recommendedPartnerAction =
+      "No external partner required; eligible to submit directly as sole lead applicant.";
     if (rr.detected_role === "partner") {
       partnerNote = `You'll likely need to apply alongside ${PARTNER_TYPE_LABEL[rr.detected_partner_type ?? "other"]} — the eligibility text implies ${orgName} cannot apply as the sole lead entity.`;
       switch (rr.detected_partner_type) {
@@ -201,12 +204,19 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
     } else if (rr.detected_role === "lead") {
       partnerNote = `${orgName} qualifies to apply as the lead applicant directly without mandatory external institutional co-applicants.`;
     } else {
-      partnerNote = "Applicant role is ambiguous in the official text — verify applicant classification with the funder prior to assembling the team.";
-      recommendedPartnerAction = "Confirm directly with the funder program officer whether independent non-profit/SME applications are accepted.";
+      partnerNote =
+        "Applicant role is ambiguous in the official text — verify applicant classification with the funder prior to assembling the team.";
+      recommendedPartnerAction =
+        "Confirm directly with the funder program officer whether independent non-profit/SME applications are accepted.";
     }
 
     // Extract requirements from database or synthesize baseline if empty
-    type RequirementRow = { requirement?: string; category?: string; isCritical?: boolean; value?: string };
+    type RequirementRow = {
+      requirement?: string;
+      category?: string;
+      isCritical?: boolean;
+      value?: string;
+    };
     let rawRequirements = (
       Array.isArray((g as { requirements?: unknown }).requirements)
         ? ((g as { requirements: RequirementRow[] }).requirements ?? [])
@@ -214,9 +224,8 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
     ).filter((r) => typeof r.requirement === "string" && r.requirement.trim());
 
     if (rawRequirements.length === 0) {
-      const { synthesizeRequirementsForGrant } = await import(
-        "@/agents/grant-requirements-analyzer.server"
-      );
+      const { synthesizeRequirementsForGrant } =
+        await import("@/agents/grant-requirements-analyzer.server");
       rawRequirements = synthesizeRequirementsForGrant({
         title: g.title,
         summary: g.summary,
@@ -229,11 +238,17 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
         funder_name: funderName,
       });
       if (rawRequirements.length > 0) {
-        supabase
-          .from("grants")
-          .update({ requirements: rawRequirements } as never)
-          .eq("id", grantId)
-          .then();
+        import("@/integrations/supabase/client.server")
+          .then(({ supabaseAdmin }) =>
+            supabaseAdmin
+              .from("grants")
+              .update({ requirements: rawRequirements } as never)
+              .eq("id", grantId),
+          )
+          .then(
+            () => {},
+            () => {},
+          );
       }
     }
 
@@ -291,7 +306,9 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
               "Output strict JSON with exact schema: " +
               "{\n" +
               '  "executive_summary": "1 punchy sentence delivering bottom-line assessment and main operational condition",\n' +
-              '  "strategic_angle": "2-3 concrete sentences proposing the exact project narrative hook, how ' + orgName + '\'s unique capabilities win this call, and how to stand out to reviewers",\n' +
+              '  "strategic_angle": "2-3 concrete sentences proposing the exact project narrative hook, how ' +
+              orgName +
+              "'s unique capabilities win this call, and how to stand out to reviewers\",\n" +
               '  "mandatory_components": ["3 to 5 explicit proposal deliverables, plans, or formal attachments required by this grant type (e.g. Detailed Gantt workplan, Knowledge Mobilization plan, EDI plan, Budget narrative & quotes, Letters of Support)"],\n' +
               '  "risks": ["3 to 5 real-world risks or traps (e.g. reimbursement cash-flow lag, intellectual property co-ownership, partner sign-off bureaucracy, matching audit compliance)"],\n' +
               '  "win_factors": ["2 to 3 tactical levers that will push this application into the top 5% of peer review scores"]\n' +
@@ -349,7 +366,9 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
       }
     } catch (e) {
       if (risks.length === 0) {
-        risks.push(`Notice: Automated narrative refinement skipped (${e instanceof Error ? e.message : String(e)}). Baseline rules applied.`);
+        risks.push(
+          `Notice: Automated narrative refinement skipped (${e instanceof Error ? e.message : String(e)}). Baseline rules applied.`,
+        );
       }
     }
 

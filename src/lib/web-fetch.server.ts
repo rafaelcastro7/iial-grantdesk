@@ -137,7 +137,7 @@ function htmlToMarkdown(html: string, max = 40_000): string {
       .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>|<br\s*\/?>/gi, "\n")
       .replace(/<[^>]+>/g, " "),
   )
-    .replace(/[ \t ]+/g, " ")
+    .replace(/[ \t\u00A0]+/g, " ")
     .replace(/\s*\n\s*/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim()

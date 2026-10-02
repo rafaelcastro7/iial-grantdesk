@@ -57,9 +57,8 @@ export const getGrantDetail = createServerFn({ method: "GET" })
     // synthesize baseline requirements dynamically from grant narrative and attributes.
     const currentReqs = (grant as { requirements?: unknown }).requirements;
     if (!currentReqs || (Array.isArray(currentReqs) && currentReqs.length === 0)) {
-      const { synthesizeRequirementsForGrant } = await import(
-        "@/agents/grant-requirements-analyzer.server"
-      );
+      const { synthesizeRequirementsForGrant } =
+        await import("@/agents/grant-requirements-analyzer.server");
       const syn = synthesizeRequirementsForGrant({
         title: grant.title,
         summary: grant.summary,
@@ -72,11 +71,17 @@ export const getGrantDetail = createServerFn({ method: "GET" })
       });
       if (syn.length > 0) {
         (grant as Record<string, unknown>).requirements = syn;
-        context.supabase
-          .from("grants")
-          .update({ requirements: syn } as never)
-          .eq("id", data.id)
-          .then();
+        import("@/integrations/supabase/client.server")
+          .then(({ supabaseAdmin }) =>
+            supabaseAdmin
+              .from("grants")
+              .update({ requirements: syn } as never)
+              .eq("id", data.id),
+          )
+          .then(
+            () => {},
+            () => {},
+          );
       }
     }
 

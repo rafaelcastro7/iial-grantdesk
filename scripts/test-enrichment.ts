@@ -3,7 +3,8 @@ import { enrichGrantImpl } from "../src/agents/enricher.functions";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://qcuzwryknrniujjfvvvr.supabase.co";
-const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_MYWEgMbOfoqZcOdKPsq7gg_-PXnH2zU";
+const KEY =
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_MYWEgMbOfoqZcOdKPsq7gg_-PXnH2zU";
 
 async function main() {
   console.log("==================================================");

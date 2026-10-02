@@ -1872,7 +1872,7 @@ export const addGrantByUrl = createServerFn({ method: "POST" })
       const { data: nameMatches } = await supabaseAdmin
         .from("funders")
         .select("id, name, country")
-        .ilike("name", funderName)
+        .eq("name", funderName)
         .eq("country", funderCountry)
         .limit(1);
       if (nameMatches?.[0]?.id) {
@@ -1880,41 +1880,37 @@ export const addGrantByUrl = createServerFn({ method: "POST" })
       }
     }
 
-    // Funder: 3) insert a new one if not found, with conflict recovery
+    // Funder: 3) insert / upsert with unique constraint resolution
     if (!funderId) {
-      const { data: created, error: funderError } = await supabaseAdmin
+      const { data: upserted, error: funderError } = await supabaseAdmin
         .from("funders")
-        .insert({
-          name: funderName,
-          country: funderCountry,
-          website: url.origin,
-          source_url: url.origin,
-        } as never)
+        .upsert(
+          {
+            name: funderName,
+            country: funderCountry,
+            website: url.origin,
+            source_url: url.origin,
+          } as never,
+          { onConflict: "name,country" },
+        )
         .select("id")
-        .single();
+        .maybeSingle();
 
-      if (funderError) {
-        if (
-          funderError.message?.includes("funders_name_country_key") ||
-          funderError.code === "23505"
-        ) {
-          const { data: recovered } = await supabaseAdmin
-            .from("funders")
-            .select("id")
-            .ilike("name", funderName)
-            .eq("country", funderCountry)
-            .limit(1);
-          if (recovered?.[0]?.id) {
-            funderId = recovered[0].id;
-          }
-        }
-        if (!funderId) {
+      if (upserted?.id) {
+        funderId = (upserted as { id: string }).id;
+      } else {
+        const { data: recovered } = await supabaseAdmin
+          .from("funders")
+          .select("id")
+          .eq("name", funderName)
+          .limit(1);
+        if (recovered?.[0]?.id) {
+          funderId = recovered[0].id;
+        } else if (funderError) {
           throw new Error(
             `Could not register the funder: ${funderError.message ?? "unknown error"}`,
           );
         }
-      } else if (created) {
-        funderId = (created as { id: string }).id;
       }
     }
 
@@ -1947,7 +1943,11 @@ export const addGrantByUrl = createServerFn({ method: "POST" })
           .eq("canonical_key", canonicalKey)
           .limit(1);
         if (existingConflict?.[0]) {
-          return { grantId: existingConflict[0].id, isNew: false, title: existingConflict[0].title };
+          return {
+            grantId: existingConflict[0].id,
+            isNew: false,
+            title: existingConflict[0].title,
+          };
         }
       }
       throw new Error(`Could not add the grant: ${insertErr?.message ?? "unknown error"}`);

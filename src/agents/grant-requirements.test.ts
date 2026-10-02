@@ -43,7 +43,9 @@ describe("analyzeGrantRequirements - RFP documents & process", () => {
     const result = analyzeGrantRequirements(
       "Applicants must collaborate with an eligible university researcher and provide evidence of partner commitment.",
     );
-    expect(result.requirements.some((r) => r.category === "partnership" && r.isCritical)).toBe(true);
+    expect(result.requirements.some((r) => r.category === "partnership" && r.isCritical)).toBe(
+      true,
+    );
     expect(result.requirements.some((r) => r.requirement.includes("commitment"))).toBe(true);
   });
 

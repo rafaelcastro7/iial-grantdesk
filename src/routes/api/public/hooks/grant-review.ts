@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/public/hooks/grant-review")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: job, error } = await supabaseAdmin
           .from("grant_review_jobs")
-          .select("id, org_id, requested_by, status")
+          .select("id, org_id, requested_by, status, started_at")
           .in("status", ["queued", "running"])
           .order("created_at", { ascending: true })
           .limit(1)
@@ -44,20 +44,31 @@ export const Route = createFileRoute("/api/public/hooks/grant-review")({
           .select("status")
           .eq("job_id", job.id);
         const statuses = queue ?? [];
-        const pending = statuses.filter((row) => ["queued", "processing"].includes(row.status)).length;
+        const pending = statuses.filter((row) =>
+          ["queued", "processing"].includes(row.status),
+        ).length;
         const completed = statuses.filter((row) => row.status === "completed").length;
         const blocked = statuses.filter((row) => row.status === "blocked").length;
         const failed = statuses.filter((row) => row.status === "failed").length;
-        await supabaseAdmin.from("grant_review_jobs").update({
-          status: pauseReason ? "paused" : pending === 0 ? "completed" : "running",
-          pause_reason: pauseReason,
-          completed_items: completed,
-          blocked_items: blocked,
-          failed_items: failed,
-          started_at: new Date().toISOString(),
-          completed_at: pending === 0 ? new Date().toISOString() : null,
-        }).eq("id", job.id);
-        return Response.json({ ok: !pauseReason, processed: claimed?.length ?? 0, pending, pauseReason });
+        await supabaseAdmin
+          .from("grant_review_jobs")
+          .update({
+            status: pauseReason ? "paused" : pending === 0 ? "completed" : "running",
+            pause_reason: pauseReason,
+            completed_items: completed,
+            blocked_items: blocked,
+            failed_items: failed,
+            started_at:
+              (job as { started_at?: string | null }).started_at ?? new Date().toISOString(),
+            completed_at: pending === 0 ? new Date().toISOString() : null,
+          })
+          .eq("id", job.id);
+        return Response.json({
+          ok: !pauseReason,
+          processed: claimed?.length ?? 0,
+          pending,
+          pauseReason,
+        });
       },
     },
   },

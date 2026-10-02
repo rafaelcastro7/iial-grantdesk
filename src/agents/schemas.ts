@@ -127,7 +127,8 @@ export const EvaluatorOutput = z.object({
   fit_score: z.number().min(0).max(1),
   eligibility_pass: z.preprocess((v) => {
     if (typeof v === "boolean") return v;
-    if (typeof v === "string") return v.toLowerCase() === "true" || v.toLowerCase() === "yes" || v.toLowerCase() === "pass";
+    if (typeof v === "string")
+      return v.toLowerCase() === "true" || v.toLowerCase() === "yes" || v.toLowerCase() === "pass";
     return true;
   }, z.boolean()),
   rationale_en: z.string().min(5).max(4000),

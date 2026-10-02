@@ -25,8 +25,14 @@ export type ServerEnv = z.infer<typeof schema>;
 export function serverEnv(): ServerEnv {
   const envMapped = {
     ...process.env,
-    SUPABASE_URL: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://qcuzwryknrniujjfvvvr.supabase.co",
-    SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_MYWEgMbOfoqZcOdKPsq7gg_-PXnH2zU",
+    SUPABASE_URL:
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      "https://qcuzwryknrniujjfvvvr.supabase.co",
+    SUPABASE_PUBLISHABLE_KEY:
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      "sb_publishable_MYWEgMbOfoqZcOdKPsq7gg_-PXnH2zU",
   };
   const parsed = schema.safeParse(envMapped);
   if (!parsed.success) {

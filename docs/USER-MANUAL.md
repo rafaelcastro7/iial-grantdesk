@@ -1155,7 +1155,7 @@ Open:
 | Page            | URL                  | Purpose                                              |
 | --------------- | -------------------- | ---------------------------------------------------- |
 | Admin dashboard | `/admin`             | Administrative overview                              |
-| Agents          | `/admin/agents`      | Review AI agents, prompts, and provider behavior      |
+| Agents          | `/admin/agents`      | Review AI agents, prompts, and provider behavior     |
 | Candidates      | `/admin/candidates`  | Review funder candidates                             |
 | History         | `/admin/history`     | Review admin history                                 |
 | Modules         | `/admin/modules`     | Manage platform modules                              |
@@ -1335,7 +1335,7 @@ Check proposal readiness:
 
 | Term               | Meaning                                                         |
 | ------------------ | --------------------------------------------------------------- |
-| Agent              | An AI-assisted worker specialized for a specific task            |
+| Agent              | An AI-assisted worker specialized for a specific task           |
 | Audit trail        | Record of changes and important actions                         |
 | Enrichment         | Fetching and structuring grant details from official sources    |
 | Evidence span      | Source-backed snippet supporting an extracted fact or decision  |

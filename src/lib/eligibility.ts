@@ -156,7 +156,8 @@ function jurisdictionRule(input: EligibilityInput): RuleResult {
 function deadlineRule(input: EligibilityInput): RuleResult {
   const { deadline, status } = input.grant;
   const isClosed =
-    typeof status === "string" && ["closed", "expired", "archived", "lost"].includes(status.toLowerCase());
+    typeof status === "string" &&
+    ["closed", "expired", "archived", "lost"].includes(status.toLowerCase());
   if (isClosed) {
     return {
       key: "deadline",

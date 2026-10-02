@@ -32,15 +32,21 @@ console.log(`🧠 Cloud LLM:    ${process.env.GROQ_API_KEY ? "✅ Groq Ready" : 
 console.log(`======================================================\n`);
 
 // Dynamic Supabase Admin
-const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://qcuzwryknrniujjfvvvr.supabase.co";
+const url =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  "https://qcuzwryknrniujjfvvvr.supabase.co";
 const rawServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const isBrokenDummyKey = !rawServiceKey || rawServiceKey.includes(".o6YD5ulurS5oZihQYqKP5NefZpJBgFEe0idYY3gBQa8");
+const isBrokenDummyKey =
+  !rawServiceKey || rawServiceKey.includes(".o6YD5ulurS5oZihQYqKP5NefZpJBgFEe0idYY3gBQa8");
 const serviceKey = isBrokenDummyKey
-  ? (process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "")
+  ? process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || ""
   : rawServiceKey;
 
 if (isBrokenDummyKey) {
-  console.warn("⚠️ [Telemetry] SUPABASE_SERVICE_ROLE_KEY is invalid/missing. Falling back to publishable key.");
+  console.warn(
+    "⚠️ [Telemetry] SUPABASE_SERVICE_ROLE_KEY is invalid/missing. Falling back to publishable key.",
+  );
 }
 
 export const supabaseAdmin = createClient(url, serviceKey, {

@@ -14,10 +14,14 @@
  */
 
 const KEYWORD_PATTERNS: Record<string, RegExp> = {
-  amount_cad_min: /(?:amount|budget|funding|grant\s+size|maximum|minimum|contribution|up\s+to\s+\$|\$[\d,]+|subvention|fonds|montant|valeur)/i,
-  amount_cad_max: /(?:amount|budget|funding|grant\s+size|maximum|minimum|contribution|up\s+to\s+\$|\$[\d,]+|subvention|fonds|montant|valeur)/i,
-  deadline: /(?:deadline|closing\s+date|due\s+date|cutoff|intake|submission\s+date|date\s+limite|échéance|date\s+de\s+clôture|rolling)/i,
-  eligibility: /(?:eligib|who\s+can\s+apply|applicant|non-profit|nonprofit|charit|indigenous|registered|admissib|qui\s+peut\s+postuler|critères)/i,
+  amount_cad_min:
+    /(?:amount|budget|funding|grant\s+size|maximum|minimum|contribution|up\s+to\s+\$|\$[\d,]+|subvention|fonds|montant|valeur)/i,
+  amount_cad_max:
+    /(?:amount|budget|funding|grant\s+size|maximum|minimum|contribution|up\s+to\s+\$|\$[\d,]+|subvention|fonds|montant|valeur)/i,
+  deadline:
+    /(?:deadline|closing\s+date|due\s+date|cutoff|intake|submission\s+date|date\s+limite|échéance|date\s+de\s+clôture|rolling)/i,
+  eligibility:
+    /(?:eligib|who\s+can\s+apply|applicant|non-profit|nonprofit|charit|indigenous|registered|admissib|qui\s+peut\s+postuler|critères)/i,
   sectors: /(?:sector|industry|priority|focus\s+area|stream|domain|secteur|priorité)/i,
 };
 
@@ -43,9 +47,8 @@ export function extractTargetedMarkdown(
 
   // 1. Keep concise opening lead (first paragraph or title, up to leadChars)
   const firstParagraph = markdown.split(/\n{2,}/)[0]?.trim() ?? "";
-  const leadSlice = firstParagraph.length <= leadChars
-    ? firstParagraph
-    : firstParagraph.slice(0, leadChars).trim();
+  const leadSlice =
+    firstParagraph.length <= leadChars ? firstParagraph : firstParagraph.slice(0, leadChars).trim();
 
   // If no specific needs are given, fallback to sequential slice
   if (!needs || needs.length === 0) {
