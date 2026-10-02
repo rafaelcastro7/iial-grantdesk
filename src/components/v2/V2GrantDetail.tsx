@@ -238,7 +238,7 @@ export function V2GrantDetail({
 
   const requirements = useMemo(() => {
     if (grant.requirements && grant.requirements.length > 0) return grant.requirements;
-    const base: GrantRequirementRow[] = [
+    const base: Requirement[] = [
       {
         category: "document",
         requirement: "Project proposal narrative & methodology",
