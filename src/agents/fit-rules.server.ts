@@ -481,11 +481,16 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
     });
   }
 
-  if (rules.applicant_types_excluded.length > 0 || rules.applicant_types_allowed.length > 0) {
+  if (
+    (rules.applicant_types_excluded?.length ?? 0) > 0 ||
+    (rules.applicant_types_allowed?.length ?? 0) > 0
+  ) {
     const restrictions = detectExcludedApplicantTypes(hay);
-    const excluded = restrictions.filter((value) => rules.applicant_types_excluded.includes(value));
+    const excluded = restrictions.filter((value) =>
+      (rules.applicant_types_excluded ?? []).includes(value),
+    );
     const eligible = detectExplicitEligibleApplicantTypes(g);
-    const allowed = configuredApplicantCategories(rules.applicant_types_allowed);
+    const allowed = configuredApplicantCategories(rules.applicant_types_allowed ?? []);
     const eligibleMatch = eligible.filter((value) => allowed.includes(value));
     const restrictionCategories = restrictions.map((value) =>
       value.replace(/_only$/, ""),

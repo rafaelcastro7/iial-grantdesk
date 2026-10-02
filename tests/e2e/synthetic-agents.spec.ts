@@ -153,12 +153,14 @@ async function enrichGrant(agent: DumbAgent) {
 
 async function evaluateGrant(agent: DumbAgent) {
   const alreadyEvaluated = await agent.page
-    .getByRole("button", { name: /re-evaluate fit/i })
+    .getByRole("button", { name: /re-evaluate fit|re-check fit|run full ai review/i })
     .isVisible()
     .catch(() => false);
 
   if (!alreadyEvaluated) {
-    const evaluateButton = agent.page.getByRole("button", { name: /check fit/i });
+    const evaluateButton = agent.page.getByRole("button", {
+      name: /check fit|evaluate fit|re-check fit|run full ai review/i,
+    });
     await expect(evaluateButton).toBeVisible();
     await expect(evaluateButton).toBeEnabled({ timeout: AGENT_TIMEOUT });
     await evaluateButton.click();
@@ -168,7 +170,9 @@ async function evaluateGrant(agent: DumbAgent) {
     await traceSheet.getByRole("button", { name: /close/i }).click();
     await expect(traceSheet).toBeHidden();
     await expect(agent.page).not.toHaveURL(/[?&]run=/);
-    await expect(agent.page.getByRole("button", { name: /re-evaluate fit/i })).toBeVisible({
+    await expect(
+      agent.page.getByRole("button", { name: /re-evaluate fit|re-check fit|run full ai review/i }),
+    ).toBeVisible({
       timeout: AGENT_TIMEOUT,
     });
   }
@@ -493,7 +497,7 @@ test("Admin: system health, agent config, and source management", async ({ page 
   const agent = new DumbAgent(page, "Admin user");
   try {
     await signUp(agent, ADMIN_USER.email);
-    await agent.press("Admin Console");
+    await agent.press(/admin console/i);
     agent.at("admin");
 
     // Check agent configs page
