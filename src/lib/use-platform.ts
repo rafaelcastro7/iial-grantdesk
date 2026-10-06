@@ -17,8 +17,19 @@ export function useModuleFlags() {
   });
 }
 
-/** Consultants see Home, Grant Radar, Fit insights and the proposals they draft. */
-export const CONSULTANT_PATHS = ["/dashboard", "/grants", "/insights", "/proposals"];
+/**
+ * Consultants can work inside every tenant explicitly assigned to them.
+ * `/clients` is the tenant picker; membership still controls which tenants
+ * are returned, so this does not grant cross-tenant access by itself.
+ */
+export const CONSULTANT_PATHS = [
+  "/dashboard",
+  "/clients",
+  "/grants",
+  "/insights",
+  "/proposals",
+  "/org",
+];
 export function isConsultantPath(path: string) {
   return CONSULTANT_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 }

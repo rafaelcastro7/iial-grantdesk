@@ -120,6 +120,20 @@
       "when": 1790856415135,
       "tag": "0016_grant_dismissals",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791315300003,
+      "tag": "0017_create_nahua_tenant",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791316800000,
+      "tag": "0018_fix_membership_rls_recursion",
+      "breakpoints": true
     }
   ]
 }

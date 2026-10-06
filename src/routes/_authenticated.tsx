@@ -22,7 +22,8 @@ export const Route = createFileRoute("/_authenticated")({
       const { error } = await supabase.rpc("ensure_current_user");
       if (!error) bootstrapped.add(key);
     }
-    // Consultants may only open Home and Grant Radar.
+    // Consultants may only open permitted consultant paths. The Clients page
+    // is their tenant picker and only returns explicitly assigned memberships.
     if (!isConsultantPath(location.pathname) && (await fetchIsConsultant())) {
       throw redirect({ to: "/grants" });
     }

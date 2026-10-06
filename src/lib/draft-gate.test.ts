@@ -19,9 +19,12 @@ describe("draft gate (button and server share it)", () => {
     ).toBe("not_eligible");
   });
 
-  it("lets consultants open the proposals they draft", () => {
+  it("lets consultants select assigned tenants and work in their permitted areas", () => {
+    expect(isConsultantPath("/clients")).toBe(true);
+    expect(isConsultantPath("/clients/4e616875-612d-4c41-8da0-000000000001")).toBe(true);
     expect(isConsultantPath("/proposals/123")).toBe(true);
     expect(isConsultantPath("/insights")).toBe(true);
+    expect(isConsultantPath("/org")).toBe(true);
     expect(isConsultantPath("/admin")).toBe(false);
   });
 });
