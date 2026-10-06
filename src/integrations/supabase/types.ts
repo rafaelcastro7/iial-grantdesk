@@ -8,6 +8,114 @@ export type Database = {
   };
   public: {
     Tables: {
+      grant_copilot_messages: {
+        Row: {
+          actions: Json | null;
+          content: string;
+          created_at: string;
+          grant_id: string;
+          id: string;
+          org_id: string;
+          role: string;
+          user_id: string;
+        };
+        Insert: {
+          actions?: Json | null;
+          content: string;
+          created_at?: string;
+          grant_id: string;
+          id?: string;
+          org_id: string;
+          role: string;
+          user_id: string;
+        };
+        Update: {
+          actions?: Json | null;
+          content?: string;
+          created_at?: string;
+          grant_id?: string;
+          id?: string;
+          org_id?: string;
+          role?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "grant_copilot_messages_grant_id_fkey";
+            columns: ["grant_id"];
+            isOneToOne: false;
+            referencedRelation: "grants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grant_copilot_messages_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      product_design_backlog: {
+        Row: {
+          category: string;
+          created_at: string;
+          description: string;
+          grant_id: string | null;
+          id: string;
+          impact: string;
+          org_id: string;
+          source: string;
+          status: string;
+          title: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          category?: string;
+          created_at?: string;
+          description: string;
+          grant_id?: string | null;
+          id?: string;
+          impact?: string;
+          org_id: string;
+          source?: string;
+          status?: string;
+          title: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          category?: string;
+          created_at?: string;
+          description?: string;
+          grant_id?: string | null;
+          id?: string;
+          impact?: string;
+          org_id?: string;
+          source?: string;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_design_backlog_grant_id_fkey";
+            columns: ["grant_id"];
+            isOneToOne: false;
+            referencedRelation: "grants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_design_backlog_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       agent_config_audit: {
         Row: {
           agent: string;

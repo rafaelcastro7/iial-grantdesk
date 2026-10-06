@@ -29,6 +29,7 @@ export const CONSULTANT_PATHS = [
   "/insights",
   "/proposals",
   "/org",
+  "/backlog",
 ];
 export function isConsultantPath(path: string) {
   return CONSULTANT_PATHS.some((p) => path === p || path.startsWith(`${p}/`));

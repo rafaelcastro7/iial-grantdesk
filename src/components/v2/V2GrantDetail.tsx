@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  Bot,
   Building2,
   CalendarClock,
   CheckCircle2,
@@ -19,6 +20,7 @@ import {
   History,
   Info,
   Landmark,
+  Lightbulb,
   Link2,
   ListChecks,
   Loader2,
@@ -45,6 +47,8 @@ import { FitEvaluation } from "@/components/grants/FitEvaluation";
 import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
 import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { OpportunityBriefPanel } from "@/components/grants/OpportunityBriefPanel";
+import { GrantCopilotSheet } from "@/components/grants/GrantCopilotSheet";
+import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
 import type { AxisScore } from "@/agents/fit-rules.shared";
 import { SelfCheckBanner } from "@/components/grants/SelfCheckBanner";
 import { ValueBlock } from "@/components/grants/GrantDetailExpress";
@@ -219,6 +223,8 @@ export function V2GrantDetail({
   onShare,
   onShortlist,
 }: Props) {
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [backlogModalOpen, setBacklogModalOpen] = useState(false);
   const funderName = grant.funder?.name ?? "Unknown funder";
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
   const ruleSnapshot = evaluation?.rule_snapshot as {
@@ -560,6 +566,16 @@ export function V2GrantDetail({
                 Draft proposal
               </Button>
             )}
+
+            <Button
+              variant="outline"
+              size="default"
+              className="gap-2 font-semibold border-primary/40 hover:bg-primary/5 text-primary shadow-2xs"
+              onClick={() => setCopilotOpen(true)}
+            >
+              <Bot className="h-4 w-4 text-primary" />
+              <span>Grant Copilot</span>
+            </Button>
 
             {grant.status !== "discovered" && (
               <NotebookLMBridge grantId={grant.id} label="Notebook" />
@@ -948,6 +964,51 @@ export function V2GrantDetail({
 
         {/* ================= RIGHT SIDEBAR / DECISION RAIL (4 COLS) ================= */}
         <aside className="space-y-5 lg:col-span-4">
+          {/* STRATEGIC COPILOT & CONSORTIUM ADVISOR */}
+          <div className="rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-4 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-primary/15 p-2 text-primary">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                    Grant Copilot
+                    <Badge variant="outline" className="text-[10px] font-normal py-0">
+                      Asesor IA
+                    </Badge>
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    Consorcios, WCIS y requisitos
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              ¿Dudas sobre cómo postular si faltan requisitos (ej. estados auditados) o qué rol de socio técnico asumir?
+            </p>
+            <div className="flex gap-2 pt-0.5">
+              <Button
+                size="sm"
+                className="flex-1 text-xs gap-1.5 h-8 font-semibold shadow-xs"
+                onClick={() => setCopilotOpen(true)}
+              >
+                <Bot className="h-3.5 w-3.5" />
+                <span>Consultar Copilot</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs gap-1 h-8"
+                onClick={() => setBacklogModalOpen(true)}
+                title="Sugerir mejora de producto para el backlog"
+              >
+                <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+                <span>Sugerir mejora</span>
+              </Button>
+            </div>
+          </div>
+
           {/* AI FIT & ELIGIBILITY VERDICT BREAKDOWN */}
           <Panel
             icon={ClipboardCheck}
@@ -1091,6 +1152,18 @@ export function V2GrantDetail({
           )}
         </aside>
       </div>
+
+      <GrantCopilotSheet
+        grantId={grant.id}
+        grantTitle={grant.title}
+        open={copilotOpen}
+        onOpenChange={setCopilotOpen}
+      />
+      <ProductDesignBacklogModal
+        grantId={grant.id}
+        open={backlogModalOpen}
+        onOpenChange={setBacklogModalOpen}
+      />
     </div>
   );
 }

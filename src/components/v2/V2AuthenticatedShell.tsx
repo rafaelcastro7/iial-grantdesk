@@ -162,6 +162,12 @@ const NAV_GROUPS: NavGroup[] = [
         description: "IIAL eligibility model",
         icon: SlidersHorizontal,
       },
+      {
+        to: "/backlog",
+        label: "Design backlog",
+        description: "Roadmap, ideas and improvements",
+        icon: Lightbulb,
+      },
       { to: "/manual", label: "Guide", description: "System guide", icon: BookOpen },
       {
         to: "/privacy",

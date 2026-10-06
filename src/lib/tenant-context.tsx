@@ -20,6 +20,7 @@ type ActiveTenantContextValue = {
   organizations: TenantMembership[];
   activeOrganization: TenantMembership | null;
   activeOrgId: string | null;
+  activeOrgName: string;
   isLoading: boolean;
   setActiveOrgId: (orgId: string) => void;
 };
@@ -78,6 +79,7 @@ export function ActiveTenantProvider({ children }: { children: React.ReactNode }
       organizations,
       activeOrganization,
       activeOrgId: activeOrganization?.id ?? null,
+      activeOrgName: activeOrganization?.name ?? "Organización activa",
       isLoading,
       setActiveOrgId,
     }),
