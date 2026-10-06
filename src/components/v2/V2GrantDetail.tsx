@@ -20,6 +20,7 @@ import {
   History,
   Info,
   Landmark,
+  Layers,
   Lightbulb,
   Link2,
   ListChecks,
@@ -27,13 +28,16 @@ import {
   MapPin,
   NotebookText,
   RefreshCw,
+  Scale,
   SearchCheck,
   Send,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   Tags,
+  TrendingUp,
   Users,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -49,9 +53,12 @@ import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { OpportunityBriefPanel } from "@/components/grants/OpportunityBriefPanel";
 import { GrantCopilotSheet } from "@/components/grants/GrantCopilotSheet";
 import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
-import type { AxisScore } from "@/agents/fit-rules.shared";
-import { SelfCheckBanner } from "@/components/grants/SelfCheckBanner";
-import { ValueBlock } from "@/components/grants/GrantDetailExpress";
+import { GrantConsortiumMatrix } from "@/components/grants/GrantConsortiumMatrix";
+import { GrantFinancialHurdles } from "@/components/grants/GrantFinancialHurdles";
+import { GrantStrategicRevenue } from "@/components/grants/GrantStrategicRevenue";
+import { GrantOutreachKit } from "@/components/grants/GrantOutreachKit";
+import { synthesizeGrantRoadmap, type RouteId } from "@/lib/grant-roadmap";
+import { useActiveTenant } from "@/lib/tenant-context";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
@@ -65,22 +72,6 @@ import {
 } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
 import { humanizeRationale } from "@/lib/eligibility-explain";
-
-const DETAIL_MODE_STORAGE_KEY = "iial.ui.grantDetailMode";
-type DetailMode = "simple" | "technical";
-
-function useDetailMode(): [DetailMode, (m: DetailMode) => void] {
-  const [mode, setMode] = useState<DetailMode>("simple");
-  useEffect(() => {
-    const stored = window.localStorage.getItem(DETAIL_MODE_STORAGE_KEY);
-    if (stored === "simple" || stored === "technical") setMode(stored);
-  }, []);
-  const update = (next: DetailMode) => {
-    setMode(next);
-    window.localStorage.setItem(DETAIL_MODE_STORAGE_KEY, next);
-  };
-  return [mode, update];
-}
 
 type Requirement = {
   category: string;
@@ -180,29 +171,16 @@ type Props = {
 const DAY_MS = 86_400_000;
 
 const STATUS_LABEL: Record<string, string> = {
-  discovered: "Discovered",
-  enriched: "Details fetched",
-  scored: "Fit checked",
-  shortlisted: "Shortlisted",
-  in_proposal: "In proposal",
-  submitted: "Submitted",
-  won: "Won",
-  lost: "Not awarded",
-  expired: "Expired",
-  archived: "Archived",
-};
-
-const STATUS_DETAIL: Record<string, string> = {
-  discovered: "Official source found; structured facts still need verification.",
-  enriched: "Core details are normalized and ready for a fit decision.",
-  scored: "The opportunity has an IIAL fit evaluation.",
-  shortlisted: "This grant is in active consideration.",
-  in_proposal: "A proposal workflow is already attached.",
-  submitted: "The proposal is with the funder.",
-  won: "Awarded opportunity.",
-  lost: "Not awarded.",
-  expired: "Past deadline.",
-  archived: "Retained for records.",
+  discovered: "Descubierto",
+  enriched: "Detalles Verificados",
+  scored: "Ajuste Evaluado",
+  shortlisted: "Preseleccionado",
+  in_proposal: "En Propuesta",
+  submitted: "Presentado",
+  won: "Adjudicado",
+  lost: "No Adjudicado",
+  expired: "Cerrado / Expirado",
+  archived: "Archivado",
 };
 
 export function V2GrantDetail({
@@ -223,67 +201,20 @@ export function V2GrantDetail({
   onShare,
   onShortlist,
 }: Props) {
+  const { activeTenant, activeOrgId } = useActiveTenant();
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string | undefined>(undefined);
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
-  const funderName = grant.funder?.name ?? "Unknown funder";
+  const [activeTab, setActiveTab] = useState<"roadmap" | "funder_facts" | "technical_audit">("roadmap");
+
+  const funderName = grant.funder?.name ?? "Organismo Financiador";
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
   const ruleSnapshot = evaluation?.rule_snapshot as {
     checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
   } | null;
-  // Same rule as the radar: a rules-only pre-check shows its verdict but no score.
   const isExhaustive = evaluation ? isFullReview(evaluation) : false;
   const fitScore = evaluation && isExhaustive ? Math.round(evaluation.fit_score * 100) : null;
   const ruleChecks = ruleSnapshot?.checks ?? [];
-
-  const requiresPartner = ruleChecks.some(
-    (c) =>
-      !!c &&
-      /university_partner|university partnership/i.test(`${c.id ?? ""} ${c.label ?? ""}`) &&
-      (c.status === "fail" || c.status === "warn"),
-  );
-
-  const requirements = useMemo(() => {
-    if (grant.requirements && grant.requirements.length > 0) return grant.requirements;
-    const base: Requirement[] = [
-      {
-        category: "document",
-        requirement: "Project proposal narrative & methodology",
-        value:
-          "Detailed proposal document describing project goals, implementation methodology, and anticipated impact.",
-        isCritical: true,
-      },
-      {
-        category: "financial",
-        requirement: "Detailed project budget & expenditure justification",
-        value: grant.amount_cad_max
-          ? `Itemized expense breakdown aligned with eligible activities (award cap: $${grant.amount_cad_max.toLocaleString()} CAD).`
-          : "Itemized breakdown of eligible expenses, personnel costs, and justification.",
-        isCritical: true,
-      },
-    ];
-    if (requiresPartner) {
-      base.push({
-        category: "partnership",
-        requirement: "Institutional letter of support / commitment from partner",
-        value: "Official letter on institutional letterhead confirming co-applicant participation.",
-        isCritical: true,
-      });
-    }
-    base.push({
-      category: "document",
-      requirement: "Work plan with milestone schedule & deliverables",
-      value: "Detailed timeline mapping major activities and deliverable targets.",
-      isCritical: false,
-    });
-    base.push({
-      category: "legal",
-      requirement: "Proof of organizational legal registration / good standing",
-      value: "Corporate registration documents or CRA charitable registration.",
-      isCritical: false,
-    });
-    return base;
-  }, [grant.requirements, grant.amount_cad_max, requiresPartner]);
-  const criticalRequirements = requirements.filter((item) => item.isCritical);
 
   const evalVerdict = evaluation
     ? evaluationVerdict({
@@ -294,6 +225,7 @@ export function V2GrantDetail({
           (evaluation.rule_snapshot as { verdict?: string } | null | undefined)?.verdict ?? null,
       })
     : null;
+
   const deadline = getDeadlineState(grant.deadline);
   const currency = grantCurrency(grant);
   const amount = amountLabel(
@@ -302,7 +234,7 @@ export function V2GrantDetail({
     grant.status !== "discovered",
     currency,
   );
-  const quality = getQualityState({ grant, evaluation, requirements, eligibilityRows });
+  const quality = getQualityState({ grant, evaluation, requirements: grant.requirements ?? [], eligibilityRows });
   const verdict = getVerdict({
     deadlineDays: deadline.days,
     evaluation,
@@ -312,32 +244,56 @@ export function V2GrantDetail({
     enrichAttempts: grant.enrich_attempts,
   });
 
+  // Synthesize complete strategic grant roadmap (Consortium routes, financial hurdles, WCIS revenue)
+  const roadmap = useMemo(() => {
+    return synthesizeGrantRoadmap({
+      id: grant.id,
+      title: grant.title,
+      funderName: grant.funder?.name,
+      summary: grant.summary,
+      amountCadMax: grant.amount_cad_max,
+      applicantTypes: grant.applicant_types,
+      sectors: grant.sectors,
+      deadline: grant.deadline,
+      deadlineKind: grant.deadline_kind,
+      jurisdiction: grant.funder?.jurisdiction,
+      requirements: grant.requirements,
+      eligibilityNote: grant.eligibility_note,
+      orgName: activeTenant?.name || "IIAL",
+    });
+  }, [grant, activeTenant?.name]);
+
+  const [selectedRouteId, setSelectedRouteId] = useState<RouteId>(roadmap.recommendedRouteId);
+
+  // Sync selectedRouteId if roadmap changes
+  useEffect(() => {
+    setSelectedRouteId(roadmap.recommendedRouteId);
+  }, [roadmap.recommendedRouteId]);
+
+  const selectedRoute = useMemo(() => {
+    return roadmap.routes.find((r) => r.id === selectedRouteId) || roadmap.routes[0];
+  }, [roadmap.routes, selectedRouteId]);
+
   const canFetch = grant.status === "discovered" && !verdict.enrichmentFailed;
   const hasEvaluableContent = (grant.summary ?? "").trim().length > 0;
   const canEvaluate = grant.status !== "discovered" || !!evaluation || hasEvaluableContent;
   const evaluateBlockedReason = canEvaluate
     ? null
     : verdict.enrichmentFailed
-      ? "We couldn't read this grant's page. Open the official page to check it by hand."
-      : "Fetch details first so there is text to assess.";
-  const canDraft =
-    // Same verdict the server checks: grants.status is shared by every user
-    // and is "scored" even after a "no", so it must not unlock drafting.
-    draftGate(evaluation) === "ok";
+      ? "No fue posible leer la página oficial automáticamente. Ábrela para revisarla manualmente."
+      : "Rastrea detalles primero para disponer de texto que evaluar.";
+  const canDraft = draftGate(evaluation) === "ok";
   const draftBlockedReason = canDraft
     ? null
     : evalVerdict === "not_eligible"
-      ? "Drafting is off: assessed as not eligible for your organization. Update profile if wrong."
+      ? "La postulación directa no cumple con los requisitos del perfil. Considera postular en consorcio (Ruta B o C)."
       : evalVerdict === "needs_input"
-        ? "Drafting unlocks once eligibility is confirmed: check the open points on the official page."
+        ? "Verifica los requisitos pendientes en las bases antes de redactar."
         : evaluation
-          ? "Drafting is unavailable until eligibility passes."
-          : "Check fit first to unlock drafting.";
+          ? "La redacción se habilita al validar la viabilidad de la ruta."
+          : "Ejecuta 'Evaluar Ajuste' para desbloquear la redacción de la propuesta.";
 
   const actionDisabled = busy != null;
-  const [detailMode, setDetailMode] = useDetailMode();
-  const isTechnical = detailMode === "technical";
-
   const kind = fundingKindOf(grant);
   const applicantTypes = grant.applicant_types ?? [];
   const fundingUses = grant.funding_uses ?? [];
@@ -354,77 +310,60 @@ export function V2GrantDetail({
     .filter((url) => url !== grant.url && url !== grant.funder?.source_url)
     .slice(0, 6);
 
-  const deadlineTone =
-    deadline.days == null
-      ? "neutral"
-      : deadline.days < 0
-        ? "danger"
-        : deadline.days <= 14
-          ? "warning"
-          : "neutral";
+  const isRolling = roadmap.financial.disbursementTimeline.intakeMode === "rolling";
 
-  // Only the rules engine's partner check raises the banner: matching the
-  // word "partner" in the summary flagged almost every grant ("partnering
-  // with industry"...).
+  const handleOpenCopilotWithPrompt = (prompt?: string) => {
+    setCopilotInitialPrompt(prompt);
+    setCopilotOpen(true);
+  };
 
   return (
     <div className="w-full max-w-[1700px] space-y-4 px-3 py-4 sm:px-6 lg:py-5">
       {/* ----------------- TOP NAVBAR & CONTROL BAR ----------------- */}
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3.5 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button asChild variant="outline" size="sm" className="gap-1.5 font-medium">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button asChild variant="outline" size="sm" className="gap-1.5 font-medium h-8 text-xs">
             <Link to="/grants">
-              <ArrowLeft className="h-4 w-4" />
-              Grant radar
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Radar de Convocatorias
             </Link>
           </Button>
+
           <div className="h-4 w-px bg-border hidden sm:block" />
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Badge variant="secondary" className="rounded-md font-medium text-xs">
               {FUNDING_KIND_LABEL[kind]}
             </Badge>
-            {kind !== "grant" && (
+
+            {isRolling ? (
               <Badge
                 variant="outline"
-                className="rounded-md border-amber-500/50 text-amber-700 dark:text-amber-300 text-xs"
+                className="rounded-md border-blue-500/40 text-blue-700 dark:text-blue-300 bg-blue-500/10 text-xs font-semibold"
               >
-                Not a grant
+                Recepción Continua (Rolling)
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="rounded-md bg-muted/60 text-xs">
+                {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
               </Badge>
             )}
-            <Badge variant="outline" className="rounded-md bg-muted/50 text-xs">
-              {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
-            </Badge>
+
             {duplicateGroupSize > 1 && (
-              <Badge
-                variant="outline"
-                className="rounded-md border-amber-500/50 text-amber-700 text-xs"
-              >
-                {duplicateGroupSize} similar
+              <Badge variant="outline" className="rounded-md border-amber-500/50 text-amber-700 text-xs">
+                {duplicateGroupSize} similares
+              </Badge>
+            )}
+
+            {activeTenant && (
+              <Badge variant="outline" className="text-xs bg-primary/5 border-primary/30 text-primary">
+                Tenant: {activeTenant.name}
               </Badge>
             )}
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Detail mode toggle */}
-          <div className="inline-flex rounded-md border bg-muted/40 p-0.5 text-xs">
-            {(["simple", "technical"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setDetailMode(mode)}
-                className={cn(
-                  "rounded-[4px] px-2.5 py-1 font-medium capitalize transition-all",
-                  detailMode === mode
-                    ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-
           <Button
             type="button"
             variant="outline"
@@ -434,7 +373,7 @@ export function V2GrantDetail({
             onClick={onShare}
           >
             <Link2 className="h-3.5 w-3.5" />
-            {busy === "share" ? "Sharing..." : shareUrl ? "Link Copied" : "Share"}
+            {busy === "share" ? "Compartiendo..." : shareUrl ? "Enlace Copiado" : "Compartir"}
           </Button>
 
           {grant.url && (
@@ -446,7 +385,7 @@ export function V2GrantDetail({
                 className: "h-8 text-xs gap-1.5",
               })}
             >
-              <span>Official page</span>
+              <span>Página oficial</span>
               <ExternalLink className="h-3 w-3" />
             </ExternalLinkPreview>
           )}
@@ -467,19 +406,20 @@ export function V2GrantDetail({
       {busy === "enrich" && (
         <div className="flex items-center gap-2.5 rounded-md border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-900 dark:text-teal-200">
           <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
-          Fetching live details from official funder page (20-60s)...
+          Rastreando bases oficiales y requisitos del fondo en vivo (20-60s)...
         </div>
       )}
 
       {/* ----------------- HERO EXECUTIVE KPI STRIP ----------------- */}
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border bg-card p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           {/* Grant Title & Funder Info */}
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-3xl leading-tight">
+          <div className="min-w-0 flex-1 space-y-2">
+            <h1 className="font-display text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-foreground leading-tight">
               {grant.title}
             </h1>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
                 <Landmark className="h-4 w-4 text-primary" />
                 {funderName}
@@ -504,76 +444,76 @@ export function V2GrantDetail({
           </div>
 
           {/* Action CTAs Cluster */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             {canFetch && (
               <Button
                 variant="outline"
-                size="default"
-                className="gap-2 font-medium"
+                size="sm"
+                className="gap-1.5 font-medium h-9 text-xs"
                 disabled={actionDisabled}
                 onClick={onFetchDetails}
               >
                 {busy === "enrich" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className="h-3.5 w-3.5" />
                 )}
-                Fetch details
+                Rastrear bases
               </Button>
             )}
 
             <Button
-              size="default"
+              size="sm"
               variant={canFetch ? "outline" : "default"}
-              className="gap-2 font-semibold shadow-xs"
+              className="gap-1.5 font-semibold h-9 text-xs shadow-xs"
               disabled={actionDisabled || !canEvaluate}
               onClick={onEvaluate}
               title={evaluateBlockedReason ?? undefined}
             >
               {busy === "eval" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <SearchCheck className="h-4 w-4" />
+                <SearchCheck className="h-3.5 w-3.5" />
               )}
-              {evaluation ? (isExhaustive ? "Re-check fit" : "Run full AI review") : "Check fit"}
+              {evaluation ? (isExhaustive ? "Re-evaluar ajuste" : "Ejecutar revisión IA") : "Evaluar ajuste"}
             </Button>
 
             {existingProposalId ? (
               <Button
                 asChild
-                size="default"
-                className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                size="sm"
+                className="gap-1.5 font-semibold h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 <Link to="/proposals/$id" params={{ id: existingProposalId }}>
-                  <FileText className="h-4 w-4" />
-                  Open proposal
+                  <FileText className="h-3.5 w-3.5" />
+                  Abrir propuesta
                 </Link>
               </Button>
             ) : (
               <Button
-                size="default"
-                className="gap-2 font-semibold shadow-xs"
+                size="sm"
+                className="gap-1.5 font-semibold h-9 text-xs shadow-xs"
                 variant="default"
                 disabled={actionDisabled || !canDraft}
                 onClick={onDraft}
                 title={draftBlockedReason ?? undefined}
               >
                 {busy === "draft" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <Send className="h-3.5 w-3.5" />
                 )}
-                Draft proposal
+                Redactar propuesta
               </Button>
             )}
 
             <Button
               variant="outline"
-              size="default"
-              className="gap-2 font-semibold border-primary/40 hover:bg-primary/5 text-primary shadow-2xs"
-              onClick={() => setCopilotOpen(true)}
+              size="sm"
+              className="gap-1.5 font-semibold h-9 text-xs border-primary/40 hover:bg-primary/5 text-primary shadow-2xs"
+              onClick={() => handleOpenCopilotWithPrompt()}
             >
-              <Bot className="h-4 w-4 text-primary" />
+              <Bot className="h-3.5 w-3.5 text-primary" />
               <span>Grant Copilot</span>
             </Button>
 
@@ -584,35 +524,31 @@ export function V2GrantDetail({
             {isAdmin && grant.status === "scored" && (
               <Button
                 variant="outline"
-                size="default"
+                size="sm"
+                className="h-9 text-xs"
                 disabled={busy === "shortlist"}
                 onClick={onShortlist}
               >
-                Shortlist
+                Preseleccionar
               </Button>
             )}
           </div>
         </div>
-        {(evaluateBlockedReason || draftBlockedReason) && !existingProposalId && (
-          <p className="mt-2 text-xs text-muted-foreground lg:text-right">
-            {evaluateBlockedReason ?? draftBlockedReason}
-          </p>
-        )}
 
         {/* 4-Column Executive KPI Cards */}
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* Card 1: Fit & Eligibility Verdict */}
-          <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-1">
+          {/* Card 1: Veredicto y Fit */}
+          <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Fit score &amp; verdict
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Veredicto &amp; Score
               </span>
               <span className={cn("h-2.5 w-2.5 rounded-full", verdict.dot)} />
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
+            <div className="mt-1.5 flex items-baseline gap-2">
               <span
                 className={cn(
-                  "text-2xl sm:text-3xl font-bold tabular-nums tracking-tight",
+                  "text-2xl font-bold tabular-nums tracking-tight",
                   evaluation?.eligibility_pass
                     ? "text-emerald-600 dark:text-emerald-400"
                     : fitScore == null
@@ -632,334 +568,288 @@ export function V2GrantDetail({
                       ? "outline"
                       : "destructive"
                 }
-                className="rounded-md font-semibold text-xs"
+                className="rounded-md font-semibold text-[10px] py-0 px-1.5"
               >
                 {evalVerdict === "eligible"
-                  ? "Eligible"
+                  ? "Viable"
                   : evalVerdict === "needs_input"
-                    ? "Needs Input"
+                    ? "Requiere Socio"
                     : evalVerdict === "not_eligible"
-                      ? "Ineligible"
-                      : "Unchecked"}
+                      ? "Ineligible Directo"
+                      : "Sin Evaluar"}
               </Badge>
             </div>
-            <p className="mt-1 text-xs font-medium text-foreground truncate" title={verdict.label}>
-              {!isExhaustive && evaluation
-                ? "Rules pre-check · score shown after the AI review"
-                : verdict.label}
+            <p className="mt-1 text-[11px] text-muted-foreground truncate" title={verdict.label}>
+              {verdict.label}
             </p>
           </div>
 
-          {/* Card 2: Award Amount */}
-          <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
+          {/* Card 2: Monto Máximo del Fondo */}
+          <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Award Amount
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Tope del Fondo
               </span>
               <DollarSign className="h-4 w-4 text-primary" />
             </div>
-            <div className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+            <div className="mt-1.5 text-xl font-bold tracking-tight text-foreground truncate">
               {amount}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground truncate">
-              {grant.historical_awards
-                ? `Median ${formatMoney(grant.historical_awards.median, grant.historical_awards.currency)} (${grant.historical_awards.count} awards)`
-                : kind === "grant"
-                  ? "Non-repayable"
-                  : "Financing"}
+            <p className="mt-1 text-[11px] text-muted-foreground truncate">
+              No representa 100% para IIAL (reparto consorcio)
             </p>
           </div>
 
-          {/* Card 3: Deadline & Days Left */}
-          <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
+          {/* Card 3: Ventana de Cierre / Recepción */}
+          <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Deadline
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Estado de Cierre
               </span>
               <CalendarClock
                 className={cn(
                   "h-4 w-4",
-                  deadlineTone === "warning"
-                    ? "text-amber-500"
-                    : deadlineTone === "danger"
-                      ? "text-rose-500"
-                      : "text-primary",
+                  deadline.days != null && deadline.days <= 14 ? "text-amber-500" : "text-primary",
                 )}
               />
             </div>
-            <div
-              className={cn(
-                "mt-2 text-xl sm:text-2xl font-bold tracking-tight truncate",
-                deadlineTone === "danger"
-                  ? "text-rose-600"
-                  : deadlineTone === "warning"
-                    ? "text-amber-600"
-                    : "text-foreground",
-              )}
-            >
-              {grant.deadline_kind === "rolling" && !grant.deadline
-                ? "Rolling Intake"
-                : deadline.label}
+            <div className="mt-1.5 text-xl font-bold tracking-tight truncate text-foreground">
+              {isRolling ? "Recepción Continua" : deadline.label}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground truncate">
-              {(deadline.days == null || deadline.days < 0) &&
-              grant.deadline_kind !== "rolling" &&
-              grant.next_expected_deadline
-                ? `Next cycle expected ${formatDate(grant.next_expected_deadline)}${
-                    grant.next_expected_deadline_confidence != null
-                      ? ` (${Math.round(Number(grant.next_expected_deadline_confidence) * 100)}% confidence)`
-                      : ""
-                  }`
-                : grant.deadline_kind === "rolling"
-                  ? "Open continuously"
-                  : grant.deadline_kind === "estimated"
-                    ? `${deadline.detail} (estimated)`
-                    : grant.deadline && grant.deadline_kind !== "confirmed"
-                      ? `${deadline.detail} · not verified on the source`
-                      : deadline.detail}
+            <p className="mt-1 text-[11px] text-muted-foreground truncate">
+              {isRolling ? "Ventana abierta todo el año" : deadline.detail}
             </p>
           </div>
 
-          {/* Card 4: Critical Requirements Summary */}
-          <div className="rounded-lg border bg-background/80 p-3.5 shadow-2xs">
+          {/* Card 4: Ruta Recomendada de Consorcio */}
+          <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Critical Asks
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Ruta Sugerida
               </span>
-              <ListChecks className="h-4 w-4 text-primary" />
+              <Workflow className="h-4 w-4 text-primary" />
             </div>
-            <div className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              {criticalRequirements.length} Critical
+            <div className="mt-1.5 text-base sm:text-lg font-bold tracking-tight text-primary truncate">
+              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)?.title.replace("Ruta ", "") || "Académica"}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground truncate">
-              {requirements.length > 0
-                ? `${requirements.length} total requirements extracted`
-                : "Open page to verify"}
+            <p className="mt-1 text-[11px] text-muted-foreground truncate">
+              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)?.recommendedPartner || "Aliado estratégico"}
             </p>
           </div>
         </div>
       </section>
 
-      {/* ----------------- PARTNER / CRITICAL CALLOUT BANNER ----------------- */}
-      {requiresPartner && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200">
-          <Users className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-          <div className="space-y-0.5">
-            <h3 className="text-sm font-bold uppercase tracking-wide">Partnership Requirement</h3>
-            <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
-              This call expects a university or postsecondary research partner, and none is
-              confirmed in your profile. Line up a partner and a letter of commitment before
-              applying.
-            </p>
-          </div>
+      {/* ----------------- NAVIGATION WORKSPACE TABS ----------------- */}
+      <div className="flex items-center justify-between border-b pb-1 gap-2 flex-wrap">
+        <div className="inline-flex rounded-lg border bg-muted/30 p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab("roadmap")}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold transition-all",
+              activeTab === "roadmap"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Workflow className="h-4 w-4 text-primary" />
+            <span>1. Hoja de Ruta &amp; Consorcio (Estratégico)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("funder_facts")}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold transition-all",
+              activeTab === "funder_facts"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <FileText className="h-4 w-4 text-primary" />
+            <span>2. Ficha Oficial del Funder</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("technical_audit")}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold transition-all",
+              activeTab === "technical_audit"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <History className="h-4 w-4 text-primary" />
+            <span>3. Subsanación &amp; Auditoría Técnica</span>
+          </button>
         </div>
-      )}
+
+        <div className="text-xs text-muted-foreground">
+          Ruta activa seleccionada: <strong className="text-foreground">{selectedRoute.title}</strong>
+        </div>
+      </div>
 
       {/* ----------------- MAIN WIDESCREEN WORKSPACE (8 COLS MAIN + 4 COLS RAIL) ----------------- */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* ================= LEFT MAIN COLUMN (8 COLS) ================= */}
         <main className="space-y-5 lg:col-span-8">
-          {/* 1. OPPORTUNITY BRIEF (WHAT YOU NEED TO APPLY - TOP PRIORITY) */}
-          <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={isTechnical} />
-
-          {/* 2. PROGRAM OVERVIEW & SCOPE */}
-          <Panel
-            icon={FileText}
-            title="Program Scope & Coverage"
-            description="High-level summary of what the grant funds, target applicants, and sector coverage."
-          >
-            <div className="space-y-4">
-              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
-                {grant.summary?.trim() ||
-                  "No reliable description extracted yet. Click 'Fetch details' or view official page."}
-              </p>
-
-              <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FactRow label="Who can apply" values={applicantTypes} />
-                <FactRow label="What it pays for" values={fundingUses} />
-                <FactRow label="Who it is meant to help" values={populations} />
-                <FactRow label="Sectors" values={sectors} />
-              </div>
-            </div>
-          </Panel>
-
-          {/* 1. CRITICAL APPLICATION CHECKLIST & REQUIREMENTS */}
-          <Panel
-            icon={FileCheck2}
-            title="Application Checklist & Requirements"
-            description="Critical conditions first, followed by required documentation and eligibility rules."
-            actions={
-              isTechnical && requirements.length > 0 ? (
-                <EvidenceChip
-                  field="requirements"
-                  label="Requirement evidence"
-                  onClick={onOpenEvidence}
-                />
-              ) : undefined
-            }
-          >
-            {requirements.length === 0 ? (
-              <EmptyState
-                icon={FileCheck2}
-                title="No requirements extracted yet"
-                body="Check the official page for matching funds, university partnerships, and documentation before assigning work."
+          {activeTab === "roadmap" && (
+            <>
+              {/* 1. MATRIZ DE RUTAS DE POSTULACIÓN Y CONSORCIO */}
+              <GrantConsortiumMatrix
+                routes={roadmap.routes}
+                recommendedRouteId={roadmap.recommendedRouteId}
+                selectedRouteId={selectedRouteId}
+                onSelectRoute={(id) => setSelectedRouteId(id)}
               />
-            ) : (
-              <div className="space-y-4">
-                {criticalRequirements.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-1.5">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      Critical Conditions ({criticalRequirements.length})
-                    </h3>
-                    <ul className="grid gap-2 sm:grid-cols-2">
-                      {criticalRequirements.map((item, idx) => (
-                        <li
-                          key={idx}
-                          className="flex items-start gap-2.5 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-xs leading-relaxed"
-                        >
-                          <CheckCircle2 className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
-                          <div>
-                            <span className="font-semibold text-foreground block">
-                              {item.requirement}
-                            </span>
-                            {item.value && (
-                              <span className="text-muted-foreground mt-0.5 block">
-                                {item.value}
-                              </span>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
 
-                {requirements.filter((item) => !item.isCritical).length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                      Standard Requirements
-                    </h3>
-                    <ul className="grid gap-2 sm:grid-cols-2">
-                      {requirements
-                        .filter((item) => !item.isCritical)
-                        .map((item, idx) => (
-                          <li
-                            key={idx}
-                            className="flex items-start gap-2.5 rounded-lg border bg-background/60 p-3 text-xs leading-relaxed"
-                          >
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
-                            <div>
-                              <span className="font-medium text-foreground block">
-                                {item.requirement}
-                              </span>
-                              {item.value && (
-                                <span className="text-muted-foreground mt-0.5 block">
-                                  {item.value}
-                                </span>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </Panel>
+              {/* 2. CONDICIONES FINANCIERAS Y BARRERAS CRÍTICAS */}
+              <GrantFinancialHurdles financial={roadmap.financial} />
 
-          {/* 3. FUNDER'S ELIGIBILITY STATEMENTS */}
-          <Panel
-            icon={ShieldCheck}
-            title="Eligibility Rules Stated by Funder"
-            description="What the official source explicitly says about who qualifies."
-            actions={
-              isTechnical && eligibilityRows.length > 0 ? (
-                <EvidenceChip
-                  field="eligibility"
-                  label="Eligibility evidence"
-                  onClick={onOpenEvidence}
-                />
-              ) : undefined
-            }
-          >
-            {eligibleGroups.length === 0 &&
-            eligibilityDetails.length === 0 &&
-            !grant.eligibility_note ? (
-              <EmptyState
-                icon={ShieldAlert}
-                title="No eligibility rules extracted yet"
-                body="Confirm who qualifies on the official page before pursuing."
+              {/* 3. RETORNO ESTRATÉGICO Y MODELO DE REVENUE */}
+              <GrantStrategicRevenue strategicReturn={roadmap.strategicReturn} />
+
+              {/* 4. EXECUTIVE BRIEF GO/NO-GO DE LA OPORTUNIDAD */}
+              <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
+
+              {/* 5. PLAN DE ACCIÓN OPERATIVO Y KIT DE ACERCAMIENTO */}
+              <GrantOutreachKit
+                outreach={roadmap.outreach}
+                selectedRouteId={selectedRouteId}
+                onOpenCopilot={handleOpenCopilotWithPrompt}
               />
-            ) : (
-              <div className="space-y-4 text-sm">
-                {grant.eligibility_note && (
-                  <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
-                    {grant.eligibility_note}
+            </>
+          )}
+
+          {activeTab === "funder_facts" && (
+            <>
+              {/* RESUMEN OFICIAL Y ALCANCE */}
+              <Panel
+                icon={FileText}
+                title="Alcance del Programa y Descripción Oficial"
+                description="Resumen extraído de la fuente oficial del organismo financiador."
+              >
+                <div className="space-y-4">
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                    {grant.summary?.trim() ||
+                      "No se ha extraído una descripción detallada. Haz clic en 'Rastrear bases' o revisa la página oficial."}
                   </p>
-                )}
-                {eligibleGroups.length > 0 && (
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
-                      Explicitly Eligible Groups
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {eligibleGroups.map((label) => (
-                        <Badge
-                          key={label}
-                          variant="secondary"
-                          className="rounded-md text-xs py-1 px-2.5"
-                        >
-                          {label}
-                        </Badge>
-                      ))}
-                    </div>
+
+                  <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FactRow label="Quién puede postular" values={applicantTypes} />
+                    <FactRow label="Qué financia el fondo" values={fundingUses} />
+                    <FactRow label="Poblaciones beneficiarias" values={populations} />
+                    <FactRow label="Sectores elegibles" values={sectors} />
                   </div>
-                )}
-                {eligibilityDetails.length > 0 && (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {eligibilityDetails.map(([key, value]) => (
-                      <div key={key} className="rounded-lg border bg-background/70 p-3">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
-                          {ELIGIBILITY_LABEL[key] ?? humanizeKey(key)}
+                </div>
+              </Panel>
+
+              {/* REGLAS TEXTUALES DEL FUNDER */}
+              <Panel
+                icon={ShieldCheck}
+                title="Reglas de Elegibilidad Declaradas por el Financiador"
+                description="Condiciones explícitas citadas por la convocatoria."
+              >
+                {eligibleGroups.length === 0 &&
+                eligibilityDetails.length === 0 &&
+                !grant.eligibility_note ? (
+                  <EmptyState
+                    icon={ShieldAlert}
+                    title="No se extrajeron reglas textuales de elegibilidad"
+                    body="Verifica en la página oficial del financiador antes de invertir tiempo de redacción."
+                  />
+                ) : (
+                  <div className="space-y-4 text-sm">
+                    {grant.eligibility_note && (
+                      <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
+                        {grant.eligibility_note}
+                      </p>
+                    )}
+                    {eligibleGroups.length > 0 && (
+                      <div>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
+                          Grupos Explícitamente Elegibles
                         </span>
-                        <div className="mt-1 text-xs">
-                          <ValueBlock value={value} />
+                        <div className="flex flex-wrap gap-1.5">
+                          {eligibleGroups.map((label) => (
+                            <Badge key={label} variant="secondary" className="rounded-md text-xs py-1 px-2.5">
+                              {label}
+                            </Badge>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    )}
+                    {eligibilityDetails.length > 0 && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {eligibilityDetails.map(([key, value]) => (
+                          <div key={key} className="rounded-lg border bg-background/70 p-3">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                              {ELIGIBILITY_LABEL[key] ?? humanizeKey(key)}
+                            </span>
+                            <div className="mt-1 text-xs">
+                              {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-          </Panel>
+              </Panel>
 
-          {/* MANUAL FACTS OVERRIDE PANEL */}
-          <ManualFactsPanel grant={grant} />
+              {/* FUENTES Y PROVENIENCIA */}
+              <Panel
+                icon={Link2}
+                title="Fuentes Oficiales y Proveniencia"
+                description="Páginas web verificadas y fechas de observación."
+              >
+                <div className="space-y-2.5 text-sm">
+                  {grant.url && <SourceLink href={grant.url} label="Página Oficial de la Convocatoria" />}
+                  {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
+                    <SourceLink href={grant.funder.source_url} label="Portal Principal del Financiador" />
+                  )}
+                  {otherSources.map((url) => (
+                    <SourceLink key={url} href={url} label={url.replace(/^https?:\/\/(www\.)?/, "")} />
+                  ))}
+                  <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
+                    <span>Descubierto: {formatDateTime(grant.discovered_at)}</span>
+                    <span>Última verificación: {formatDateTime(grant.last_seen_at)}</span>
+                  </div>
+                </div>
+              </Panel>
+            </>
+          )}
 
-          {/* 6. OFFICIAL SOURCES & VERIFICATION LINKS */}
-          <Panel
-            icon={Link2}
-            title="Official Sources & Provenance"
-            description="Validated web URLs and observation dates."
-          >
-            <div className="space-y-2.5 text-sm">
-              {grant.url && <SourceLink href={grant.url} label="Official Grant Page" />}
-              {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
-                <SourceLink href={grant.funder.source_url} label="Funder Main Portal" />
-              )}
-              {otherSources.map((url) => (
-                <SourceLink key={url} href={url} label={url.replace(/^https?:\/\/(www\.)?/, "")} />
-              ))}
-              {!grant.url && !grant.funder?.source_url && (
-                <p className="text-xs text-muted-foreground">No official URL stored.</p>
-              )}
-              <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
-                <span>First discovered: {formatDateTime(grant.discovered_at)}</span>
-                <span>Last checked: {formatDateTime(grant.last_seen_at)}</span>
-              </div>
-            </div>
-          </Panel>
+          {activeTab === "technical_audit" && (
+            <>
+              {/* SUBSANACIÓN MANUAL DE HECHOS */}
+              <ManualFactsPanel grant={grant} />
+
+              {/* DESGLOSE DE PUNTUACIÓN Y AUDITORÍA DE REGLAS */}
+              <FitEvaluation
+                status={grant.status}
+                discoveredAt={grant.discovered_at}
+                enrichedAt={grant.enriched_at}
+                scoredAt={grant.scored_at}
+                evaluation={
+                  evaluation
+                    ? {
+                        fit_score: evaluation.fit_score,
+                        eligibility_pass: evaluation.eligibility_pass,
+                        rationale_en: evaluation.rationale_en,
+                        created_at: evaluation.created_at,
+                        rule_snapshot: evaluation.rule_snapshot as Record<string, unknown> | null,
+                        axis_breakdown: evaluation.axis_breakdown as Record<string, unknown> | null,
+                      }
+                    : null
+                }
+              />
+
+              {/* TRAZA DE EVENTOS */}
+              <FetchTrailPanel events={events} />
+            </>
+          )}
         </main>
 
         {/* ================= RIGHT SIDEBAR / DECISION RAIL (4 COLS) ================= */}
@@ -984,14 +874,36 @@ export function V2GrantDetail({
                 </div>
               </div>
             </div>
+
             <p className="text-xs text-muted-foreground leading-relaxed">
-              ¿Dudas sobre cómo postular si faltan requisitos (ej. estados auditados) o qué rol de socio técnico asumir?
+              Asesoría contextual para postular en consorcio con {selectedRoute.leadEntity} y articular el estándar WCIS.
             </p>
-            <div className="flex gap-2 pt-0.5">
+
+            <div className="space-y-1.5 pt-1">
+              <button
+                type="button"
+                onClick={() => handleOpenCopilotWithPrompt(`¿Cómo estructuramos la ${selectedRoute.title} para maximizar el puntaje en esta convocatoria?`)}
+                className="w-full text-left text-[11px] p-2 rounded-md bg-background/80 border hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-between"
+              >
+                <span>Estructurar {selectedRoute.title}</span>
+                <ArrowRight className="h-3 w-3 shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenCopilotWithPrompt("¿Cómo presentamos el estándar WCIS para que cuente como contrapartida en especie (in-kind)?")}
+                className="w-full text-left text-[11px] p-2 rounded-md bg-background/80 border hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-between"
+              >
+                <span>Justificar contrapartida in-kind con WCIS</span>
+                <ArrowRight className="h-3 w-3 shrink-0" />
+              </button>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-border/50">
               <Button
                 size="sm"
                 className="flex-1 text-xs gap-1.5 h-8 font-semibold shadow-xs"
-                onClick={() => setCopilotOpen(true)}
+                onClick={() => handleOpenCopilotWithPrompt()}
               >
                 <Bot className="h-3.5 w-3.5" />
                 <span>Consultar Copilot</span>
@@ -1009,19 +921,14 @@ export function V2GrantDetail({
             </div>
           </div>
 
-          {/* AI FIT & ELIGIBILITY VERDICT BREAKDOWN */}
+          {/* AI FIT & DECISION RATIONALE */}
           <Panel
             icon={ClipboardCheck}
-            title="IIAL Fit &amp; Decision Rationale"
+            title="Dictamen de Ajuste &amp; Decisiones"
             description={
               evaluation
-                ? `Evaluated ${formatDateTime(evaluation.created_at)}`
-                : "Fit check not executed yet."
-            }
-            actions={
-              isTechnical && evaluation ? (
-                <EvidenceChip field="fit_score" label="Score evidence" onClick={onOpenEvidence} />
-              ) : undefined
+                ? `Evaluado el ${formatDateTime(evaluation.created_at)}`
+                : "Ajuste no evaluado aún."
             }
           >
             <div className="space-y-3">
@@ -1029,136 +936,28 @@ export function V2GrantDetail({
 
               {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
 
-              {!isTechnical && evaluation?.rationale_en && (
+              {evaluation?.rationale_en && (
                 <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed text-foreground">
-                  <span className="font-semibold block mb-1">Evaluator Rationale:</span>
+                  <span className="font-semibold block mb-1">Evaluación del Motor:</span>
                   {humanizeRationale(evaluation.rationale_en)}
                 </div>
               )}
             </div>
           </Panel>
-
-          {/* TECHNICAL SCORE BREAKDOWN (WHEN TECHNICAL MODE ACTIVE) */}
-          {isTechnical && (
-            <FitEvaluation
-              status={grant.status}
-              discoveredAt={grant.discovered_at}
-              enrichedAt={grant.enriched_at}
-              scoredAt={grant.scored_at}
-              evaluation={
-                evaluation
-                  ? {
-                      fit_score: evaluation.fit_score,
-                      eligibility_pass: evaluation.eligibility_pass,
-                      rule_verdict: evalVerdict === "needs_input" ? "needs_input" : null,
-                      rationale_en: humanizeRationale(evaluation.rationale_en) ?? "",
-                      rationale_fr: evaluation.rationale_fr ?? "",
-                      created_at: evaluation.created_at,
-                      axis_breakdown:
-                        (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
-                    }
-                  : null
-              }
-              fr={false}
-            />
-          )}
-
-          {isTechnical && grant.enriched_at && <EvaluationDetail grantId={grant.id} />}
-
-          {/* DATA COMPLETENESS & QUALITY GAUGE (TECHNICAL MODE) */}
-          {isTechnical && (
-            <>
-              <Panel
-                icon={Gauge}
-                title="Data Quality &amp; Grounding"
-                description="Grounded extraction completeness."
-              >
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span>Completeness</span>
-                  <span className="tabular-nums">
-                    {quality.pct}% ({quality.known}/{quality.total} fields)
-                  </span>
-                </div>
-                <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-2 rounded-full bg-primary transition-all duration-300"
-                    style={{ width: `${quality.pct}%` }}
-                  />
-                </div>
-                <ul className="mt-3 space-y-1.5 text-xs">
-                  {quality.checks.map((check) => (
-                    <li key={check.label} className="flex items-center justify-between gap-2">
-                      <span className="text-muted-foreground">{check.label}</span>
-                      {check.ok ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                      ) : (
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </Panel>
-
-              {/* LIFECYCLE HISTORY */}
-              <Panel
-                icon={History}
-                title="Lifecycle Audit Log"
-                description="Status transitions over time."
-              >
-                {events.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No status events logged yet.</p>
-                ) : (
-                  <ol className="space-y-2 text-xs">
-                    {events.slice(0, 6).map((event, index) => (
-                      <li key={`${event.created_at}-${index}`} className="flex gap-2.5">
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                        <div className="min-w-0">
-                          <span className="font-semibold block">
-                            {event.from_status ?? "none"} &rarr; {event.to_status}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {formatDateTime(event.created_at)}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-                <div className="mt-3 pt-2 border-t text-[11px] text-muted-foreground flex justify-between items-center">
-                  <span>Times seen: {grant.times_seen ?? 1}</span>
-                  <Link
-                    to="/grants/$id/audit"
-                    params={{ id: grant.id }}
-                    className="text-primary underline-offset-4 hover:underline font-medium"
-                  >
-                    View audit report
-                  </Link>
-                </div>
-              </Panel>
-
-              <SelfCheckBanner
-                grantId={grant.id}
-                retrying={busy === "enrich"}
-                onRetry={onFetchDetails}
-              />
-
-              <FetchTrailPanel
-                grantId={grant.id}
-                retrying={busy === "enrich"}
-                errorMsg={grant.enrich_last_error ?? null}
-                onRetry={onFetchDetails}
-              />
-            </>
-          )}
         </aside>
       </div>
 
+      {/* ----------------- MODALS & SLIDE-OVER SHEETS ----------------- */}
       <GrantCopilotSheet
         grantId={grant.id}
-        grantTitle={grant.title}
         open={copilotOpen}
-        onOpenChange={setCopilotOpen}
+        onOpenChange={(open) => {
+          setCopilotOpen(open);
+          if (!open) setCopilotInitialPrompt(undefined);
+        }}
+        initialPrompt={copilotInitialPrompt}
       />
+
       <ProductDesignBacklogModal
         grantId={grant.id}
         open={backlogModalOpen}
@@ -1168,39 +967,36 @@ export function V2GrantDetail({
   );
 }
 
+// ----------------- SUBCOMPONENTES & HELPERS -----------------
+
 const ELIGIBILITY_LABEL: Record<string, string> = {
-  smb: "Small and medium businesses",
-  startup: "Startups",
-  non_profit: "Nonprofits",
-  for_profit: "For-profit companies",
-  indigenous: "Indigenous organizations or people",
-  government: "Public bodies and governments",
-  individual: "Individuals",
-  research_university: "Universities and research institutions",
-  ai_ml: "AI / machine learning work",
+  non_profit: "Entidad Sin Fines de Lucro",
+  for_profit: "Empresa con Fines de Lucro",
+  academic: "Institución Académica / Universidad",
+  individual: "Personas Naturales",
+  indigenous: "Comunidades / Entidades Indígenas",
+  canadian_entity: "Entidad Legal Canadiense",
+  ontario_based: "Radicado en Ontario",
+  registered_charity: "Organización de Beneficencia CRA",
 };
 
 function FactRow({ label, values }: { label: string; values: string[] }) {
   return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="space-y-1">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
         {label}
-      </dt>
-      <dd className="mt-1 flex flex-wrap gap-1 text-xs">
-        {values.length ? (
-          values.map((value) => (
-            <Badge
-              key={value}
-              variant="outline"
-              className="rounded-md font-normal bg-background/50"
-            >
-              {displayTag(value)}
+      </span>
+      {values.length === 0 ? (
+        <span className="text-xs text-muted-foreground italic">No especificado</span>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {values.map((v) => (
+            <Badge key={v} variant="outline" className="text-xs py-0.5 px-2 bg-background/50">
+              {displayTag(v)}
             </Badge>
-          ))
-        ) : (
-          <span className="text-muted-foreground text-xs">Not specified</span>
-        )}
-      </dd>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1274,19 +1070,19 @@ function EmptyState({
 function getDeadlineState(deadline: string | null) {
   if (!deadline) {
     return {
-      label: "No fixed deadline",
-      detail: "Rolling or unextracted intake",
+      label: "Ventana Abierta",
+      detail: "Recepción continua o sin fecha fija",
       days: null as number | null,
     };
   }
   const date = new Date(deadline);
   if (Number.isNaN(date.getTime())) {
-    return { label: "Unparsed deadline", detail: deadline, days: null as number | null };
+    return { label: "Fecha no estandarizada", detail: deadline, days: null as number | null };
   }
   const days = Math.ceil((date.getTime() - Date.now()) / DAY_MS);
-  if (days < 0) return { label: "Closed", detail: formatDate(deadline), days };
-  if (days === 0) return { label: "Closes today", detail: formatDate(deadline), days };
-  return { label: `${days} days left`, detail: formatDate(deadline), days };
+  if (days < 0) return { label: "Cerrada", detail: formatDate(deadline), days };
+  if (days === 0) return { label: "Cierra hoy", detail: formatDate(deadline), days };
+  return { label: `${days} días restantes`, detail: formatDate(deadline), days };
 }
 
 function getQualityState({
@@ -1333,83 +1129,71 @@ function getVerdict({
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
-      label: "Awarded Opportunity",
-      detail: "This opportunity was won. Retain for post-award reporting and evidence history.",
+      label: "Oportunidad Adjudicada",
+      detail: "Oportunidad ganada. Conservar para reportes y archivo histórico.",
     };
   }
   if (status === "submitted" || status === "in_proposal") {
     return {
       dot: "bg-teal-500",
       enrichmentFailed,
-      label: status === "submitted" ? "Awaiting Funder Decision" : "Proposal Drafting in Progress",
-      detail: STATUS_DETAIL[status],
+      label: status === "submitted" ? "En Evaluación por el Funder" : "Propuesta en Redacción",
+      detail: STATUS_LABEL[status] || status,
     };
   }
   if (isTerminalGrantStatus(status) || (deadlineDays != null && deadlineDays < 0)) {
     return {
       dot: "bg-rose-500",
       enrichmentFailed,
-      label: "Closed / Expired",
-      detail: "This record is closed or past deadline. Retain for historical reference.",
+      label: "Cerrada / Expirada",
+      detail: "Convocatoria fuera de plazo. Monitorear para el siguiente ciclo.",
     };
   }
   if (enrichmentFailed) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Validate Source First",
-      detail:
-        "Automated extraction could not read enough structured facts. Review official page manually.",
-    };
-  }
-  if (qualityPct < 55) {
-    return {
-      dot: "bg-amber-500",
-      enrichmentFailed,
-      label: "Incomplete Lead",
-      detail: "Useful lead, but details are not yet complete enough for a final decision.",
+      label: "Verificar Fuente Manualmente",
+      detail: "La extracción automática no obtuvo suficientes datos estructurados.",
     };
   }
   if (!evaluation) {
     return {
       dot: "bg-teal-500",
       enrichmentFailed,
-      label: "Ready for Fit Check",
-      detail: "The record has usable detail. Run the evaluator to confirm organization fit.",
+      label: "Lista para Evaluación de Ajuste",
+      detail: "El registro cuenta con detalles suficientes. Ejecuta la evaluación para medir encaje.",
     };
   }
   if (evaluation.eligibility_pass && evaluation.fit_score >= 0.7) {
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
-      label: "Strong Pursue (High Fit)",
-      detail:
-        "High strategic fit and no eligibility blockers found. Recommended to start proposal.",
+      label: "Alta Prioridad (Encaje Fuerte)",
+      detail: "Alto alineamiento temático y sin bloqueos fiduciarios detectados.",
     };
   }
   if (evaluation.eligibility_pass && evaluation.fit_score >= 0.45) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Selective Pursue",
-      detail: "Potentially useful if aligned with an active project or partner commitment.",
+      label: "Postulación Viable con Condiciones",
+      detail: "Viable si se articula con el aliado o consorcio adecuado.",
     };
   }
   if (evalVerdict === "needs_input") {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Confirm Eligibility",
-      detail: "No explicit disqualifier, but check key conditions before investing drafting time.",
+      label: "Confirmar Requisitos en Consorcio",
+      detail: "Revisar condiciones de auditoría o representatividad antes de redactar.",
     };
   }
   return {
     dot: "bg-rose-500",
     enrichmentFailed,
-    label: evaluation.eligibility_pass ? "Low Priority" : "Ineligible / Hard Blocker",
-    detail: evaluation.eligibility_pass
-      ? "Fit signal is weak. Retain for reference."
-      : "Does not meet one or more eligibility rules. Review rule checks to resolve profile settings.",
+    label: evaluation.eligibility_pass ? "Baja Prioridad" : "Bloqueo Directo (Requiere Consorcio)",
+    detail: "No viable para postulación directa. Revisa la matriz de consorcio para desbloquearla.",
   };
 }
 
@@ -1421,22 +1205,22 @@ function amountLabel(
 ): string {
   const f = (v: number) => formatMoney(v, currency);
   if (min != null && max != null) return min === max ? f(max) : `${f(min)} – ${f(max)}`;
-  if (max != null) return `Up to ${f(max)}`;
-  if (min != null) return `From ${f(min)}`;
-  return everEnriched ? "Not published" : "Not extracted";
+  if (max != null) return `Hasta ${f(max)}`;
+  if (min != null) return `Desde ${f(min)}`;
+  return everEnriched ? "No publicado" : "Por verificar";
 }
 
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-CA", { day: "numeric", month: "short", year: "numeric" });
+  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function formatDateTime(value: string | null | undefined) {
-  if (!value) return "Not recorded";
+  if (!value) return "No registrado";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("en-CA", {
+  return date.toLocaleString("es-ES", {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
@@ -1460,7 +1244,7 @@ function displayTag(value: string) {
 }
 
 function formatMoney(value: number, currency: "CAD" | "USD" = "CAD") {
-  return new Intl.NumberFormat(currency === "USD" ? "en-US" : "en-CA", {
+  return new Intl.NumberFormat(currency === "USD" ? "en-US" : "es-CA", {
     currency,
     maximumFractionDigits: 0,
     style: "currency",
