@@ -310,6 +310,13 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
         : "Recepción periódica anual según calendario institucional.",
   };
 
+  const financial: FinancialConditions = {
+    auditLevel,
+    matchingFunds,
+    canadianLegal,
+    disbursementTimeline,
+  };
+
   // 3. Retorno Estratégico y Líneas de Revenue para IIAL
   const strategicReturn: StrategicReturn = {
     opexCoverage: {

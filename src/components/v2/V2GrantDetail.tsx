@@ -201,7 +201,7 @@ export function V2GrantDetail({
   onShare,
   onShortlist,
 }: Props) {
-  const { activeTenant, activeOrgId } = useActiveTenant();
+  const { activeOrganization, activeOrgName, activeOrgId } = useActiveTenant();
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string | undefined>(undefined);
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
@@ -259,9 +259,9 @@ export function V2GrantDetail({
       jurisdiction: grant.funder?.jurisdiction,
       requirements: grant.requirements,
       eligibilityNote: grant.eligibility_note,
-      orgName: activeTenant?.name || "IIAL",
+      orgName: activeOrgName || "IIAL",
     });
-  }, [grant, activeTenant?.name]);
+  }, [grant, activeOrgName]);
 
   const [selectedRouteId, setSelectedRouteId] = useState<RouteId>(roadmap.recommendedRouteId);
 
@@ -355,9 +355,9 @@ export function V2GrantDetail({
               </Badge>
             )}
 
-            {activeTenant && (
+            {activeOrgName && (
               <Badge variant="outline" className="text-xs bg-primary/5 border-primary/30 text-primary">
-                Tenant: {activeTenant.name}
+                Tenant: {activeOrgName}
               </Badge>
             )}
           </div>
@@ -837,17 +837,20 @@ export function V2GrantDetail({
                     ? {
                         fit_score: evaluation.fit_score,
                         eligibility_pass: evaluation.eligibility_pass,
+                        rule_verdict:
+                          (evaluation.rule_snapshot as { verdict?: string } | null | undefined)
+                            ?.verdict ?? null,
                         rationale_en: evaluation.rationale_en,
+                        rationale_fr: evaluation.rationale_fr ?? "",
                         created_at: evaluation.created_at,
-                        rule_snapshot: evaluation.rule_snapshot as Record<string, unknown> | null,
-                        axis_breakdown: evaluation.axis_breakdown as Record<string, unknown> | null,
+                        axis_breakdown: (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
                       }
                     : null
                 }
               />
 
               {/* TRAZA DE EVENTOS */}
-              <FetchTrailPanel events={events} />
+              <FetchTrailPanel grantId={grant.id} onRetry={onFetchDetails} retrying={busy === "enrich"} />
             </>
           )}
         </main>
@@ -950,6 +953,7 @@ export function V2GrantDetail({
       {/* ----------------- MODALS & SLIDE-OVER SHEETS ----------------- */}
       <GrantCopilotSheet
         grantId={grant.id}
+        grantTitle={grant.title}
         open={copilotOpen}
         onOpenChange={(open) => {
           setCopilotOpen(open);

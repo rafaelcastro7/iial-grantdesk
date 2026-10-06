@@ -34,9 +34,10 @@ import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBack
 
 type Props = {
   grantId: string;
-  grantTitle: string;
+  grantTitle?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialPrompt?: string;
 };
 
 const QUICK_PROMPTS = [
@@ -48,16 +49,23 @@ const QUICK_PROMPTS = [
 
 export function GrantCopilotSheet({
   grantId,
-  grantTitle,
+  grantTitle = "Grant",
   open,
   onOpenChange,
+  initialPrompt,
 }: Props) {
   const { activeOrgId, activeOrgName } = useActiveTenant();
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialPrompt ?? "");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
   const [copiedActionIdx, setCopiedActionIdx] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialPrompt && open) {
+      setInput(initialPrompt);
+    }
+  }, [initialPrompt, open]);
 
   // Backlog modal state
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
