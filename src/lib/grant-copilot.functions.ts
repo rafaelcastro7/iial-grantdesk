@@ -201,7 +201,7 @@ STRATEGIC KNOWLEDGE RULES:
 4. RIGOR:
    - State what is grounded in the official page vs what is an inference.
    - If something requires clarification with the program officer, state it clearly.
-   - You can speak in Spanish or English depending on the user's language.
+   - You must speak in English and create all generated outreach drafts and backlog suggestions in English.
 
 RESPONSE FORMAT:
 Answer directly and helpfully in markdown.

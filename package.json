@@ -13,9 +13,9 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:synthetic": "vitest run src/agents/synthetic-workflow.e2e.test.ts src/evals/eligibility.synthetic.test.ts src/agents/pipeline.e2e.test.ts",
+    "test": "vitest run --pool=threads",
+    "test:watch": "vitest --pool=threads",
+    "test:synthetic": "vitest run --pool=threads src/agents/synthetic-workflow.e2e.test.ts src/evals/eligibility.synthetic.test.ts src/agents/pipeline.e2e.test.ts src/agents/synthetic-user-stress.e2e.test.ts",
     "test:e2e": "playwright test"
   },
   "overrides": {

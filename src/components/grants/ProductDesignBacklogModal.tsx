@@ -26,13 +26,13 @@ type Props = {
 };
 
 const CATEGORIES = [
-  { id: "consorcio_rutas", label: "Consorcios y Rutas" },
-  { id: "fuentes_latam", label: "Fuentes de Toda América" },
-  { id: "contrapartida_fondos", label: "Contrapartida / In-Kind" },
-  { id: "filtros_busqueda", label: "Filtros y Búsqueda" },
-  { id: "ui_ux", label: "Experiencia UI / UX" },
-  { id: "moneda_region", label: "Moneda y Región" },
-  { id: "otro", label: "Otra mejora" },
+  { id: "consorcio_rutas", label: "Consortia & Routes" },
+  { id: "fuentes_latam", label: "Americas & International Sources" },
+  { id: "contrapartida_fondos", label: "Matching Funds & In-Kind" },
+  { id: "filtros_busqueda", label: "Search & Filters" },
+  { id: "ui_ux", label: "UI / UX Experience" },
+  { id: "moneda_region", label: "Currency & Region" },
+  { id: "otro", label: "Other Enhancement" },
 ] as const;
 
 export function ProductDesignBacklogModal({
@@ -56,7 +56,7 @@ export function ProductDesignBacklogModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
-      setError("Por favor completa el título y la descripción de la mejora.");
+      setError("Please provide both a title and description for this request.");
       return;
     }
 
@@ -80,7 +80,7 @@ export function ProductDesignBacklogModal({
         onSuccess?.();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al registrar la sugerencia.");
+      setError(err instanceof Error ? err.message : "Error saving backlog request.");
     } finally {
       setSubmitting(false);
     }
@@ -96,10 +96,10 @@ export function ProductDesignBacklogModal({
             </div>
             <div>
               <DialogTitle className="text-base font-bold">
-                Registrar Solicitud en el Backlog de Diseño
+                Log Request in Product Design Backlog
               </DialogTitle>
               <DialogDescription className="text-xs">
-                Captura una necesidad, caso de uso no cubierto o mejora requerida para el roadmap de GrantDesk.
+                Record an operational requirement, unaddressed consortium scenario, or feature request for the GrantDesk roadmap.
               </DialogDescription>
             </div>
           </div>
@@ -108,9 +108,9 @@ export function ProductDesignBacklogModal({
         {success ? (
           <div className="py-8 text-center space-y-2">
             <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-            <h4 className="text-sm font-semibold">¡Sugerencia registrada con éxito!</h4>
+            <h4 className="text-sm font-semibold">Request recorded successfully!</h4>
             <p className="text-xs text-muted-foreground">
-              Se ha agregado al backlog del sistema para priorización del equipo.
+              Added to the system product backlog for team prioritization.
             </p>
           </div>
         ) : (
@@ -124,12 +124,12 @@ export function ProductDesignBacklogModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Título de la mejora o necesidad
+                Enhancement or Need Title
               </label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="ej. Comparar dos rutas de consorcio para un mismo grant"
+                placeholder="e.g. Compare two consortium routes for the same opportunity"
                 className="text-sm"
                 required
               />
@@ -137,7 +137,7 @@ export function ProductDesignBacklogModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Categoría
+                Category
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {CATEGORIES.map((cat) => (
@@ -155,12 +155,12 @@ export function ProductDesignBacklogModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Descripción detallada del caso y resultado esperado
+                Detailed Description &amp; Expected Outcome
               </label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Explica qué problema operativo encontraste, por qué es necesario y cómo debería funcionar la solución en GrantDesk..."
+                placeholder="Explain the operational challenge encountered, why it matters, and how GrantDesk should resolve it..."
                 rows={4}
                 className="text-sm leading-relaxed"
                 required
@@ -169,19 +169,23 @@ export function ProductDesignBacklogModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Nivel de impacto para la postulación
+                Priority Impact Level
               </label>
               <div className="flex gap-2">
-                {(["alto", "medio", "bajo"] as const).map((lvl) => (
+                {[
+                  { id: "alto", label: "High Impact" },
+                  { id: "medio", label: "Medium Impact" },
+                  { id: "bajo", label: "Low Impact" },
+                ].map((lvl) => (
                   <Button
-                    key={lvl}
+                    key={lvl.id}
                     type="button"
                     size="sm"
-                    variant={impact === lvl ? "secondary" : "ghost"}
-                    className={`capitalize text-xs ${impact === lvl ? "border font-bold" : ""}`}
-                    onClick={() => setImpact(lvl)}
+                    variant={impact === lvl.id ? "secondary" : "ghost"}
+                    className={`capitalize text-xs ${impact === lvl.id ? "border font-bold" : ""}`}
+                    onClick={() => setImpact(lvl.id as "alto" | "medio" | "bajo")}
                   >
-                    Impacto {lvl}
+                    {lvl.label}
                   </Button>
                 ))}
               </div>
@@ -195,7 +199,7 @@ export function ProductDesignBacklogModal({
                 onClick={() => onOpenChange(false)}
                 disabled={submitting}
               >
-                Cancelar
+                Cancel
               </Button>
               <Button type="submit" size="sm" disabled={submitting} className="gap-1.5">
                 {submitting ? (
@@ -203,7 +207,7 @@ export function ProductDesignBacklogModal({
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                <span>Guardar en Backlog</span>
+                <span>Save to Backlog</span>
               </Button>
             </DialogFooter>
           </form>

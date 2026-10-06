@@ -172,16 +172,16 @@ type Props = {
 const DAY_MS = 86_400_000;
 
 const STATUS_LABEL: Record<string, string> = {
-  discovered: "Descubierto",
-  enriched: "Detalles Verificados",
-  scored: "Ajuste Evaluado",
-  shortlisted: "Preseleccionado",
-  in_proposal: "En Propuesta",
-  submitted: "Presentado",
-  won: "Adjudicado",
-  lost: "No Adjudicado",
-  expired: "Cerrado / Expirado",
-  archived: "Archivado",
+  discovered: "Discovered",
+  enriched: "Details Fetched",
+  scored: "Fit Evaluated",
+  shortlisted: "Shortlisted",
+  in_proposal: "In Proposal",
+  submitted: "Submitted",
+  won: "Awarded",
+  lost: "Not Awarded",
+  expired: "Closed / Expired",
+  archived: "Archived",
 };
 
 export function V2GrantDetail({
@@ -208,7 +208,7 @@ export function V2GrantDetail({
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"roadmap" | "funder_facts" | "technical_audit">("roadmap");
 
-  const funderName = grant.funder?.name ?? "Organismo Financiador";
+  const funderName = grant.funder?.name ?? "Funding Agency";
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
   const ruleSnapshot = evaluation?.rule_snapshot as {
     checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
@@ -281,18 +281,18 @@ export function V2GrantDetail({
   const evaluateBlockedReason = canEvaluate
     ? null
     : verdict.enrichmentFailed
-      ? "No fue posible leer la página oficial automáticamente. Ábrela para revisarla manualmente."
-      : "Rastrea detalles primero para disponer de texto que evaluar.";
+      ? "Unable to read official webpage automatically. Open the link to review manually."
+      : "Fetch details first to provide text for evaluation.";
   const canDraft = draftGate(evaluation) === "ok";
   const draftBlockedReason = canDraft
     ? null
     : evalVerdict === "not_eligible"
-      ? "La postulación directa no cumple con los requisitos del perfil. Considera postular en consorcio (Ruta B o C)."
+      ? "Direct application does not meet profile criteria. Consider applying via a consortium (Route B or C)."
       : evalVerdict === "needs_input"
-        ? "Verifica los requisitos pendientes en las bases antes de redactar."
+        ? "Verify pending call requirements before drafting."
         : evaluation
-          ? "La redacción se habilita al validar la viabilidad de la ruta."
-          : "Ejecuta 'Evaluar Ajuste' para desbloquear la redacción de la propuesta.";
+          ? "Drafting is enabled upon validating route feasibility."
+          : "Run 'Check Fit' to unlock proposal drafting.";
 
   const actionDisabled = busy != null;
   const kind = fundingKindOf(grant);
@@ -326,7 +326,7 @@ export function V2GrantDetail({
           <Button asChild variant="outline" size="sm" className="gap-1.5 font-medium h-8 text-xs">
             <Link to="/grants">
               <ArrowLeft className="h-3.5 w-3.5" />
-              Radar de Convocatorias
+              Grant Radar
             </Link>
           </Button>
 
@@ -342,7 +342,7 @@ export function V2GrantDetail({
                 variant="outline"
                 className="rounded-md border-blue-500/40 text-blue-700 dark:text-blue-300 bg-blue-500/10 text-xs font-semibold"
               >
-                Recepción Continua (Rolling)
+                Continuous Intake (Rolling)
               </Badge>
             ) : (
               <Badge variant="outline" className="rounded-md bg-muted/60 text-xs">
@@ -352,7 +352,7 @@ export function V2GrantDetail({
 
             {duplicateGroupSize > 1 && (
               <Badge variant="outline" className="rounded-md border-amber-500/50 text-amber-700 text-xs">
-                {duplicateGroupSize} similares
+                {duplicateGroupSize} similar
               </Badge>
             )}
 
@@ -374,7 +374,7 @@ export function V2GrantDetail({
             onClick={onShare}
           >
             <Link2 className="h-3.5 w-3.5" />
-            {busy === "share" ? "Compartiendo..." : shareUrl ? "Enlace Copiado" : "Compartir"}
+            {busy === "share" ? "Sharing..." : shareUrl ? "Link Copied" : "Share"}
           </Button>
 
           {grant.url && (
@@ -386,7 +386,7 @@ export function V2GrantDetail({
                 className: "h-8 text-xs gap-1.5",
               })}
             >
-              <span>Página oficial</span>
+              <span>Official page</span>
               <ExternalLink className="h-3 w-3" />
             </ExternalLinkPreview>
           )}
@@ -407,7 +407,7 @@ export function V2GrantDetail({
       {busy === "enrich" && (
         <div className="flex items-center gap-2.5 rounded-md border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-900 dark:text-teal-200">
           <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
-          Rastreando bases oficiales y requisitos del fondo en vivo (20-60s)...
+          Fetching official guidelines and call requirements live (20-60s)...
         </div>
       )}
 
@@ -459,7 +459,7 @@ export function V2GrantDetail({
                 ) : (
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
-                Rastrear bases
+                Fetch details
               </Button>
             )}
 
@@ -476,7 +476,7 @@ export function V2GrantDetail({
               ) : (
                 <SearchCheck className="h-3.5 w-3.5" />
               )}
-              {evaluation ? (isExhaustive ? "Re-evaluar ajuste" : "Ejecutar revisión IA") : "Evaluar ajuste"}
+              {evaluation ? (isExhaustive ? "Re-check fit" : "Run AI review") : "Check fit"}
             </Button>
 
             {existingProposalId ? (
@@ -487,7 +487,7 @@ export function V2GrantDetail({
               >
                 <Link to="/proposals/$id" params={{ id: existingProposalId }}>
                   <FileText className="h-3.5 w-3.5" />
-                  Abrir propuesta
+                  Open proposal
                 </Link>
               </Button>
             ) : (
@@ -504,7 +504,7 @@ export function V2GrantDetail({
                 ) : (
                   <Send className="h-3.5 w-3.5" />
                 )}
-                Redactar propuesta
+                Draft proposal
               </Button>
             )}
 
@@ -530,7 +530,7 @@ export function V2GrantDetail({
                 disabled={busy === "shortlist"}
                 onClick={onShortlist}
               >
-                Preseleccionar
+                Shortlist
               </Button>
             )}
           </div>
@@ -538,11 +538,11 @@ export function V2GrantDetail({
 
         {/* 4-Column Executive KPI Cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-1">
-          {/* Card 1: Veredicto y Fit */}
+          {/* Card 1: Verdict and Fit */}
           <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Veredicto &amp; Score
+                Verdict &amp; Score
               </span>
               <span className={cn("h-2.5 w-2.5 rounded-full", verdict.dot)} />
             </div>
@@ -572,12 +572,12 @@ export function V2GrantDetail({
                 className="rounded-md font-semibold text-[10px] py-0 px-1.5"
               >
                 {evalVerdict === "eligible"
-                  ? "Viable"
+                  ? "Eligible"
                   : evalVerdict === "needs_input"
-                    ? "Requiere Socio"
+                    ? "Partner Required"
                     : evalVerdict === "not_eligible"
-                      ? "Ineligible Directo"
-                      : "Sin Evaluar"}
+                      ? "Direct Ineligible"
+                      : "Unevaluated"}
               </Badge>
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground truncate" title={verdict.label}>
@@ -585,11 +585,11 @@ export function V2GrantDetail({
             </p>
           </div>
 
-          {/* Card 2: Monto Máximo del Fondo */}
+          {/* Card 2: Maximum Funding Ceiling */}
           <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Tope del Fondo
+                Funding Ceiling
               </span>
               <DollarSign className="h-4 w-4 text-primary" />
             </div>
@@ -597,15 +597,15 @@ export function V2GrantDetail({
               {amount}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground truncate">
-              No representa 100% para IIAL (reparto consorcio)
+              Does not represent 100% for IIAL (consortium allocation)
             </p>
           </div>
 
-          {/* Card 3: Ventana de Cierre / Recepción */}
+          {/* Card 3: Intake / Deadline Window */}
           <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Estado de Cierre
+                Intake Window
               </span>
               <CalendarClock
                 className={cn(
@@ -615,26 +615,26 @@ export function V2GrantDetail({
               />
             </div>
             <div className="mt-1.5 text-xl font-bold tracking-tight truncate text-foreground">
-              {isRolling ? "Recepción Continua" : deadline.label}
+              {isRolling ? "Continuous Intake" : deadline.label}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground truncate">
-              {isRolling ? "Ventana abierta todo el año" : deadline.detail}
+              {isRolling ? "Open year-round window" : deadline.detail}
             </p>
           </div>
 
-          {/* Card 4: Ruta Recomendada de Consorcio */}
+          {/* Card 4: Recommended Consortium Route */}
           <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Ruta Sugerida
+                Suggested Route
               </span>
               <Workflow className="h-4 w-4 text-primary" />
             </div>
             <div className="mt-1.5 text-base sm:text-lg font-bold tracking-tight text-primary truncate">
-              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)?.title.replace("Ruta ", "") || "Académica"}
+              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)?.title.replace("Route ", "") || "Academic"}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground truncate">
-              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)?.recommendedPartner || "Aliado estratégico"}
+              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)?.recommendedPartner || "Strategic Partner"}
             </p>
           </div>
         </div>
@@ -654,7 +654,7 @@ export function V2GrantDetail({
             )}
           >
             <Workflow className="h-4 w-4 text-primary" />
-            <span>1. Hoja de Ruta &amp; Consorcio (Estratégico)</span>
+            <span>1. Strategic Roadmap &amp; Consortium</span>
           </button>
 
           <button
@@ -668,7 +668,7 @@ export function V2GrantDetail({
             )}
           >
             <FileText className="h-4 w-4 text-primary" />
-            <span>2. Ficha Oficial del Funder</span>
+            <span>2. Official Funder Overview</span>
           </button>
 
           <button
@@ -682,12 +682,12 @@ export function V2GrantDetail({
             )}
           >
             <History className="h-4 w-4 text-primary" />
-            <span>3. Subsanación &amp; Auditoría Técnica</span>
+            <span>3. Remediation &amp; Technical Audit</span>
           </button>
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Ruta activa seleccionada: <strong className="text-foreground">{selectedRoute.title}</strong>
+          Active route selected: <strong className="text-foreground">{selectedRoute.title}</strong>
         </div>
       </div>
 
@@ -725,40 +725,40 @@ export function V2GrantDetail({
 
           {activeTab === "funder_facts" && (
             <>
-              {/* RESUMEN OFICIAL Y ALCANCE */}
+              {/* OFFICIAL SUMMARY & SCOPE */}
               <Panel
                 icon={FileText}
-                title="Alcance del Programa y Descripción Oficial"
-                description="Resumen extraído de la fuente oficial del organismo financiador."
+                title="Program Scope &amp; Official Description"
+                description="Summary extracted from official funder documentation."
               >
                 <div className="space-y-4">
                   <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
                     {grant.summary?.trim() ||
-                      "No se ha extraído una descripción detallada. Haz clic en 'Rastrear bases' o revisa la página oficial."}
+                      "No detailed description extracted yet. Click 'Fetch details' or visit the official page."}
                   </p>
 
                   <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FactRow label="Quién puede postular" values={applicantTypes} />
-                    <FactRow label="Qué financia el fondo" values={fundingUses} />
-                    <FactRow label="Poblaciones beneficiarias" values={populations} />
-                    <FactRow label="Sectores elegibles" values={sectors} />
+                    <FactRow label="Who can apply" values={applicantTypes} />
+                    <FactRow label="Eligible uses of funds" values={fundingUses} />
+                    <FactRow label="Target populations" values={populations} />
+                    <FactRow label="Eligible sectors" values={sectors} />
                   </div>
                 </div>
               </Panel>
 
-              {/* REGLAS TEXTUALES DEL FUNDER */}
+              {/* FUNDER ELIGIBILITY RULES */}
               <Panel
                 icon={ShieldCheck}
-                title="Reglas de Elegibilidad Declaradas por el Financiador"
-                description="Condiciones explícitas citadas por la convocatoria."
+                title="Eligibility Rules Declared by Funder"
+                description="Explicit conditions stated in call guidelines."
               >
                 {eligibleGroups.length === 0 &&
                 eligibilityDetails.length === 0 &&
                 !grant.eligibility_note ? (
                   <EmptyState
                     icon={ShieldAlert}
-                    title="No se extrajeron reglas textuales de elegibilidad"
-                    body="Verifica en la página oficial del financiador antes de invertir tiempo de redacción."
+                    title="No textual eligibility rules extracted"
+                    body="Verify on the funder's official website before investing drafting time."
                   />
                 ) : (
                   <div className="space-y-4 text-sm">
@@ -770,7 +770,7 @@ export function V2GrantDetail({
                     {eligibleGroups.length > 0 && (
                       <div>
                         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
-                          Grupos Explícitamente Elegibles
+                          Explicitly Eligible Groups
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {eligibleGroups.map((label) => (
@@ -799,23 +799,23 @@ export function V2GrantDetail({
                 )}
               </Panel>
 
-              {/* FUENTES Y PROVENIENCIA */}
+              {/* SOURCES & PROVENANCE */}
               <Panel
                 icon={Link2}
-                title="Fuentes Oficiales y Proveniencia"
-                description="Páginas web verificadas y fechas de observación."
+                title="Official Sources &amp; Provenance"
+                description="Verified web pages and observation timestamps."
               >
                 <div className="space-y-2.5 text-sm">
-                  {grant.url && <SourceLink href={grant.url} label="Página Oficial de la Convocatoria" />}
+                  {grant.url && <SourceLink href={grant.url} label="Official Call Guidelines Page" />}
                   {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
-                    <SourceLink href={grant.funder.source_url} label="Portal Principal del Financiador" />
+                    <SourceLink href={grant.funder.source_url} label="Main Funder Portal" />
                   )}
                   {otherSources.map((url) => (
                     <SourceLink key={url} href={url} label={url.replace(/^https?:\/\/(www\.)?/, "")} />
                   ))}
                   <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
-                    <span>Descubierto: {formatDateTime(grant.discovered_at)}</span>
-                    <span>Última verificación: {formatDateTime(grant.last_seen_at)}</span>
+                    <span>Discovered: {formatDateTime(grant.discovered_at)}</span>
+                    <span>Last verified: {formatDateTime(grant.last_seen_at)}</span>
                   </div>
                 </div>
               </Panel>
@@ -869,36 +869,36 @@ export function V2GrantDetail({
                   <h4 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
                     Grant Copilot
                     <Badge variant="outline" className="text-[10px] font-normal py-0">
-                      Asesor IA
+                      AI Advisor
                     </Badge>
                   </h4>
                   <p className="text-[11px] text-muted-foreground">
-                    Consorcios, WCIS y requisitos
+                    Consortia, WCIS &amp; Requirements
                   </p>
                 </div>
               </div>
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Asesoría contextual para postular en consorcio con {selectedRoute.leadEntity} y articular el estándar WCIS.
+              Contextual intelligence to apply in consortium with {selectedRoute.leadEntity} and articulate the WCIS standard.
             </p>
 
             <div className="space-y-1.5 pt-1">
               <button
                 type="button"
-                onClick={() => handleOpenCopilotWithPrompt(`¿Cómo estructuramos la ${selectedRoute.title} para maximizar el puntaje en esta convocatoria?`)}
+                onClick={() => handleOpenCopilotWithPrompt(`How should we structure ${selectedRoute.title} to maximize scoring in this call?`)}
                 className="w-full text-left text-[11px] p-2 rounded-md bg-background/80 border hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-between"
               >
-                <span>Estructurar {selectedRoute.title}</span>
+                <span>Structure {selectedRoute.title}</span>
                 <ArrowRight className="h-3 w-3 shrink-0" />
               </button>
 
               <button
                 type="button"
-                onClick={() => handleOpenCopilotWithPrompt("¿Cómo presentamos el estándar WCIS para que cuente como contrapartida en especie (in-kind)?")}
+                onClick={() => handleOpenCopilotWithPrompt("How can we position the WCIS standard as an in-kind contribution for this grant?")}
                 className="w-full text-left text-[11px] p-2 rounded-md bg-background/80 border hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-between"
               >
-                <span>Justificar contrapartida in-kind con WCIS</span>
+                <span>Justify in-kind match with WCIS</span>
                 <ArrowRight className="h-3 w-3 shrink-0" />
               </button>
             </div>
@@ -910,17 +910,17 @@ export function V2GrantDetail({
                 onClick={() => handleOpenCopilotWithPrompt()}
               >
                 <Bot className="h-3.5 w-3.5" />
-                <span>Consultar Copilot</span>
+                <span>Consult Copilot</span>
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 className="text-xs gap-1 h-8"
                 onClick={() => setBacklogModalOpen(true)}
-                title="Sugerir mejora de producto para el backlog"
+                title="Suggest product improvement for backlog"
               >
                 <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
-                <span>Sugerir mejora</span>
+                <span>Suggest improvement</span>
               </Button>
             </div>
           </div>
@@ -928,11 +928,11 @@ export function V2GrantDetail({
           {/* AI FIT & DECISION RATIONALE */}
           <Panel
             icon={ClipboardCheck}
-            title="Dictamen de Ajuste &amp; Decisiones"
+            title="Fit Verdict &amp; Decisions"
             description={
               evaluation
-                ? `Evaluado el ${formatDateTime(evaluation.created_at)}`
-                : "Ajuste no evaluado aún."
+                ? `Evaluated on ${formatDateTime(evaluation.created_at)}`
+                : "Fit not evaluated yet."
             }
           >
             <div className="space-y-3">
@@ -942,7 +942,7 @@ export function V2GrantDetail({
 
               {evaluation?.rationale_en && (
                 <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed text-foreground">
-                  <span className="font-semibold block mb-1">Evaluación del Motor:</span>
+                  <span className="font-semibold block mb-1">Evaluation Engine Rationale:</span>
                   {humanizeRationale(evaluation.rationale_en)}
                 </div>
               )}
@@ -975,14 +975,14 @@ export function V2GrantDetail({
 // ----------------- SUBCOMPONENTES & HELPERS -----------------
 
 const ELIGIBILITY_LABEL: Record<string, string> = {
-  non_profit: "Entidad Sin Fines de Lucro",
-  for_profit: "Empresa con Fines de Lucro",
-  academic: "Institución Académica / Universidad",
-  individual: "Personas Naturales",
-  indigenous: "Comunidades / Entidades Indígenas",
-  canadian_entity: "Entidad Legal Canadiense",
-  ontario_based: "Radicado en Ontario",
-  registered_charity: "Organización de Beneficencia CRA",
+  non_profit: "Non-profit Entity",
+  for_profit: "For-profit Enterprise",
+  academic: "Academic / University Institution",
+  individual: "Individual / Sole Proprietor",
+  indigenous: "Indigenous Community / Organization",
+  canadian_entity: "Canadian Registered Legal Entity",
+  ontario_based: "Ontario-based",
+  registered_charity: "CRA Registered Charity",
 };
 
 function FactRow({ label, values }: { label: string; values: string[] }) {
@@ -992,7 +992,7 @@ function FactRow({ label, values }: { label: string; values: string[] }) {
         {label}
       </span>
       {values.length === 0 ? (
-        <span className="text-xs text-muted-foreground italic">No especificado</span>
+        <span className="text-xs text-muted-foreground italic">Not specified</span>
       ) : (
         <div className="flex flex-wrap gap-1">
           {values.map((v) => (
@@ -1075,19 +1075,19 @@ function EmptyState({
 function getDeadlineState(deadline: string | null) {
   if (!deadline) {
     return {
-      label: "Ventana Abierta",
-      detail: "Recepción continua o sin fecha fija",
+      label: "Open Window",
+      detail: "Continuous intake or unspecified date",
       days: null as number | null,
     };
   }
   const date = new Date(deadline);
   if (Number.isNaN(date.getTime())) {
-    return { label: "Fecha no estandarizada", detail: deadline, days: null as number | null };
+    return { label: "Non-standard date", detail: deadline, days: null as number | null };
   }
   const days = Math.ceil((date.getTime() - Date.now()) / DAY_MS);
-  if (days < 0) return { label: "Cerrada", detail: formatDate(deadline), days };
-  if (days === 0) return { label: "Cierra hoy", detail: formatDate(deadline), days };
-  return { label: `${days} días restantes`, detail: formatDate(deadline), days };
+  if (days < 0) return { label: "Closed", detail: formatDate(deadline), days };
+  if (days === 0) return { label: "Closes today", detail: formatDate(deadline), days };
+  return { label: `${days} days remaining`, detail: formatDate(deadline), days };
 }
 
 function getQualityState({
@@ -1134,15 +1134,15 @@ function getVerdict({
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
-      label: "Oportunidad Adjudicada",
-      detail: "Oportunidad ganada. Conservar para reportes y archivo histórico.",
+      label: "Awarded Grant",
+      detail: "Grant won. Retain for reporting and historical archive.",
     };
   }
   if (status === "submitted" || status === "in_proposal") {
     return {
       dot: "bg-teal-500",
       enrichmentFailed,
-      label: status === "submitted" ? "En Evaluación por el Funder" : "Propuesta en Redacción",
+      label: status === "submitted" ? "Under Review by Funder" : "Proposal in Drafting",
       detail: STATUS_LABEL[status] || status,
     };
   }
@@ -1150,55 +1150,55 @@ function getVerdict({
     return {
       dot: "bg-rose-500",
       enrichmentFailed,
-      label: "Cerrada / Expirada",
-      detail: "Convocatoria fuera de plazo. Monitorear para el siguiente ciclo.",
+      label: "Closed / Expired",
+      detail: "Call deadline has passed. Monitor for future intake cycles.",
     };
   }
   if (enrichmentFailed) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Verificar Fuente Manualmente",
-      detail: "La extracción automática no obtuvo suficientes datos estructurados.",
+      label: "Verify Source Manually",
+      detail: "Automatic ingestion did not extract sufficient structured data.",
     };
   }
   if (!evaluation) {
     return {
       dot: "bg-teal-500",
       enrichmentFailed,
-      label: "Lista para Evaluación de Ajuste",
-      detail: "El registro cuenta con detalles suficientes. Ejecuta la evaluación para medir encaje.",
+      label: "Ready for Fit Evaluation",
+      detail: "Record has sufficient detail. Run evaluation to assess institutional fit.",
     };
   }
   if (evaluation.eligibility_pass && evaluation.fit_score >= 0.7) {
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
-      label: "Alta Prioridad (Encaje Fuerte)",
-      detail: "Alto alineamiento temático y sin bloqueos fiduciarios detectados.",
+      label: "High Priority (Strong Fit)",
+      detail: "High thematic alignment with no fiduciary blocks detected.",
     };
   }
   if (evaluation.eligibility_pass && evaluation.fit_score >= 0.45) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Postulación Viable con Condiciones",
-      detail: "Viable si se articula con el aliado o consorcio adecuado.",
+      label: "Conditionally Viable",
+      detail: "Viable when articulated with the right consortium partner.",
     };
   }
   if (evalVerdict === "needs_input") {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Confirmar Requisitos en Consorcio",
-      detail: "Revisar condiciones de auditoría o representatividad antes de redactar.",
+      label: "Confirm Consortium Requirements",
+      detail: "Review audit conditions or partner representation before drafting.",
     };
   }
   return {
     dot: "bg-rose-500",
     enrichmentFailed,
-    label: evaluation.eligibility_pass ? "Baja Prioridad" : "Bloqueo Directo (Requiere Consorcio)",
-    detail: "No viable para postulación directa. Revisa la matriz de consorcio para desbloquearla.",
+    label: evaluation.eligibility_pass ? "Low Priority" : "Direct Block (Consortium Required)",
+    detail: "Not viable for direct application. Review consortium matrix to unlock.",
   };
 }
 
@@ -1210,22 +1210,22 @@ function amountLabel(
 ): string {
   const f = (v: number) => formatMoney(v, currency);
   if (min != null && max != null) return min === max ? f(max) : `${f(min)} – ${f(max)}`;
-  if (max != null) return `Hasta ${f(max)}`;
-  if (min != null) return `Desde ${f(min)}`;
-  return everEnriched ? "No publicado" : "Por verificar";
+  if (max != null) return `Up to ${f(max)}`;
+  if (min != null) return `From ${f(min)}`;
+  return everEnriched ? "Not published" : "To be verified";
 }
 
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+  return date.toLocaleDateString("en-CA", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function formatDateTime(value: string | null | undefined) {
-  if (!value) return "No registrado";
+  if (!value) return "Not recorded";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("es-ES", {
+  return date.toLocaleString("en-CA", {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
@@ -1249,7 +1249,7 @@ function displayTag(value: string) {
 }
 
 function formatMoney(value: number, currency: "CAD" | "USD" = "CAD") {
-  return new Intl.NumberFormat(currency === "USD" ? "en-US" : "es-CA", {
+  return new Intl.NumberFormat(currency === "USD" ? "en-US" : "en-CA", {
     currency,
     maximumFractionDigits: 0,
     style: "currency",

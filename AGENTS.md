@@ -33,3 +33,4 @@
 - Multitenancy: evaluations, profiles and fit rules are strictly scoped by `org_id`; active tenant is driven by session context (`useActiveTenant`), never by mutating `profiles.org_id`.
 - Grant Copilot & Backlog: contextual assistant uses active tenant profile and grant evidence; feature requests and gap observations persist in `product_design_backlog`.
 - Consortium & America coverage: evaluations distinguish lead applicant vs consortium partner (technical partner WCIS vs territorial/governance lead); support rolling/unsolicited deadlines and in-kind match.
+- Language: All UI screens, product design backlog, AI Copilot defaults, and generated artifacts must be in English.

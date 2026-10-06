@@ -6,6 +6,7 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
+    pool: "threads",
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],

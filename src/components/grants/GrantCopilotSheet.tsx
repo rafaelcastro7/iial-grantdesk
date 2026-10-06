@@ -41,10 +41,10 @@ type Props = {
 };
 
 const QUICK_PROMPTS = [
-  "¿Podemos participar en consorcio si no cumplimos el rol principal?",
-  "¿Qué activos estratégicos y revenue futuro genera este grant?",
-  "Genera un borrador de correo de acercamiento para un socio técnico o académico",
-  "¿Se acepta contrapartida en especie (in-kind) o estados financieros internos?",
+  "Can IIAL participate in a consortium if not eligible as the lead applicant?",
+  "What strategic assets and downstream revenue does this grant unlock for IIAL?",
+  "Draft an institutional outreach email for Lambton College or a territorial partner",
+  "Does this call accept in-kind matching or signed internal financial statements?",
 ];
 
 export function GrantCopilotSheet({
@@ -143,7 +143,7 @@ export function GrantCopilotSheet({
       const errorMsg: CopilotMessage = {
         id: "err-" + Date.now(),
         role: "assistant",
-        content: `Error al consultar el asistente: ${err instanceof Error ? err.message : String(err)}`,
+        content: `Error querying assistant: ${err instanceof Error ? err.message : String(err)}`,
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -191,7 +191,7 @@ export function GrantCopilotSheet({
                     </Badge>
                   </SheetTitle>
                   <SheetDescription className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <span>Contexto:</span>
+                    <span>Tenant context:</span>
                     <strong className="text-foreground">{activeOrgName}</strong>
                   </SheetDescription>
                 </div>
@@ -207,7 +207,7 @@ export function GrantCopilotSheet({
                 }}
               >
                 <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
-                <span>Sugerir mejora</span>
+                <span>Suggest Enhancement</span>
               </Button>
             </div>
 
@@ -221,24 +221,24 @@ export function GrantCopilotSheet({
             {initialLoading ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground text-xs gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Cargando conversación previa...</span>
+                <span>Loading message history...</span>
               </div>
             ) : messages.length === 0 ? (
               <div className="space-y-4 py-4">
                 <div className="rounded-xl border bg-card p-4 space-y-2 text-center">
                   <Sparkles className="h-8 w-8 text-primary mx-auto opacity-80" />
                   <h4 className="text-sm font-semibold text-foreground">
-                    Asesor Estratégico de Convocatoria
+                    Strategic Grant Advisor
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Pregúntame sobre elegibilidad, rutas de consorcio (socio técnico vs solicitante),
-                    contrapartida requerida, estados financieros o alineación con el estándar WCIS.
+                    Ask me about eligibility, consortium routes (technical partner vs lead applicant),
+                    required matching funds, financial audit thresholds, or WCIS standard alignment.
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
-                    Consultas rápidas recomendadas
+                    Recommended Quick Queries
                   </span>
                   <div className="grid gap-1.5">
                     {QUICK_PROMPTS.map((prompt, i) => (
@@ -288,7 +288,7 @@ export function GrantCopilotSheet({
                                 <div className="flex items-center justify-between">
                                   <span className="text-[11px] font-bold uppercase tracking-wide text-primary flex items-center gap-1">
                                     <Users className="h-3.5 w-3.5" />
-                                    Borrador para: {act.target_partner}
+                                    Draft for: {act.target_partner}
                                   </span>
                                   <Button
                                     size="sm"
@@ -296,7 +296,7 @@ export function GrantCopilotSheet({
                                     className="h-6 text-[10px] gap-1 px-2"
                                     onClick={() =>
                                       handleCopy(
-                                        `Asunto: ${act.subject}\n\n${act.body}`,
+                                        `Subject: ${act.subject}\n\n${act.body}`,
                                         actionKey,
                                       )
                                     }
@@ -304,12 +304,12 @@ export function GrantCopilotSheet({
                                     {copiedActionIdx === actionKey ? (
                                       <>
                                         <Check className="h-3 w-3 text-emerald-500" />
-                                        <span>Copiado</span>
+                                        <span>Copied</span>
                                       </>
                                     ) : (
                                       <>
                                         <Copy className="h-3 w-3" />
-                                        <span>Copiar correo</span>
+                                        <span>Copy Email</span>
                                       </>
                                     )}
                                   </Button>
@@ -333,7 +333,7 @@ export function GrantCopilotSheet({
                                 <div className="flex items-center justify-between">
                                   <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
                                     <Lightbulb className="h-3.5 w-3.5" />
-                                    Mejora Sugerida para el Sistema
+                                    Suggested System Enhancement
                                   </span>
                                   <Button
                                     size="sm"
@@ -341,7 +341,7 @@ export function GrantCopilotSheet({
                                     className="h-6 text-[10px] gap-1 px-2 border-amber-500/40"
                                     onClick={() => handleOpenBacklogWithPrefill(act)}
                                   >
-                                    <span>Agregar al Backlog</span>
+                                    <span>Add to Backlog</span>
                                   </Button>
                                 </div>
                                 <p className="text-[11px] font-medium text-foreground">
@@ -366,7 +366,7 @@ export function GrantCopilotSheet({
             {loading && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span>Analizando oportunidad y estructurando respuesta...</span>
+                <span>Analyzing opportunity and structuring response...</span>
               </div>
             )}
           </div>
@@ -374,25 +374,25 @@ export function GrantCopilotSheet({
           {/* Quick Prompts bar (when conversation exists) */}
           {messages.length > 0 && !loading && (
             <div className="px-4 py-1.5 border-t bg-muted/20 flex gap-2 overflow-x-auto text-[11px]">
-              <span className="text-muted-foreground shrink-0 py-0.5">Sugerencias:</span>
+              <span className="text-muted-foreground shrink-0 py-0.5">Suggestions:</span>
               <button
                 type="button"
                 className="underline-offset-4 hover:underline text-primary shrink-0"
                 onClick={() =>
-                  handleSend("¿Qué requisitos faltan por verificar con el Program Officer?")
+                  handleSend("What requirements should we verify with the Program Officer?")
                 }
               >
-                ¿Qué preguntar al oficial?
+                What to ask Program Officer?
               </button>
               <span className="text-muted-foreground">•</span>
               <button
                 type="button"
                 className="underline-offset-4 hover:underline text-primary shrink-0"
                 onClick={() =>
-                  handleSend("Genera un borrador de correo de propuesta de alianza para este grant")
+                  handleSend("Generate an outreach email draft for a consortium partner for this grant")
                 }
               >
-                Borrador de alianza
+                Consortium outreach draft
               </button>
             </div>
           )}
@@ -415,7 +415,7 @@ export function GrantCopilotSheet({
                     handleSend();
                   }
                 }}
-                placeholder="Pregunta sobre rutas, socios, WCIS, requisitos..."
+                placeholder="Ask about routes, partners, WCIS, requirements..."
                 rows={2}
                 disabled={loading}
                 className="text-xs resize-none min-h-[46px] max-h-[120px]"

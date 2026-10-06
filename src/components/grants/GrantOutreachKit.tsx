@@ -3,12 +3,8 @@ import {
   Bot,
   Check,
   Copy,
-  GraduationCap,
   Mail,
-  Send,
   Sparkles,
-  Users2,
-  FileText,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,12 +24,11 @@ export function GrantOutreachKit({
   const [activeTemplateIdx, setActiveTemplateIdx] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  // Auto-select template based on selected route
   const currentTemplate = outreach.templates[activeTemplateIdx] || outreach.templates[0];
 
   const handleCopy = () => {
     if (!currentTemplate) return;
-    const fullText = `Asunto: ${currentTemplate.subject}\n\n${currentTemplate.body}`;
+    const fullText = `Subject: ${currentTemplate.subject}\n\n${currentTemplate.body}`;
     navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -41,7 +36,7 @@ export function GrantOutreachKit({
 
   const handleConsultCopilot = () => {
     if (!currentTemplate) return;
-    const prompt = `Ayúdame a personalizar esta comunicación para ${currentTemplate.title}. El borrador actual es:\n\n${currentTemplate.body}\n\n¿Qué ajustes recomiendas para maximizar la tasa de respuesta?`;
+    const prompt = `Help me refine and customize this institutional outreach email for ${currentTemplate.title}. The current draft is:\n\n${currentTemplate.body}\n\nWhat adjustments would maximize partner response rates?`;
     onOpenCopilot(prompt);
   };
 
@@ -52,24 +47,24 @@ export function GrantOutreachKit({
           <div>
             <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
               <Mail className="h-4 w-4 text-primary" />
-              Plan de Acción Operativo &amp; Kit de Acercamiento (Outreach)
+              Operational Action Plan &amp; Consortium Outreach Kit
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Pasos inmediatos y borradores institucionales para contactar a aliados del consorcio y oficiales del fondo
+              Immediate tactical steps and institutional email drafts ready to engage consortium partners and program officers
             </p>
           </div>
           <Badge variant="outline" className="text-xs py-0.5 self-start sm:self-auto">
-            {outreach.immediateSteps.length} pasos estratégicos
+            {outreach.immediateSteps.length} action items
           </Badge>
         </div>
       </CardHeader>
 
       <CardContent className="p-4 sm:p-5 space-y-5">
-        {/* Pasos Inmediatos Numerados */}
+        {/* Immediate Numbered Steps */}
         <div>
           <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Hoja de Ruta Inmediata (Próximos Pasos)
+            Immediate Roadmap (Next Steps)
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             {outreach.immediateSteps.map((step, idx) => (
@@ -86,12 +81,12 @@ export function GrantOutreachKit({
           </div>
         </div>
 
-        {/* Generador de Borrador de Comunicación */}
+        {/* Institutional Outreach Templates Generator */}
         <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-                Plantillas de Acercamiento Institucional:
+                Institutional Outreach Templates:
               </span>
             </div>
 
@@ -119,13 +114,13 @@ export function GrantOutreachKit({
             <div className="space-y-2.5 rounded-lg border bg-background/95 p-3.5 shadow-2xs">
               <div className="space-y-1 pb-2 border-b">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase text-muted-foreground">Destinatario:</span>
+                  <span className="text-[11px] font-bold uppercase text-muted-foreground">Recipient:</span>
                   <Badge variant="secondary" className="text-[10px] py-0 font-medium">
                     {currentTemplate.title}
                   </Badge>
                 </div>
                 <div className="text-xs font-semibold text-foreground">
-                  <span className="text-muted-foreground font-normal">Asunto: </span>
+                  <span className="text-muted-foreground font-normal">Subject: </span>
                   {currentTemplate.subject}
                 </div>
               </div>
@@ -136,7 +131,7 @@ export function GrantOutreachKit({
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                 <span className="text-[11px] text-muted-foreground">
-                  Puedes editar y personalizar este borrador antes de enviarlo.
+                  Customize and review this draft prior to transmission.
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -149,12 +144,12 @@ export function GrantOutreachKit({
                     {copied ? (
                       <>
                         <Check className="h-3.5 w-3.5 text-emerald-600" />
-                        <span>Copiado</span>
+                        <span>Copied</span>
                       </>
                     ) : (
                       <>
                         <Copy className="h-3.5 w-3.5" />
-                        <span>Copiar Borrador</span>
+                        <span>Copy Draft</span>
                       </>
                     )}
                   </Button>
@@ -165,7 +160,7 @@ export function GrantOutreachKit({
                     onClick={handleConsultCopilot}
                   >
                     <Bot className="h-3.5 w-3.5" />
-                    <span>Personalizar con Copilot</span>
+                    <span>Refine with Copilot</span>
                   </Button>
                 </div>
               </div>
