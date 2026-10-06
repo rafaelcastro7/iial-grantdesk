@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { humanizeBriefCondition, humanizeBriefReason } from "@/lib/eligibility-explain";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
+import { useActiveTenant } from "@/lib/tenant-context";
 
 function StatusIcon({ s }: { s: string }) {
   if (s === "pass") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />;
@@ -63,14 +64,17 @@ export function OpportunityBriefPanel({
   grantId: string;
   showScreeningDetails?: boolean;
 }) {
+  const { activeOrgId } = useActiveTenant();
   const [copied, setCopied] = useState(false);
   const gen = useServerFn(generateOpportunityBrief);
-  const m = useMutation({ mutationFn: () => gen({ data: { grantId } }) });
+  const m = useMutation({
+    mutationFn: () => gen({ data: { grantId, orgId: activeOrgId! } }),
+  });
 
   useEffect(() => {
-    m.mutate();
+    if (activeOrgId) m.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grantId]);
+  }, [grantId, activeOrgId]);
 
   const b = m.data?.brief;
 

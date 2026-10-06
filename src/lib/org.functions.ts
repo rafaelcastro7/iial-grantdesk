@@ -7,14 +7,20 @@ import { resolveUniqueOrgSlug } from "./org-slug.shared";
 
 export const getOrgProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await getOrgProfileForUser(context.supabase, context.userId);
+  .inputValidator((input) => z.object({ orgId: z.string().uuid().optional() }).parse(input ?? {}))
+  .handler(async ({ data: input, context }) => {
+    const { data, error } = await getOrgProfileForUser(
+      context.supabase,
+      context.userId,
+      input.orgId,
+    );
     if (error) throw new Error(error.message);
     return { profile: data };
   });
 
 const OrgInput = z
   .object({
+    orgId: z.string().uuid().optional(),
     org_name: z.string().min(1).max(200),
     sectors: z.array(z.string().min(1).max(80)).max(60),
     jurisdictions: z.array(z.string().min(2).max(8)).min(1).max(80),
@@ -82,13 +88,25 @@ export const saveOrgProfile = createServerFn({ method: "POST" })
     // would be more robust for two orgs sharing a name, but this closes the
     // "nothing is ever assigned" gap with the same identity a person already
     // types in this exact form.
-    const { data: profile, error: profileErr } = await context.supabase
-      .from("profiles")
-      .select("org_id")
-      .eq("id", context.userId)
-      .maybeSingle();
-    if (profileErr) throw new Error(profileErr.message);
-    let orgId = profile?.org_id ?? null;
+    let orgId = data.orgId ?? null;
+    if (orgId) {
+      const { data: membership, error: membershipError } = await context.supabase
+        .from("user_organizations")
+        .select("org_id")
+        .eq("user_id", context.userId)
+        .eq("org_id", orgId)
+        .maybeSingle();
+      if (membershipError) throw new Error(membershipError.message);
+      if (!membership) throw new Error("Forbidden: organization is not assigned to this user");
+    } else {
+      const { data: profile, error: profileErr } = await context.supabase
+        .from("profiles")
+        .select("org_id")
+        .eq("id", context.userId)
+        .maybeSingle();
+      if (profileErr) throw new Error(profileErr.message);
+      orgId = profile?.org_id ?? null;
+    }
     if (!orgId) {
       // organizations has no INSERT policy (SELECT-only — see "Users can
       // view their own organization" / org_member_r), so this one step needs
@@ -123,17 +141,19 @@ export const saveOrgProfile = createServerFn({ method: "POST" })
     const { data: existing, error: existingError } = await getOrgProfileForUser(
       context.supabase,
       context.userId,
+      orgId,
     );
     if (existingError) throw new Error(existingError.message);
+    const { orgId: _requestedOrgId, ...profileData } = data;
     const payload = {
-      ...data,
+      ...profileData,
       org_id: orgId,
       profile_updated_by: context.userId,
     };
     const write = existing
-      ? context.supabase.from("org_profiles").update(payload).eq("user_id", existing.user_id)
+      ? context.supabase.from("org_profiles").update(payload).eq("id", existing.id)
       : context.supabase.from("org_profiles").insert({ user_id: context.userId, ...payload });
-    const { data: saved, error: saveError } = await write.select("user_id").maybeSingle();
+    const { data: saved, error: saveError } = await write.select("id").maybeSingle();
     if (saveError) throw new Error(saveError.message);
     if (!saved) throw new Error("org_profile_not_authorized");
 
@@ -143,9 +163,17 @@ export const saveOrgProfile = createServerFn({ method: "POST" })
 export const listGrantsWithEvaluations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({ limit: z.number().int().min(1).max(100).default(50) }).parse(input ?? {}),
+    z
+      .object({
+        limit: z.number().int().min(1).max(100).default(50),
+        orgId: z.string().uuid().optional(),
+      })
+      .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(context.supabase, context.userId, data.orgId);
+    if (!principal.orgId) throw new Error("Organization context is required");
     const { data: rows, error } = await context.supabase
       .from("grants")
       .select(
@@ -154,7 +182,7 @@ export const listGrantsWithEvaluations = createServerFn({ method: "GET" })
          funder:funders(name, name_fr, jurisdiction),
          evaluation:grant_evaluations!left(fit_score, rationale_en, rationale_fr, eligibility_pass)`,
       )
-      .eq("grant_evaluations.user_id", context.userId)
+      .eq("grant_evaluations.org_id", principal.orgId)
       .order("status", { ascending: false })
       .limit(data.limit);
     if (error) throw new Error(error.message);

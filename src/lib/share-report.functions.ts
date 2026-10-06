@@ -11,14 +11,19 @@ import type { AxisScore } from "@/agents/fit-rules.shared";
 
 export const createShareLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ grantId: z.string().uuid() }).parse(i))
+  .inputValidator((i) =>
+    z.object({ grantId: z.string().uuid(), orgId: z.string().uuid().optional() }).parse(i),
+  )
   .handler(async ({ data, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(context.supabase, context.userId, data.orgId);
+    if (!principal.orgId) throw new Error("Organization context is required");
     // Reuse an active link for this grant+user when one exists.
     const { data: existing } = await context.supabase
       .from("shared_fit_reports" as never)
       .select("token, expires_at")
       .eq("grant_id", data.grantId)
-      .eq("user_id", context.userId)
+      .eq("org_id", principal.orgId)
       .eq("revoked", false)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
@@ -30,6 +35,7 @@ export const createShareLink = createServerFn({ method: "POST" })
       token,
       grant_id: data.grantId,
       user_id: context.userId,
+      org_id: principal.orgId,
     } as never);
     if (error) throw new Error(`share_link_create_failed: ${error.message}`);
     return { token, reused: false };
@@ -73,12 +79,13 @@ export const getSharedReport = createServerFn({ method: "GET" })
 
     const { data: share } = await supabaseAdmin
       .from("shared_fit_reports" as never)
-      .select("grant_id, user_id, expires_at, revoked")
+      .select("grant_id, user_id, org_id, expires_at, revoked")
       .eq("token", data.token)
       .maybeSingle();
     const s = share as {
       grant_id: string;
       user_id: string;
+      org_id: string | null;
       expires_at: string;
       revoked: boolean;
     } | null;
@@ -100,7 +107,7 @@ export const getSharedReport = createServerFn({ method: "GET" })
           "fit_score, eligibility_pass, rationale_en, axis_breakdown, created_at, model, rule_snapshot, rule_verdict:rule_snapshot->>verdict",
         )
         .eq("grant_id", s.grant_id)
-        .eq("user_id", s.user_id)
+        .eq("org_id", s.org_id)
         .maybeSingle(),
       supabaseAdmin
         .from("evidence_spans")

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgProfile } from "@/lib/org.functions";
+import { useActiveTenant } from "@/lib/tenant-context";
 import { autoEvaluatePending, listGrants } from "@/lib/grants.functions";
 import { getVerdictSummary } from "@/lib/fit-insights.functions";
 import { evaluationVerdict, realFit } from "@/lib/grant-radar";
@@ -75,31 +76,39 @@ type NextStep =
   | { kind: "grant"; eyebrow: string; title: string; body: string; cta: string; id: string };
 
 function Dashboard() {
+  const { activeOrgId } = useActiveTenant();
   const [email, setEmail] = useState<string | null>(null);
   const [personName, setPersonName] = useState<string | null>(null);
 
   const fetchOrg = useServerFn(getOrgProfile);
-  const { data: org } = useQuery({ queryKey: ["org", "self"], queryFn: () => fetchOrg() });
+  const { data: org } = useQuery({
+    queryKey: ["org", activeOrgId],
+    queryFn: () => fetchOrg({ data: { orgId: activeOrgId! } }),
+    enabled: !!activeOrgId,
+  });
   const fetchGrants = useServerFn(listGrants);
   // Under the "grants" key so every evaluation, dismissal or profile change
   // (which all invalidate ["grants"]) refreshes the dashboard too.
   const { data: grantData } = useQuery({
-    queryKey: ["grants", "dashboard"],
-    queryFn: () => fetchGrants({ data: { limit: 100 } }),
+    queryKey: ["grants", "dashboard", activeOrgId],
+    queryFn: () => fetchGrants({ data: { limit: 100, orgId: activeOrgId! } }),
+    enabled: !!activeOrgId,
   });
   // Counts come from the shared verdict summary (same as Fit insights), not
   // from the first page of grants.
   const fetchSummary = useServerFn(getVerdictSummary);
   const { data: summary } = useQuery({
-    queryKey: ["grants", "verdict-summary"],
-    queryFn: () => fetchSummary(),
+    queryKey: ["grants", "verdict-summary", activeOrgId],
+    queryFn: () => fetchSummary({ data: { orgId: activeOrgId! } }),
+    enabled: !!activeOrgId,
   });
   // Re-check stale verdicts on arrival (rules only, 0 tokens), like the radar.
   const qc = useQueryClient();
   const autoEval = useServerFn(autoEvaluatePending);
   useEffect(() => {
+    if (!activeOrgId) return;
     let cancelled = false;
-    void autoEval({ data: { limit: 100, background: false } })
+    void autoEval({ data: { limit: 100, background: false, orgId: activeOrgId } })
       .then((r) => {
         if (!cancelled && ((r as { evaluated?: number }).evaluated ?? 0) > 0) {
           void qc.invalidateQueries({ queryKey: ["grants"] });
@@ -109,7 +118,7 @@ function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [autoEval, qc]);
+  }, [activeOrgId, autoEval, qc]);
   // Coverage trust signal — "how many funders are we watching" is table
   // stakes on every competing grant-search product (Instrumentl, Candid);
   // without it, "56 grants" has no context for whether that's a small slice

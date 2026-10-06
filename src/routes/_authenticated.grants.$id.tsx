@@ -3,14 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  createFileRoute,
-  Link,
-  notFound,
-  Outlet,
-  useNavigate,
-  useRouterState,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { startEvaluator } from "@/agents/evaluator.functions";
 import { runStrategist } from "@/agents/strategist.functions";
@@ -22,11 +15,12 @@ import { enrichGrant, markGrantsCurated } from "@/lib/grants.functions";
 import { createShareLink } from "@/lib/share-report.functions";
 import { useIsAdmin } from "@/lib/use-platform";
 import "@/i18n";
+import { useActiveTenant } from "@/lib/tenant-context";
 
-const detailQuery = (id: string) =>
+const detailQuery = (id: string, orgId: string) =>
   queryOptions({
-    queryKey: ["grant-detail", id],
-    queryFn: () => getGrantDetail({ data: { id } }),
+    queryKey: ["grant-detail", id, orgId],
+    queryFn: () => getGrantDetail({ data: { id, orgId } }),
   });
 
 type GrantRequirementRow = {
@@ -56,14 +50,6 @@ export const Route = createFileRoute("/_authenticated/grants/$id")({
     agent: typeof raw.agent === "string" ? raw.agent : undefined,
     step: typeof raw.step === "string" ? raw.step : undefined,
   }),
-  loader: async ({ context, params }) => {
-    try {
-      return await context.queryClient.ensureQueryData(detailQuery(params.id));
-    } catch (e) {
-      if (e instanceof Error && e.message.includes("Grant not found")) throw notFound();
-      throw e;
-    }
-  },
   errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,
   notFoundComponent: () => (
     <div className="mx-auto max-w-lg space-y-3 p-8 text-center">
@@ -76,10 +62,18 @@ export const Route = createFileRoute("/_authenticated/grants/$id")({
       </Link>
     </div>
   ),
-  component: GrantDetailPage,
+  component: TenantGrantDetailPage,
 });
 
-function GrantDetailPage() {
+function TenantGrantDetailPage() {
+  const { activeOrgId, isLoading } = useActiveTenant();
+  if (isLoading || !activeOrgId) {
+    return <div className="p-8 text-sm text-muted-foreground">Loading grant workspace…</div>;
+  }
+  return <GrantDetailPage key={activeOrgId} orgId={activeOrgId} />;
+}
+
+function GrantDetailPage({ orgId }: { orgId: string }) {
   const { id } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate();
@@ -90,7 +84,7 @@ function GrantDetailPage() {
   const strategize = useServerFn(runStrategist);
   const curate = useServerFn(markGrantsCurated);
   const shareLink = useServerFn(createShareLink);
-  const { data } = useSuspenseQuery(detailQuery(id));
+  const { data } = useSuspenseQuery(detailQuery(id, orgId));
   const [busy, setBusy] = useState<string | null>(null);
   const isAuditRoute = useRouterState({
     select: (state) => state.location.pathname.endsWith("/audit"),
@@ -155,12 +149,12 @@ function GrantDetailPage() {
   // this tab is closed); here we open its live trace at once and wait for the
   // new verdict to be saved.
   async function evaluate() {
-    const started = await startEval({ data: { grantId: id, force: true } });
+    const started = await startEval({ data: { grantId: id, orgId, force: true } });
     setTraceFromRun(started, "evaluator", true);
     const startedAt = new Date(started.startedAt).getTime() - 5_000;
     for (let attempt = 0; attempt < 120; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 2_500));
-      const detail = await getGrantDetail({ data: { id } });
+      const detail = await getGrantDetail({ data: { id, orgId } });
       const evaluatedAt = (detail.evaluation as { evaluated_at?: string } | null)?.evaluated_at;
       if (evaluatedAt && new Date(evaluatedAt).getTime() >= startedAt) return started;
     }
@@ -248,7 +242,7 @@ function GrantDetailPage() {
     setBusy("draft");
     setErr(null);
     try {
-      const r = await strategize({ data: { grantId: id } });
+      const r = await strategize({ data: { grantId: id, orgId } });
       if (r.runId && !r.reused) setTraceRun({ runId: r.runId, agent: "strategist" });
       await navigate({ to: "/proposals/$id", params: { id: r.proposalId } });
     } catch (e) {
@@ -262,7 +256,7 @@ function GrantDetailPage() {
     setBusy("share");
     setErr(null);
     try {
-      const { token } = await shareLink({ data: { grantId: id } });
+      const { token } = await shareLink({ data: { grantId: id, orgId } });
       const url = `${window.location.origin}/report/${token}`;
       await navigator.clipboard.writeText(url);
       setShareUrl(url);

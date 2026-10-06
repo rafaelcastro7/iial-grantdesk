@@ -38,11 +38,14 @@ const FitRulesInput = z.object({
 
 export const getFitRules = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input) => z.object({ orgId: z.string().uuid().optional() }).parse(input ?? {}))
+  .handler(async ({ data: input, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(context.supabase, context.userId, input.orgId);
     const { data, error } = await context.supabase
       .from("fit_rules")
       .select("*")
-      .eq("user_id", context.userId)
+      .eq("org_id", principal.orgId!)
       .maybeSingle();
     if (error) throw new Error(error.message);
     return { rules: (data as FitRules | null) ?? DEFAULT_RULES, exists: !!data };
@@ -50,11 +53,20 @@ export const getFitRules = createServerFn({ method: "GET" })
 
 export const saveFitRules = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => FitRulesInput.parse(input))
+  .inputValidator((input) =>
+    FitRulesInput.extend({ orgId: z.string().uuid().optional() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
+    const { orgId: requestedOrgId, ...rules } = data;
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(context.supabase, context.userId, requestedOrgId);
+    if (!principal.orgId) throw new Error("Organization context is required");
     const { error } = await context.supabase
       .from("fit_rules")
-      .upsert({ user_id: context.userId, ...data }, { onConflict: "user_id" });
+      .upsert(
+        { user_id: context.userId, org_id: principal.orgId, ...rules },
+        { onConflict: "org_id" },
+      );
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -65,11 +77,15 @@ export const previewFitRules = createServerFn({ method: "POST" })
     z
       .object({
         rules: FitRulesInput,
+        orgId: z.string().uuid().optional(),
         limit: z.number().int().min(1).max(50).default(20),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(context.supabase, context.userId, data.orgId);
+    if (!principal.orgId) throw new Error("Organization context is required");
     const { data: rows, error } = await context.supabase
       .from("grants")
       .select(
@@ -97,7 +113,7 @@ export const previewFitRules = createServerFn({ method: "POST" })
       const { data: evals } = await context.supabase
         .from("grant_evaluations")
         .select("grant_id, fit_score, llm_fit_score, eligibility_pass")
-        .eq("user_id", context.userId)
+        .eq("org_id", principal.orgId)
         .in("grant_id", grantIds);
       for (const e of evals ?? []) {
         storedCombinedById.set(e.grant_id, e.fit_score);
@@ -140,10 +156,13 @@ export const previewFitRules = createServerFn({ method: "POST" })
  */
 export const checkOrgRulesDrift = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ issues: DriftIssue[] }> => {
+  .inputValidator((input) => z.object({ orgId: z.string().uuid().optional() }).parse(input ?? {}))
+  .handler(async ({ data: input, context }): Promise<{ issues: DriftIssue[] }> => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(context.supabase, context.userId, input.orgId);
     const [{ data: org }, { data: rulesRow }] = await Promise.all([
-      getOrgProfileForUser(context.supabase, context.userId),
-      context.supabase.from("fit_rules").select("*").eq("user_id", context.userId).maybeSingle(),
+      getOrgProfileForUser(context.supabase, context.userId, principal.orgId),
+      context.supabase.from("fit_rules").select("*").eq("org_id", principal.orgId!).maybeSingle(),
     ]);
 
     // No stored rules = user hasn't customized; deriveRulesFromOrg runs at

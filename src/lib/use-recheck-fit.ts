@@ -10,8 +10,8 @@ import { autoEvaluatePending } from "@/lib/grants.functions";
 export function useRecheckFit() {
   const qc = useQueryClient();
   const autoEval = useServerFn(autoEvaluatePending);
-  return () => {
-    void autoEval({ data: { limit: 100 } })
+  return (orgId?: string) => {
+    void autoEval({ data: { limit: 100, orgId } })
       .then(async (result) => {
         const queued = (result as { queued?: number }).queued ?? 0;
         await qc.invalidateQueries({ queryKey: ["grants"] });

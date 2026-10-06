@@ -4,13 +4,16 @@ import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { getOrgProfile } from "@/lib/org.functions";
 import { computeOrgProfileReadiness } from "@/lib/org-profile-readiness";
+import { useActiveTenant } from "@/lib/tenant-context";
 
 /** Persistent Action Needed cue; hidden as soon as verified matching is safe. */
 export function TenantReadinessBanner() {
+  const { activeOrgId, activeOrganization } = useActiveTenant();
   const fetchProfile = useServerFn(getOrgProfile);
   const { data, isError } = useQuery({
-    queryKey: ["org", "self"],
-    queryFn: () => fetchProfile(),
+    queryKey: ["org", activeOrgId],
+    queryFn: () => fetchProfile({ data: { orgId: activeOrgId! } }),
+    enabled: !!activeOrgId,
     staleTime: 60_000,
   });
   if (isError || !data) return null;
@@ -25,7 +28,8 @@ export function TenantReadinessBanner() {
         <p className="flex min-w-0 items-center gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>
-            <strong>Action needed:</strong> IIAL matching is provisional until {names.join(", ")}
+            <strong>Action needed:</strong> {activeOrganization?.name ?? "Organization"} matching is
+            provisional until {names.join(", ")}
             {readiness.criticalMissing.length > 3 ? " and other core facts" : ""} are confirmed.
           </span>
         </p>

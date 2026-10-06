@@ -1,12 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  useSuspenseQuery,
-  useQuery,
-  queryOptions,
-  useQueryClient,
-  useMutation,
-} from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   autoEvaluatePending,
@@ -47,12 +41,7 @@ import {
   startStrictGrantReview,
 } from "@/lib/grant-review.functions";
 import "@/i18n";
-
-const grantsQueryOptions = (search = "", profileId?: string) =>
-  queryOptions({
-    queryKey: ["grants", "all", search, profileId ?? "general"],
-    queryFn: () => listGrants({ data: { limit: 100, search: search || undefined, profileId } }),
-  });
+import { useActiveTenant } from "@/lib/tenant-context";
 
 // SSR-safe sessionStorage access (component renders on the server too).
 const ss = {
@@ -102,13 +91,18 @@ export const Route = createFileRoute("/_authenticated/grants/")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(grantsQueryOptions()),
   errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,
   pendingComponent: GrantsListSkeleton,
-  component: GrantsPage,
+  component: TenantGrantsPage,
 });
 
-function GrantsPage() {
+function TenantGrantsPage() {
+  const { activeOrgId, isLoading } = useActiveTenant();
+  if (isLoading || !activeOrgId) return <GrantsListSkeleton />;
+  return <GrantsPage key={activeOrgId} orgId={activeOrgId} />;
+}
+
+function GrantsPage({ orgId }: { orgId: string }) {
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
   const isConsultant = useIsConsultant();
@@ -118,11 +112,11 @@ function GrantsPage() {
   // Evaluations run in the background on the server (they finish even if the
   // tab is closed); wait here until the new verdict is saved.
   const evaluate = async ({ data }: { data: { grantId: string } }) => {
-    const started = await startEval({ data });
+    const started = await startEval({ data: { ...data, orgId } });
     const since = new Date(started.startedAt).getTime() - 5_000;
     for (let attempt = 0; attempt < 120; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 2_500));
-      const detail = await getGrantDetail({ data: { id: data.grantId } });
+      const detail = await getGrantDetail({ data: { id: data.grantId, orgId } });
       const at = (detail.evaluation as { evaluated_at?: string } | null)?.evaluated_at;
       if (at && new Date(at).getTime() >= since) return started;
     }
@@ -179,6 +173,7 @@ function GrantsPage() {
       facets,
       includeHardBlocked,
       includeDismissed,
+      orgId,
     ],
     queryFn: () =>
       fetchGrants({
@@ -197,14 +192,15 @@ function GrantsPage() {
           evidenceStates: one<"known" | "unknown" | "conflicting">(facets.evidenceState),
           includeHardBlocked,
           includeDismissed,
+          orgId,
         },
       }),
   });
 
   const grants = data.grants as GrantRowData[];
   const { data: radarProfiles = [] } = useQuery({
-    queryKey: ["radar", "profiles"],
-    queryFn: () => listRadarProfiles(),
+    queryKey: ["radar", "profiles", orgId],
+    queryFn: () => listRadarProfiles({ data: { orgId } }),
     staleTime: 60_000,
   });
   const { data: strictReview, refetch: refetchStrictReview } = useQuery({
@@ -271,7 +267,7 @@ function GrantsPage() {
       // Batches of 100 until nothing is stale, so a profile change reaches
       // every grant, not only the first batch. Rules-only: 0 tokens.
       for (let batch = 0; batch < 20 && !cancelled; batch++) {
-        const result = (await autoEval({ data: { limit: 100 } })) as {
+        const result = (await autoEval({ data: { limit: 100, orgId } })) as {
           queued?: number;
           remaining?: number;
         };
@@ -291,7 +287,7 @@ function GrantsPage() {
     return () => {
       cancelled = true;
     };
-  }, [hasGrants, autoEval, qc]);
+  }, [hasGrants, autoEval, orgId, qc]);
   const sectors = useMemo(() => collectSectors(grants), [grants]);
   const countries = useMemo(() => {
     const list = data.availableCountries ?? [];
@@ -424,7 +420,7 @@ function GrantsPage() {
   const onDraft = (grantId: string) =>
     run(`${grantId}:draft`, async () => {
       try {
-        const r = await strategize({ data: { grantId } });
+        const r = await strategize({ data: { grantId, orgId } });
         await navigate({ to: "/proposals/$id", params: { id: r.proposalId } });
       } catch (e) {
         if (e instanceof Error && e.message.includes("org_profile_missing")) {

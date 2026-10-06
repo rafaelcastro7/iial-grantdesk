@@ -7,7 +7,13 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const runEvaluator = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({ grantId: z.string().uuid(), force: z.boolean().optional() }).parse(input),
+    z
+      .object({
+        grantId: z.string().uuid(),
+        orgId: z.string().uuid().optional(),
+        force: z.boolean().optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { evaluateGrantImpl } = await import("@/agents/evaluator.impl.server");
@@ -15,6 +21,7 @@ export const runEvaluator = createServerFn({ method: "POST" })
       grantId: data.grantId,
       userId: context.userId,
       userSupabase: context.supabase,
+      orgId: data.orgId,
       force: data.force,
     });
   });
@@ -27,7 +34,13 @@ export const runEvaluator = createServerFn({ method: "POST" })
 export const startEvaluator = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({ grantId: z.string().uuid(), force: z.boolean().optional() }).parse(input),
+    z
+      .object({
+        grantId: z.string().uuid(),
+        orgId: z.string().uuid().optional(),
+        force: z.boolean().optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { evaluateGrantImpl } = await import("@/agents/evaluator.impl.server");
@@ -40,6 +53,7 @@ export const startEvaluator = createServerFn({ method: "POST" })
         grantId: data.grantId,
         userId: context.userId,
         userSupabase: context.supabase,
+        orgId: data.orgId,
         runId,
         force: data.force,
       }),

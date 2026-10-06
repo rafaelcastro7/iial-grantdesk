@@ -134,6 +134,13 @@
       "when": 1791316800000,
       "tag": "0018_fix_membership_rls_recursion",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791318600000,
+      "tag": "0019_tenant_scoped_profiles_and_evaluations",
+      "breakpoints": true
     }
   ]
 }

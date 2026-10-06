@@ -8,27 +8,31 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { applyProfileSuggestion, getFitInsights } from "@/lib/fit-insights.functions";
 import { autoEvaluatePending } from "@/lib/grants.functions";
+import { useActiveTenant } from "@/lib/tenant-context";
 
 export const Route = createFileRoute("/_authenticated/insights")({
   component: FitInsightsPage,
 });
 
 function FitInsightsPage() {
+  const { activeOrgId } = useActiveTenant();
   const fetchInsights = useServerFn(getFitInsights);
   const apply = useServerFn(applyProfileSuggestion);
   const qc = useQueryClient();
   const [applied, setApplied] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<string | null>(null);
   const { data, isLoading, error } = useQuery({
-    queryKey: ["grants", "fit-insights"],
-    queryFn: () => fetchInsights(),
+    queryKey: ["grants", "fit-insights", activeOrgId],
+    queryFn: () => fetchInsights({ data: { orgId: activeOrgId! } }),
+    enabled: !!activeOrgId,
   });
   // Re-check stale verdicts here too (rules only, 0 tokens), so the counts
   // reflect the current profile without a visit to the radar first.
   const recheck = useServerFn(autoEvaluatePending);
   useEffect(() => {
+    if (!activeOrgId) return;
     let cancelled = false;
-    void recheck({ data: { limit: 100, background: false } })
+    void recheck({ data: { limit: 100, background: false, orgId: activeOrgId } })
       .then((r) => {
         if (!cancelled && ((r as { evaluated?: number }).evaluated ?? 0) > 0) {
           void qc.invalidateQueries({ queryKey: ["grants", "fit-insights"] });
@@ -38,10 +42,15 @@ function FitInsightsPage() {
     return () => {
       cancelled = true;
     };
-  }, [recheck, qc, applied.size]);
+  }, [activeOrgId, recheck, qc, applied.size]);
   const mutation = useMutation({
     mutationFn: (s: { kind: string; value: string; grantIds: string[] }) =>
-      apply({ data: s as { kind: "add_sector"; value: string; grantIds: string[] } }),
+      apply({
+        data: {
+          ...s,
+          orgId: activeOrgId!,
+        } as { kind: "add_sector"; value: string; grantIds: string[]; orgId: string },
+      }),
     onSuccess: async (r, s) => {
       setApplied((prev) => new Set(prev).add(`${s.kind}:${s.value}`));
       const { rechecked = 0, nowPassing = 0 } = (r ?? {}) as {
@@ -54,7 +63,7 @@ function FitInsightsPage() {
           : "Profile updated.",
       );
       await qc.invalidateQueries({ queryKey: ["grants"] });
-      await qc.invalidateQueries({ queryKey: ["org", "self"] });
+      await qc.invalidateQueries({ queryKey: ["org", activeOrgId] });
       await qc.invalidateQueries({ queryKey: ["grants", "fit-insights"] });
     },
   });

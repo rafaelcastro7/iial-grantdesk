@@ -154,6 +154,7 @@ beforeEach(() => {
     {
       id: "org_1",
       user_id: USER_ID,
+      org_id: "org_1",
       org_name: "IIAL Test Org",
       sectors: ["cleantech"],
       jurisdictions: ["CA", "ON"],
@@ -172,6 +173,7 @@ beforeEach(() => {
   db.tables.fit_rules = [
     {
       user_id: USER_ID,
+      org_id: "org_1",
       min_amount_cad: null,
       max_amount_cad: null,
       required_jurisdictions: [],

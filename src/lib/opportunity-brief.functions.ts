@@ -68,10 +68,15 @@ export type Brief = {
 
 export const generateOpportunityBrief = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ grantId: z.string().uuid() }).parse(input))
+  .inputValidator((input) =>
+    z.object({ grantId: z.string().uuid(), orgId: z.string().uuid().optional() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { grantId } = data;
     const { supabase, userId } = context;
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(supabase, userId, data.orgId);
+    if (!principal.orgId) throw new Error("Organization context is required");
 
     const [{ data: g, error: gerr }, { data: rulesRow }, { data: org }] = await Promise.all([
       supabase
@@ -81,8 +86,8 @@ export const generateOpportunityBrief = createServerFn({ method: "POST" })
         )
         .eq("id", grantId)
         .maybeSingle(),
-      supabase.from("fit_rules").select("*").eq("user_id", userId).maybeSingle(),
-      getOrgProfileForUser(supabase, userId),
+      supabase.from("fit_rules").select("*").eq("org_id", principal.orgId).maybeSingle(),
+      getOrgProfileForUser(supabase, userId, principal.orgId),
     ]);
     if (gerr) throw new Error(gerr.message);
     if (!g) throw new Error("grant_not_found");

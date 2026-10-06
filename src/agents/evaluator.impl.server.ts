@@ -13,6 +13,8 @@ export async function evaluateGrantImpl(opts: {
   grantId: string;
   userId: string;
   userSupabase: SupabaseClient;
+  /** Explicit applicant tenant, verified through user_organizations. */
+  orgId?: string;
   /** Pre-assigned run id, so a caller can return it before the run finishes. */
   runId?: string;
   /**
@@ -62,7 +64,7 @@ export async function evaluateGrantImpl(opts: {
       )
       .eq("id", grantId)
       .maybeSingle(),
-    getOrgProfileForUser(userSupabase, userId),
+    getOrgProfileForUser(userSupabase, userId, opts.orgId),
   ]);
   if (gerr) throw new Error(gerr.message);
   if (!g) {
@@ -77,6 +79,11 @@ export async function evaluateGrantImpl(opts: {
     throw new Error("org_profile_missing");
   }
   const effectiveOrg = org as Record<string, unknown>;
+  const evaluationOrgId = (effectiveOrg.org_id as string | null) ?? null;
+  if (!evaluationOrgId) {
+    await trace("load", "Organization tenant missing", "error");
+    throw new Error("organization_context_missing");
+  }
   const narrate = (mode: "rules" | "fallback") =>
     narrateEvaluation({
       orgName:
@@ -116,7 +123,7 @@ export async function evaluateGrantImpl(opts: {
   const { data: rulesRow } = await userSupabase
     .from("fit_rules")
     .select("*")
-    .eq("user_id", userId)
+    .eq("org_id", evaluationOrgId)
     .maybeSingle();
   const {
     DEFAULT_RULES,
@@ -197,7 +204,7 @@ export async function evaluateGrantImpl(opts: {
   const { data: prior } = await userSupabase
     .from("grant_evaluations")
     .select("fit_score, eligibility_pass, run_id, model, llm_fit_score, rule_snapshot")
-    .eq("user_id", userId)
+    .eq("org_id", evaluationOrgId)
     .eq("grant_id", g.id)
     .maybeSingle();
 
@@ -219,7 +226,7 @@ export async function evaluateGrantImpl(opts: {
     await userSupabase
       .from("grant_evaluations")
       .update({ evaluated_at: new Date().toISOString() } as never)
-      .eq("user_id", userId)
+      .eq("org_id", evaluationOrgId)
       .eq("grant_id", g.id);
     return {
       ok: true,
@@ -364,6 +371,7 @@ export async function evaluateGrantImpl(opts: {
   const { error: upErr } = await userSupabase.from("grant_evaluations").upsert(
     {
       user_id: userId,
+      org_id: evaluationOrgId,
       grant_id: g.id,
       fit_score: parsed.fit_score,
       llm_fit_score: usedModel === "rules-engine-deterministic" ? null : llmFit,
@@ -409,7 +417,7 @@ export async function evaluateGrantImpl(opts: {
         weight_llm: rules.weight_llm,
       },
     },
-    { onConflict: "user_id,grant_id" },
+    { onConflict: "org_id,grant_id" },
   );
   if (upErr) {
     await trace("persist", `grant_evaluations upsert failed: ${upErr.message}`, "error");

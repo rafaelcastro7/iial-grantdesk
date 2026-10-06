@@ -153,6 +153,7 @@ export const runStrategist = createServerFn({ method: "POST" })
     z
       .object({
         grantId: z.string().uuid(),
+        orgId: z.string().uuid().optional(),
         templateId: z.string().uuid().optional(),
       })
       .parse(i),
@@ -181,7 +182,7 @@ export const runStrategist = createServerFn({ method: "POST" })
           )
           .eq("id", data.grantId)
           .maybeSingle(),
-        getOrgProfileForUser(context.supabase, context.userId),
+        getOrgProfileForUser(context.supabase, context.userId, data.orgId),
         data.templateId
           ? context.supabase
               .from("proposal_templates")
@@ -207,6 +208,7 @@ export const runStrategist = createServerFn({ method: "POST" })
     // the same grant is reused instead of creating a second one (and a
     // second LLM call). Checked again right before insert (see below).
     const orgId = (org as { org_id?: string | null }).org_id ?? null;
+    if (!orgId) throw new Error("organization_context_missing");
     const findExisting = async () => {
       let q = context.supabase
         .from("proposals")
@@ -234,7 +236,7 @@ export const runStrategist = createServerFn({ method: "POST" })
     const { data: ev, error: eve } = await context.supabase
       .from("grant_evaluations")
       .select("eligibility_pass, model, rule_snapshot")
-      .eq("user_id", context.userId)
+      .eq("org_id", orgId)
       .eq("grant_id", data.grantId)
       .maybeSingle();
     if (eve) throw new Error(eve.message);

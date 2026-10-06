@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useForm, type UseFormProps } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useRecheckFit } from "@/lib/use-recheck-fit";
 import { useTranslation } from "react-i18next";
@@ -11,20 +11,21 @@ import { getOrgProfile, saveOrgProfile } from "@/lib/org.functions";
 import { parseCSV } from "@/lib/csv.shared";
 import { syncClientLocale } from "@/i18n/sync";
 import { toast } from "sonner";
+import { useActiveTenant } from "@/lib/tenant-context";
 import {
   GrantReadinessProfileForm,
   optionalNumber,
 } from "@/components/org/GrantReadinessProfileForm";
 import "@/i18n";
 
-const orgQueryOptions = queryOptions({
-  queryKey: ["org", "self"],
-  queryFn: () => getOrgProfile(),
-});
+const orgQueryOptions = (orgId: string) =>
+  queryOptions({
+    queryKey: ["org", orgId],
+    queryFn: () => getOrgProfile({ data: { orgId } }),
+  });
 
 export const Route = createFileRoute("/_authenticated/org")({
   head: () => ({ meta: [{ title: "Organization — IIAL" }] }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(orgQueryOptions),
   component: OrgPage,
 });
 
@@ -69,10 +70,40 @@ const orgSchema = z.object({
 export type OrgFormValues = z.infer<typeof orgSchema>;
 
 function OrgPage() {
+  const { activeOrgId, activeOrganization, isLoading } = useActiveTenant();
+  const query = useQuery({
+    ...orgQueryOptions(activeOrgId ?? "00000000-0000-0000-0000-000000000000"),
+    enabled: !!activeOrgId,
+  });
+  if (isLoading || !activeOrgId || !query.data) {
+    return (
+      <div className="mx-auto max-w-5xl p-8 text-sm text-muted-foreground">
+        Loading organization profile…
+      </div>
+    );
+  }
+  return (
+    <OrgProfileEditor
+      key={activeOrgId}
+      orgId={activeOrgId}
+      organizationName={activeOrganization?.name ?? "Organization"}
+      data={query.data}
+    />
+  );
+}
+
+function OrgProfileEditor({
+  orgId,
+  organizationName,
+  data,
+}: {
+  orgId: string;
+  organizationName: string;
+  data: Awaited<ReturnType<typeof getOrgProfile>>;
+}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const recheckAfterChange = useRecheckFit();
-  const { data } = useSuspenseQuery(orgQueryOptions);
   const save = useServerFn(saveOrgProfile);
   const mut = useMutation({
     mutationFn: (input: {
@@ -99,11 +130,11 @@ function OrgPage() {
       funding_max_cad: number | null;
       cost_share_max_pct: number | null;
       indirect_cost_rate_pct: number | null;
-    }) => save({ data: input }),
+    }) => save({ data: { ...input, orgId } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["org"] });
+      qc.invalidateQueries({ queryKey: ["org", orgId] });
       qc.invalidateQueries({ queryKey: ["org-rules-drift"] });
-      recheckAfterChange();
+      recheckAfterChange(orgId);
       toast.success(t("org.saved"));
     },
     onError: (error) => {
@@ -120,7 +151,7 @@ function OrgPage() {
   const form = useForm<OrgFormValues>({
     resolver: zodResolver(orgSchema) as unknown as UseFormProps<OrgFormValues>["resolver"],
     defaultValues: {
-      org_name: p?.org_name ?? "",
+      org_name: p?.org_name ?? organizationName,
       sectors: (p?.sectors ?? []).join(", "),
       jurisdictions: (p?.jurisdictions ?? ["CA"]).join(", "),
       stage: ((p?.stage as (typeof STAGES)[number]) ?? "sme") as OrgFormValues["stage"],

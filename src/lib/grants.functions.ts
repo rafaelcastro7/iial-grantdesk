@@ -100,6 +100,7 @@ export const listGrants = createServerFn({ method: "GET" })
         search: z.string().trim().max(120).optional(),
         // ISO country of the opportunity (CA, US, INTL, …). Omitted = all.
         country: z.string().trim().min(2).max(8).optional(),
+        orgId: z.string().uuid().optional(),
         profileId: z.string().uuid().optional(),
         applicantTypes: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
         populationsServed: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
@@ -120,6 +121,7 @@ export const listGrants = createServerFn({ method: "GET" })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
     const profilePromise = data.profileId
       ? context.supabase
           .from("grant_search_profiles")
@@ -142,12 +144,8 @@ export const listGrants = createServerFn({ method: "GET" })
     // "small business innovation" got province-locked programs from the other
     // side of the country at the top — the evaluator then correctly failed
     // them on jurisdiction, after the user had already spent a click.
-    const orgProfilePromise = getOrgProfileForUser(context.supabase, context.userId);
-    const principalPromise = context.supabase
-      .from("profiles")
-      .select("org_id")
-      .eq("id", context.userId)
-      .maybeSingle();
+    const orgProfilePromise = getOrgProfileForUser(context.supabase, context.userId, data.orgId);
+    const principalPromise = getTenantPrincipal(context.supabase, context.userId, data.orgId);
     const searchConfigPromise = context.supabase
       .from("grant_search_runtime_config")
       .select("hybrid_enabled,shadow_mode,ranking_version")
@@ -158,7 +156,7 @@ export const listGrants = createServerFn({ method: "GET" })
       { data: searchProfile, error: profileError },
       { data: feedback, error: feedbackError },
       { data: orgProfile },
-      { data: principal, error: principalError },
+      principal,
       { data: searchConfig, error: searchConfigError },
     ] = await Promise.all([
       profilePromise,
@@ -169,7 +167,7 @@ export const listGrants = createServerFn({ method: "GET" })
     ]);
     if (profileError) throw new Error(profileError.message);
     if (feedbackError) throw new Error(feedbackError.message);
-    if (principalError) throw new Error(principalError.message);
+    if (!principal.orgId) throw new Error("Organization context is required");
     if (searchConfigError) throw new Error(searchConfigError.message);
     if (data.profileId && !searchProfile) throw new Error("Search profile not found");
 
@@ -364,7 +362,7 @@ export const listGrants = createServerFn({ method: "GET" })
         .select(
           "grant_id, fit_score, llm_fit_score, model, eligibility_pass, rationale_en, rationale_fr, created_at, rule_snapshot, rule_verdict:rule_snapshot->>verdict",
         )
-        .eq("user_id", context.userId)
+        .eq("org_id", principal.orgId!)
         .in("grant_id", chunk);
       if (evalsError) throw new Error(`grant_evaluations: ${evalsError.message}`);
       for (const evaluation of evals ?? []) {
@@ -572,14 +570,14 @@ export const listGrants = createServerFn({ method: "GET" })
         evaluated_at: string | null;
       }
     >();
-    if (principal?.org_id && grants.length > 0) {
+    if (principal.orgId && grants.length > 0) {
       for (const ids of chunkIds(grants.map((grant) => grant.id))) {
         const { data: reviewStates, error: reviewError } = await context.supabase
           .from("grant_review_states")
           .select(
             "grant_id,status,coverage_pct,missing_fields,critical_issues,next_action,evaluated_at",
           )
-          .eq("org_id", principal.org_id)
+          .eq("org_id", principal.orgId)
           .in("grant_id", ids);
         if (reviewError) throw new Error(`grant_review_states: ${reviewError.message}`);
         for (const state of reviewStates ?? []) reviewByGrant.set(state.grant_id, state);
@@ -693,7 +691,7 @@ export const listGrants = createServerFn({ method: "GET" })
           : effectiveSearchMode);
       const { error: telemetryError } = await context.supabase.from("grant_search_runs").insert({
         user_id: context.userId,
-        org_id: principal?.org_id ?? null,
+        org_id: principal.orgId,
         profile_id: data.profileId ?? null,
         query_text: data.search,
         filters: {
@@ -1101,13 +1099,18 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
         // running in the background so the page does not wait.
         rulesOnly: z.boolean().default(true),
         background: z.boolean().default(true),
+        orgId: z.string().uuid().optional(),
       })
       .parse(i ?? {}),
   )
   .handler(async ({ data, context }) => {
     // Without an org profile every evaluation throws org_profile_missing.
-    const { data: org } = await getOrgProfileForUser(context.supabase, context.userId);
+    const { data: org } = await getOrgProfileForUser(context.supabase, context.userId, data.orgId);
     if (!org) return { ok: true, evaluated: 0, skipped: 0, reason: "org_profile_missing" as const };
+    const evaluationOrgId = (org as { org_id?: string | null }).org_id ?? null;
+    if (!evaluationOrgId) {
+      return { ok: true, evaluated: 0, skipped: 0, reason: "org_context_missing" as const };
+    }
 
     const { assertAgentEnabled } = await import("@/lib/admin-agents.functions");
     try {
@@ -1143,7 +1146,7 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
     const { data: rulesRow } = await context.supabase
       .from("fit_rules")
       .select("updated_at")
-      .eq("user_id", context.userId)
+      .eq("org_id", evaluationOrgId)
       .maybeSingle();
     const rulesChangedAt = Math.max(
       new Date((org as { updated_at?: string | null }).updated_at ?? 0).getTime(),
@@ -1165,7 +1168,7 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
         .select(
           "grant_id, evaluated_at, model, prompt_version, hard_fail:rule_snapshot->>hard_fail",
         )
-        .eq("user_id", context.userId)
+        .eq("org_id", evaluationOrgId)
         .in("grant_id", chunk);
       if (existingError) throw new Error(`grant_evaluations: ${existingError.message}`);
       // A verdict older than the last profile change is stale: re-check it so
@@ -1202,6 +1205,7 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
             grantId,
             userId: context.userId,
             userSupabase: context.supabase,
+            orgId: evaluationOrgId,
             rulesOnly: aiMode ? false : data.rulesOnly,
             freeOnly: aiMode,
           });

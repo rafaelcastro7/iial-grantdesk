@@ -7,8 +7,13 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // timeline events for full context.
 export const getGrantDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .inputValidator((i) =>
+    z.object({ id: z.string().uuid(), orgId: z.string().uuid().optional() }).parse(i),
+  )
   .handler(async ({ data, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(context.supabase, context.userId, data.orgId);
+    if (!principal.orgId) throw new Error("Organization context is required");
     const { data: grant, error } = await context.supabase
       .from("grants")
       .select(
@@ -126,7 +131,7 @@ export const getGrantDetail = createServerFn({ method: "GET" })
       .select(
         "fit_score, eligibility_pass, rationale_en, rationale_fr, axis_breakdown, rule_snapshot, created_at, evaluated_at, model",
       )
-      .eq("user_id", context.userId)
+      .eq("org_id", principal.orgId)
       .eq("grant_id", data.id)
       .maybeSingle();
 
@@ -142,7 +147,11 @@ export const getGrantDetail = createServerFn({ method: "GET" })
     // Per organization, like the strategist's guard: a teammate's live
     // proposal for this grant is opened instead of drafting a second one.
     const { getOrgProfileForUser } = await import("@/lib/org-profile-query");
-    const { data: myOrg } = await getOrgProfileForUser(context.supabase, context.userId);
+    const { data: myOrg } = await getOrgProfileForUser(
+      context.supabase,
+      context.userId,
+      principal.orgId,
+    );
     const myOrgId = (myOrg as { org_id?: string | null } | null)?.org_id ?? null;
     let proposalQuery = context.supabase
       .from("proposals")

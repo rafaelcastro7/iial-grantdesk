@@ -52,6 +52,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getLlmRouteStatus, type LlmRouteStatus } from "@/lib/llm-route.functions";
 import { TenantReadinessBanner } from "@/components/org/TenantReadinessBanner";
+import { useActiveTenant } from "@/lib/tenant-context";
 const SIDEBAR_COLLAPSED_KEY = "iial.v2.sidebar.collapsed";
 
 type NavItem = {
@@ -608,6 +609,7 @@ function V2TopBar({
         </div>
 
         <div className="flex items-center gap-2">
+          <TenantSelector />
           <Button
             variant="outline"
             size="sm"
@@ -691,6 +693,35 @@ function V2TopBar({
         </div>
       )}
     </header>
+  );
+}
+
+function TenantSelector() {
+  const { organizations, activeOrgId, isLoading, setActiveOrgId } = useActiveTenant();
+  if (!isLoading && organizations.length === 0) return null;
+
+  return (
+    <label className="relative hidden items-center gap-2 rounded-lg border border-border/60 bg-card/70 px-2.5 py-1.5 shadow-2xs sm:flex">
+      <Building2 className="h-4 w-4 shrink-0 text-primary" />
+      <span className="sr-only">Active organization</span>
+      <select
+        aria-label="Active organization"
+        value={activeOrgId ?? ""}
+        disabled={isLoading || organizations.length === 0}
+        onChange={(event) => setActiveOrgId(event.target.value)}
+        className="max-w-[170px] cursor-pointer appearance-none truncate bg-transparent pr-4 text-xs font-semibold text-foreground outline-none disabled:cursor-wait"
+      >
+        {!activeOrgId && <option value="">Loading workspace…</option>}
+        {organizations.map((organization) => (
+          <option key={organization.id} value={organization.id}>
+            {organization.name}
+          </option>
+        ))}
+      </select>
+      {organizations.length > 1 && (
+        <ChevronRight className="pointer-events-none absolute right-2 h-3 w-3 rotate-90 text-muted-foreground" />
+      )}
+    </label>
   );
 }
 

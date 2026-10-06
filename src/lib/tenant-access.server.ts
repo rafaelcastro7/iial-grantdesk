@@ -23,7 +23,19 @@ const ENTITY_TABLE = {
 export async function getTenantPrincipal(
   supabase: DbClient,
   userId: string,
+  requestedOrgId?: string | null,
 ): Promise<TenantPrincipal> {
+  if (requestedOrgId) {
+    const { data: membership, error: membershipError } = await supabase
+      .from("user_organizations")
+      .select("org_id")
+      .eq("user_id", userId)
+      .eq("org_id", requestedOrgId)
+      .maybeSingle();
+    if (membershipError) throw new Error(`Tenant lookup failed: ${membershipError.message}`);
+    if (!membership) throw new Error("Forbidden: organization is not assigned to this user");
+    return { userId, orgId: requestedOrgId };
+  }
   const { data, error } = await supabase
     .from("profiles")
     .select("org_id")

@@ -33,6 +33,7 @@ export async function loadUserVerdicts(
   db: Db,
   userId: string,
   now = Date.now(),
+  orgId?: string,
 ): Promise<VerdictRow[]> {
   const evals: Array<{
     grant_id: string;
@@ -42,12 +43,11 @@ export async function loadUserVerdicts(
     model?: string | null;
   }> = [];
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db
+    let query = db
       .from("grant_evaluations")
-      .select("grant_id, fit_score, eligibility_pass, rule_snapshot, model")
-      .eq("user_id", userId)
-      .order("grant_id")
-      .range(from, from + PAGE - 1);
+      .select("grant_id, fit_score, eligibility_pass, rule_snapshot, model");
+    query = orgId ? query.eq("org_id", orgId) : query.eq("user_id", userId);
+    const { data, error } = await query.order("grant_id").range(from, from + PAGE - 1);
     if (error) throw new Error(`grant_evaluations: ${error.message}`);
     evals.push(...(data ?? []));
     if (!data || data.length < PAGE) break;

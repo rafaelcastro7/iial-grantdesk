@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getOrgProfileForUser } from "@/lib/org-profile-query";
+import { z } from "zod";
 
 export type RadarClientProfile = {
   clientId: string;
@@ -15,10 +16,12 @@ export type RadarClientProfile = {
 /** Client profiles the radar can check grants against (RLS-scoped to the caller). */
 export const listRadarProfiles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<RadarClientProfile[]> => {
+  .inputValidator((input) => z.object({ orgId: z.string().uuid().optional() }).parse(input ?? {}))
+  .handler(async ({ data: input, context }): Promise<RadarClientProfile[]> => {
     const { data: organization, error: organizationError } = await getOrgProfileForUser(
       context.supabase,
       context.userId,
+      input.orgId,
     );
     if (organizationError) throw new Error(organizationError.message);
 

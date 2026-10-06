@@ -5,6 +5,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { V2AuthenticatedShell } from "@/components/v2/V2AuthenticatedShell";
 import { UiVersionProvider } from "@/components/v2/UiVersionProvider";
+import { ActiveTenantProvider } from "@/lib/tenant-context";
 
 const bootstrapped = new Set<string>();
 
@@ -34,9 +35,11 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   return (
-    <UiVersionProvider>
-      <AuthenticatedLayoutInner />
-    </UiVersionProvider>
+    <ActiveTenantProvider>
+      <UiVersionProvider>
+        <AuthenticatedLayoutInner />
+      </UiVersionProvider>
+    </ActiveTenantProvider>
   );
 }
 

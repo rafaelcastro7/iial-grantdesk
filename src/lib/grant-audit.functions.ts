@@ -9,8 +9,13 @@ import { getOrgProfileForUser } from "@/lib/org-profile-query";
 
 export const getGrantAudit = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .inputValidator((i) =>
+    z.object({ id: z.string().uuid(), orgId: z.string().uuid().optional() }).parse(i),
+  )
   .handler(async ({ data, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    const principal = await getTenantPrincipal(context.supabase, context.userId, data.orgId);
+    if (!principal.orgId) throw new Error("Organization context is required");
     const { data: grant, error } = await context.supabase
       .from("grants")
       .select(
@@ -22,8 +27,8 @@ export const getGrantAudit = createServerFn({ method: "GET" })
     if (!grant) throw new Error("Grant not found");
 
     const [{ data: rulesRow }, { data: org }] = await Promise.all([
-      context.supabase.from("fit_rules").select("*").eq("user_id", context.userId).maybeSingle(),
-      getOrgProfileForUser(context.supabase, context.userId),
+      context.supabase.from("fit_rules").select("*").eq("org_id", principal.orgId).maybeSingle(),
+      getOrgProfileForUser(context.supabase, context.userId, principal.orgId),
     ]);
 
     const { DEFAULT_RULES, evaluateRules, deriveRulesFromOrg } =
@@ -51,7 +56,7 @@ export const getGrantAudit = createServerFn({ method: "GET" })
       .select(
         "fit_score,llm_fit_score,eligibility_pass,rationale_en,model,axis_breakdown,rule_snapshot,evaluated_at,created_at",
       )
-      .eq("user_id", context.userId)
+      .eq("org_id", principal.orgId)
       .eq("grant_id", data.id)
       .maybeSingle();
 

@@ -12,10 +12,11 @@ export const listUserOrganizations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const supabase = await createSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("user_organizations")
-      .select(
-        `
+    const [{ data, error }, { data: profile, error: profileError }] = await Promise.all([
+      supabase
+        .from("user_organizations")
+        .select(
+          `
         org_id,
         role,
         organizations:org_id (
@@ -25,15 +26,27 @@ export const listUserOrganizations = createServerFn({ method: "GET" })
           created_at
         )
       `,
-      )
-      .eq("user_id", context.userId);
+        )
+        .eq("user_id", context.userId),
+      supabase.from("profiles").select("org_id").eq("id", context.userId).maybeSingle(),
+    ]);
 
     if (error) throw new Error(error.message);
+    if (profileError) throw new Error(profileError.message);
 
-    const orgs = (data ?? []).map((row) => ({
-      ...row.organizations,
-      user_role: row.role,
-    }));
+    const orgs = (data ?? []).flatMap((row) => {
+      const organization = Array.isArray(row.organizations)
+        ? row.organizations[0]
+        : row.organizations;
+      if (!organization) return [];
+      return [
+        {
+          ...organization,
+          user_role: row.role,
+          is_default: row.org_id === profile?.org_id,
+        },
+      ];
+    });
 
     return { organizations: orgs };
   });
@@ -451,9 +464,7 @@ export const listGrantsForOrganization = createServerFn({ method: "GET" })
     return { grants: filtered };
   });
 
-/**
- * Switch current organization context (for backward compatibility with profiles.org_id)
- */
+/** @deprecated The active workspace is client session state; this only checks access. */
 export const switchOrganizationContext = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ orgId: z.string().uuid() }))
@@ -471,14 +482,6 @@ export const switchOrganizationContext = createServerFn({ method: "POST" })
     if (!membership) {
       throw new Error("Access denied");
     }
-
-    // Update profiles.org_id for backward compatibility
-    const { error } = await admin
-      .from("profiles")
-      .update({ org_id: data.orgId })
-      .eq("id", context.userId);
-
-    if (error) throw new Error(error.message);
 
     return { ok: true };
   });

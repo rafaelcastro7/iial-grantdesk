@@ -1517,12 +1517,14 @@ export type Database = {
           hard_fail_on_excluded_keyword: boolean;
           hard_fail_on_jurisdiction: boolean;
           hard_fail_on_runway: boolean;
+          id: string;
           iial_capabilities: string[];
           lead_min_weeks: number | null;
           max_amount_cad: number | null;
           max_cost_share_pct_org_carries: number | null;
           min_amount_cad: number | null;
           min_days_to_deadline: number | null;
+          org_id: string | null;
           partner_min_weeks: number | null;
           require_match_verification: boolean;
           required_jurisdictions: string[];
@@ -1531,7 +1533,7 @@ export type Database = {
           rolling_intake_passes_runway: boolean;
           threshold_fit_pass: number;
           updated_at: string;
-          user_id: string;
+          user_id: string | null;
           weight_llm: number;
         };
         Insert: {
@@ -1549,12 +1551,14 @@ export type Database = {
           hard_fail_on_excluded_keyword?: boolean;
           hard_fail_on_jurisdiction?: boolean;
           hard_fail_on_runway?: boolean;
+          id?: string;
           iial_capabilities?: string[];
           lead_min_weeks?: number | null;
           max_amount_cad?: number | null;
           max_cost_share_pct_org_carries?: number | null;
           min_amount_cad?: number | null;
           min_days_to_deadline?: number | null;
+          org_id?: string | null;
           partner_min_weeks?: number | null;
           require_match_verification?: boolean;
           required_jurisdictions?: string[];
@@ -1563,7 +1567,7 @@ export type Database = {
           rolling_intake_passes_runway?: boolean;
           threshold_fit_pass?: number;
           updated_at?: string;
-          user_id: string;
+          user_id?: string | null;
           weight_llm?: number;
         };
         Update: {
@@ -1581,12 +1585,14 @@ export type Database = {
           hard_fail_on_excluded_keyword?: boolean;
           hard_fail_on_jurisdiction?: boolean;
           hard_fail_on_runway?: boolean;
+          id?: string;
           iial_capabilities?: string[];
           lead_min_weeks?: number | null;
           max_amount_cad?: number | null;
           max_cost_share_pct_org_carries?: number | null;
           min_amount_cad?: number | null;
           min_days_to_deadline?: number | null;
+          org_id?: string | null;
           partner_min_weeks?: number | null;
           require_match_verification?: boolean;
           required_jurisdictions?: string[];
@@ -1595,10 +1601,18 @@ export type Database = {
           rolling_intake_passes_runway?: boolean;
           threshold_fit_pass?: number;
           updated_at?: string;
-          user_id?: string;
+          user_id?: string | null;
           weight_llm?: number;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "fit_rules_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       funder_candidates: {
         Row: {
@@ -1920,6 +1934,7 @@ export type Database = {
           id: string;
           llm_fit_score: number | null;
           model: string;
+          org_id: string | null;
           prompt_version: string;
           rationale_en: string;
           rationale_fr: string | null;
@@ -1937,6 +1952,7 @@ export type Database = {
           id?: string;
           llm_fit_score?: number | null;
           model: string;
+          org_id?: string | null;
           prompt_version: string;
           rationale_en: string;
           rationale_fr?: string | null;
@@ -1954,6 +1970,7 @@ export type Database = {
           id?: string;
           llm_fit_score?: number | null;
           model?: string;
+          org_id?: string | null;
           prompt_version?: string;
           rationale_en?: string;
           rationale_fr?: string | null;
@@ -1967,6 +1984,13 @@ export type Database = {
             columns: ["grant_id"];
             isOneToOne: false;
             referencedRelation: "grants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "grant_evaluations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
         ];
@@ -3089,6 +3113,7 @@ export type Database = {
           funding_max_cad: number | null;
           funding_min_cad: number | null;
           indirect_cost_rate_pct: number | null;
+          id: string;
           jurisdictions: string[];
           languages: string[];
           legal_name: string | null;
@@ -3103,7 +3128,7 @@ export type Database = {
           sectors: string[];
           stage: Database["public"]["Enums"]["org_stage"];
           updated_at: string;
-          user_id: string;
+          user_id: string | null;
           website: string | null;
           years_operating: number | null;
         };
@@ -3120,6 +3145,7 @@ export type Database = {
           funding_max_cad?: number | null;
           funding_min_cad?: number | null;
           indirect_cost_rate_pct?: number | null;
+          id?: string;
           jurisdictions?: string[];
           languages?: string[];
           legal_name?: string | null;
@@ -3134,7 +3160,7 @@ export type Database = {
           sectors?: string[];
           stage?: Database["public"]["Enums"]["org_stage"];
           updated_at?: string;
-          user_id: string;
+          user_id?: string | null;
           website?: string | null;
           years_operating?: number | null;
         };
@@ -3151,6 +3177,7 @@ export type Database = {
           funding_max_cad?: number | null;
           funding_min_cad?: number | null;
           indirect_cost_rate_pct?: number | null;
+          id?: string;
           jurisdictions?: string[];
           languages?: string[];
           legal_name?: string | null;
@@ -3165,7 +3192,7 @@ export type Database = {
           sectors?: string[];
           stage?: Database["public"]["Enums"]["org_stage"];
           updated_at?: string;
-          user_id?: string;
+          user_id?: string | null;
           website?: string | null;
           years_operating?: number | null;
         };
@@ -3881,6 +3908,7 @@ export type Database = {
           expires_at: string;
           grant_id: string;
           id: string;
+          org_id: string | null;
           revoked: boolean;
           token: string;
           user_id: string;
@@ -3890,6 +3918,7 @@ export type Database = {
           expires_at?: string;
           grant_id: string;
           id?: string;
+          org_id?: string | null;
           revoked?: boolean;
           token: string;
           user_id: string;
@@ -3899,6 +3928,7 @@ export type Database = {
           expires_at?: string;
           grant_id?: string;
           id?: string;
+          org_id?: string | null;
           revoked?: boolean;
           token?: string;
           user_id?: string;
@@ -3909,6 +3939,13 @@ export type Database = {
             columns: ["grant_id"];
             isOneToOne: false;
             referencedRelation: "grants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shared_fit_reports_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
         ];

@@ -35,13 +35,17 @@ import {
 import { DEFAULT_RULES, type FitRules } from "@/agents/fit-rules.shared";
 import { cn } from "@/lib/utils";
 import { AppTopBar } from "@/components/AppSidebar";
+import { useActiveTenant } from "@/lib/tenant-context";
 
-const rulesQO = queryOptions({ queryKey: ["fit-rules"], queryFn: () => getFitRules() });
+const rulesQO = (orgId: string) =>
+  queryOptions({
+    queryKey: ["fit-rules", orgId],
+    queryFn: () => getFitRules({ data: { orgId } }),
+  });
 
 export const Route = createFileRoute("/_authenticated/fit-rules")({
   head: () => ({ meta: [{ title: "Screening Rules — IIAL" }] }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(rulesQO),
-  component: FitRulesPage,
+  component: TenantFitRulesPage,
 });
 
 // ─── Reference data ───────────────────────────────────────────────────────────
@@ -142,10 +146,18 @@ function detectStrictness(r: FitRules): StrictnessId | "custom" {
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
-function FitRulesPage() {
+function TenantFitRulesPage() {
+  const { activeOrgId, isLoading } = useActiveTenant();
+  if (isLoading || !activeOrgId) {
+    return <div className="p-8 text-sm text-muted-foreground">Loading screening rules…</div>;
+  }
+  return <FitRulesPage key={activeOrgId} orgId={activeOrgId} />;
+}
+
+function FitRulesPage({ orgId }: { orgId: string }) {
   const qc = useQueryClient();
   const recheckAfterChange = useRecheckFit();
-  const { data } = useSuspenseQuery(rulesQO);
+  const { data } = useSuspenseQuery(rulesQO(orgId));
   const save = useServerFn(saveFitRules);
   const preview = useServerFn(previewFitRules);
 
@@ -156,14 +168,16 @@ function FitRulesPage() {
   const dirty = useMemo(() => JSON.stringify(r) !== JSON.stringify(data.rules), [r, data.rules]);
 
   const mut = useMutation({
-    mutationFn: () => save({ data: r }),
+    mutationFn: () => save({ data: { ...r, orgId } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fit-rules"] });
       qc.invalidateQueries({ queryKey: ["org-rules-drift"] });
-      recheckAfterChange();
+      recheckAfterChange(orgId);
     },
   });
-  const prev = useMutation({ mutationFn: () => preview({ data: { rules: r, limit: 20 } }) });
+  const prev = useMutation({
+    mutationFn: () => preview({ data: { rules: r, limit: 20, orgId } }),
+  });
 
   const stats = useMemo(() => {
     const items = prev.data?.items ?? [];

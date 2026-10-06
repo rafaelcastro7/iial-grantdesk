@@ -1,9 +1,8 @@
-import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { clientQueryOptions } from "@/lib/client-queries";
-import { useServerFn } from "@tanstack/react-start";
 import { useTranslation } from "react-i18next";
-import { switchOrganizationContext } from "@/lib/clients.functions";
+import { useActiveTenant } from "@/lib/tenant-context";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AppTopBar } from "@/components/AppSidebar";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
@@ -28,14 +27,16 @@ export const Route = createFileRoute("/_authenticated/clients/$orgId")({
 
 function ClientLayout() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data } = useSuspenseQuery(clientQueryOptions(Route.useParams().orgId));
-  const switchOrg = useServerFn(switchOrganizationContext);
+  const { setActiveOrgId } = useActiveTenant();
   const { organization, profile, membership, stats } = data;
 
   const handleSwitchContext = async () => {
     try {
-      await switchOrg({ data: { orgId: organization.id } });
+      setActiveOrgId(organization.id);
       toast.success(t("clients.contextSwitched"));
+      await navigate({ to: "/grants" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     }

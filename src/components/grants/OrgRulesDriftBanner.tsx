@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { checkOrgRulesDrift } from "@/lib/fit-rules.functions";
 import { AlertTriangle, ArrowRight, X } from "lucide-react";
 import { useState } from "react";
+import { useActiveTenant } from "@/lib/tenant-context";
 
 /**
  * Surfaces inconsistencies between the org profile and the stored screening
@@ -11,12 +12,14 @@ import { useState } from "react";
  * customized either, so it never shows false positives.
  */
 export function OrgRulesDriftBanner() {
+  const { activeOrgId } = useActiveTenant();
   const fn = useServerFn(checkOrgRulesDrift);
   const [dismissed, setDismissed] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["org-rules-drift"],
-    queryFn: () => fn(),
+    queryKey: ["org-rules-drift", activeOrgId],
+    queryFn: () => fn({ data: { orgId: activeOrgId! } }),
+    enabled: !!activeOrgId,
     // Re-check every 5 minutes — drift changes when either profile or rules
     // are saved, and both invalidate different query keys.
     refetchInterval: 5 * 60_000,

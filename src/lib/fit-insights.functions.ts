@@ -33,16 +33,33 @@ const splitValues = (raw: string) =>
 /** Verdict counts shared by the dashboard and Fit insights (one source). */
 export const getVerdictSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input) => z.object({ orgId: z.string().uuid().optional() }).parse(input ?? {}))
+  .handler(async ({ data, context }) => {
     const { loadUserVerdicts, summarizeVerdicts } = await import("@/lib/verdict-summary.server");
-    return summarizeVerdicts(await loadUserVerdicts(context.supabase as never, context.userId));
+    if (data.orgId) {
+      const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+      await getTenantPrincipal(context.supabase, context.userId, data.orgId);
+    }
+    return summarizeVerdicts(
+      await loadUserVerdicts(context.supabase as never, context.userId, Date.now(), data.orgId),
+    );
   });
 
 export const getFitInsights = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input) => z.object({ orgId: z.string().uuid().optional() }).parse(input ?? {}))
+  .handler(async ({ data, context }) => {
     const { loadUserVerdicts, summarizeVerdicts } = await import("@/lib/verdict-summary.server");
-    const verdictRows = await loadUserVerdicts(context.supabase as never, context.userId);
+    if (data.orgId) {
+      const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+      await getTenantPrincipal(context.supabase, context.userId, data.orgId);
+    }
+    const verdictRows = await loadUserVerdicts(
+      context.supabase as never,
+      context.userId,
+      Date.now(),
+      data.orgId,
+    );
     const summary = summarizeVerdicts(verdictRows);
     const titles = new Map(verdictRows.map((r) => [r.grantId, r.title]));
     const ref = (id: string): GrantRef => ({ id, title: titles.get(id) ?? "Untitled grant" });
@@ -157,16 +174,25 @@ export const applyProfileSuggestion = createServerFn({ method: "POST" })
       .object({
         kind: z.enum(["add_applicant_type", "add_sector", "add_jurisdiction", "lower_min_amount"]),
         value: z.string().min(1).max(80),
+        orgId: z.string().uuid().optional(),
         /** Grants this suggestion was raised for; re-checked right away. */
         grantIds: z.array(z.string().uuid()).max(200).default([]),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { data: org, error } = await getOrgProfileForUser(context.supabase, context.userId);
+    const { data: org, error } = await getOrgProfileForUser(
+      context.supabase,
+      context.userId,
+      data.orgId,
+    );
     if (error) throw new Error(error.message);
     if (!org) throw new Error("org_profile_missing");
-    const profile = org as Record<string, unknown> & { user_id: string; org_id: string | null };
+    const profile = org as Record<string, unknown> & {
+      id: string;
+      user_id: string | null;
+      org_id: string | null;
+    };
     const add = (field: string) => {
       const current = (profile[field] as string[] | null) ?? [];
       return current.includes(data.value) ? current : [...current, data.value];
@@ -181,11 +207,10 @@ export const applyProfileSuggestion = createServerFn({ method: "POST" })
             : { funding_min_cad: Number(data.value) };
     // updated_at drives the automatic re-check of every grant.
     patch.updated_at = new Date().toISOString();
-    let query = context.supabase.from("org_profiles").update(patch as never);
-    query = profile.org_id
-      ? query.eq("org_id", profile.org_id)
-      : query.eq("user_id", profile.user_id);
-    const { error: updateError } = await query;
+    const { error: updateError } = await context.supabase
+      .from("org_profiles")
+      .update(patch as never)
+      .eq("id", profile.id);
     if (updateError) throw new Error(updateError.message);
 
     // Saved custom rules take precedence over the profile in the evaluator,
@@ -193,7 +218,7 @@ export const applyProfileSuggestion = createServerFn({ method: "POST" })
     const { data: rules } = await context.supabase
       .from("fit_rules")
       .select("applicant_types_allowed, required_sectors, required_jurisdictions")
-      .eq("user_id", context.userId)
+      .eq("org_id", profile.org_id!)
       .maybeSingle();
     if (rules) {
       const append = (list: string[] | null) =>
@@ -209,7 +234,7 @@ export const applyProfileSuggestion = createServerFn({ method: "POST" })
       await context.supabase
         .from("fit_rules")
         .update(rulesPatch as never)
-        .eq("user_id", context.userId);
+        .eq("org_id", profile.org_id!);
     }
 
     // Re-check at once the grants that were failing on this rule, so the
@@ -224,6 +249,7 @@ export const applyProfileSuggestion = createServerFn({ method: "POST" })
           grantId,
           userId: context.userId,
           userSupabase: context.supabase,
+          orgId: profile.org_id ?? undefined,
           rulesOnly: true,
         })) as { eligibility_pass?: boolean };
         rechecked++;

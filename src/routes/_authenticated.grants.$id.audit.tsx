@@ -12,23 +12,23 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { explainCheck, explainFitScore } from "@/lib/eligibility-explain";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
+import { useActiveTenant } from "@/lib/tenant-context";
 
-const auditQuery = (id: string) =>
+const auditQuery = (id: string, orgId: string) =>
   queryOptions({
-    queryKey: ["grant-audit", id],
-    queryFn: () => getGrantAudit({ data: { id } }),
+    queryKey: ["grant-audit", id, orgId],
+    queryFn: () => getGrantAudit({ data: { id, orgId } }),
   });
 
 export const Route = createFileRoute("/_authenticated/grants/$id/audit")({
   head: ({ params }) => ({
     meta: [{ title: `Scoring details · Grant ${params.id.slice(0, 8)} — IIAL` }],
   }),
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(auditQuery(params.id)),
   errorComponent: ({ error }) => (
     <div className="p-6 text-destructive">{(error as Error).message}</div>
   ),
   notFoundComponent: () => <div className="p-6">Not found</div>,
-  component: AuditPage,
+  component: TenantAuditPage,
 });
 
 const STATUS_ICON = {
@@ -38,9 +38,17 @@ const STATUS_ICON = {
   skip: <MinusCircle className="h-4 w-4 text-muted-foreground" />,
 };
 
-function AuditPage() {
+function TenantAuditPage() {
+  const { activeOrgId, isLoading } = useActiveTenant();
+  if (isLoading || !activeOrgId) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading scoring details…</div>;
+  }
+  return <AuditPage key={activeOrgId} orgId={activeOrgId} />;
+}
+
+function AuditPage({ orgId }: { orgId: string }) {
   const { id } = Route.useParams();
-  const { data } = useSuspenseQuery(auditQuery(id));
+  const { data } = useSuspenseQuery(auditQuery(id, orgId));
   const { grant, rules, evaluation, evidence, trace, verdict } = data;
   const g = grant as {
     id: string;
