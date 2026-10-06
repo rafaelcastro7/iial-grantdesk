@@ -48,6 +48,7 @@ import { FetchTrailPanel } from "@/components/grants/FetchTrailPanel";
 import { DismissGrantControl } from "@/components/grants/DismissGrantControl";
 import { EligibilityIssues } from "@/components/grants/EligibilityIssues";
 import { FitEvaluation } from "@/components/grants/FitEvaluation";
+import type { AxisScore } from "@/agents/fit-rules.shared";
 import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
 import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { OpportunityBriefPanel } from "@/components/grants/OpportunityBriefPanel";
