@@ -30,3 +30,6 @@
 - Enrichment: semantic windowing (`targeted-chunks.server.ts`, 70% token savings); early-exit deep crawl and LLM gap-fill if deadline is closed/expired (0 tokens); conditional critic in requirements extraction when primary pass is high confidence.
 - Keep loose TS settings; exclude tests/e2e/fixtures from typecheck.
 - Theme via `src/styles.css` tokens (iial.ca style); V2 is the only UI.
+- Multitenancy: evaluations, profiles and fit rules are strictly scoped by `org_id`; active tenant is driven by session context (`useActiveTenant`), never by mutating `profiles.org_id`.
+- Grant Copilot & Backlog: contextual assistant uses active tenant profile and grant evidence; feature requests and gap observations persist in `product_design_backlog`.
+- Consortium & America coverage: evaluations distinguish lead applicant vs consortium partner (technical partner WCIS vs territorial/governance lead); support rolling/unsolicited deadlines and in-kind match.
