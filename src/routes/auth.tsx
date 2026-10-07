@@ -75,6 +75,7 @@ function AuthPage() {
   }
 
   const DEMO_USERS = [
+    { label: "Rocio (IIAL Lead)", email: "rocio@iial.ca", password: "IIAL-Demo-2026!" },
     { label: "Admin", email: "demo-admin@iial.test", password: "IIAL-Demo-2026!" },
     { label: "Member A", email: "demo-member-a@iial.test", password: "IIAL-Demo-2026!" },
     { label: "Member B", email: "demo-member-b@iial.test", password: "IIAL-Demo-2026!" },

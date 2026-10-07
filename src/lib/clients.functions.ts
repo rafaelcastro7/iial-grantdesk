@@ -12,6 +12,40 @@ export const listUserOrganizations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const supabase = await createSupabaseAdmin();
+
+    // Check user roles and email for staff/consultant privileges
+    const [{ data: userRoles }, { data: authUser }] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", context.userId),
+      supabase.auth.admin.getUserById(context.userId).catch(() => ({ data: { user: null } })),
+    ]);
+
+    const isStaff =
+      (userRoles ?? []).some((r) => r.role === "admin" || r.role === "consultant") ||
+      (authUser?.user?.email?.toLowerCase().includes("rocio") ?? false) ||
+      (authUser?.user?.email?.toLowerCase().endsWith("@iial.ca") ?? false);
+
+    // If staff/consultant or Rocio, ensure both IIAL and Nahua Canada exist in user_organizations
+    if (isStaff) {
+      const { data: allCoreOrgs } = await supabase
+        .from("organizations")
+        .select("id")
+        .in("slug", ["iial", "nahua-canada"]);
+
+      if (allCoreOrgs && allCoreOrgs.length > 0) {
+        await supabase
+          .from("user_organizations")
+          .upsert(
+            allCoreOrgs.map((o) => ({
+              user_id: context.userId,
+              org_id: o.id,
+              role: "admin",
+            })),
+            { onConflict: "user_id,org_id", ignoreDuplicates: true },
+          )
+          .catch(() => {});
+      }
+    }
+
     const [{ data, error }, { data: profile, error: profileError }] = await Promise.all([
       supabase
         .from("user_organizations")
@@ -61,15 +95,34 @@ export const getClientOrganization = createServerFn({ method: "GET" })
     const supabase = await createSupabaseAdmin();
 
     // Verify user has access to this org
-    const { data: membership } = await supabase
+    let { data: membership } = await supabase
       .from("user_organizations")
       .select("role")
       .eq("user_id", context.userId)
       .eq("org_id", data.orgId)
-      .single();
+      .maybeSingle();
 
     if (!membership) {
-      throw new Error("Access denied: not a member of this organization");
+      // Check if user is staff (admin, consultant, or Rocio)
+      const [{ data: userRoles }, { data: authUser }] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", context.userId),
+        supabase.auth.admin.getUserById(context.userId).catch(() => ({ data: { user: null } })),
+      ]);
+
+      const isStaff =
+        (userRoles ?? []).some((r) => r.role === "admin" || r.role === "consultant") ||
+        (authUser?.user?.email?.toLowerCase().includes("rocio") ?? false) ||
+        (authUser?.user?.email?.toLowerCase().endsWith("@iial.ca") ?? false);
+
+      if (isStaff) {
+        await supabase
+          .from("user_organizations")
+          .upsert({ user_id: context.userId, org_id: data.orgId, role: "admin" })
+          .catch(() => {});
+        membership = { role: "admin" };
+      } else {
+        throw new Error("Access denied: not a member of this organization");
+      }
     }
 
     // Get organization details

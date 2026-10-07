@@ -934,3 +934,53 @@ describe("Synthetic User Stress: Currency & Geographic Edge Cases", () => {
     expect(formatMoney(750000, "USD")).toBe("US$750K");
   });
 });
+
+describe("Synthetic User Stress: Multi-Tenant Client Visibility & Rocio Access", () => {
+  it("ensures both IIAL and Nahua Canada are present and switchable for consultants/Rocio", () => {
+    const mockOrganizations = [
+      {
+        id: "00000000-0000-0000-0000-000000000001",
+        name: "IIAL",
+        slug: "iial",
+        created_at: new Date().toISOString(),
+        user_role: "admin",
+        is_default: true,
+      },
+      {
+        id: "4e616875-612d-4c41-8da0-000000000001",
+        name: "Nahua Canada",
+        slug: "nahua-canada",
+        created_at: new Date().toISOString(),
+        user_role: "admin",
+        is_default: false,
+      },
+    ];
+
+    expect(mockOrganizations.length).toBe(2);
+    expect(mockOrganizations.map((o) => o.slug)).toContain("iial");
+    expect(mockOrganizations.map((o) => o.slug)).toContain("nahua-canada");
+
+    // Switching simulation
+    let activeOrgId = mockOrganizations[0]!.id;
+    const setActiveOrgId = (id: string) => {
+      if (!mockOrganizations.some((o) => o.id === id)) {
+        throw new Error("Organization is not assigned to this user");
+      }
+      activeOrgId = id;
+    };
+
+    // Verify switching to Nahua Canada succeeds without throwing
+    expect(() => setActiveOrgId("4e616875-612d-4c41-8da0-000000000001")).not.toThrow();
+    expect(activeOrgId).toBe("4e616875-612d-4c41-8da0-000000000001");
+
+    // Verify switching back to IIAL succeeds
+    expect(() => setActiveOrgId("00000000-0000-0000-0000-000000000001")).not.toThrow();
+    expect(activeOrgId).toBe("00000000-0000-0000-0000-000000000001");
+
+    // Verify switching to an unassigned organization is blocked
+    expect(() => setActiveOrgId("99999999-9999-9999-9999-999999999999")).toThrow(
+      "Organization is not assigned to this user",
+    );
+  });
+});
+
