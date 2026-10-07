@@ -11,35 +11,10 @@ import { createSupabaseAdmin } from "./supabase-admin";
 export const listUserOrganizations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const supabase = await createSupabaseAdmin();
-
-    // Platform staff = an explicit admin/consultant role granted in user_roles.
-    // Never inferred from the email address (anyone can sign up as "rocio@...").
-    const isStaff = await isPlatformStaff(supabase, context.userId);
-
-    // Staff work for both client organizations (IIAL and Nahua Canada).
-    if (isStaff) {
-      try {
-        const { data: allCoreOrgs } = await supabase
-          .from("organizations")
-          .select("id")
-          .in("slug", ["iial", "nahua-canada"]);
-
-        if (allCoreOrgs && allCoreOrgs.length > 0) {
-          await supabase.from("user_organizations").upsert(
-            allCoreOrgs.map((o) => ({
-              user_id: context.userId,
-              org_id: o.id,
-              role: "admin",
-            })),
-            { onConflict: "user_id,org_id", ignoreDuplicates: true },
-          );
-        }
-      } catch {
-        // Ignore upsert errors
-      }
-    }
-
+    // The user's own session is enough: members read their memberships and
+    // the organizations they belong to (RLS). Memberships are assigned in the
+    // database (ensure_current_user + platform_staff); reading never adds any.
+    const supabase = context.supabase;
     const [{ data, error }, { data: profile, error: profileError }] = await Promise.all([
       supabase
         .from("user_organizations")
