@@ -100,6 +100,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: ListChecks,
       },
       {
+        to: "/partners",
+        label: "Partners",
+        description: "Universities, co-ops, chambers, contacts",
+        icon: Users,
+      },
+      {
         to: "/insights",
         label: "Fit insights",
         description: "Why grants do not pass",

@@ -26,6 +26,7 @@ import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated.manual'
 import { Route as AuthenticatedOpsRouteImport } from './routes/_authenticated.ops'
 import { Route as AuthenticatedOrgRouteImport } from './routes/_authenticated.org'
+import { Route as AuthenticatedPartnersRouteImport } from './routes/_authenticated.partners'
 import { Route as AuthenticatedPipelineRouteImport } from './routes/_authenticated.pipeline'
 import { Route as AuthenticatedPostAwardRouteImport } from './routes/_authenticated.post-award'
 import { Route as AuthenticatedPrivacyRouteImport } from './routes/_authenticated.privacy'
@@ -153,6 +154,11 @@ const AuthenticatedOpsRoute = AuthenticatedOpsRouteImport.update({
 const AuthenticatedOrgRoute = AuthenticatedOrgRouteImport.update({
   id: '/org',
   path: '/org',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPartnersRoute = AuthenticatedPartnersRouteImport.update({
+  id: '/partners',
+  path: '/partners',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedPipelineRoute = AuthenticatedPipelineRouteImport.update({
@@ -416,6 +422,7 @@ export interface FileRoutesByFullPath {
   '/manual': typeof AuthenticatedManualRoute
   '/ops': typeof AuthenticatedOpsRoute
   '/org': typeof AuthenticatedOrgRoute
+  '/partners': typeof AuthenticatedPartnersRoute
   '/pipeline': typeof AuthenticatedPipelineRoute
   '/post-award': typeof AuthenticatedPostAwardRoute
   '/privacy': typeof AuthenticatedPrivacyRoute
@@ -476,6 +483,7 @@ export interface FileRoutesByTo {
   '/manual': typeof AuthenticatedManualRoute
   '/ops': typeof AuthenticatedOpsRoute
   '/org': typeof AuthenticatedOrgRoute
+  '/partners': typeof AuthenticatedPartnersRoute
   '/pipeline': typeof AuthenticatedPipelineRoute
   '/post-award': typeof AuthenticatedPostAwardRoute
   '/privacy': typeof AuthenticatedPrivacyRoute
@@ -539,6 +547,7 @@ export interface FileRoutesById {
   '/_authenticated/manual': typeof AuthenticatedManualRoute
   '/_authenticated/ops': typeof AuthenticatedOpsRoute
   '/_authenticated/org': typeof AuthenticatedOrgRoute
+  '/_authenticated/partners': typeof AuthenticatedPartnersRoute
   '/_authenticated/pipeline': typeof AuthenticatedPipelineRoute
   '/_authenticated/post-award': typeof AuthenticatedPostAwardRoute
   '/_authenticated/privacy': typeof AuthenticatedPrivacyRoute
@@ -602,6 +611,7 @@ export interface FileRouteTypes {
     | '/manual'
     | '/ops'
     | '/org'
+    | '/partners'
     | '/pipeline'
     | '/post-award'
     | '/privacy'
@@ -662,6 +672,7 @@ export interface FileRouteTypes {
     | '/manual'
     | '/ops'
     | '/org'
+    | '/partners'
     | '/pipeline'
     | '/post-award'
     | '/privacy'
@@ -724,6 +735,7 @@ export interface FileRouteTypes {
     | '/_authenticated/manual'
     | '/_authenticated/ops'
     | '/_authenticated/org'
+    | '/_authenticated/partners'
     | '/_authenticated/pipeline'
     | '/_authenticated/post-award'
     | '/_authenticated/privacy'
@@ -905,6 +917,13 @@ declare module '@tanstack/react-router' {
       path: '/org'
       fullPath: '/org'
       preLoaderRoute: typeof AuthenticatedOrgRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/partners': {
+      id: '/_authenticated/partners'
+      path: '/partners'
+      fullPath: '/partners'
+      preLoaderRoute: typeof AuthenticatedPartnersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/pipeline': {
@@ -1286,6 +1305,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedManualRoute: typeof AuthenticatedManualRoute
   AuthenticatedOpsRoute: typeof AuthenticatedOpsRoute
   AuthenticatedOrgRoute: typeof AuthenticatedOrgRoute
+  AuthenticatedPartnersRoute: typeof AuthenticatedPartnersRoute
   AuthenticatedPipelineRoute: typeof AuthenticatedPipelineRoute
   AuthenticatedPostAwardRoute: typeof AuthenticatedPostAwardRoute
   AuthenticatedPrivacyRoute: typeof AuthenticatedPrivacyRoute
@@ -1321,6 +1341,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedManualRoute: AuthenticatedManualRoute,
   AuthenticatedOpsRoute: AuthenticatedOpsRoute,
   AuthenticatedOrgRoute: AuthenticatedOrgRoute,
+  AuthenticatedPartnersRoute: AuthenticatedPartnersRoute,
   AuthenticatedPipelineRoute: AuthenticatedPipelineRoute,
   AuthenticatedPostAwardRoute: AuthenticatedPostAwardRoute,
   AuthenticatedPrivacyRoute: AuthenticatedPrivacyRoute,

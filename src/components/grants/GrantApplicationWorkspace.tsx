@@ -23,6 +23,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getGrantWorkspace, saveGrantWorkspace } from "@/lib/grant-workspace.functions";
+import { listPartners, savePartner } from "@/lib/partner-directory.functions";
+import {
+  TEMPLATE_IDS,
+  TEMPLATE_LABEL,
+  composeOutreach,
+  type Lang,
+  type TemplateId,
+} from "@/lib/outreach-templates.shared";
 import {
   CALL_STATUSES,
   CALL_STATUS_LABEL,
@@ -61,6 +69,20 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
     queryKey: ["grant-workspace", grantId, orgId],
     queryFn: () => fetchWs({ data: { grantId, orgId } }),
   });
+  const fetchDirectory = useServerFn(listPartners);
+  const saveToDirectory = useServerFn(savePartner);
+  const { data: directory } = useQuery({
+    queryKey: ["partner-directory", orgId],
+    queryFn: () => fetchDirectory({ data: { orgId } }),
+  });
+  const directoryByName = useMemo(
+    () => new Map((directory?.partners ?? []).map((d) => [d.name.trim().toLowerCase(), d])),
+    [directory],
+  );
+  const [template, setTemplate] = useState<TemplateId>("partner_intro");
+  const [lang, setLang] = useState<Lang>("es");
+  const [partnerIdx, setPartnerIdx] = useState(0);
+  const [senderName, setSenderName] = useState("Rocío Cruz");
   const [ws, setWs] = useState<Workspace | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -408,11 +430,30 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               <Input
                 value={p.name}
                 placeholder="Organization"
-                onChange={(e) =>
+                list="partner-directory-names"
+                onChange={(e) => {
+                  const known = directoryByName.get(e.target.value.trim().toLowerCase());
                   setPartners(
-                    ws.partners.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)),
-                  )
-                }
+                    ws.partners.map((x, i) =>
+                      i === idx
+                        ? {
+                            ...x,
+                            name: e.target.value,
+                            ...(known
+                              ? {
+                                  country: x.country || known.country,
+                                  type: x.type || known.type,
+                                  contact:
+                                    x.contact ||
+                                    [known.contact_name, known.email].filter(Boolean).join(" · ") ||
+                                    null,
+                                }
+                              : {}),
+                          }
+                        : x,
+                    ),
+                  );
+                }}
               />
               <Input
                 value={p.country ?? ""}
@@ -481,6 +522,48 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         >
           <Plus className="h-4 w-4" /> Add partner
         </Button>
+        <datalist id="partner-directory-names">
+          {(directory?.partners ?? []).map((d) => (
+            <option key={d.id} value={d.name} />
+          ))}
+        </datalist>
+        {directory?.available &&
+          ws.partners.some(
+            (p) => p.name.trim() && !directoryByName.has(p.name.trim().toLowerCase()),
+          ) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-1 text-xs"
+              onClick={async () => {
+                const fresh = ws.partners.filter(
+                  (p) => p.name.trim() && !directoryByName.has(p.name.trim().toLowerCase()),
+                );
+                for (const p of fresh) {
+                  await saveToDirectory({
+                    data: {
+                      org_id: orgId,
+                      name: p.name.trim(),
+                      country: p.country ?? null,
+                      type: p.type ?? null,
+                      contact_name: p.contact ?? null,
+                      contact_title: null,
+                      email: null,
+                      phone: null,
+                      website: null,
+                      languages: [],
+                      notes: null,
+                    },
+                  }).catch(() => undefined);
+                }
+                await qc.invalidateQueries({ queryKey: ["partner-directory", orgId] });
+                toast.success(`${fresh.length} partner(s) added to the directory`);
+              }}
+            >
+              Save new partners to the directory
+            </Button>
+          )}
       </Section>
 
       {/* 4. Project idea */}
@@ -654,6 +737,106 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             ))}
           </ol>
         )}
+      </Section>
+
+      {/* 8. Emails */}
+      <Section
+        icon={<Mail className="h-4 w-4" />}
+        title="Emails to partners and funders"
+        hint="Filled from this plan. Never includes the internal blockers."
+      >
+        {(() => {
+          const partner = ws.partners[partnerIdx] ?? null;
+          const known = partner
+            ? directoryByName.get(partner.name.trim().toLowerCase())
+            : undefined;
+          const orgName = data.orgs.find((o) => o.id === orgId)?.name ?? "our organization";
+          const email = composeOutreach({
+            template,
+            lang,
+            grant: data.grant,
+            workspace: ws,
+            orgName,
+            senderName,
+            partner,
+            recipientName: known?.contact_name ?? undefined,
+          });
+          const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
+          const mailto = `mailto:${toPartner && known?.email ? encodeURIComponent(known.email) : ""}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
+          return (
+            <div className="space-y-3">
+              <div className="grid gap-2 sm:grid-cols-4">
+                <select
+                  className={selectClass}
+                  value={template}
+                  onChange={(e) => setTemplate(e.target.value as TemplateId)}
+                >
+                  {TEMPLATE_IDS.map((t) => (
+                    <option key={t} value={t}>
+                      {TEMPLATE_LABEL[t].en}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={selectClass}
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value as Lang)}
+                >
+                  <option value="es">Spanish</option>
+                  <option value="en">English</option>
+                </select>
+                {toPartner && (
+                  <select
+                    className={selectClass}
+                    value={partnerIdx}
+                    onChange={(e) => setPartnerIdx(Number(e.target.value))}
+                  >
+                    {ws.partners.length === 0 && <option value={0}>No partners yet</option>}
+                    {ws.partners.map((p, i) => (
+                      <option key={p.id} value={i}>
+                        {p.name || `Partner ${i + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <Input
+                  value={senderName}
+                  placeholder="Sender"
+                  onChange={(e) => setSenderName(e.target.value)}
+                />
+              </div>
+              <div className="text-xs font-semibold">Subject: {email.subject}</div>
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
+                {email.body}
+              </pre>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        `Subject: ${email.subject}\n\n${email.body}`,
+                      );
+                      toast.success("Email copied");
+                    } catch {
+                      toast.error("Could not copy; select the text instead.");
+                    }
+                  }}
+                >
+                  <Copy className="h-4 w-4" /> Copy
+                </Button>
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <a href={mailto}>
+                    <Mail className="h-4 w-4" /> Open in email app
+                  </a>
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
       </Section>
 
       {/* 7. Decision memo */}
