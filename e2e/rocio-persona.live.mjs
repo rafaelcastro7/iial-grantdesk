@@ -167,6 +167,18 @@ await ask("Resumen B1 para Marcelo de esta cooperativa, con servicios y link", a
   await shot("04-partners");
 });
 
+await ask("@Busca en la web: AI Web Scout button opens live search dialog with quick queries", async () => {
+  await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
+  const scoutBtn = page.getByRole("button", { name: "AI Web Scout" });
+  must(await scoutBtn.isVisible(), "AI Web Scout button not visible on radar");
+  await scoutBtn.click();
+  await page.waitForTimeout(600);
+  const dialogTitle = page.getByText("AI Web Grant Scout");
+  must(await dialogTitle.isVisible(), "AI Web Grant Scout dialog did not open");
+  await shot("05-web-scout");
+  await page.keyboard.press("Escape");
+});
+
 fs.writeFileSync(path.join(OUT, "rocio-report.json"), JSON.stringify({ base: BASE, results, problems }, null, 2));
 console.log(`\n${results.filter((r) => r.ok).length}/${results.length} requests answered; ${problems.length} problems`);
 for (const p of [...new Set(problems)].slice(0, 20)) console.log("  -", p);

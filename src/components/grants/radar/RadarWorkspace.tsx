@@ -5,6 +5,7 @@ import { DiscoveryProgress } from "@/components/grants/DiscoveryProgress";
 import { EventLog } from "@/components/grants/EventLog";
 import { FunderSelector } from "@/components/grants/FunderSelector";
 import { AddGrantModal } from "@/components/grants/AddGrantModal";
+import { WebGrantScoutModal } from "./WebGrantScoutModal";
 import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { Button } from "@/components/ui/button";
 import { NEXT_ACTION_LABELS, countryName, formatMoney, type RadarResult } from "@/lib/grant-radar";
@@ -74,6 +75,7 @@ export function RadarWorkspace({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <WebGrantScoutModal />
             <AddGrantModal />
             {!simple && <NotebookLMBridge />}
             {isAdmin && (
