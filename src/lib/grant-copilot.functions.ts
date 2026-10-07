@@ -262,7 +262,7 @@ Only output actions when genuinely relevant to the user's request.`;
 
       replyText = raw;
     } catch (err) {
-      replyText = `Lo siento, ocurrió un error al consultar el asistente estratégico (${err instanceof Error ? err.message : String(err)}). Por favor intenta nuevamente.`;
+      replyText = `Sorry, an error occurred while consulting the strategic copilot assistant (${err instanceof Error ? err.message : String(err)}). Please try again.`;
     }
 
     // 7. Record assistant reply in DB

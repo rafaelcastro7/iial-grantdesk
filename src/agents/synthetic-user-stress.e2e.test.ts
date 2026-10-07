@@ -559,3 +559,304 @@ describe("Synthetic User Stress: Multi-Tenant Security & Proposal Isolation", ()
     expect(crossTenantSections).toHaveLength(0);
   });
 });
+
+describe("Synthetic User Stress: Adversarial Copilot Actions Parsing & Fault Tolerance", () => {
+  function extractActionsSafely(rawText: string) {
+    let raw = rawText;
+    let extractedActions: unknown = null;
+    const actionMatch = raw.match(/```actions\s*([\s\S]*?)\s*```/);
+    if (actionMatch) {
+      try {
+        const parsed = JSON.parse(actionMatch[1]!);
+        if (Array.isArray(parsed)) {
+          extractedActions = parsed;
+        }
+      } catch {
+        // safely ignore json parse error on actions
+      }
+      raw = raw.replace(/```actions\s*[\s\S]*?\s*```/, "").trim();
+    }
+    return { cleanText: raw, actions: extractedActions };
+  }
+
+  it("extracts valid action cards and leaves clean markdown text", () => {
+    const aiOutput = `Here is our proposed strategic plan for the consortium with Lambton College.
+
+\`\`\`actions
+[
+  {
+    "type": "outreach_draft",
+    "target_partner": "Lambton College Research Office",
+    "subject": "NSERC Alliance Collaboration",
+    "body": "Dear Dean of Applied Research..."
+  },
+  {
+    "type": "backlog_suggestion",
+    "title": "Enable multi-party revenue splitting",
+    "description": "System should model shared post-grant IP revenue.",
+    "category": "consorcio_rutas"
+  }
+]
+\`\`\`
+`;
+    const res = extractActionsSafely(aiOutput);
+    expect(res.cleanText).toContain("Here is our proposed strategic plan");
+    expect(res.cleanText).not.toContain("```actions");
+    expect(Array.isArray(res.actions)).toBe(true);
+    expect((res.actions as unknown[]).length).toBe(2);
+  });
+
+  it("gracefully survives malformed JSON, truncated actions, or injection attempts without throwing", () => {
+    const malformedOutputs = [
+      // Truncated JSON
+      'Here is the response. ```actions [{"type": "outreach_draft", "target_partner": "Lambton"',
+      // Broken JSON with trailing comma
+      'Here is the response. ```actions [{"type": "outreach_draft",},] ```',
+      // Non-array JSON
+      'Here is the response. ```actions {"type": "not_an_array"} ```',
+      // Code injection attempt inside JSON
+      'Here is the response. ```actions <script>alert(1)</script> ```',
+      // Empty action block
+      "Here is the response. ```actions ```",
+      // Nested backticks
+      "Here is the response. ```actions ```nested``` ```",
+    ];
+
+    for (const raw of malformedOutputs) {
+      expect(() => {
+        const res = extractActionsSafely(raw);
+        expect(typeof res.cleanText).toBe("string");
+      }).not.toThrow();
+    }
+  });
+});
+
+describe("Synthetic User Stress: Proposal Readiness & Critical RFP Coverage", () => {
+  it("evaluates proposal readiness and flags missing critical requirements", async () => {
+    const { computeProposalReadiness } = await import("@/lib/proposal-readiness");
+
+    const criticalRequirements = [
+      { category: "governance", requirement: "Must have signed consortium governance agreement with university", isCritical: true },
+      { category: "financial", requirement: "Requires minimum 30% matching contributions", isCritical: true },
+      { category: "technical", requirement: "Digital traceability system architecture specification", isCritical: false },
+    ];
+
+    // 1. Partial/Incomplete proposal: only mentions governance
+    const incompleteSections = [
+      {
+        id: "sec-01",
+        kind: "summary",
+        heading_en: "Executive Summary",
+        content_en: "Our consortium has signed a formal governance agreement with the university partner for applied research.",
+        citations: ["cite-1"],
+        critic_notes: null,
+      },
+      {
+        id: "sec-02",
+        kind: "budget",
+        heading_en: "Budget",
+        content_en: "Short text.",
+        citations: [],
+        critic_notes: null,
+      },
+    ];
+
+    const initialReadiness = computeProposalReadiness({
+      sections: incompleteSections,
+      requirements: criticalRequirements,
+    });
+
+    expect(initialReadiness.totalSections).toBe(2);
+    expect(initialReadiness.criticalRequirements).toBe(2);
+    // Financial matching is still missing from the corpus
+    expect(initialReadiness.openCriticalRequirements.length).toBeGreaterThanOrEqual(1);
+
+    // 2. Complete proposal covering all critical requirements
+    const completeSections = [
+      ...incompleteSections,
+      {
+        id: "sec-03",
+        kind: "budget_justification",
+        heading_en: "Matching Funds and Financial Commitments",
+        content_en: "The consortium partners formally confirm 30% matching contributions through cash and verified in-kind hours.",
+        citations: ["cite-2"],
+        critic_notes: null,
+      },
+    ];
+
+    const completeReadiness = computeProposalReadiness({
+      sections: completeSections,
+      requirements: criticalRequirements,
+    });
+
+    expect(completeReadiness.openCriticalRequirements).toHaveLength(0);
+  });
+
+  it("handles adversarial inputs in proposal readiness (empty strings, undefined arrays) safely", async () => {
+    const { computeProposalReadiness } = await import("@/lib/proposal-readiness");
+
+    expect(() => {
+      computeProposalReadiness({ sections: [] });
+      computeProposalReadiness({
+        sections: [
+          {
+            id: "sec-empty",
+            kind: "other",
+            heading_en: "",
+            content_en: null,
+            citations: null,
+            critic_notes: null,
+          },
+        ],
+        requirements: null,
+      });
+    }).not.toThrow();
+  });
+});
+
+describe("Synthetic User Stress: Draft Gate Security Matrix", () => {
+  it("enforces strict gatekeeping for proposals across all evaluation states", () => {
+    // 1. Null evaluation -> must check fit first
+    expect(draftGate(null)).toBe("not_evaluated");
+
+    // 2. Disqualified / hard-failed evaluation -> locked
+    expect(
+      draftGate({
+        eligibility_pass: false,
+        model: "rules-engine-deterministic",
+        rule_snapshot: { verdict: "not_eligible" },
+      }),
+    ).toBe("not_eligible");
+
+    // 3. Needs input / soft-check failure -> locked
+    expect(
+      draftGate({
+        eligibility_pass: false,
+        model: "rules-engine-deterministic",
+        rule_snapshot: { verdict: "needs_input" },
+      }),
+    ).toBe("not_eligible");
+
+    // 4. Eligible pass -> unlocked
+    expect(
+      draftGate({
+        eligibility_pass: true,
+        model: "rules-engine-deterministic",
+        rule_snapshot: { verdict: "eligible" },
+      }),
+    ).toBe("ok");
+
+    // 5. Eligible pass via full AI review -> unlocked
+    expect(
+      draftGate({
+        eligibility_pass: true,
+        model: "claude-opus-5-5",
+        is_exhaustive: true,
+      }),
+    ).toBe("ok");
+  });
+});
+
+describe("Synthetic User Stress: Zod Schema Boundaries (Manual Facts & Backlog)", () => {
+  it("rejects adversarial values for manual fields (negative numbers, invalid dates, oversized lists)", async () => {
+    const { z } = await import("zod");
+    const MANUAL_FIELDS = [
+      "amount_cad_min",
+      "amount_cad_max",
+      "deadline",
+      "eligibility_note",
+      "sectors",
+      "applicant_types",
+    ] as const;
+
+    const manualFieldSchema = z
+      .object({
+        grantId: z.string().uuid(),
+        field: z.enum(MANUAL_FIELDS),
+        value: z.union([
+          z.number().nonnegative(),
+          z.string().max(4000),
+          z.array(z.string().min(1).max(80)).max(20),
+          z.null(),
+        ]),
+        note: z.string().max(500).optional(),
+      })
+      .refine(
+        (v) =>
+          v.value === null ||
+          (["amount_cad_min", "amount_cad_max"].includes(v.field)
+            ? typeof v.value === "number"
+            : v.field === "deadline"
+              ? typeof v.value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.value)
+              : ["sectors", "applicant_types"].includes(v.field)
+                ? Array.isArray(v.value)
+                : typeof v.value === "string"),
+        { message: "value does not match the field type" },
+      );
+
+    const validUuid = "a0000001-0000-0000-0000-000000000001";
+
+    // 1. Valid cases
+    expect(() =>
+      manualFieldSchema.parse({
+        grantId: validUuid,
+        field: "amount_cad_max",
+        value: 750000,
+        note: "Audited amount",
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      manualFieldSchema.parse({
+        grantId: validUuid,
+        field: "deadline",
+        value: "2027-12-31",
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      manualFieldSchema.parse({
+        grantId: validUuid,
+        field: "sectors",
+        value: ["agriculture", "technology"],
+      }),
+    ).not.toThrow();
+
+    // 2. Adversarial / invalid cases
+    // Negative number
+    expect(() =>
+      manualFieldSchema.parse({
+        grantId: validUuid,
+        field: "amount_cad_max",
+        value: -50000,
+      }),
+    ).toThrow();
+
+    // Invalid deadline format (e.g. DD/MM/YYYY or arbitrary string)
+    expect(() =>
+      manualFieldSchema.parse({
+        grantId: validUuid,
+        field: "deadline",
+        value: "31-12-2027",
+      }),
+    ).toThrow();
+
+    // Wrong type: string given for number field
+    expect(() =>
+      manualFieldSchema.parse({
+        grantId: validUuid,
+        field: "amount_cad_max",
+        value: "one million dollars",
+      }),
+    ).toThrow();
+
+    // Unauthorized field
+    expect(() =>
+      manualFieldSchema.parse({
+        grantId: validUuid,
+        field: "funder_id" as any,
+        value: "00000000-0000-0000-0000-000000000000",
+      }),
+    ).toThrow();
+  });
+});
