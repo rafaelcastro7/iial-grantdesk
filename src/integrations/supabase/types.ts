@@ -2735,6 +2735,108 @@ export type Database = {
         }
         Relationships: []
       }
+      grant_workspaces: {
+        Row: {
+          administrator: string | null
+          applicant_org_ids: string[]
+          blockers: string[]
+          call_status: string | null
+          checklist: Json
+          created_at: string
+          created_by: string | null
+          deadline_time: string | null
+          deadline_timezone: string | null
+          decision_notes: string | null
+          grant_id: string
+          id: string
+          instrument: string | null
+          lead_institution: string | null
+          match_in_kind_ok: boolean | null
+          match_pct: number | null
+          milestones: Json
+          org_id: string
+          partners: Json
+          priority: string
+          project_title: string | null
+          route: string | null
+          updated_at: string
+          updated_by: string | null
+          verified_at: string | null
+          wcis_angle: string | null
+        }
+        Insert: {
+          administrator?: string | null
+          applicant_org_ids?: string[]
+          blockers?: string[]
+          call_status?: string | null
+          checklist?: Json
+          created_at?: string
+          created_by?: string | null
+          deadline_time?: string | null
+          deadline_timezone?: string | null
+          decision_notes?: string | null
+          grant_id: string
+          id?: string
+          instrument?: string | null
+          lead_institution?: string | null
+          match_in_kind_ok?: boolean | null
+          match_pct?: number | null
+          milestones?: Json
+          org_id: string
+          partners?: Json
+          priority?: string
+          project_title?: string | null
+          route?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+          wcis_angle?: string | null
+        }
+        Update: {
+          administrator?: string | null
+          applicant_org_ids?: string[]
+          blockers?: string[]
+          call_status?: string | null
+          checklist?: Json
+          created_at?: string
+          created_by?: string | null
+          deadline_time?: string | null
+          deadline_timezone?: string | null
+          decision_notes?: string | null
+          grant_id?: string
+          id?: string
+          instrument?: string | null
+          lead_institution?: string | null
+          match_in_kind_ok?: boolean | null
+          match_pct?: number | null
+          milestones?: Json
+          org_id?: string
+          partners?: Json
+          priority?: string
+          project_title?: string | null
+          route?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+          wcis_angle?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_workspaces_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_workspaces_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grants: {
         Row: {
           amount_cad_max: number | null
@@ -3340,6 +3442,68 @@ export type Database = {
             columns: ["submission_id"]
             isOneToOne: true
             referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_directory: {
+        Row: {
+          contact_name: string | null
+          contact_title: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          languages: string[]
+          name: string
+          notes: string | null
+          org_id: string
+          phone: string | null
+          type: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          contact_name?: string | null
+          contact_title?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          languages?: string[]
+          name: string
+          notes?: string | null
+          org_id: string
+          phone?: string | null
+          type?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          contact_name?: string | null
+          contact_title?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          languages?: string[]
+          name?: string
+          notes?: string | null
+          org_id?: string
+          phone?: string | null
+          type?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_directory_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

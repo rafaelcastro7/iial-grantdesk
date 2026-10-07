@@ -162,6 +162,20 @@
       "when": 1791381565098,
       "tag": "0022_fix_blanket_memberships_and_email_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791381602999,
+      "tag": "0023_grant_workspaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791381610479,
+      "tag": "0024_partner_directory",
+      "breakpoints": true
     }
   ]
 }
