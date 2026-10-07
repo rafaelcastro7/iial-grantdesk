@@ -27,11 +27,13 @@ export function GrantConsortiumMatrix({
   recommendedRouteId,
   selectedRouteId,
   onSelectRoute,
+  orgName = "Organization",
 }: {
   routes: ConsortiumRoute[];
   recommendedRouteId: RouteId;
   selectedRouteId: RouteId;
   onSelectRoute: (id: RouteId) => void;
+  orgName?: string;
 }) {
   return (
     <Card className="border-primary/25 shadow-sm overflow-hidden bg-card">
@@ -43,7 +45,7 @@ export function GrantConsortiumMatrix({
               Consortium &amp; Application Routes Matrix
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Comparative strategy: determines administrative lead, IIAL's delivery role, and how to bypass audit or territorial representation hurdles.
+              Comparative strategy: determines administrative lead, {orgName}'s delivery role, and how to bypass audit or territorial representation hurdles.
             </p>
           </div>
           <Badge variant="outline" className="text-xs bg-primary/10 border-primary/30 text-primary self-start sm:self-auto py-1">
@@ -123,7 +125,7 @@ export function GrantConsortiumMatrix({
 
                     <div className="rounded-md bg-muted/40 p-2 border border-border/40">
                       <span className="text-[10px] font-bold uppercase text-muted-foreground block mb-0.5">
-                        IIAL Technical Role
+                        {orgName} Delivery Role
                       </span>
                       <span className="text-xs text-foreground/90 leading-tight block">
                         {route.iialRole}

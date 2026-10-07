@@ -15,8 +15,10 @@ import type { FinancialConditions } from "@/lib/grant-roadmap";
 
 export function GrantFinancialHurdles({
   financial,
+  orgName = "Organization",
 }: {
   financial: FinancialConditions;
+  orgName?: string;
 }) {
   return (
     <Card className="border-border/70 shadow-sm bg-card overflow-hidden">
@@ -67,12 +69,12 @@ export function GrantFinancialHurdles({
               {financial.auditLevel.allowsInternalSigned ? (
                 <>
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                  <span>Does not block IIAL directly</span>
+                  <span>Does not block {orgName} directly</span>
                 </>
               ) : (
                 <>
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                  <span>Requires postsecondary lead (Lambton)</span>
+                  <span>Requires institutional lead (e.g. Lambton)</span>
                 </>
               )}
             </div>
@@ -111,7 +113,7 @@ export function GrantFinancialHurdles({
               <span className="text-primary font-bold">✓</span>
               <span>
                 {financial.matchingFunds.inKindAllowed
-                  ? "Coverable via team hours & WCIS standard assets"
+                  ? "Coverable via team hours & standard institutional assets"
                   : "Requires confirmed banking deposit commitment"}
               </span>
             </div>
@@ -140,7 +142,7 @@ export function GrantFinancialHurdles({
 
             <div className="mt-3 pt-2 border-t text-[11px] font-medium text-foreground/80 flex items-center gap-1">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-              <span>IIAL qualifies as federal NPO with CRA</span>
+              <span>{orgName} matches active CRA / corporate eligibility</span>
             </div>
           </div>
 

@@ -984,3 +984,219 @@ describe("Synthetic User Stress: Multi-Tenant Client Visibility & Rocio Access",
   });
 });
 
+describe("Synthetic User Stress: Multi-Tenant Grant Strategic Roadmap & Entity Personalization", () => {
+  const sampleGacGrant = {
+    id: "gac-001",
+    title: "GAC Unsolicited Concept Note – Climate Resilient Agriculture in the Americas",
+    funderName: "Global Affairs Canada",
+    summary: "Unsolicited proposals for international development cooperation in Latin America.",
+    amountCadMax: 2000000,
+    costSharePct: 20,
+    deadline: null,
+    deadlineKind: "unsolicited",
+  };
+
+  it("dynamically personalizes all roadmap sections for IIAL", () => {
+    const roadmap = synthesizeGrantRoadmap({
+      ...sampleGacGrant,
+      orgName: "IIAL",
+    });
+
+    // Route A Lead
+    expect(roadmap.routes[0]?.leadEntity).toBe("IIAL (Sole Lead Applicant)");
+    expect(roadmap.routes[0]?.tacticalValue).toContain("Allows IIAL to submit an initiative continuously");
+
+    // Audit Level
+    expect(roadmap.financial.auditLevel.detail).toContain("disqualify IIAL");
+    expect(roadmap.financial.auditLevel.allowsInternalSigned).toBe(true);
+
+    // Strategic Return
+    expect(roadmap.strategicReturn.opexCoverage.salariesAndFees).toContain("IIAL core personnel");
+
+    // Outreach Email Templates
+    const academicEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "academic");
+    expect(academicEmail?.body).toContain("Institute of Innovation and Advanced Learning (IIAL)");
+    expect(academicEmail?.body).toContain("Rocío Cruz");
+
+    const territorialEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "territorial");
+    expect(territorialEmail?.body).toContain("IIAL is reaching out");
+    expect(territorialEmail?.body).toContain("Institute of Innovation and Advanced Learning (IIAL)");
+  });
+
+  it("dynamically personalizes all roadmap sections for Nahua Canada without leaking IIAL identity", () => {
+    const roadmap = synthesizeGrantRoadmap({
+      ...sampleGacGrant,
+      orgName: "Nahua Canada",
+    });
+
+    // Route A Lead
+    expect(roadmap.routes[0]?.leadEntity).toBe("Nahua Canada (Sole Lead Applicant)");
+    expect(roadmap.routes[0]?.tacticalValue).toContain("Allows Nahua Canada to submit an initiative continuously");
+
+    // Audit Level
+    expect(roadmap.financial.auditLevel.detail).toContain("disqualify Nahua Canada");
+    expect(roadmap.financial.auditLevel.detail).not.toContain("disqualify IIAL");
+
+    // Strategic Return
+    expect(roadmap.strategicReturn.opexCoverage.salariesAndFees).toContain("Nahua Canada core personnel");
+
+    // Outreach Email Templates
+    const academicEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "academic");
+    expect(academicEmail?.body).toContain("Nahua Canada");
+    expect(academicEmail?.body).not.toContain("Institute of Innovation and Advanced Learning (IIAL)");
+
+    const territorialEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "territorial");
+    expect(territorialEmail?.body).toContain("Nahua Canada is reaching out");
+    expect(territorialEmail?.body).not.toContain("Institute of Innovation and Advanced Learning (IIAL)");
+
+    const funderEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "funder_officer");
+    expect(funderEmail?.body).toContain("Nahua Canada");
+    expect(funderEmail?.body).not.toContain("Institute of Innovation and Advanced Learning (IIAL)");
+  });
+});
+
+describe("Synthetic User Stress: In-Kind Matching & Cost-Share Calculation Stress", () => {
+  it("accurately calculates matching funds and allowable in-kind percentages across varying grant amounts", () => {
+    // Case 1: 50% cost share on $500,000 grant
+    const grant500k = {
+      id: "grant-500k",
+      title: "Agri-Tech Commercialization Fund",
+      funderName: "FedDev Ontario",
+      costSharePct: 50,
+      amountCadMax: 500000,
+    };
+    const roadmap1 = synthesizeGrantRoadmap(grant500k);
+    expect(roadmap1.financial.matchingFunds.percentage).toBe(50);
+    expect(roadmap1.financial.matchingFunds.inKindAllowed).toBe(true);
+    expect(roadmap1.financial.matchingFunds.inKindCapPct).toBe(50);
+
+    // Case 2: 0% cost share (100% non-repayable)
+    const grantZeroMatch = {
+      id: "grant-zero",
+      title: "CFLI Local Development Award",
+      funderName: "Global Affairs Canada",
+      costSharePct: 0,
+      amountCadMax: 100000,
+    };
+    const roadmap2 = synthesizeGrantRoadmap(grantZeroMatch);
+    expect(roadmap2.financial.matchingFunds.percentage).toBe(0);
+    expect(roadmap2.financial.matchingFunds.label).toContain("100% Non-Repayable");
+
+    // Case 3: In-kind hourly rate budgeting simulation
+    const seniorResearcherRate = 120; // CAD/hour
+    const fieldAgronomistRate = 75; // CAD/hour
+    const plannedResearchHours = 1000;
+    const plannedFieldHours = 1500;
+
+    const totalInKindValue = (seniorResearcherRate * plannedResearchHours) + (fieldAgronomistRate * plannedFieldHours);
+    expect(totalInKindValue).toBe(232500); // 120k + 112.5k = 232.5k CAD
+
+    // Verifies in-kind covers required match if match requirement is <= 232.5k
+    const requiredMatch200k = 200000;
+    expect(totalInKindValue >= requiredMatch200k).toBe(true);
+  });
+});
+
+describe("Synthetic User Stress: Organization Profile Workspace Validation", () => {
+  it("enforces strict tenant separation on organization profiles and CRA credentials", () => {
+    type OrgProfile = {
+      orgId: string;
+      legalName: string;
+      craBusinessNumber: string;
+      applicantType: "non_profit" | "for_profit_sme" | "higher_ed";
+      primaryJurisdictions: string[];
+      sectors: string[];
+      leadScientist: string;
+    };
+
+    const iialProfile: OrgProfile = {
+      orgId: IIAL_ORG_ID,
+      legalName: "Institute of Innovation and Advanced Learning",
+      craBusinessNumber: "732918234RC0001",
+      applicantType: "non_profit",
+      primaryJurisdictions: ["CA", "ON", "QC"],
+      sectors: ["agriculture", "education", "sustainability", "traceability"],
+      leadScientist: "Rocío Cruz",
+    };
+
+    const nahuaProfile: OrgProfile = {
+      orgId: NAHUA_ORG_ID,
+      legalName: "Nahua Canada Inc.",
+      craBusinessNumber: "893120192RC0001",
+      applicantType: "for_profit_sme",
+      primaryJurisdictions: ["CA", "ON", "CR"],
+      sectors: ["agrifood", "cocoa", "trade", "sustainable_supply_chains"],
+      leadScientist: "Juan Gómez",
+    };
+
+    const profileStore: Record<string, OrgProfile> = {
+      [IIAL_ORG_ID]: iialProfile,
+      [NAHUA_ORG_ID]: nahuaProfile,
+    };
+
+    // Verify isolation
+    expect(profileStore[IIAL_ORG_ID]?.applicantType).toBe("non_profit");
+    expect(profileStore[NAHUA_ORG_ID]?.applicantType).toBe("for_profit_sme");
+    expect(profileStore[IIAL_ORG_ID]?.craBusinessNumber).not.toBe(profileStore[NAHUA_ORG_ID]?.craBusinessNumber);
+
+    // Profile update under Nahua tenant must not mutate IIAL
+    const updatedNahua = {
+      ...profileStore[NAHUA_ORG_ID]!,
+      primaryJurisdictions: ["CA", "ON", "CR", "PE"],
+    };
+    profileStore[NAHUA_ORG_ID] = updatedNahua;
+
+    expect(profileStore[IIAL_ORG_ID]?.primaryJurisdictions).toEqual(["CA", "ON", "QC"]);
+    expect(profileStore[NAHUA_ORG_ID]?.primaryJurisdictions).toContain("PE");
+  });
+});
+
+describe("Synthetic User Stress: Proposal Workflow & Word Budget Tracking", () => {
+  it("simulates full proposal lifecycle and word count boundary enforcement", () => {
+    type ProposalSection = {
+      id: string;
+      title: string;
+      maxWords: number;
+      content: string;
+      status: "draft" | "review" | "final";
+    };
+
+    const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+
+    const sections: ProposalSection[] = [
+      {
+        id: "sec-1",
+        title: "Executive Summary",
+        maxWords: 500,
+        content: "This project implements the Whole Chain Integrity Standard (WCIS) across cocoa cooperatives.",
+        status: "draft",
+      },
+      {
+        id: "sec-2",
+        title: "Project Narrative & Methodology",
+        maxWords: 2500,
+        content: "Building on field-proven traceability frameworks in Costa Rica and Peru...",
+        status: "draft",
+      },
+      {
+        id: "sec-3",
+        title: "Consortium Governance & Risk",
+        maxWords: 1000,
+        content: "SOCODEVI acts as fiduciary oversight partner while IIAL leads field deployment.",
+        status: "draft",
+      },
+    ];
+
+    for (const section of sections) {
+      const words = countWords(section.content);
+      expect(words).toBeLessThanOrEqual(section.maxWords);
+      expect(words).toBeGreaterThan(0);
+    }
+
+    // Stress test: word limit boundary overflow warning
+    const verboseContent = Array(600).fill("methodology").join(" ");
+    const isOverflowing = countWords(verboseContent) > sections[0]!.maxWords;
+    expect(isOverflowing).toBe(true);
+  });
+});
+

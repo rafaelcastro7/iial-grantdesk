@@ -145,7 +145,7 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
     directViability = "high";
     directViabilityLabel = "High (Unsolicited Concept Note)";
     directKeyBarrier = "Requires Canadian CRA registration number and 2 years of financial statements (signed internal statements accepted).";
-    directTacticalValue = "Allows submitting an initiative continuously without waiting for a scheduled thematic call.";
+    directTacticalValue = `Allows ${orgName} to submit an initiative continuously without waiting for a scheduled thematic call, retaining 100% project leadership.`;
   } else if (isSTDF) {
     directViability = "conditional";
     directViabilityLabel = "Conditional on Beneficiary Country Partner";
@@ -156,7 +156,7 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
   // Route B: Academic Consortium
   let academicViability: "high" | "conditional" | "blocked" = "high";
   let academicViabilityLabel = "High (Recommended R&D Route)";
-  let academicBarrier = "Finalize institutional overhead terms, IP sharing, and dedicated budget allocation for IIAL.";
+  let academicBarrier = `Finalize institutional overhead terms, IP sharing, and dedicated budget allocation for ${orgName}.`;
   let academicTacticalValue = `Lambton College or university manages the award; ${orgName} leads technical implementation utilizing the WCIS framework.`;
   let academicPartner = "Lambton College / Seneca Polytechnic / University of Costa Rica";
   if (isFedDev) {
@@ -181,8 +181,8 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
   let commercialViability: "high" | "conditional" | "blocked" = isFedDev ? "high" : "conditional";
   let commercialViabilityLabel = isFedDev ? "High (Ontario SME Focus)" : "Conditional on Private Match";
   let commercialBarrier = "Requires confirmed private co-funding (cash/in-kind) and commercial viability justification.";
-  let commercialTacticalValue = `Private impact enterprise (e.g. Nahua Canada) leads commercial scale-up of sustainable cocoa/food products; ${orgName} provides WCIS certification and impact verification.`;
-  let commercialPartner = "Nahua Canada / Southern Ontario Agrifood SMEs";
+  let commercialTacticalValue = `Commercial partner leads commercial scale-up of sustainable food products; ${orgName} provides certification, traceability, and impact verification.`;
+  let commercialPartner = orgName === "Nahua Canada" ? "Agrifood Distributors / Southern Ontario SMEs" : "Nahua Canada / Southern Ontario Agrifood SMEs";
 
   const routes: ConsortiumRoute[] = [
     {
@@ -254,7 +254,7 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
         label: "External Audit Required (3 Years)",
         allowsInternalSigned: false,
         status: "warn" as const,
-        detail: "Direct fiduciary management requires 3 years of audited financial statements. Overcome by applying via Lambton College as administrative lead (Route B).",
+        detail: `Direct fiduciary management requires 3 years of audited financial statements. Overcome by applying via Lambton College or eligible postsecondary partner as administrative lead (Route B).`,
       }
     : isGAC
       ? {
@@ -262,7 +262,7 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
           label: "Accepts Signed Internal Financial Statements",
           allowsInternalSigned: true,
           status: "pass" as const,
-          detail: "Global Affairs Canada accepts signed financial statements for the past 2 fiscal years from the legal representative / internal CPA. Lack of external audit does not disqualify IIAL.",
+          detail: `Global Affairs Canada accepts signed financial statements for the past 2 fiscal years from the legal representative / internal CPA. Lack of external audit does not disqualify ${orgName}.`,
         }
       : {
           type: "notice_to_reader" as const,
@@ -282,7 +282,7 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
     label: costSharePct > 0 ? `${costSharePct}% Matching Contribution` : "100% Non-Repayable (No Matching Required)",
     detail: costSharePct > 0
       ? (allowsInKind
-          ? "Permits covering matching contribution through eligible in-kind support: researcher hours, methodologies, and WCIS platform tools."
+          ? "Permits covering matching contribution through eligible in-kind support: researcher hours, methodologies, and technical platform tools."
           : "Requires verifiable cash contributions deposited into a dedicated project bank account.")
       : "The grant covers 100% of eligible project activities without requiring cost-sharing or co-investment.",
   };
@@ -291,10 +291,10 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
     requiresCraCharity: /charity|charitable status|bienfaisance/i.test(text),
     requiresNpoFederal: true,
     craNumberSufficient: isGAC || /business number|cra/i.test(text),
-    label: isGAC ? "Canadian Entity CRA Business Number" : "Federal Non-Profit or Postsecondary Entity",
+    label: isGAC ? "Canadian Entity CRA Business Number" : "Federal Entity or Recognized Corporate Registration",
     detail: isGAC
       ? "Requires recognized Canadian legal status and active Canada Revenue Agency (CRA) Business Number."
-      : "Must maintain federal or provincial non-profit corporate incorporation in good standing.",
+      : "Must maintain federal or provincial incorporation in good standing.",
   };
 
   const isRolling = /rolling|continu|unsolicited/i.test(`${input.deadlineKind ?? ""} ${title} ${summary}`);
@@ -316,7 +316,7 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
     disbursementTimeline,
   };
 
-  // 3. Strategic Value Return & Revenue Model for IIAL
+  // 3. Strategic Value Return & Revenue Model
   const strategicReturn: StrategicReturn = {
     opexCoverage: {
       salariesAndFees: `Full technical fees and management compensation for ${orgName} core personnel (researchers, agronomists, and supply chain specialists).`,
@@ -326,7 +326,7 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
     },
     wcisAssetCreation: {
       standardFocus: "Whole Chain Integrity Standard (WCIS): Comprehensive standard for traceability, climate governance, and gender equity across agricultural value chains.",
-      useCaseValidation: "Rigorous field piloting and proof-of-concept of the WCIS framework in operating cocoa and coffee supply chains with partner cooperatives.",
+      useCaseValidation: "Rigorous field piloting and proof-of-concept of the methodology in operating cocoa and coffee supply chains with partner cooperatives.",
       fieldTesting: "Quantitative verification of smallholder household income gains, post-harvest loss reduction, and women producer economic autonomy.",
     },
     futureRevenueLines: [
@@ -347,7 +347,7 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
       {
         line: "Live Cohorts & Corporate Training Programs",
         targetClient: "Producer federations, commodity boards, corporate agrifood buyers",
-        model: "Custom institutional cohorts delivered live with IIAL subject matter experts",
+        model: "Custom institutional cohorts delivered live with subject matter experts",
         priceRange: "CAD $5,000 – $15,000 per institutional cohort",
         examples: "Closed corporate masterclass on ethical data governance and verified origin tracking.",
       },
@@ -363,38 +363,37 @@ export function synthesizeGrantRoadmap(input: GrantRoadmapInput): GrantRoadmap {
 
   // 4. Outreach Action Kit
   const funderDisplay = input.funderName || "the funding agency";
+  const orgDisplayName = orgName === "IIAL" ? "Institute of Innovation and Advanced Learning (IIAL)" : orgName;
+
   const outreach: OutreachKit = {
     immediateSteps: [
       isSSHRC || isNSERC
         ? "1. Contact the Lambton College Applied Research & Innovation Office to confirm interest as postsecondary lead applicant."
         : isGAC
-          ? "1. Access Partners@International portal to verify IIAL CRA business number and upload signed financial statements."
+          ? `1. Access Partners@International portal to verify ${orgName} CRA business number and upload signed financial statements.`
           : "1. Download official applicant guides to verify strategic alignment with published thematic priority areas.",
-      "2. Draft a 2-page project Concept Note highlighting the innovative WCIS methodology.",
+      "2. Draft a 2-page project Concept Note highlighting the innovative methodology and delivery capacity.",
       "3. Request formal Letters of Intent from territorial partners (SOCODEVI, producer cooperatives, research centers).",
       "4. Schedule a 15-minute alignment call with the Program Officer to validate project scope prior to formal submission.",
     ],
     templates: [
       {
-        id: "academic_outreach",
         targetAudience: "academic",
         title: "Academic Partner Outreach (Lambton College)",
         subject: `Applied Research Consortium Proposal: ${input.title} / WCIS Framework`,
-        body: `Dear Director of Applied Research & Innovation,\n\nI am reaching out on behalf of the Institute of Innovation and Advanced Learning (IIAL). We have identified an immediate strategic opportunity in the call "${input.title}" funded by ${funderDisplay}.\n\nWe propose structuring a joint consortium where your institution serves as the postsecondary lead applicant, while IIAL serves as the technical delivery co-applicant leading field implementation of the Whole Chain Integrity Standard (WCIS) for traceability, gender equity, and climate resilience in agrifood value chains.\n\nThis partnership offers significant advantages: accredited research publications, funded student internships and field missions, and validated real-world impact metrics, without requiring your department to manage grassroots field operations.\n\nWould you have 20 minutes for a brief introductory call this week to review the concept?\n\nWarm regards,\nRocío Cruz / Executive Leadership Team\nInstitute of Innovation and Advanced Learning (IIAL)`,
+        body: `Dear Director of Applied Research & Innovation,\n\nI am reaching out on behalf of ${orgDisplayName}. We have identified an immediate strategic opportunity in the call "${input.title}" funded by ${funderDisplay}.\n\nWe propose structuring a joint consortium where your institution serves as the postsecondary lead applicant, while ${orgName} serves as the technical delivery co-applicant leading field implementation of the Whole Chain Integrity Standard (WCIS) for traceability, gender equity, and climate resilience in agrifood value chains.\n\nThis partnership offers significant advantages: accredited research publications, funded student internships and field missions, and validated real-world impact metrics, without requiring your department to manage grassroots field operations.\n\nWould you have 20 minutes for a brief introductory call this week to review the concept?\n\nWarm regards,\nRocío Cruz / Executive Leadership Team\n${orgDisplayName}`,
       },
       {
-        id: "territorial_outreach",
         targetAudience: "territorial",
         title: "Territorial Partner Outreach (SOCODEVI / Cooperative)",
         subject: `Strategic Funding Partnership Opportunity: ${input.title}`,
-        body: `Dear Leadership Team,\n\nIIAL is reaching out to explore joining forces for the newly open opportunity "${input.title}" offered by ${funderDisplay}.\n\nWe envision a collaborative consortium where the local producer organization maintains territorial leadership and community ownership, complemented by IIAL's technical support through the WCIS framework for digital traceability, institutional strengthening, and value-added market access.\n\nThe project budget includes direct dedicated allocations to compensate local staff hours, host community training workshops, and cover field operational expenses.\n\nWe would welcome the opportunity to coordinate a brief working session to review the draft concept note and align roles.\n\nBest regards,\nRocío Cruz / Project Strategy Direction\nInstitute of Innovation and Advanced Learning (IIAL)`,
+        body: `Dear Leadership Team,\n\n${orgName} is reaching out to explore joining forces for the newly open opportunity "${input.title}" offered by ${funderDisplay}.\n\nWe envision a collaborative consortium where the local producer organization maintains territorial leadership and community ownership, complemented by ${orgName}'s technical support through the WCIS framework for digital traceability, institutional strengthening, and value-added market access.\n\nThe project budget includes direct dedicated allocations to compensate local staff hours, host community training workshops, and cover field operational expenses.\n\nWe would welcome the opportunity to coordinate a brief working session to review the draft concept note and align roles.\n\nBest regards,\nRocío Cruz / Project Strategy Direction\n${orgDisplayName}`,
       },
       {
-        id: "funder_inquiry",
         targetAudience: "funder_officer",
         title: "Program Officer Pre-Application Inquiry",
         subject: `Concept Scope Alignment Inquiry: ${input.title}`,
-        body: `Dear Program Officer,\n\nI am writing on behalf of the Institute of Innovation and Advanced Learning (IIAL), a Canadian institute dedicated to applied sustainability, value chain integrity, and socio-economic empowerment.\n\nWe are preparing a concept note for "${input.title}" focusing on empowering women producers and cooperatives through the Whole Chain Integrity Standard (WCIS) for climate resilience and verifiable traceability.\n\nWe would appreciate confirming whether an initiative combining Canadian technical leadership with Latin American cooperative partners aligns fully with your current funding priorities for this cycle.\n\nWe would be grateful for the opportunity to share a 2-page concept overview for brief feedback.\n\nBest regards,\nExecutive Direction / Strategic Partnerships\nInstitute of Innovation and Advanced Learning (IIAL)`,
+        body: `Dear Program Officer,\n\nI am writing on behalf of ${orgDisplayName}, dedicated to applied sustainability, value chain integrity, and socio-economic empowerment.\n\nWe are preparing a concept note for "${input.title}" focusing on empowering women producers and cooperatives through the Whole Chain Integrity Standard (WCIS) for climate resilience and verifiable traceability.\n\nWe would appreciate confirming whether an initiative combining Canadian technical leadership with Latin American cooperative partners aligns fully with your current funding priorities for this cycle.\n\nWe would be grateful for the opportunity to share a 2-page concept overview for brief feedback.\n\nBest regards,\nExecutive Direction / Strategic Partnerships\n${orgDisplayName}`,
       },
     ],
   };

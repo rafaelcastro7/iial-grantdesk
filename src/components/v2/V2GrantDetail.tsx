@@ -703,13 +703,14 @@ export function V2GrantDetail({
                 recommendedRouteId={roadmap.recommendedRouteId}
                 selectedRouteId={selectedRouteId}
                 onSelectRoute={(id) => setSelectedRouteId(id)}
+                orgName={activeOrgName}
               />
 
               {/* 2. FINANCIAL CONDITIONS & CRITICAL HURDLES */}
-              <GrantFinancialHurdles financial={roadmap.financial} />
+              <GrantFinancialHurdles financial={roadmap.financial} orgName={activeOrgName} />
 
               {/* 3. STRATEGIC RETURN & DOWNSTREAM REVENUE MODEL */}
-              <GrantStrategicRevenue strategicReturn={roadmap.strategicReturn} />
+              <GrantStrategicRevenue strategicReturn={roadmap.strategicReturn} orgName={activeOrgName} />
 
               {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
               <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />

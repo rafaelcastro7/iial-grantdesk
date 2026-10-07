@@ -11,8 +11,10 @@ import type { StrategicReturn } from "@/lib/grant-roadmap";
 
 export function GrantStrategicRevenue({
   strategicReturn,
+  orgName = "Organization",
 }: {
   strategicReturn: StrategicReturn;
+  orgName?: string;
 }) {
   return (
     <Card className="border-border/70 shadow-sm bg-card overflow-hidden">
@@ -20,7 +22,7 @@ export function GrantStrategicRevenue({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
-            Strategic Return &amp; Revenue Model for IIAL
+            Strategic Return &amp; Revenue Model for {orgName}
           </CardTitle>
           <span className="text-xs text-muted-foreground">
             Three-tier value breakdown: Immediate OPEX + Strategic WCIS Asset + Downstream Commercialization
@@ -69,7 +71,7 @@ export function GrantStrategicRevenue({
             </div>
 
             <p className="mt-3 pt-2.5 border-t border-emerald-500/20 text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
-              💡 Outcome: Core IIAL programmatic activities executed without risking internal capital.
+              💡 Outcome: Core {orgName} programmatic activities executed without risking internal capital.
             </p>
           </div>
 
@@ -126,16 +128,16 @@ export function GrantStrategicRevenue({
           </div>
         </div>
 
-        {/* Tier 3: Downstream Commercialization & IIAL Revenue Lines */}
+        {/* Tier 3: Downstream Commercialization & Revenue Lines */}
         <div className="rounded-xl border bg-muted/20 p-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-3">
             <div>
               <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
                 <Target className="h-4 w-4 text-primary" />
-                Tier 3: Downstream Commercialization &amp; IIAL Revenue Lines
+                Tier 3: Downstream Commercialization &amp; {orgName} Revenue Lines
               </h4>
               <p className="text-xs text-muted-foreground">
-                How the grant and WCIS framework convert into recurring post-grant revenue for IIAL
+                How the grant and strategic framework convert into recurring post-grant revenue for {orgName}
               </p>
             </div>
           </div>
