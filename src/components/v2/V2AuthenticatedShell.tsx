@@ -94,6 +94,12 @@ const NAV_GROUPS: NavGroup[] = [
       },
       { to: "/grants", label: "Grant radar", description: "Discover and qualify", icon: Radar },
       {
+        to: "/pipeline",
+        label: "Pipeline",
+        description: "Grants we are working, decisions, export",
+        icon: ListChecks,
+      },
+      {
         to: "/insights",
         label: "Fit insights",
         description: "Why grants do not pass",

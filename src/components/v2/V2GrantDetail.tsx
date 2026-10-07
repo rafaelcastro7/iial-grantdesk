@@ -60,6 +60,7 @@ import { GrantStrategicRevenue } from "@/components/grants/GrantStrategicRevenue
 import { GrantOutreachKit } from "@/components/grants/GrantOutreachKit";
 import { synthesizeGrantRoadmap, type RouteId } from "@/lib/grant-roadmap";
 import { useActiveTenant } from "@/lib/tenant-context";
+import { GrantApplicationWorkspace } from "@/components/grants/GrantApplicationWorkspace";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
@@ -207,9 +208,11 @@ export function V2GrantDetail({
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string | undefined>(undefined);
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"roadmap" | "funder_facts" | "technical_audit">(
-    "roadmap",
-  );
+  // The application plan (saved decisions) comes first: it is where the
+  // consultant works; the roadmap and funder facts support it.
+  const [activeTab, setActiveTab] = useState<
+    "plan" | "roadmap" | "funder_facts" | "technical_audit"
+  >("plan");
 
   const funderName = grant.funder?.name ?? "Funding Agency";
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
@@ -659,7 +662,21 @@ export function V2GrantDetail({
 
       {/* ----------------- NAVIGATION WORKSPACE TABS ----------------- */}
       <div className="flex items-center justify-between border-b pb-1 gap-2 flex-wrap">
-        <div className="inline-flex rounded-lg border bg-muted/30 p-1 text-xs">
+        <div className="inline-flex flex-wrap rounded-lg border bg-muted/30 p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab("plan")}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold transition-all",
+              activeTab === "plan"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <ClipboardCheck className="h-4 w-4 text-primary" />
+            <span>Application plan</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab("roadmap")}
@@ -671,7 +688,7 @@ export function V2GrantDetail({
             )}
           >
             <Workflow className="h-4 w-4 text-primary" />
-            <span>1. Strategic Roadmap &amp; Consortium</span>
+            <span>Suggested routes</span>
           </button>
 
           <button
@@ -685,7 +702,7 @@ export function V2GrantDetail({
             )}
           >
             <FileText className="h-4 w-4 text-primary" />
-            <span>2. Official Funder Overview</span>
+            <span>Funder facts</span>
           </button>
 
           <button
@@ -699,7 +716,7 @@ export function V2GrantDetail({
             )}
           >
             <History className="h-4 w-4 text-primary" />
-            <span>3. Remediation &amp; Technical Audit</span>
+            <span>Technical audit</span>
           </button>
         </div>
 
@@ -712,6 +729,14 @@ export function V2GrantDetail({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* ================= LEFT MAIN COLUMN (8 COLS) ================= */}
         <main className="space-y-5 lg:col-span-8">
+          {activeTab === "plan" &&
+            (activeOrgId ? (
+              <GrantApplicationWorkspace grantId={grant.id} orgId={activeOrgId} />
+            ) : (
+              <p className="rounded-lg border p-4 text-sm text-muted-foreground">
+                Choose the organization you are working for to open its application plan.
+              </p>
+            ))}
           {activeTab === "roadmap" && (
             <>
               {/* 1. APPLICATION ROUTES & CONSORTIUM MATRIX */}

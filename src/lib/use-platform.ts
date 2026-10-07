@@ -26,6 +26,7 @@ export const CONSULTANT_PATHS = [
   "/dashboard",
   "/clients",
   "/grants",
+  "/pipeline",
   "/insights",
   "/proposals",
   "/org",

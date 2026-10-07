@@ -26,6 +26,7 @@ import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated.manual'
 import { Route as AuthenticatedOpsRouteImport } from './routes/_authenticated.ops'
 import { Route as AuthenticatedOrgRouteImport } from './routes/_authenticated.org'
+import { Route as AuthenticatedPipelineRouteImport } from './routes/_authenticated.pipeline'
 import { Route as AuthenticatedPostAwardRouteImport } from './routes/_authenticated.post-award'
 import { Route as AuthenticatedPrivacyRouteImport } from './routes/_authenticated.privacy'
 import { Route as AuthenticatedQualityRouteImport } from './routes/_authenticated.quality'
@@ -152,6 +153,11 @@ const AuthenticatedOpsRoute = AuthenticatedOpsRouteImport.update({
 const AuthenticatedOrgRoute = AuthenticatedOrgRouteImport.update({
   id: '/org',
   path: '/org',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPipelineRoute = AuthenticatedPipelineRouteImport.update({
+  id: '/pipeline',
+  path: '/pipeline',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedPostAwardRoute = AuthenticatedPostAwardRouteImport.update({
@@ -410,6 +416,7 @@ export interface FileRoutesByFullPath {
   '/manual': typeof AuthenticatedManualRoute
   '/ops': typeof AuthenticatedOpsRoute
   '/org': typeof AuthenticatedOrgRoute
+  '/pipeline': typeof AuthenticatedPipelineRoute
   '/post-award': typeof AuthenticatedPostAwardRoute
   '/privacy': typeof AuthenticatedPrivacyRoute
   '/quality': typeof AuthenticatedQualityRoute
@@ -469,6 +476,7 @@ export interface FileRoutesByTo {
   '/manual': typeof AuthenticatedManualRoute
   '/ops': typeof AuthenticatedOpsRoute
   '/org': typeof AuthenticatedOrgRoute
+  '/pipeline': typeof AuthenticatedPipelineRoute
   '/post-award': typeof AuthenticatedPostAwardRoute
   '/privacy': typeof AuthenticatedPrivacyRoute
   '/quality': typeof AuthenticatedQualityRoute
@@ -531,6 +539,7 @@ export interface FileRoutesById {
   '/_authenticated/manual': typeof AuthenticatedManualRoute
   '/_authenticated/ops': typeof AuthenticatedOpsRoute
   '/_authenticated/org': typeof AuthenticatedOrgRoute
+  '/_authenticated/pipeline': typeof AuthenticatedPipelineRoute
   '/_authenticated/post-award': typeof AuthenticatedPostAwardRoute
   '/_authenticated/privacy': typeof AuthenticatedPrivacyRoute
   '/_authenticated/quality': typeof AuthenticatedQualityRoute
@@ -593,6 +602,7 @@ export interface FileRouteTypes {
     | '/manual'
     | '/ops'
     | '/org'
+    | '/pipeline'
     | '/post-award'
     | '/privacy'
     | '/quality'
@@ -652,6 +662,7 @@ export interface FileRouteTypes {
     | '/manual'
     | '/ops'
     | '/org'
+    | '/pipeline'
     | '/post-award'
     | '/privacy'
     | '/quality'
@@ -713,6 +724,7 @@ export interface FileRouteTypes {
     | '/_authenticated/manual'
     | '/_authenticated/ops'
     | '/_authenticated/org'
+    | '/_authenticated/pipeline'
     | '/_authenticated/post-award'
     | '/_authenticated/privacy'
     | '/_authenticated/quality'
@@ -893,6 +905,13 @@ declare module '@tanstack/react-router' {
       path: '/org'
       fullPath: '/org'
       preLoaderRoute: typeof AuthenticatedOrgRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pipeline': {
+      id: '/_authenticated/pipeline'
+      path: '/pipeline'
+      fullPath: '/pipeline'
+      preLoaderRoute: typeof AuthenticatedPipelineRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/post-award': {
@@ -1267,6 +1286,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedManualRoute: typeof AuthenticatedManualRoute
   AuthenticatedOpsRoute: typeof AuthenticatedOpsRoute
   AuthenticatedOrgRoute: typeof AuthenticatedOrgRoute
+  AuthenticatedPipelineRoute: typeof AuthenticatedPipelineRoute
   AuthenticatedPostAwardRoute: typeof AuthenticatedPostAwardRoute
   AuthenticatedPrivacyRoute: typeof AuthenticatedPrivacyRoute
   AuthenticatedQualityRoute: typeof AuthenticatedQualityRoute
@@ -1301,6 +1321,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedManualRoute: AuthenticatedManualRoute,
   AuthenticatedOpsRoute: AuthenticatedOpsRoute,
   AuthenticatedOrgRoute: AuthenticatedOrgRoute,
+  AuthenticatedPipelineRoute: AuthenticatedPipelineRoute,
   AuthenticatedPostAwardRoute: AuthenticatedPostAwardRoute,
   AuthenticatedPrivacyRoute: AuthenticatedPrivacyRoute,
   AuthenticatedQualityRoute: AuthenticatedQualityRoute,
@@ -1346,13 +1367,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
