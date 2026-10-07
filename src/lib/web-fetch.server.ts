@@ -394,11 +394,17 @@ export async function localWebSearch(
  * Resilient, zero-token web search fallback using DuckDuckGo HTML endpoint.
  * Activates seamlessly when SearXNG local service is unavailable or in cloud environments.
  */
+let lastDdgQueryAt = 0;
+
 export async function duckDuckGoWebSearch(
   query: string,
   limit = 10,
   timeoutMs = 12_000,
 ): Promise<{ ok: true; hits: SearchHit[] } | { ok: false; error: string }> {
+  // Be a polite client: at most one query every 2 seconds per instance.
+  const wait = lastDdgQueryAt + 2_000 - Date.now();
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  lastDdgQueryAt = Date.now();
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -413,26 +419,35 @@ export async function duckDuckGoWebSearch(
     if (!res.ok) return { ok: false, error: `duckduckgo_${res.status}` };
     const html = await res.text();
     const hits: SearchHit[] = [];
-    const linkRegex = /<a class="result__url"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-    const snippetRegex = /<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-    let match: RegExpExecArray | null;
-    while ((match = linkRegex.exec(html)) !== null && hits.length < limit) {
-      let rawUrl = match[1];
+    const { isPrivateHost } = await import("@/lib/grant-intake.shared");
+    // Parse one result block at a time so a missing snippet never shifts the
+    // next result's snippet onto the wrong link.
+    const blocks = html.split(/<div class="result results_links/).slice(1);
+    for (const block of blocks) {
+      if (hits.length >= limit) break;
+      const link = block.match(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+      if (!link) continue;
+      let rawUrl = link[1].replace(/&amp;/g, "&");
       if (rawUrl.includes("uddg=")) {
         try {
-          const u = new URL(`https://duckduckgo.com${rawUrl}`);
+          const u = new URL(rawUrl.startsWith("http") ? rawUrl : `https://duckduckgo.com${rawUrl}`);
           rawUrl = decodeURIComponent(u.searchParams.get("uddg") || rawUrl);
         } catch {
-          // ignore parsing error
+          // keep the raw link
         }
       }
-      if (!rawUrl.startsWith("http")) continue;
-      const snippetMatch = snippetRegex.exec(html);
-      const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, "").trim() : "";
+      if (!/^https?:\/\//.test(rawUrl)) continue;
+      try {
+        // Results feed the crawler: never follow them into private networks.
+        if (isPrivateHost(new URL(rawUrl).hostname)) continue;
+      } catch {
+        continue;
+      }
+      const snippet = block.match(/<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
       hits.push({
         url: rawUrl,
-        title: match[2].replace(/<[^>]+>/g, "").trim(),
-        snippet: snippet.slice(0, 500),
+        title: link[2].replace(/<[^>]+>/g, "").trim(),
+        snippet: (snippet ? snippet[1].replace(/<[^>]+>/g, "").trim() : "").slice(0, 500),
       });
     }
     return { ok: true, hits };

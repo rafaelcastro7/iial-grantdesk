@@ -266,7 +266,7 @@ export function AgentTracePanel({
               {runId ? (
                 <span className="font-mono">run {runId.slice(0, 12)}…</span>
               ) : fr ? (
-                "Aucune corrida sélectionnée"
+                "Aucune exécution sélectionnée"
               ) : (
                 "No run selected"
               )}

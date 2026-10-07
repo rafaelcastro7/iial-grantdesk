@@ -13,33 +13,11 @@ export const listUserOrganizations = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const supabase = await createSupabaseAdmin();
 
-    // Check user roles and email for staff/consultant privileges
-    let isStaff = false;
-    try {
-      const { data: userRoles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", context.userId);
-      if ((userRoles ?? []).some((r) => r.role === "admin" || r.role === "consultant")) {
-        isStaff = true;
-      }
-    } catch {
-      // Ignore error
-    }
+    // Platform staff = an explicit admin/consultant role granted in user_roles.
+    // Never inferred from the email address (anyone can sign up as "rocio@...").
+    const isStaff = await isPlatformStaff(supabase, context.userId);
 
-    if (!isStaff) {
-      try {
-        const { data: authUser } = await supabase.auth.admin.getUserById(context.userId);
-        const email = authUser?.user?.email?.toLowerCase() ?? "";
-        if (email.includes("rocio") || email.endsWith("@iial.ca")) {
-          isStaff = true;
-        }
-      } catch {
-        // Ignore error
-      }
-    }
-
-    // If staff/consultant or Rocio, ensure both IIAL and Nahua Canada exist in user_organizations
+    // Staff work for both client organizations (IIAL and Nahua Canada).
     if (isStaff) {
       try {
         const { data: allCoreOrgs } = await supabase
@@ -48,16 +26,14 @@ export const listUserOrganizations = createServerFn({ method: "GET" })
           .in("slug", ["iial", "nahua-canada"]);
 
         if (allCoreOrgs && allCoreOrgs.length > 0) {
-          await supabase
-            .from("user_organizations")
-            .upsert(
-              allCoreOrgs.map((o) => ({
-                user_id: context.userId,
-                org_id: o.id,
-                role: "admin",
-              })),
-              { onConflict: "user_id,org_id", ignoreDuplicates: true },
-            );
+          await supabase.from("user_organizations").upsert(
+            allCoreOrgs.map((o) => ({
+              user_id: context.userId,
+              org_id: o.id,
+              role: "admin",
+            })),
+            { onConflict: "user_id,org_id", ignoreDuplicates: true },
+          );
         }
       } catch {
         // Ignore upsert errors
@@ -121,33 +97,13 @@ export const getClientOrganization = createServerFn({ method: "GET" })
       .maybeSingle();
 
     if (!membership) {
-      // Check if user is staff (admin, consultant, or Rocio)
-      let isStaff = false;
-      try {
-        const { data: userRoles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", context.userId);
-        if ((userRoles ?? []).some((r) => r.role === "admin" || r.role === "consultant")) {
-          isStaff = true;
-        }
-      } catch {
-        // Ignore error
-      }
+      // Only platform staff, and only for the core client organizations; any
+      // other org requires a real membership (no auto-join on read).
+      const isStaff = await isPlatformStaff(supabase, context.userId);
+      const coreIds = isStaff ? await coreClientOrgIds(supabase) : [];
+      const canJoin = coreIds.includes(data.orgId);
 
-      if (!isStaff) {
-        try {
-          const { data: authUser } = await supabase.auth.admin.getUserById(context.userId);
-          const email = authUser?.user?.email?.toLowerCase() ?? "";
-          if (email.includes("rocio") || email.endsWith("@iial.ca")) {
-            isStaff = true;
-          }
-        } catch {
-          // Ignore error
-        }
-      }
-
-      if (isStaff) {
+      if (canJoin) {
         try {
           await supabase
             .from("user_organizations")
@@ -577,3 +533,24 @@ export const switchOrganizationContext = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+/** Explicit platform role (granted by an admin), never derived from the email. */
+async function isPlatformStaff(
+  supabase: Awaited<ReturnType<typeof createSupabaseAdmin>>,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  if (error) return false;
+  return (data ?? []).some((r) => r.role === "admin" || r.role === "consultant");
+}
+
+/** The client organizations platform staff work for. */
+async function coreClientOrgIds(
+  supabase: Awaited<ReturnType<typeof createSupabaseAdmin>>,
+): Promise<string[]> {
+  const { data } = await supabase
+    .from("organizations")
+    .select("id")
+    .in("slug", ["iial", "nahua-canada"]);
+  return (data ?? []).map((o) => o.id as string);
+}

@@ -70,6 +70,7 @@ import {
   fundingKindOf,
   grantCurrency,
   isFullReview,
+  realFit,
 } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
 import { humanizeRationale } from "@/lib/eligibility-explain";
@@ -206,7 +207,9 @@ export function V2GrantDetail({
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string | undefined>(undefined);
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"roadmap" | "funder_facts" | "technical_audit">("roadmap");
+  const [activeTab, setActiveTab] = useState<"roadmap" | "funder_facts" | "technical_audit">(
+    "roadmap",
+  );
 
   const funderName = grant.funder?.name ?? "Funding Agency";
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
@@ -235,7 +238,12 @@ export function V2GrantDetail({
     grant.status !== "discovered",
     currency,
   );
-  const quality = getQualityState({ grant, evaluation, requirements: grant.requirements ?? [], eligibilityRows });
+  const quality = getQualityState({
+    grant,
+    evaluation,
+    requirements: grant.requirements ?? [],
+    eligibilityRows,
+  });
   const verdict = getVerdict({
     deadlineDays: deadline.days,
     evaluation,
@@ -351,13 +359,19 @@ export function V2GrantDetail({
             )}
 
             {duplicateGroupSize > 1 && (
-              <Badge variant="outline" className="rounded-md border-amber-500/50 text-amber-700 text-xs">
+              <Badge
+                variant="outline"
+                className="rounded-md border-amber-500/50 text-amber-700 text-xs"
+              >
                 {duplicateGroupSize} similar
               </Badge>
             )}
 
             {activeOrgName && (
-              <Badge variant="outline" className="text-xs bg-primary/5 border-primary/30 text-primary">
+              <Badge
+                variant="outline"
+                className="text-xs bg-primary/5 border-primary/30 text-primary"
+              >
                 Tenant: {activeOrgName}
               </Badge>
             )}
@@ -631,10 +645,13 @@ export function V2GrantDetail({
               <Workflow className="h-4 w-4 text-primary" />
             </div>
             <div className="mt-1.5 text-base sm:text-lg font-bold tracking-tight text-primary truncate">
-              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)?.title.replace("Route ", "") || "Academic"}
+              {roadmap.routes
+                .find((r) => r.id === roadmap.recommendedRouteId)
+                ?.title.replace("Route ", "") || "Academic"}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground truncate">
-              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)?.recommendedPartner || "Strategic Partner"}
+              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)
+                ?.recommendedPartner || "Strategic Partner"}
             </p>
           </div>
         </div>
@@ -710,7 +727,10 @@ export function V2GrantDetail({
               <GrantFinancialHurdles financial={roadmap.financial} orgName={activeOrgName} />
 
               {/* 3. STRATEGIC RETURN & DOWNSTREAM REVENUE MODEL */}
-              <GrantStrategicRevenue strategicReturn={roadmap.strategicReturn} orgName={activeOrgName} />
+              <GrantStrategicRevenue
+                strategicReturn={roadmap.strategicReturn}
+                orgName={activeOrgName}
+              />
 
               {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
               <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
@@ -775,7 +795,11 @@ export function V2GrantDetail({
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {eligibleGroups.map((label) => (
-                            <Badge key={label} variant="secondary" className="rounded-md text-xs py-1 px-2.5">
+                            <Badge
+                              key={label}
+                              variant="secondary"
+                              className="rounded-md text-xs py-1 px-2.5"
+                            >
                               {label}
                             </Badge>
                           ))}
@@ -807,12 +831,18 @@ export function V2GrantDetail({
                 description="Verified web pages and observation timestamps."
               >
                 <div className="space-y-2.5 text-sm">
-                  {grant.url && <SourceLink href={grant.url} label="Official Call Guidelines Page" />}
+                  {grant.url && (
+                    <SourceLink href={grant.url} label="Official Call Guidelines Page" />
+                  )}
                   {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
                     <SourceLink href={grant.funder.source_url} label="Main Funder Portal" />
                   )}
                   {otherSources.map((url) => (
-                    <SourceLink key={url} href={url} label={url.replace(/^https?:\/\/(www\.)?/, "")} />
+                    <SourceLink
+                      key={url}
+                      href={url}
+                      label={url.replace(/^https?:\/\/(www\.)?/, "")}
+                    />
                   ))}
                   <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
                     <span>Discovered: {formatDateTime(grant.discovered_at)}</span>
@@ -845,14 +875,19 @@ export function V2GrantDetail({
                         rationale_en: evaluation.rationale_en,
                         rationale_fr: evaluation.rationale_fr ?? "",
                         created_at: evaluation.created_at,
-                        axis_breakdown: (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
+                        axis_breakdown:
+                          (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
                       }
                     : null
                 }
               />
 
               {/* TRAZA DE EVENTOS */}
-              <FetchTrailPanel grantId={grant.id} onRetry={onFetchDetails} retrying={busy === "enrich"} />
+              <FetchTrailPanel
+                grantId={grant.id}
+                onRetry={onFetchDetails}
+                retrying={busy === "enrich"}
+              />
             </>
           )}
         </main>
@@ -881,13 +916,18 @@ export function V2GrantDetail({
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Contextual intelligence to apply in consortium with {selectedRoute.leadEntity} and articulate the WCIS standard.
+              Contextual intelligence to apply in consortium with {selectedRoute.leadEntity} and
+              articulate the WCIS standard.
             </p>
 
             <div className="space-y-1.5 pt-1">
               <button
                 type="button"
-                onClick={() => handleOpenCopilotWithPrompt(`How should we structure ${selectedRoute.title} to maximize scoring in this call?`)}
+                onClick={() =>
+                  handleOpenCopilotWithPrompt(
+                    `How should we structure ${selectedRoute.title} to maximize scoring in this call?`,
+                  )
+                }
                 className="w-full text-left text-[11px] p-2 rounded-md bg-background/80 border hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-between"
               >
                 <span>Structure {selectedRoute.title}</span>
@@ -896,7 +936,11 @@ export function V2GrantDetail({
 
               <button
                 type="button"
-                onClick={() => handleOpenCopilotWithPrompt("How can we position the WCIS standard as an in-kind contribution for this grant?")}
+                onClick={() =>
+                  handleOpenCopilotWithPrompt(
+                    "How can we position the WCIS standard as an in-kind contribution for this grant?",
+                  )
+                }
                 className="w-full text-left text-[11px] p-2 rounded-md bg-background/80 border hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-between"
               >
                 <span>Justify in-kind match with WCIS</span>
@@ -1171,7 +1215,7 @@ function getVerdict({
       detail: "Record has sufficient detail. Run evaluation to assess institutional fit.",
     };
   }
-  if (evaluation.eligibility_pass && evaluation.fit_score >= 0.7) {
+  if (evalVerdict === "eligible" && (realFit(evaluation) ?? 0) >= 70) {
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
@@ -1179,7 +1223,7 @@ function getVerdict({
       detail: "High thematic alignment with no fiduciary blocks detected.",
     };
   }
-  if (evaluation.eligibility_pass && evaluation.fit_score >= 0.45) {
+  if (evalVerdict === "eligible" && (realFit(evaluation) ?? 0) >= 45) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,

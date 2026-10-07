@@ -44,8 +44,16 @@ const serviceKey = isBrokenDummyKey
   : rawServiceKey;
 
 if (isBrokenDummyKey) {
+  // In production a missing service key must fail loudly: with the publishable
+  // key every admin write is silently rejected by RLS and data looks saved
+  // when it is not. Local development may fall back for read-only scripts.
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[supabaseAdmin] SUPABASE_SERVICE_ROLE_KEY is missing or invalid in production: admin writes will be rejected by RLS.",
+    );
+  }
   console.warn(
-    "⚠️ [Telemetry] SUPABASE_SERVICE_ROLE_KEY is invalid/missing. Falling back to publishable key.",
+    "⚠️ [Telemetry] SUPABASE_SERVICE_ROLE_KEY is invalid/missing. Falling back to publishable key (local only).",
   );
 }
 
