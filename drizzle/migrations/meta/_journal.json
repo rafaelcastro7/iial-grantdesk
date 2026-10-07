@@ -183,6 +183,13 @@
       "when": 1791381670718,
       "tag": "0025_expand_org_profile_strategic_readiness",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791389638244,
+      "tag": "0026_superadmin_qa_and_profile_facts",
+      "breakpoints": true
     }
   ]
 }
