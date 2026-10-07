@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { writeFileSync } from "fs";
 import { resolve } from "path";
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: [".env.local", ".env"] });
 
 async function main() {
   const url = process.env.VITE_SUPABASE_URL!;
