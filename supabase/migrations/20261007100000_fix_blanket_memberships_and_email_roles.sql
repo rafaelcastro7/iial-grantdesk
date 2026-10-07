@@ -24,11 +24,11 @@ CREATE POLICY platform_staff_admin_read ON public.platform_staff
   FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.user_roles r WHERE r.user_id = auth.uid() AND r.role = 'admin'));
 
+-- Never list demo accounts here: their passwords are in the client code.
 INSERT INTO public.platform_staff (email, role) VALUES
   ('rocio@iial.ca', 'admin'),
   ('rafael@example.com', 'admin'),
-  ('rafael@iial.ca', 'admin'),
-  ('demo-admin@iial.test', 'admin')
+  ('rafael@iial.ca', 'admin')
 ON CONFLICT (email) DO NOTHING;
 
 -- 2. Remove the blanket memberships added on/after 2026-10-07 for anyone who is
