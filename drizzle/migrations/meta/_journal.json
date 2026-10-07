@@ -148,6 +148,41 @@
       "when": 1791322000000,
       "tag": "0020_grant_copilot_and_design_backlog",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791381523414,
+      "tag": "0021_fix_membership_rls_recursion",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791381565098,
+      "tag": "0022_fix_blanket_memberships_and_email_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791381602999,
+      "tag": "0023_grant_workspaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791381610479,
+      "tag": "0024_partner_directory",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791381670718,
+      "tag": "0025_expand_org_profile_strategic_readiness",
+      "breakpoints": true
     }
   ]
 }
