@@ -148,6 +148,13 @@
       "when": 1791322000000,
       "tag": "0020_grant_copilot_and_design_backlog",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791381523414,
+      "tag": "0021_fix_membership_rls_recursion",
+      "breakpoints": true
     }
   ]
 }

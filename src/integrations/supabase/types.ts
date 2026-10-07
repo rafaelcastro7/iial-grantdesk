@@ -1523,12 +1523,14 @@ export type Database = {
           hard_fail_on_excluded_keyword: boolean
           hard_fail_on_jurisdiction: boolean
           hard_fail_on_runway: boolean
+          id: string
           iial_capabilities: string[]
           lead_min_weeks: number | null
           max_amount_cad: number | null
           max_cost_share_pct_org_carries: number | null
           min_amount_cad: number | null
           min_days_to_deadline: number | null
+          org_id: string | null
           partner_min_weeks: number | null
           require_match_verification: boolean
           required_jurisdictions: string[]
@@ -1537,7 +1539,7 @@ export type Database = {
           rolling_intake_passes_runway: boolean
           threshold_fit_pass: number
           updated_at: string
-          user_id: string
+          user_id: string | null
           weight_llm: number
         }
         Insert: {
@@ -1555,12 +1557,14 @@ export type Database = {
           hard_fail_on_excluded_keyword?: boolean
           hard_fail_on_jurisdiction?: boolean
           hard_fail_on_runway?: boolean
+          id?: string
           iial_capabilities?: string[]
           lead_min_weeks?: number | null
           max_amount_cad?: number | null
           max_cost_share_pct_org_carries?: number | null
           min_amount_cad?: number | null
           min_days_to_deadline?: number | null
+          org_id?: string | null
           partner_min_weeks?: number | null
           require_match_verification?: boolean
           required_jurisdictions?: string[]
@@ -1569,7 +1573,7 @@ export type Database = {
           rolling_intake_passes_runway?: boolean
           threshold_fit_pass?: number
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           weight_llm?: number
         }
         Update: {
@@ -1587,12 +1591,14 @@ export type Database = {
           hard_fail_on_excluded_keyword?: boolean
           hard_fail_on_jurisdiction?: boolean
           hard_fail_on_runway?: boolean
+          id?: string
           iial_capabilities?: string[]
           lead_min_weeks?: number | null
           max_amount_cad?: number | null
           max_cost_share_pct_org_carries?: number | null
           min_amount_cad?: number | null
           min_days_to_deadline?: number | null
+          org_id?: string | null
           partner_min_weeks?: number | null
           require_match_verification?: boolean
           required_jurisdictions?: string[]
@@ -1601,10 +1607,18 @@ export type Database = {
           rolling_intake_passes_runway?: boolean
           threshold_fit_pass?: number
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           weight_llm?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fit_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       funder_candidates: {
         Row: {
@@ -1809,6 +1823,54 @@ export type Database = {
           },
         ]
       }
+      grant_copilot_messages: {
+        Row: {
+          actions: Json | null
+          content: string
+          created_at: string
+          grant_id: string
+          id: string
+          org_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          actions?: Json | null
+          content: string
+          created_at?: string
+          grant_id: string
+          id?: string
+          org_id: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          actions?: Json | null
+          content?: string
+          created_at?: string
+          grant_id?: string
+          id?: string
+          org_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_copilot_messages_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_copilot_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grant_deadline_observations: {
         Row: {
           evidence_span_id: string | null
@@ -1926,6 +1988,7 @@ export type Database = {
           id: string
           llm_fit_score: number | null
           model: string
+          org_id: string | null
           prompt_version: string
           rationale_en: string
           rationale_fr: string | null
@@ -1943,6 +2006,7 @@ export type Database = {
           id?: string
           llm_fit_score?: number | null
           model: string
+          org_id?: string | null
           prompt_version: string
           rationale_en: string
           rationale_fr?: string | null
@@ -1960,6 +2024,7 @@ export type Database = {
           id?: string
           llm_fit_score?: number | null
           model?: string
+          org_id?: string | null
           prompt_version?: string
           rationale_en?: string
           rationale_fr?: string | null
@@ -1973,6 +2038,13 @@ export type Database = {
             columns: ["grant_id"]
             isOneToOne: false
             referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_evaluations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -3094,6 +3166,7 @@ export type Database = {
           focus_areas: string | null
           funding_max_cad: number | null
           funding_min_cad: number | null
+          id: string
           indirect_cost_rate_pct: number | null
           jurisdictions: string[]
           languages: string[]
@@ -3109,7 +3182,7 @@ export type Database = {
           sectors: string[]
           stage: Database["public"]["Enums"]["org_stage"]
           updated_at: string
-          user_id: string
+          user_id: string | null
           website: string | null
           years_operating: number | null
         }
@@ -3125,6 +3198,7 @@ export type Database = {
           focus_areas?: string | null
           funding_max_cad?: number | null
           funding_min_cad?: number | null
+          id?: string
           indirect_cost_rate_pct?: number | null
           jurisdictions?: string[]
           languages?: string[]
@@ -3140,7 +3214,7 @@ export type Database = {
           sectors?: string[]
           stage?: Database["public"]["Enums"]["org_stage"]
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           website?: string | null
           years_operating?: number | null
         }
@@ -3156,6 +3230,7 @@ export type Database = {
           focus_areas?: string | null
           funding_max_cad?: number | null
           funding_min_cad?: number | null
+          id?: string
           indirect_cost_rate_pct?: number | null
           jurisdictions?: string[]
           languages?: string[]
@@ -3171,7 +3246,7 @@ export type Database = {
           sectors?: string[]
           stage?: Database["public"]["Enums"]["org_stage"]
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           website?: string | null
           years_operating?: number | null
         }
@@ -3329,6 +3404,66 @@ export type Database = {
             columns: ["grant_id"]
             isOneToOne: false
             referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_design_backlog: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          grant_id: string | null
+          id: string
+          impact: string
+          org_id: string
+          source: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          grant_id?: string | null
+          id?: string
+          impact?: string
+          org_id: string
+          source?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          grant_id?: string | null
+          id?: string
+          impact?: string
+          org_id?: string
+          source?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_design_backlog_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_design_backlog_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -3887,6 +4022,7 @@ export type Database = {
           expires_at: string
           grant_id: string
           id: string
+          org_id: string | null
           revoked: boolean
           token: string
           user_id: string
@@ -3896,6 +4032,7 @@ export type Database = {
           expires_at?: string
           grant_id: string
           id?: string
+          org_id?: string | null
           revoked?: boolean
           token: string
           user_id: string
@@ -3905,6 +4042,7 @@ export type Database = {
           expires_at?: string
           grant_id?: string
           id?: string
+          org_id?: string | null
           revoked?: boolean
           token?: string
           user_id?: string
@@ -3915,6 +4053,13 @@ export type Database = {
             columns: ["grant_id"]
             isOneToOne: false
             referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_fit_reports_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -4468,6 +4613,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _uid: string }; Returns: boolean }
+      is_tenant_member: { Args: { _org_id: string }; Returns: boolean }
       match_answers: {
         Args: {
           max_results?: number
@@ -4627,6 +4773,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      tenant_membership_role: { Args: { _org_id: string }; Returns: string }
       user_org_ids: {
         Args: { _roles?: string[]; _uid: string }
         Returns: string[]
