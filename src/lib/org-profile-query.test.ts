@@ -56,4 +56,38 @@ describe("getOrgProfileForUser tenant context", () => {
       "organization is not assigned",
     );
   });
+
+  it("returns strategic readiness fields for IIAL and Nahua profiles", async () => {
+    const db = fakeSupabase({
+      profiles: [{ id: "user-1", org_id: "iial" }],
+      user_organizations: [
+        { user_id: "user-1", org_id: "iial" },
+        { user_id: "user-1", org_id: "nahua" },
+      ],
+      org_profiles: [
+        {
+          id: "profile-iial",
+          org_id: "iial",
+          org_name: "IIAL",
+          audit_readiness_level: "notice_to_reader",
+          consortium_roles: ["technical_partner", "lead_applicant"],
+          strategic_standards: ["WCIS (Whole Chain Integrity Standard)", "CSIP Certification"],
+          in_kind_capacity_cad: 120000,
+          partner_network: ["Lambton College", "SOCODEVI", "Nahua Canada"],
+          past_funders: ["Global Affairs Canada (GAC)", "NRC-IRAP", "SSHRC"],
+        },
+      ],
+    });
+
+    const result = await getOrgProfileForUser(db as never, "user-1", "iial");
+    expect(result.error).toBeNull();
+    expect(result.data).toMatchObject({
+      audit_readiness_level: "notice_to_reader",
+      consortium_roles: ["technical_partner", "lead_applicant"],
+      strategic_standards: ["WCIS (Whole Chain Integrity Standard)", "CSIP Certification"],
+      in_kind_capacity_cad: 120000,
+      partner_network: ["Lambton College", "SOCODEVI", "Nahua Canada"],
+    });
+  });
 });
+

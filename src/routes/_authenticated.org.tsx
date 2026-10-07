@@ -25,12 +25,12 @@ const orgQueryOptions = (orgId: string) =>
   });
 
 export const Route = createFileRoute("/_authenticated/org")({
-  head: () => ({ meta: [{ title: "Organization — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Organization Readiness Profile — IIAL Grants" }] }),
   component: OrgPage,
 });
 
-const STAGES = ["startup", "sme", "nonprofit", "research", "public_sector"] as const;
-const REGISTRATION_STATUSES = [
+export const STAGES = ["startup", "sme", "nonprofit", "research", "public_sector"] as const;
+export const REGISTRATION_STATUSES = [
   "registered_charity",
   "nonprofit",
   "for_profit",
@@ -39,6 +39,14 @@ const REGISTRATION_STATUSES = [
   "indigenous",
   "unregistered",
   "other",
+] as const;
+
+export const AUDIT_READINESS_LEVELS = [
+  "unaudited",
+  "notice_to_reader",
+  "review_engagement",
+  "external_audit_1yr",
+  "external_audit_3yr",
 ] as const;
 
 const orgSchema = z.object({
@@ -65,16 +73,24 @@ const orgSchema = z.object({
   funding_max_cad: z.string().optional().default(""),
   cost_share_max_pct: z.string().optional().default(""),
   indirect_cost_rate_pct: z.string().optional().default(""),
+  audit_readiness_level: z.enum(AUDIT_READINESS_LEVELS).optional().nullable(),
+  consortium_roles: z.string().optional().default(""),
+  strategic_standards: z.string().optional().default(""),
+  in_kind_capacity_cad: z.string().optional().default(""),
+  partner_network: z.string().optional().default(""),
+  past_funders: z.string().optional().default(""),
 });
 
 export type OrgFormValues = z.infer<typeof orgSchema>;
 
 function OrgPage() {
-  const { activeOrgId, activeOrganization, isLoading } = useActiveTenant();
+  const { activeOrgId, activeOrganization, organizations, setActiveOrgId, isLoading } =
+    useActiveTenant();
   const query = useQuery({
     ...orgQueryOptions(activeOrgId ?? "00000000-0000-0000-0000-000000000000"),
     enabled: !!activeOrgId,
   });
+
   if (isLoading || !activeOrgId || !query.data) {
     return (
       <div className="mx-auto max-w-5xl p-8 text-sm text-muted-foreground">
@@ -82,11 +98,14 @@ function OrgPage() {
       </div>
     );
   }
+
   return (
     <OrgProfileEditor
       key={activeOrgId}
       orgId={activeOrgId}
       organizationName={activeOrganization?.name ?? "Organization"}
+      organizations={organizations}
+      onSwitchOrg={setActiveOrgId}
       data={query.data}
     />
   );
@@ -95,16 +114,21 @@ function OrgPage() {
 function OrgProfileEditor({
   orgId,
   organizationName,
+  organizations,
+  onSwitchOrg,
   data,
 }: {
   orgId: string;
   organizationName: string;
+  organizations: Array<{ id: string; name: string; slug: string; user_role: string }>;
+  onSwitchOrg: (id: string) => void;
   data: Awaited<ReturnType<typeof getOrgProfile>>;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const recheckAfterChange = useRecheckFit();
   const save = useServerFn(saveOrgProfile);
+
   const mut = useMutation({
     mutationFn: (input: {
       org_name: string;
@@ -130,12 +154,18 @@ function OrgProfileEditor({
       funding_max_cad: number | null;
       cost_share_max_pct: number | null;
       indirect_cost_rate_pct: number | null;
+      audit_readiness_level?: (typeof AUDIT_READINESS_LEVELS)[number] | null;
+      consortium_roles?: string[];
+      strategic_standards?: string[];
+      in_kind_capacity_cad?: number | null;
+      partner_network?: string[];
+      past_funders?: string[];
     }) => save({ data: { ...input, orgId } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["org", orgId] });
       qc.invalidateQueries({ queryKey: ["org-rules-drift"] });
       recheckAfterChange(orgId);
-      toast.success(t("org.saved"));
+      toast.success(t("org.saved", "Organization readiness profile saved successfully"));
     },
     onError: (error) => {
       toast.error((error as Error).message);
@@ -175,6 +205,13 @@ function OrgProfileEditor({
       funding_max_cad: p?.funding_max_cad?.toString() ?? "",
       cost_share_max_pct: p?.cost_share_max_pct?.toString() ?? "",
       indirect_cost_rate_pct: p?.indirect_cost_rate_pct?.toString() ?? "",
+      audit_readiness_level:
+        (p?.audit_readiness_level as (typeof AUDIT_READINESS_LEVELS)[number] | null) ?? undefined,
+      consortium_roles: (p?.consortium_roles ?? []).join(", "),
+      strategic_standards: (p?.strategic_standards ?? []).join(", "),
+      in_kind_capacity_cad: p?.in_kind_capacity_cad?.toString() ?? "",
+      partner_network: (p?.partner_network ?? []).join(", "),
+      past_funders: (p?.past_funders ?? []).join(", "),
     },
   });
 
@@ -203,12 +240,24 @@ function OrgProfileEditor({
       funding_max_cad: optionalNumber(values.funding_max_cad),
       cost_share_max_pct: optionalNumber(values.cost_share_max_pct),
       indirect_cost_rate_pct: optionalNumber(values.indirect_cost_rate_pct),
+      audit_readiness_level: values.audit_readiness_level ?? null,
+      consortium_roles: parseCSV(values.consortium_roles),
+      strategic_standards: parseCSV(values.strategic_standards),
+      in_kind_capacity_cad: optionalNumber(values.in_kind_capacity_cad),
+      partner_network: parseCSV(values.partner_network),
+      past_funders: parseCSV(values.past_funders),
     });
   };
 
-  return <GrantReadinessProfileForm form={form} mut={mut} onSubmit={onSubmit} />;
+  return (
+    <GrantReadinessProfileForm
+      form={form}
+      mut={mut}
+      onSubmit={onSubmit}
+      orgId={orgId}
+      organizationName={organizationName}
+      organizations={organizations}
+      onSwitchOrg={onSwitchOrg}
+    />
+  );
 }
-
-// -----------------------------------------------------------------------------
-// V2 — friendly redesign (presentation only; same form/mutation as v1)
-// -----------------------------------------------------------------------------

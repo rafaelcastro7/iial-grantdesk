@@ -16,6 +16,12 @@ export type GrantReadinessProfile = {
   funding_min_cad?: number | null;
   funding_max_cad?: number | null;
   cost_share_max_pct?: number | null;
+  audit_readiness_level?: string | null;
+  consortium_roles?: string[] | null;
+  strategic_standards?: string[] | null;
+  in_kind_capacity_cad?: number | null;
+  partner_network?: string[] | null;
+  past_funders?: string[] | null;
 };
 
 export type ProfileReadinessItem = {
@@ -124,6 +130,27 @@ export function computeOrgProfileReadiness(profile: GrantReadinessProfile | null
       complete: hasNumber(p.cost_share_max_pct),
       critical: false,
       why: "Makes matching-fund feasibility explicit before drafting.",
+    },
+    {
+      key: "audit_readiness_level",
+      label: "Financial statement audit level",
+      complete: hasText(p.audit_readiness_level),
+      critical: false,
+      why: "Determines eligibility for calls requiring compilation vs external CPA audits.",
+    },
+    {
+      key: "consortium_roles",
+      label: "Consortium capabilities",
+      complete: hasItems(p.consortium_roles),
+      critical: false,
+      why: "Identifies whether applying as Lead, Technical Partner, or Commercial Off-taker.",
+    },
+    {
+      key: "strategic_standards",
+      label: "Strategic standards & IP",
+      complete: hasItems(p.strategic_standards),
+      critical: false,
+      why: "Unlocks standard development, traceability, and certification funding.",
     },
   ];
 

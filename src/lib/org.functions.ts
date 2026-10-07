@@ -55,6 +55,21 @@ const OrgInput = z
     funding_max_cad: z.number().nonnegative().nullable(),
     cost_share_max_pct: z.number().min(0).max(100).nullable(),
     indirect_cost_rate_pct: z.number().min(0).max(100).nullable(),
+    audit_readiness_level: z
+      .enum([
+        "unaudited",
+        "notice_to_reader",
+        "review_engagement",
+        "external_audit_1yr",
+        "external_audit_3yr",
+      ])
+      .nullable()
+      .optional(),
+    consortium_roles: z.array(z.string().min(1).max(100)).max(30).optional().default([]),
+    strategic_standards: z.array(z.string().min(1).max(120)).max(30).optional().default([]),
+    in_kind_capacity_cad: z.number().nonnegative().nullable().optional(),
+    partner_network: z.array(z.string().min(1).max(120)).max(50).optional().default([]),
+    past_funders: z.array(z.string().min(1).max(120)).max(50).optional().default([]),
   })
   .refine(
     (value) =>
