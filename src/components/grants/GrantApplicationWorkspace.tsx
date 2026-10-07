@@ -15,6 +15,8 @@ import {
   Users,
   XCircle,
   AlertTriangle,
+  Sparkles,
+  Workflow,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -24,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getGrantWorkspace, saveGrantWorkspace } from "@/lib/grant-workspace.functions";
 import { explainTerms } from "@/lib/consultant-desk.shared";
+import { synthesizeGrantRoadmap } from "@/lib/grant-roadmap";
 import { listPartners, savePartner } from "@/lib/partner-directory.functions";
 import {
   TEMPLATE_IDS,
@@ -43,6 +46,7 @@ import {
   PRIORITY_LABEL,
   ROUTES,
   ROUTE_LABEL,
+  adoptConsortiumRoute,
   decisionMemo,
   defaultMilestones,
   newId,
@@ -125,6 +129,28 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       ]),
     [data, ws],
   );
+
+  const currentOrgName = useMemo(() => {
+    return data?.orgs.find((o) => o.id === orgId)?.name ?? "IIAL";
+  }, [data?.orgs, orgId]);
+
+  const roadmap = useMemo(() => {
+    if (!data?.grant) return null;
+    return synthesizeGrantRoadmap({
+      id: data.grant.id,
+      title: data.grant.title,
+      funderName: data.grant.funder?.name,
+      summary: data.grant.summary,
+      amountCadMax: data.grant.amount_cad_max,
+      deadline: data.grant.deadline,
+      deadlineKind: data.grant.deadline_kind,
+      requirements: data.grant.requirements?.map((r) => ({
+        requirement: r.requirement ?? "",
+        isCritical: r.isCritical,
+      })),
+      orgName: currentOrgName,
+    });
+  }, [data?.grant, currentOrgName]);
 
   if (isLoading || !ws) {
     return (
@@ -268,6 +294,109 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
 
       {/* 2. Decision and route */}
       <Section icon={<ClipboardList className="h-4 w-4" />} title="Decision and route">
+        {roadmap && (
+          <div className="mb-4 space-y-2 rounded-lg border bg-muted/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
+                <Workflow className="h-3.5 w-3.5 text-primary" />
+                Strategic suggested routes
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Recommended:{" "}
+                <strong className="text-primary">
+                  {roadmap.routes
+                    .find((r) => r.id === roadmap.recommendedRouteId)
+                    ?.title.split(":")[1]
+                    ?.trim() ?? "Academic"}
+                </strong>
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+              {roadmap.routes.map((r) => {
+                const isAdopted =
+                  (r.id === "direct" && ws.route === "lead") ||
+                  (r.id === "academic" &&
+                    (ws.lead_institution?.toLowerCase().includes("lambton") ||
+                      ws.partners.some((p) => p.name.toLowerCase().includes("lambton")))) ||
+                  (r.id === "territorial" &&
+                    (ws.lead_institution?.toLowerCase().includes("socodevi") ||
+                      ws.lead_institution?.toLowerCase().includes("app cacao") ||
+                      ws.partners.some((p) => p.name.toLowerCase().includes("socodevi")))) ||
+                  (r.id === "commercial" &&
+                    (ws.lead_institution?.toLowerCase().includes("nahua") ||
+                      ws.partners.some((p) => p.name.toLowerCase().includes("nahua"))));
+
+                return (
+                  <div
+                    key={r.id}
+                    className={cn(
+                      "flex flex-col justify-between rounded-lg border p-2.5 text-xs transition-all",
+                      isAdopted
+                        ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30"
+                        : "border-border/70 bg-card hover:border-primary/40",
+                    )}
+                  >
+                    <div>
+                      <div className="mb-1 flex items-center justify-between gap-1">
+                        <span className="font-semibold text-foreground line-clamp-1">
+                          {r.title.split(":")[0]}
+                        </span>
+                        <Badge
+                          variant={
+                            r.viability === "high"
+                              ? "secondary"
+                              : r.viability === "conditional"
+                                ? "outline"
+                                : "destructive"
+                          }
+                          className="px-1.5 py-0 text-[10px] font-normal"
+                        >
+                          {r.viability === "high"
+                            ? "Viable"
+                            : r.viability === "conditional"
+                              ? "Conditional"
+                              : "Blocked"}
+                        </Badge>
+                      </div>
+                      <p className="mb-1 font-medium leading-tight text-foreground line-clamp-1">
+                        {r.title.split(":")[1]?.trim()}
+                      </p>
+                      <p className="mb-1.5 text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
+                        {r.tacticalValue}
+                      </p>
+                      <div className="text-[10px] text-muted-foreground">
+                        <strong>Lead:</strong> {r.leadEntity.split("(")[0]?.trim()}
+                      </div>
+                    </div>
+                    <div className="mt-2.5 border-t border-border/40 pt-2">
+                      {isAdopted ? (
+                        <span className="flex items-center justify-center gap-1 py-0.5 text-[11px] font-semibold text-primary">
+                          <CheckCircle2 className="h-3 w-3" /> Active route
+                        </span>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 w-full px-2 text-[11px]"
+                          onClick={() => {
+                            const next = adoptConsortiumRoute(ws, r, currentOrgName);
+                            setWs(next);
+                            setDirty(true);
+                            toast.success(`Adopted ${r.title}`);
+                          }}
+                        >
+                          Adopt route
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Priority">
             <select

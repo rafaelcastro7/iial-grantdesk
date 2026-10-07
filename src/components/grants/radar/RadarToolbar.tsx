@@ -35,6 +35,7 @@ const STATUS_LABELS: Record<RadarStatusFilter, string> = {
   active: "In progress",
   new: "New leads",
   pursuing: "Pursuing",
+  upcoming: "Upcoming cycles",
   closed: "Finished",
   all: "Everything",
 };

@@ -125,11 +125,34 @@ await ask("Un solo email a Marcelo que hable de todos los grants", async () => {
   await shot("03-digest");
 });
 
+await ask("Adopta la ruta sugerida (Ruta B / R&D o Consorcio) con un solo clic", async () => {
+  const routesSection = page.locator('section:has-text("Decision and route")');
+  await routesSection.getByText("Strategic suggested routes").waitFor({ timeout: 15000 });
+  const adoptBtn = routesSection.getByRole("button", { name: /Adopt route/i }).first();
+  if (await adoptBtn.isVisible()) {
+    await adoptBtn.click();
+    await page.waitForTimeout(500);
+    const text = await routesSection.innerText();
+    must(/Active route/i.test(text), "route not marked active after adoption");
+  }
+});
+
 await ask("¿Qué grants abren pronto? (próximos ciclos: FONTAGRO 2027, BID 2027)", async () => {
   await page.getByRole("button", { name: "Upcoming cycles" }).click();
   await page.waitForTimeout(500);
   const t = await page.locator("main").innerText();
-  must(!/something went wrong/i.test(t), "upcoming filter broke the page");
+  must(!/something went wrong/i.test(t), "pipeline upcoming filter broke the page");
+
+  // Also check radar status filter
+  await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
+  const statusTrigger = page.locator('button[aria-label="Status"]');
+  if (await statusTrigger.isVisible()) {
+    await statusTrigger.click();
+    await page.getByRole("option", { name: "Upcoming cycles" }).click();
+    await page.waitForTimeout(1000);
+    const body = await page.locator("body").innerText();
+    must(!/something went wrong/i.test(body), "radar upcoming filter broke the page");
+  }
 });
 
 await ask("Resumen B1 para Marcelo de esta cooperativa, con servicios y link", async () => {

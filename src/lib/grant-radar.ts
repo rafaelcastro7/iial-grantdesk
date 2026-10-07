@@ -16,7 +16,7 @@ import { humanizeRationale } from "@/lib/eligibility-explain";
 export type RadarVerdict = "eligible" | "needs_input" | "not_eligible";
 export type RadarTiming = "closed" | "too_soon" | "urgent" | "comfortable" | "open_ended";
 export type RadarNextAction = "enrich" | "evaluate" | "draft" | "open";
-export type RadarStatusFilter = "active" | "new" | "pursuing" | "closed" | "all";
+export type RadarStatusFilter = "active" | "new" | "pursuing" | "upcoming" | "closed" | "all";
 export type RadarVerdictFilter = "all" | RadarVerdict;
 
 export type RadarGrant = {
@@ -25,6 +25,9 @@ export type RadarGrant = {
   status: string;
   country?: string | null;
   deadline?: string | null;
+  deadline_kind?: string | null;
+  next_expected_deadline?: string | null;
+  call_status?: string | null;
   amount_cad_min?: number | null;
   amount_cad_max?: number | null;
   sectors?: string[] | null;
@@ -386,7 +389,12 @@ export function toRadarItem<T extends RadarGrant>(
   };
 }
 
-function matchesStatus(status: string, filter: RadarStatusFilter): boolean {
+function matchesStatus(
+  status: string,
+  filter: RadarStatusFilter,
+  grant?: RadarGrant,
+  now?: number,
+): boolean {
   switch (filter) {
     case "all":
       return true;
@@ -396,6 +404,27 @@ function matchesStatus(status: string, filter: RadarStatusFilter): boolean {
       return PURSUING_STATUSES.has(status);
     case "closed":
       return FINISHED_STATUSES.has(status);
+    case "upcoming": {
+      const g = grant as
+        | (RadarGrant & {
+            deadline_kind?: string | null;
+            next_expected_deadline?: string | null;
+            call_status?: string | null;
+          })
+        | undefined;
+      const dk = (g?.deadline_kind ?? "").toLowerCase();
+      const cs = (g?.call_status ?? "").toLowerCase();
+      const dl = g?.deadline ? daysUntil(g.deadline, now ?? Date.now()) : null;
+      return (
+        status === "upcoming" ||
+        dk === "upcoming" ||
+        dk === "closed_next_cycle" ||
+        cs === "upcoming" ||
+        cs === "closed_next_cycle" ||
+        Boolean(g?.next_expected_deadline) ||
+        (dl != null && dl > 60)
+      );
+    }
     case "active":
     default:
       return !FINISHED_STATUSES.has(status);
@@ -423,7 +452,7 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
   const items: RadarItem<T>[] = [];
 
   for (const g of grants) {
-    if (!matchesStatus(g.status, opts.status)) {
+    if (!matchesStatus(g.status, opts.status, g, now)) {
       hiddenByFilters++;
       continue;
     }

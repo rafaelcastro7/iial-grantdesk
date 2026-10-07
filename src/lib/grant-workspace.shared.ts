@@ -2,6 +2,7 @@
 // decision, who applies and in what role, consortium, documents checklist,
 // milestones counted back from the deadline, WCIS project idea — plus the
 // outputs built from it (decision memo, pipeline export). Pure and client-safe.
+import type { ConsortiumRoute } from "@/lib/grant-roadmap";
 
 export const PRIORITIES = ["now", "prepare", "monitor", "discard"] as const;
 export type Priority = (typeof PRIORITIES)[number];
@@ -462,4 +463,100 @@ export function pipelineCsv(rows: PipelineRow[]): string {
 
 export function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Adopts a synthesized strategic consortium route directly into an application workspace,
+ * populating the role, lead institution, fund administrator, WCIS angle, and consortium partners.
+ */
+export function adoptConsortiumRoute(
+  ws: Workspace,
+  route: ConsortiumRoute,
+  orgName = "IIAL",
+): Workspace {
+  let mappedRoute: Route = "partner";
+  let leadInst = ws.lead_institution;
+  let admin = ws.administrator;
+  const partnersToAdd: Partner[] = [];
+
+  switch (route.id) {
+    case "direct":
+      mappedRoute = "lead";
+      leadInst = orgName;
+      admin = orgName;
+      break;
+
+    case "academic":
+      mappedRoute = "partner";
+      leadInst = "Lambton College";
+      admin = "Lambton College / Research Office";
+      partnersToAdd.push({
+        id: newId("partner"),
+        name: "Lambton College",
+        country: "Canada",
+        type: "College",
+        role: "Academic lead applicant and grant administrator",
+        status: "to_contact",
+      });
+      break;
+
+    case "territorial":
+      mappedRoute = "partner";
+      leadInst = "SOCODEVI / APP CACAO";
+      admin = "SOCODEVI";
+      partnersToAdd.push(
+        {
+          id: newId("partner"),
+          name: "SOCODEVI",
+          country: "Canada",
+          type: "NGO / Cooperatives",
+          role: "Fiduciary governance and territorial lead",
+          status: "to_contact",
+        },
+        {
+          id: newId("partner"),
+          name: "APP CACAO",
+          country: "Peru",
+          type: "Cooperative / producers",
+          role: "Beneficiary producer association",
+          status: "to_contact",
+        },
+      );
+      break;
+
+    case "commercial":
+      mappedRoute = orgName === "Nahua Canada" ? "lead" : "partner";
+      leadInst = "Nahua Canada";
+      admin = "Nahua Canada";
+      if (orgName !== "Nahua Canada") {
+        partnersToAdd.push({
+          id: newId("partner"),
+          name: "Nahua Canada",
+          country: "Canada",
+          type: "Company",
+          role: "Commercial applicant and private match lead",
+          status: "to_contact",
+        });
+      }
+      break;
+  }
+
+  // Deduplicate partners by name
+  const existingNames = new Set(ws.partners.map((p) => p.name.trim().toLowerCase()));
+  const mergedPartners = [...ws.partners];
+  for (const p of partnersToAdd) {
+    if (!existingNames.has(p.name.trim().toLowerCase())) {
+      mergedPartners.push(p);
+      existingNames.add(p.name.trim().toLowerCase());
+    }
+  }
+
+  return {
+    ...ws,
+    route: mappedRoute,
+    lead_institution: leadInst,
+    administrator: admin,
+    wcis_angle: ws.wcis_angle?.trim() ? ws.wcis_angle : route.tacticalValue,
+    partners: mergedPartners,
+  };
 }

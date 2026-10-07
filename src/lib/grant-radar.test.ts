@@ -91,6 +91,21 @@ describe("grant radar", () => {
     expect(buildRadar(grants, { ...opts, verdict: "eligible" }).items).toHaveLength(1);
     expect(buildRadar(grants, { ...opts, country: "US" }).items[0].grant.id).toBe("b");
   });
+
+  it("filters by status 'upcoming' for upcoming calls or closed next cycle", () => {
+    const grants = [
+      { id: "open-active", ...base, country: "CA", deadline: inDays(30) },
+      { id: "future-call", ...base, country: "CA", deadline_kind: "upcoming" },
+      { id: "next-cycle", ...base, country: "CA", deadline_kind: "closed_next_cycle" },
+      { id: "far-future", ...base, country: "CA", deadline: inDays(120) },
+    ];
+    const r = buildRadar(grants, { ...opts, status: "upcoming" });
+    const ids = r.items.map((i) => i.grant.id);
+    expect(ids).toContain("future-call");
+    expect(ids).toContain("next-cycle");
+    expect(ids).toContain("far-future");
+    expect(ids).not.toContain("open-active");
+  });
 });
 
 describe("grant radar eligibility pre-check", () => {

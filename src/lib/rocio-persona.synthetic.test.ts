@@ -7,7 +7,14 @@ import {
   partnerBrief,
   whatsappIntro,
 } from "@/lib/consultant-desk.shared";
-import { emptyWorkspace, decisionMemo, type WorkspaceGrant } from "@/lib/grant-workspace.shared";
+import {
+  adoptConsortiumRoute,
+  emptyWorkspace,
+  decisionMemo,
+  type WorkspaceGrant,
+} from "@/lib/grant-workspace.shared";
+import { synthesizeGrantRoadmap } from "@/lib/grant-roadmap";
+import { buildRadar } from "@/lib/grant-radar";
 import { composeOutreach } from "@/lib/outreach-templates.shared";
 
 const sshrc: WorkspaceGrant = {
@@ -225,5 +232,88 @@ describe("Rocío's requests", () => {
       orgName: "IIAL",
     });
     expect(m.body).toMatch(/lead institution pays IIAL for services/);
+  });
+
+  it("'Ruta B: LAMBTON COLLEGE aplica y IIAL aporta el WCIS' → adopt Route B from synthesized roadmap into plan", () => {
+    const ws = plan(sshrc);
+    const roadmap = synthesizeGrantRoadmap({
+      id: sshrc.id,
+      title: sshrc.title,
+      funderName: sshrc.funder?.name,
+      summary: sshrc.summary,
+      amountCadMax: sshrc.amount_cad_max,
+      deadline: sshrc.deadline,
+      orgName: "IIAL",
+    });
+    const academicRoute = roadmap.routes.find((r) => r.id === "academic")!;
+    expect(academicRoute).toBeDefined();
+    expect(academicRoute.viability).toBe("high");
+
+    const adopted = adoptConsortiumRoute(ws, academicRoute, "IIAL");
+    expect(adopted.route).toBe("partner");
+    expect(adopted.lead_institution).toBe("Lambton College");
+    expect(adopted.administrator).toBe("Lambton College / Research Office");
+    expect(adopted.partners.some((p) => p.name === "Lambton College")).toBe(true);
+
+    const memo = decisionMemo(sshrc, adopted, {
+      applicantNames: ["IIAL"],
+      eligibility: [],
+      orgName: "IIAL",
+    });
+    expect(memo.body).toContain("Lead institution: Lambton College");
+    expect(memo.body).toContain("Our role: Partner (another organization administers)");
+    expect(memo.body).toContain(
+      "Lambton College (Canada): Academic lead applicant and grant administrator",
+    );
+  });
+
+  it("'SOCODEVI / APP CACAO como partner en proyectos de impacto territorial' → adopt Route C into plan", () => {
+    const ws = plan(sshrc);
+    const roadmap = synthesizeGrantRoadmap({
+      id: sshrc.id,
+      title: sshrc.title,
+      funderName: sshrc.funder?.name,
+      orgName: "IIAL",
+    });
+    const territorial = roadmap.routes.find((r) => r.id === "territorial")!;
+    const adopted = adoptConsortiumRoute(ws, territorial, "IIAL");
+    expect(adopted.route).toBe("partner");
+    expect(adopted.lead_institution).toBe("SOCODEVI / APP CACAO");
+    expect(adopted.administrator).toBe("SOCODEVI");
+    expect(adopted.partners.some((p) => p.name === "SOCODEVI")).toBe(true);
+    expect(adopted.partners.some((p) => p.name === "APP CACAO")).toBe(true);
+  });
+
+  it("'¿Qué convocatorias abren en los próximos ciclos (FONTAGRO 2027, BID, Food-Link)?' → radar 'upcoming' filter", () => {
+    const mockGrants = [
+      { id: "active-now", status: "enriched", country: "CA", deadline: "2026-10-25" },
+      {
+        id: "food-link",
+        status: "enriched",
+        country: "CA",
+        deadline_kind: "upcoming",
+        title: "AAFC Food-Link Fund",
+      },
+      {
+        id: "fontagro-2027",
+        status: "enriched",
+        country: "INTL",
+        deadline_kind: "closed_next_cycle",
+        title: "FONTAGRO Agri-Food Systems",
+      },
+    ];
+    const r = buildRadar(mockGrants, {
+      now: Date.UTC(2026, 9, 7),
+      leadTimeWeeks: 4,
+      minAmount: 0,
+      country: "all",
+      sector: "all",
+      status: "upcoming",
+      verdict: "all",
+    });
+    const ids = r.items.map((i) => i.grant.id);
+    expect(ids).toContain("food-link");
+    expect(ids).toContain("fontagro-2027");
+    expect(ids).not.toContain("active-now");
   });
 });
