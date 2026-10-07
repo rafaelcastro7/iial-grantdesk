@@ -16,6 +16,7 @@ dist-ssr
 .nitro
 *.local
 test-results/
+e2e-artifacts/
 
 # Wrangler / Cloudflare
 .wrangler/

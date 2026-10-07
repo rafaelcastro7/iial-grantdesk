@@ -77,6 +77,18 @@ await ask("¿A qué se refiere 'financial statements' y 'Organization Attestatio
   must(/financial|CRA|registration|letter of support/i.test(t), "glossary is empty");
 });
 
+await ask("Adopta la ruta sugerida (Ruta B / R&D o Consorcio) con un solo clic", async () => {
+  const routesSection = page.locator('section:has-text("Decision and route")');
+  await routesSection.getByText("Strategic suggested routes").waitFor({ timeout: 15000 });
+  const adoptBtn = routesSection.getByRole("button", { name: /Adopt route/i }).first();
+  if (await adoptBtn.isVisible()) {
+    await adoptBtn.click();
+    await page.waitForTimeout(500);
+    const text = await routesSection.innerText();
+    must(/Active route/i.test(text), "route not marked active after adoption");
+  }
+});
+
 await ask("Mensaje a Marcelo: de qué trata, WCIS, requisitos, plazos, monto, qué falta, qué gana IIAL", async () => {
   const memo = await pre("Decision memo");
   for (const s of ["Hi Marcelo", "Money and dates", "What we are missing", "gets", "Recommendation"])
@@ -123,18 +135,6 @@ await ask("Un solo email a Marcelo que hable de todos los grants", async () => {
   await page.locator('section:has-text("One email to Marcelo") select').selectOption("es");
   must((await pre("One email to Marcelo")).startsWith("Hola Marcelo"), "Spanish digest not built");
   await shot("03-digest");
-});
-
-await ask("Adopta la ruta sugerida (Ruta B / R&D o Consorcio) con un solo clic", async () => {
-  const routesSection = page.locator('section:has-text("Decision and route")');
-  await routesSection.getByText("Strategic suggested routes").waitFor({ timeout: 15000 });
-  const adoptBtn = routesSection.getByRole("button", { name: /Adopt route/i }).first();
-  if (await adoptBtn.isVisible()) {
-    await adoptBtn.click();
-    await page.waitForTimeout(500);
-    const text = await routesSection.innerText();
-    must(/Active route/i.test(text), "route not marked active after adoption");
-  }
 });
 
 await ask("¿Qué grants abren pronto? (próximos ciclos: FONTAGRO 2027, BID 2027)", async () => {
