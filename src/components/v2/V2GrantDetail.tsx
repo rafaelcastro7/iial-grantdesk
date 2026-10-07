@@ -57,7 +57,6 @@ import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBack
 import { GrantConsortiumMatrix } from "@/components/grants/GrantConsortiumMatrix";
 import { GrantFinancialHurdles } from "@/components/grants/GrantFinancialHurdles";
 import { GrantStrategicRevenue } from "@/components/grants/GrantStrategicRevenue";
-import { GrantOutreachKit } from "@/components/grants/GrantOutreachKit";
 import { synthesizeGrantRoadmap, type RouteId } from "@/lib/grant-roadmap";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { GrantApplicationWorkspace } from "@/components/grants/GrantApplicationWorkspace";
@@ -760,12 +759,7 @@ export function V2GrantDetail({
               {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
               <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
 
-              {/* 5. OPERATIONAL ACTION PLAN & STRATEGIC OUTREACH KIT */}
-              <GrantOutreachKit
-                outreach={roadmap.outreach}
-                selectedRouteId={selectedRouteId}
-                onOpenCopilot={handleOpenCopilotWithPrompt}
-              />
+              {/* Emails live in the Application plan (one composer, real partners). */}
             </>
           )}
 
