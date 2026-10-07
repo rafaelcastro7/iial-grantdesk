@@ -4,7 +4,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, ListChecks } from "lucide-react";
+import { Copy, Download, ListChecks, Mail } from "lucide-react";
+import { toast } from "sonner";
 import { useMemo, useState } from "react";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ import {
   type Priority,
 } from "@/lib/grant-workspace.shared";
 import { evaluationVerdict, realFit } from "@/lib/grant-radar";
+import { grantsDigest, type Lang } from "@/lib/consultant-desk.shared";
 import { useActiveTenant } from "@/lib/tenant-context";
 
 export const Route = createFileRoute("/_authenticated/pipeline")({
@@ -39,7 +41,9 @@ const PRIORITY_TONE: Record<Priority, string> = {
 function PipelinePage() {
   const { activeOrgId, activeOrgName } = useActiveTenant();
   const fetchRows = useServerFn(listGrantWorkspaces);
-  const [priority, setPriority] = useState<Priority | "all">("all");
+  const [priority, setPriority] = useState<Priority | "all" | "upcoming">("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [digestLang, setDigestLang] = useState<Lang>("en");
   const { data, isLoading, error } = useQuery({
     queryKey: ["grant-pipeline", activeOrgId],
     queryFn: () => fetchRows({ data: { orgId: activeOrgId as string } }),
@@ -51,7 +55,15 @@ function PipelinePage() {
     const nameById = new Map(data.orgs.map((o) => [o.id, o.name]));
     const today = new Date().toISOString().slice(0, 10);
     return data.rows
-      .filter((r) => r.grant && (priority === "all" || r.workspace.priority === priority))
+      .filter(
+        (r) =>
+          r.grant &&
+          (priority === "all" ||
+            (priority === "upcoming"
+              ? r.workspace.call_status === "upcoming" ||
+                r.workspace.call_status === "closed_next_cycle"
+              : r.workspace.priority === priority)),
+      )
       .map(({ workspace: ws, grant, evaluation }) => {
         const g = grant!;
         const ev = evaluation as Parameters<typeof evaluationVerdict>[0] | null;
@@ -91,6 +103,31 @@ function PipelinePage() {
       });
   }, [data, priority]);
 
+  const digest = useMemo(() => {
+    if (!data || selected.size === 0) return null;
+    const nameById = new Map(data.orgs.map((o) => [o.id, o.name]));
+    return grantsDigest(
+      data.rows
+        .filter((r) => r.grant && selected.has(r.grant.id))
+        .map((r) => ({
+          grant: r.grant!,
+          workspace: r.workspace,
+          applicantNames: r.workspace.applicant_org_ids
+            .map((id) => nameById.get(id) ?? "")
+            .filter(Boolean),
+        })),
+      { lang: digestLang, orgName: activeOrgName || "IIAL" },
+    );
+  }, [data, selected, digestLang, activeOrgName]);
+
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+
   const download = () => {
     const blob = new Blob([pipelineCsv(rows)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -110,14 +147,14 @@ function PipelinePage() {
       />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
-          {(["all", ...PRIORITIES] as const).map((p) => (
+          {(["all", ...PRIORITIES, "upcoming"] as const).map((p) => (
             <Button
               key={p}
               size="sm"
               variant={priority === p ? "default" : "outline"}
               onClick={() => setPriority(p)}
             >
-              {p === "all" ? "All" : PRIORITY_LABEL[p]}
+              {p === "all" ? "All" : p === "upcoming" ? "Upcoming cycles" : PRIORITY_LABEL[p]}
             </Button>
           ))}
         </div>
@@ -158,6 +195,18 @@ function PipelinePage() {
           <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
+                <th className="px-3 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all"
+                    checked={rows.length > 0 && rows.every((r) => selected.has(r.grantId))}
+                    onChange={(e) =>
+                      setSelected(
+                        e.target.checked ? new Set(rows.map((r) => r.grantId)) : new Set(),
+                      )
+                    }
+                  />
+                </th>
                 {[
                   "Opportunity",
                   "Status",
@@ -183,6 +232,14 @@ function PipelinePage() {
                   "monitor") as Priority;
                 return (
                   <tr key={r.grantId} className="align-top hover:bg-accent/40">
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${r.title}`}
+                        checked={selected.has(r.grantId)}
+                        onChange={() => toggle(r.grantId)}
+                      />
+                    </td>
                     <td className="px-3 py-2">
                       <Link
                         to="/grants/$id"
@@ -216,6 +273,54 @@ function PipelinePage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {rows.length > 0 && (
+        <section className="mt-6 rounded-lg border bg-card p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <Mail className="h-4 w-4" /> One email to Marcelo about the selected grants
+            </h2>
+            <select
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+              value={digestLang}
+              onChange={(e) => setDigestLang(e.target.value as Lang)}
+            >
+              <option value="en">English (simple)</option>
+              <option value="es">Spanish</option>
+            </select>
+          </div>
+          {!digest ? (
+            <p className="text-sm text-muted-foreground">
+              Tick the grants in the table to build one summary email: process, what we need,
+              partners, deadlines and what we gain, for each one.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold">Subject: {digest.subject}</div>
+              <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
+                {digest.body}
+              </pre>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      `Subject: ${digest.subject}\n\n${digest.body}`,
+                    );
+                    toast.success("Email copied");
+                  } catch {
+                    toast.error("Could not copy; select the text instead.");
+                  }
+                }}
+              >
+                <Copy className="h-4 w-4" /> Copy email
+              </Button>
+            </div>
+          )}
+        </section>
       )}
     </PageContainer>
   );

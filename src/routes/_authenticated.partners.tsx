@@ -3,7 +3,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Pencil, Plus, Trash2, Users } from "lucide-react";
+import { FileText, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
@@ -17,6 +17,7 @@ import {
   savePartner,
   type DirectoryPartner,
 } from "@/lib/partner-directory.functions";
+import { partnerBrief } from "@/lib/consultant-desk.shared";
 import { useActiveTenant } from "@/lib/tenant-context";
 
 export const Route = createFileRoute("/_authenticated/partners")({
@@ -229,6 +230,27 @@ function PartnersPage() {
                   </p>
                 </div>
                 <div className="flex gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Copy brief for Marcelo"
+                    title="Copy a short brief for Marcelo"
+                    onClick={async () => {
+                      const b = partnerBrief(
+                        p,
+                        used.map((u) => u.title),
+                        { lang: "en" },
+                      );
+                      try {
+                        await navigator.clipboard.writeText(`Subject: ${b.subject}\n\n${b.body}`);
+                        toast.success("Brief copied");
+                      } catch {
+                        toast.error("Could not copy");
+                      }
+                    }}
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
                   <Button
                     size="icon"
                     variant="ghost"

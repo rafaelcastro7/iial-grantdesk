@@ -1,0 +1,337 @@
+// What the consultant asks for every day while working grants, built from the
+// application plans and the partner directory: one email to the decision maker
+// covering several grants, plain explanations of funder jargon, a short
+// partner brief, a WhatsApp introduction and what the organization gains.
+// Deterministic (no AI, no cost). Pure and client-safe.
+import {
+  amountText,
+  deadlineText,
+  PRIORITY_LABEL,
+  ROUTE_LABEL,
+  valueForUs,
+  type Route,
+  type Workspace,
+  type WorkspaceGrant,
+} from "@/lib/grant-workspace.shared";
+
+export type Lang = "en" | "es";
+export { valueForUs };
+
+// ---------------------------------------------------------------------------
+// Glossary: "what does this mean?" for the terms funders use.
+export type GlossaryEntry = { term: string; match: RegExp; en: string; es: string };
+
+export const GLOSSARY: GlossaryEntry[] = [
+  {
+    term: "Audited financial statements",
+    match:
+      /audited (financial )?statements|audit(ed)? report|estados financieros auditados|EEFF auditados/i,
+    en: "Your yearly accounts checked and signed by an external accountant (CPA). Many funders ask for the last 2 years. If you do not have them, another organization (e.g. a college) can apply and manage the money.",
+    es: "Los estados financieros anuales revisados y firmados por un contador externo (CPA). Muchos financiadores piden los últimos 2 años. Si no los tienen, otra institución (p. ej. un college) puede aplicar y administrar los fondos.",
+  },
+  {
+    term: "Financial statements (last 2 years)",
+    match: /financial statements|estados financieros/i,
+    en: "Your balance sheet and income statement for the last two completed fiscal years. They do not always need to be audited; check if 'signed' is enough.",
+    es: "El balance y el estado de resultados de los dos últimos años fiscales cerrados. No siempre deben ser auditados; revisen si basta con que estén firmados.",
+  },
+  {
+    term: "Organization attestation",
+    match: /attestation/i,
+    en: "A short form where your financial officer (or director) signs that the information about the organization is true.",
+    es: "Un formulario breve en el que el responsable financiero (o director) firma que la información de la organización es verdadera.",
+  },
+  {
+    term: "CRA business number",
+    match: /\bCRA\b|business number|numéro d'entreprise|n[uú]mero de empresa/i,
+    en: "The 9-digit number the Canada Revenue Agency gives every Canadian organization. Non-profits have one too; it is not the same as being a registered charity.",
+    es: "El número de 9 dígitos que la Canada Revenue Agency asigna a toda organización canadiense. Las sin fines de lucro también lo tienen; no es lo mismo que ser charity registrada.",
+  },
+  {
+    term: "Registered charity",
+    match: /registered charit|qualified donee/i,
+    en: "A non-profit approved by CRA to issue tax receipts. Some foundations only fund charities ('qualified donees'). A non-profit is not automatically a charity.",
+    es: "Una sin fines de lucro aprobada por la CRA para emitir recibos fiscales. Algunas fundaciones solo financian charities. Ser sin fines de lucro no te convierte en charity.",
+  },
+  {
+    term: "SSHRC",
+    match: /\bSSHRC\b|CRSH/i,
+    en: "Social Sciences and Humanities Research Council of Canada: the federal agency that funds research in social sciences. To receive its money, the institution must be 'eligible' (usually universities and colleges).",
+    es: "Social Sciences and Humanities Research Council de Canadá: la agencia federal que financia investigación en ciencias sociales. Para recibir fondos, la institución debe ser 'elegible' (normalmente universidades y colleges).",
+  },
+  {
+    term: "Eligible institution",
+    match:
+      /eligible (postsecondary )?institution|institutional eligibility|administer(ing)? (the )?(grant )?funds/i,
+    en: "An organization the funder has approved to receive and manage its money. If you are not one, a partner that is (e.g. a college) applies and you join as partner.",
+    es: "Una organización aprobada por el financiador para recibir y administrar su dinero. Si no lo son, un socio que sí lo es (p. ej. un college) aplica y ustedes participan como socios.",
+  },
+  {
+    term: "Match / cost-share",
+    match: /\bmatch(ing)?\b|cost[- ]shar|co-?financ|contrapartida|cofinanc/i,
+    en: "The part of the project budget you (and partners) must pay. It is usually a % of the total.",
+    es: "La parte del presupuesto que ustedes (y los socios) deben aportar. Normalmente es un % del total.",
+  },
+  {
+    term: "In-kind contribution",
+    match: /in[- ]kind|en especie/i,
+    en: "Contributions that are not cash: staff time, use of rooms or equipment, software, expertise. Many funders accept it as part of the match.",
+    es: "Aportes que no son dinero: horas de personal, espacios, equipos, software, conocimiento. Muchos financiadores lo aceptan como contrapartida.",
+  },
+  {
+    term: "Letter of intent / notice of intent",
+    match: /letter of intent|notice of intent|\bLOI\b|\bNOI\b|carta de intenci[oó]n/i,
+    en: "A short first step that tells the funder you plan to apply. Sometimes required before the full application.",
+    es: "Un primer paso corto que avisa al financiador que piensan aplicar. A veces es obligatorio antes de la aplicación completa.",
+  },
+  {
+    term: "Concept note",
+    match: /concept note|nota conceptual/i,
+    en: "A 2–5 page summary of the project idea. If the funder likes it, they invite a full proposal.",
+    es: "Un resumen de 2 a 5 páginas de la idea del proyecto. Si al financiador le interesa, invita a presentar la propuesta completa.",
+  },
+  {
+    term: "Letter of support",
+    match: /letters? of support|cartas? de apoyo/i,
+    en: "A signed letter from a partner, on its letterhead, saying it supports the project and describing its role.",
+    es: "Una carta firmada por un socio, en papel membretado, que dice que apoya el proyecto y describe su rol.",
+  },
+  {
+    term: "Unsolicited proposal",
+    match: /unsolicited|no solicitad/i,
+    en: "A proposal sent without an open call. The funder reviews it on a rolling basis; there is no fixed deadline.",
+    es: "Una propuesta enviada sin convocatoria abierta. El financiador la revisa de forma continua; no hay fecha límite fija.",
+  },
+  {
+    term: "Contribution (vs grant)",
+    match: /\bcontribution\b/i,
+    en: "Government money with conditions and reporting; you are paid against eligible expenses. Some contributions must be repaid ('repayable').",
+    es: "Dinero del gobierno con condiciones e informes; se paga contra gastos elegibles. Algunas contribuciones deben devolverse ('repayable').",
+  },
+  {
+    term: "Portal registration",
+    match: /portal|register|registration|registro/i,
+    en: "Creating your organization's account on the funder's website. It can take 10 or more business days, so do it early, even before deciding to apply.",
+    es: "Crear la cuenta de la organización en el sitio del financiador. Puede tardar 10 o más días hábiles, así que conviene hacerlo antes, incluso antes de decidir si se aplica.",
+  },
+];
+
+/** Glossary entries that appear in the given texts (requirements, summary, checklist). */
+export function explainTerms(texts: Array<string | null | undefined>): GlossaryEntry[] {
+  const all = texts.filter(Boolean).join("\n");
+  const hits = GLOSSARY.filter((g) => g.match.test(all));
+  // "Audited financial statements" already covers the generic entry.
+  return hits.some((h) => h.term === "Audited financial statements")
+    ? hits.filter((h) => h.term !== "Financial statements (last 2 years)")
+    : hits;
+}
+
+// ---------------------------------------------------------------------------
+// One email to the decision maker about several grants at once.
+export type DigestEntry = {
+  grant: WorkspaceGrant;
+  workspace: Workspace;
+  applicantNames: string[];
+};
+
+const ROUTE_ES: Record<Route, string> = {
+  lead: "Aplicante principal",
+  co_lead: "Co-aplicante",
+  partner: "Socio (otra institución administra)",
+  beneficiary: "Beneficiario",
+};
+const PRIORITY_ES = {
+  now: "Aplicar ya",
+  prepare: "Preparar",
+  monitor: "Monitorear",
+  discard: "Descartar",
+};
+
+export function grantsDigest(
+  entries: DigestEntry[],
+  opts: { lang?: Lang; recipient?: string; sender?: string; orgName?: string } = {},
+): { subject: string; body: string } {
+  const lang = opts.lang ?? "en";
+  const recipient = opts.recipient ?? "Marcelo";
+  const sender = opts.sender ?? "Rocío";
+  const orgName = opts.orgName ?? "IIAL";
+  const n = entries.length;
+  const sorted = [...entries].sort((a, b) =>
+    (a.grant.deadline ?? "9999").localeCompare(b.grant.deadline ?? "9999"),
+  );
+  const es = lang === "es";
+  const L = es
+    ? {
+        hi: `Hola ${recipient},`,
+        intro: `Te comparto un resumen de ${n} oportunidad${n === 1 ? "" : "es"} para decidir dónde aplicamos. Están ordenadas por fecha límite.`,
+        what: "Qué es",
+        how: "Cómo aplicamos",
+        need: "Qué necesitamos",
+        partners: "Socios / beneficiarios",
+        money: "Monto",
+        deadline: "Fecha límite",
+        rec: "Recomendación",
+        link: "Link",
+        gain: "Qué gana",
+        none: "Nada pendiente",
+        tbd: "por definir",
+        close: "¿Lo conversamos esta semana? Dime cuáles priorizamos.",
+        subject: `Resumen de ${n} grant${n === 1 ? "" : "s"} para decidir`,
+      }
+    : {
+        hi: `Hi ${recipient},`,
+        intro: `Here is a short summary of ${n} opportunit${n === 1 ? "y" : "ies"} so we can decide where to apply. They are sorted by deadline.`,
+        what: "What it is",
+        how: "How we apply",
+        need: "What we need",
+        partners: "Partners / beneficiaries",
+        money: "Amount",
+        deadline: "Deadline",
+        rec: "Recommendation",
+        link: "Link",
+        gain: `What ${orgName} gets`,
+        none: "Nothing missing",
+        tbd: "to decide",
+        close: "Can we talk this week? Tell me which ones we prioritize.",
+        subject: `Summary of ${n} grant${n === 1 ? "" : "s"} to decide`,
+      };
+  const blocks = sorted.map((e, i) => {
+    const { grant: g, workspace: ws } = e;
+    const missing = ws.checklist.filter(
+      (c) => c.status === "missing" || c.status === "in_progress",
+    );
+    const partners = ws.partners.filter((p) => p.name.trim());
+    const route = ws.route ? (es ? ROUTE_ES[ws.route] : ROUTE_LABEL[ws.route]) : L.tbd;
+    const who = e.applicantNames.length ? e.applicantNames.join(" + ") : L.tbd;
+    const lead = ws.lead_institution ? ` — ${es ? "lidera" : "lead"}: ${ws.lead_institution}` : "";
+    const summary = g.summary?.trim().replace(/\s+/g, " ");
+    return [
+      `${i + 1}. ${g.title}${g.funder?.name ? ` (${g.funder.name})` : ""}`,
+      summary ? `   ${L.what}: ${summary.slice(0, 220)}${summary.length > 220 ? "…" : ""}` : "",
+      `   ${L.how}: ${who} — ${route}${lead}`,
+      `   ${L.money}: ${amountText(g)} · ${L.deadline}: ${deadlineText(g, ws)}`,
+      `   ${L.need}: ${
+        missing.length
+          ? missing
+              .slice(0, 5)
+              .map((c) => c.item)
+              .join("; ") + (missing.length > 5 ? ` (+${missing.length - 5})` : "")
+          : L.none
+      }`,
+      ws.blockers.length ? `   ${es ? "Riesgos" : "Risks"}: ${ws.blockers.join("; ")}` : "",
+      partners.length
+        ? `   ${L.partners}: ${partners.map((p) => `${p.name}${p.role ? ` (${p.role})` : ""}`).join("; ")}`
+        : "",
+      `   ${L.gain}: ${valueForUs(ws.route, orgName, lang)[0]}`,
+      `   ${L.rec}: ${es ? PRIORITY_ES[ws.priority] : PRIORITY_LABEL[ws.priority]}`,
+      g.url ? `   ${L.link}: ${g.url}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  });
+  const body = [L.hi, "", L.intro, "", blocks.join("\n\n"), "", L.close, "", sender].join("\n");
+  return { subject: L.subject, body };
+}
+
+// ---------------------------------------------------------------------------
+// A partner organization explained to the decision maker in a few lines.
+export type DirectoryPartner = {
+  name: string;
+  country?: string | null;
+  type?: string | null;
+  contact_name?: string | null;
+  contact_title?: string | null;
+  email?: string | null;
+  website?: string | null;
+  notes?: string | null;
+};
+
+export function partnerBrief(
+  p: DirectoryPartner,
+  grants: string[],
+  opts: { lang?: Lang; recipient?: string; sender?: string } = {},
+): { subject: string; body: string } {
+  const es = opts.lang === "es";
+  const recipient = opts.recipient ?? "Marcelo";
+  const sender = opts.sender ?? "Rocío";
+  const where = [p.type, p.country].filter(Boolean).join(es ? " de " : " in ");
+  const lines = es
+    ? [
+        `Hola ${recipient},`,
+        "",
+        `Te comparto un resumen corto de ${p.name}${where ? ` (${where})` : ""}.`,
+        p.notes?.trim() ? `- Qué hacen: ${p.notes.trim()}` : "",
+        p.website ? `- Web: ${p.website}` : "",
+        p.contact_name
+          ? `- Contacto: ${p.contact_name}${p.contact_title ? `, ${p.contact_title}` : ""}${p.email ? ` (${p.email})` : ""}`
+          : "",
+        grants.length
+          ? `- Grants donde los consideramos: ${grants.join("; ")}`
+          : "- Aún no los asociamos a un grant.",
+        "",
+        "Dime si avanzamos con el contacto.",
+        "",
+        sender,
+      ]
+    : [
+        `Hi ${recipient},`,
+        "",
+        `Here is a short summary of ${p.name}${where ? ` (${where})` : ""}.`,
+        p.notes?.trim() ? `- What they do: ${p.notes.trim()}` : "",
+        p.website ? `- Website: ${p.website}` : "",
+        p.contact_name
+          ? `- Contact: ${p.contact_name}${p.contact_title ? `, ${p.contact_title}` : ""}${p.email ? ` (${p.email})` : ""}`
+          : "",
+        grants.length
+          ? `- Grants where we see them: ${grants.join("; ")}`
+          : "- Not linked to a grant yet.",
+        "",
+        "Let me know if we move forward with the contact.",
+        "",
+        sender,
+      ];
+  return {
+    subject: es ? `Posible socio: ${p.name}` : `Possible partner: ${p.name}`,
+    body: lines
+      .filter((l) => l !== "" || true)
+      .filter((l, i, a) => !(l === "" && a[i - 1] === ""))
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Short WhatsApp introduction: who we are, with links. No grant details.
+export function whatsappIntro(opts: {
+  lang?: Lang;
+  recipientName?: string;
+  senderName: string;
+  orgName: string;
+  links?: string[];
+  reason?: string;
+}): string {
+  const es = opts.lang !== "en";
+  const name = opts.recipientName?.trim();
+  const links = (opts.links ?? []).filter(Boolean);
+  const lines = es
+    ? [
+        `Hola${name ? ` ${name}` : ""}, ¿cómo está? Le saluda ${opts.senderName}, de ${opts.orgName}.`,
+        `${opts.orgName} es una organización canadiense sin fines de lucro que trabaja en innovación aplicada, formación profesional y certificaciones (CSIP, CSCIP, CARP) y en el fortalecimiento de cadenas de valor con el Whole-Chain International Standard (WCIS).`,
+        opts.reason?.trim()
+          ? opts.reason.trim()
+          : "Nos encantaría explorar cómo podemos colaborar.",
+        links.length ? `Le comparto más información: ${links.join(" · ")}` : "",
+        "¿Le parece si coordinamos una breve llamada?",
+      ]
+    : [
+        `Hello${name ? ` ${name}` : ""}, this is ${opts.senderName} from ${opts.orgName}.`,
+        `${opts.orgName} is a Canadian non-profit working on applied innovation, professional training and certifications (CSIP, CSCIP, CARP), and stronger value chains with the Whole-Chain International Standard (WCIS).`,
+        opts.reason?.trim()
+          ? opts.reason.trim()
+          : "We would love to explore how we can work together.",
+        links.length ? `More information: ${links.join(" · ")}` : "",
+        "Could we schedule a short call?",
+      ];
+  return lines.filter(Boolean).join("\n\n");
+}

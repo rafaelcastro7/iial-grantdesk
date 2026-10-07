@@ -270,6 +270,7 @@ export function decisionMemo(
     eligibility: ApplicantEligibility[];
     recipient?: string;
     sender?: string;
+    orgName?: string;
   },
 ): { subject: string; body: string } {
   const recipient = opts.recipient ?? "Marcelo";
@@ -343,6 +344,9 @@ export function decisionMemo(
       : "- Nothing, we are ready",
     ...(ws.blockers.length ? ["", "Risks / blockers", ...ws.blockers.map((b) => `- ${b}`)] : []),
     "",
+    `What ${opts.orgName ?? "we"} get${opts.orgName ? "s" : ""}`,
+    ...valueForUs(ws.route, opts.orgName ?? "IIAL").map((v) => `- ${v}`),
+    "",
     "Recommendation",
     recommendation[ws.priority],
     ws.decision_notes?.trim() ? ws.decision_notes.trim() : "",
@@ -356,6 +360,62 @@ export function decisionMemo(
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return { subject: `Grant decision: ${grant.title}`, body };
+}
+
+// ---------------------------------------------------------------------------
+// What the organization gains (the revenue question), by route.
+export function valueForUs(
+  route: Route | null,
+  orgName: string,
+  lang: "en" | "es" = "en",
+): string[] {
+  const en: Record<Route | "none", string[]> = {
+    lead: [
+      `${orgName} manages the budget: staff time and an administration share (overhead) are paid by the grant.`,
+      "Paid delivery of training, certifications (CSIP, CSCIP, CARP) and applied research inside the project.",
+      "WCIS is applied and validated in a funded project: a case study to sell it later.",
+    ],
+    co_lead: [
+      `${orgName} receives its own part of the budget for the activities it leads.`,
+      "Paid delivery of training, certifications and WCIS work inside the project.",
+      "Shared visibility with the lead institution and access to its network.",
+    ],
+    partner: [
+      `The lead institution pays ${orgName} for services (WCIS methodology, training, certifications) as a sub-contract or partner budget line.`,
+      "No need to manage the funds or have audited statements.",
+      "A funded reference project and a new institutional relationship for future calls.",
+    ],
+    beneficiary: [
+      "Funded activities are delivered for us (training, technical assistance, market access).",
+      "Usually no direct cash to us; the value is capacity, visibility and new partners.",
+    ],
+    none: ["Decide our role first: the benefit depends on it (lead, co-applicant or partner)."],
+  };
+  const es: Record<Route | "none", string[]> = {
+    lead: [
+      `${orgName} administra el presupuesto: el tiempo del equipo y un porcentaje de administración (overhead) se pagan con el grant.`,
+      "Entrega pagada de formación, certificaciones (CSIP, CSCIP, CARP) e investigación aplicada dentro del proyecto.",
+      "El WCIS se aplica y valida en un proyecto financiado: un caso de éxito para venderlo después.",
+    ],
+    co_lead: [
+      `${orgName} recibe su propia parte del presupuesto por las actividades que lidera.`,
+      "Entrega pagada de formación, certificaciones y trabajo con WCIS dentro del proyecto.",
+      "Visibilidad compartida con la institución líder y acceso a su red.",
+    ],
+    partner: [
+      `La institución líder paga a ${orgName} por servicios (metodología WCIS, formación, certificaciones) como subcontrato o línea de presupuesto del socio.`,
+      "No es necesario administrar fondos ni tener estados financieros auditados.",
+      "Un proyecto financiado de referencia y una nueva relación institucional para futuras convocatorias.",
+    ],
+    beneficiary: [
+      "Recibimos actividades financiadas (formación, asistencia técnica, acceso a mercados).",
+      "Normalmente no hay dinero directo; el valor es capacidad, visibilidad y nuevos socios.",
+    ],
+    none: [
+      "Primero hay que decidir nuestro rol: el beneficio depende de él (líder, co-aplicante o socio).",
+    ],
+  };
+  return (lang === "en" ? en : es)[route ?? "none"];
 }
 
 export type PipelineRow = {

@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getGrantWorkspace, saveGrantWorkspace } from "@/lib/grant-workspace.functions";
+import { explainTerms } from "@/lib/consultant-desk.shared";
 import { listPartners, savePartner } from "@/lib/partner-directory.functions";
 import {
   TEMPLATE_IDS,
@@ -83,6 +84,8 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [lang, setLang] = useState<Lang>("es");
   const [partnerIdx, setPartnerIdx] = useState(0);
   const [senderName, setSenderName] = useState("Rocío Cruz");
+  const [meetingWhen, setMeetingWhen] = useState("");
+  const [links, setLinks] = useState("https://iial.ca");
   const [ws, setWs] = useState<Workspace | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -106,11 +109,22 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
     const names = data.orgs.filter((o) => ws.applicant_org_ids.includes(o.id)).map((o) => o.name);
     return decisionMemo(data.grant, ws, {
       applicantNames: names,
+      orgName: names[0] ?? undefined,
       eligibility: data.eligibility.filter(
         (e) => ws.applicant_org_ids.length === 0 || ws.applicant_org_ids.includes(e.orgId),
       ),
     });
   }, [data, ws]);
+
+  const glossary = useMemo(
+    () =>
+      explainTerms([
+        ...(ws?.checklist ?? []).map((c) => c.item),
+        ...(data?.grant.requirements ?? []).map((r) => r.requirement),
+        data?.grant.summary,
+      ]),
+    [data, ws],
+  );
 
   if (isLoading || !ws) {
     return (
@@ -682,6 +696,24 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         </div>
       </Section>
 
+      {/* 5b. Plain explanations of the funder's terms */}
+      {glossary.length > 0 && (
+        <Section
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          title="What these requirements mean"
+          hint="Plain explanations, no AI"
+        >
+          <dl className="space-y-2 text-sm">
+            {glossary.map((g) => (
+              <div key={g.term}>
+                <dt className="font-medium">{g.term}</dt>
+                <dd className="text-muted-foreground">{lang === "es" ? g.es : g.en}</dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      )}
+
       {/* 6. Timeline */}
       <Section
         icon={<ClipboardList className="h-4 w-4" />}
@@ -760,7 +792,10 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             senderName,
             partner,
             recipientName: known?.contact_name ?? undefined,
+            meetingWhen,
+            links: links.split(/[\s,]+/).filter(Boolean),
           });
+          const isWhatsApp = template === "whatsapp_intro";
           const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
           const mailto = `mailto:${toPartner && known?.email ? encodeURIComponent(known.email) : ""}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
           return (
@@ -805,7 +840,23 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   onChange={(e) => setSenderName(e.target.value)}
                 />
               </div>
-              <div className="text-xs font-semibold">Subject: {email.subject}</div>
+              {template === "meeting_invite" && (
+                <Input
+                  value={meetingWhen}
+                  placeholder="Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams"
+                  onChange={(e) => setMeetingWhen(e.target.value)}
+                />
+              )}
+              {isWhatsApp && (
+                <Input
+                  value={links}
+                  placeholder="Links to share (presentation, website)"
+                  onChange={(e) => setLinks(e.target.value)}
+                />
+              )}
+              {email.subject && (
+                <div className="text-xs font-semibold">Subject: {email.subject}</div>
+              )}
               <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
                 {email.body}
               </pre>
@@ -818,7 +869,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(
-                        `Subject: ${email.subject}\n\n${email.body}`,
+                        email.subject ? `Subject: ${email.subject}\n\n${email.body}` : email.body,
                       );
                       toast.success("Email copied");
                     } catch {
@@ -828,11 +879,23 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 >
                   <Copy className="h-4 w-4" /> Copy
                 </Button>
-                <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <a href={mailto}>
-                    <Mail className="h-4 w-4" /> Open in email app
-                  </a>
-                </Button>
+                {isWhatsApp ? (
+                  <Button asChild variant="outline" size="sm" className="gap-1.5">
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(email.body)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Mail className="h-4 w-4" /> Open in WhatsApp
+                    </a>
+                  </Button>
+                ) : (
+                  <Button asChild variant="outline" size="sm" className="gap-1.5">
+                    <a href={mailto}>
+                      <Mail className="h-4 w-4" /> Open in email app
+                    </a>
+                  </Button>
+                )}
               </div>
             </div>
           );

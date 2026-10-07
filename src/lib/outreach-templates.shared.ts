@@ -3,6 +3,7 @@
 // Spanish. Partner- and funder-facing templates never include internal
 // blockers or weaknesses: they only use public facts and the plan's role,
 // project idea and dates.
+import { whatsappIntro } from "@/lib/consultant-desk.shared";
 import {
   amountText,
   deadlineText,
@@ -13,17 +14,29 @@ import {
 
 export const TEMPLATE_IDS = [
   "partner_intro",
+  "meeting_invite",
   "meeting_follow_up",
   "deadline_reminder",
   "portal_registration",
   "package_request",
   "program_officer",
+  "whatsapp_intro",
 ] as const;
 export type TemplateId = (typeof TEMPLATE_IDS)[number];
 export type Lang = "en" | "es";
 
 export const TEMPLATE_LABEL: Record<TemplateId, { en: string; es: string; audience: string }> = {
   partner_intro: { en: "Partner invitation", es: "Invitación a socio", audience: "Partner" },
+  meeting_invite: {
+    en: "Meeting invitation (proposed time)",
+    es: "Invitación a reunión (hora propuesta)",
+    audience: "Partner",
+  },
+  whatsapp_intro: {
+    en: "WhatsApp: who we are",
+    es: "WhatsApp: quiénes somos",
+    audience: "Partner",
+  },
   meeting_follow_up: {
     en: "Follow-up after a meeting",
     es: "Seguimiento tras reunión",
@@ -61,6 +74,10 @@ export type ComposeInput = {
   senderTitle?: string;
   partner?: Partner | null;
   recipientName?: string;
+  /** Proposed meeting, e.g. "Monday, June 1 at 11:00 (Peru time) on Teams". */
+  meetingWhen?: string;
+  /** Links shared in the WhatsApp introduction (presentation, website). */
+  links?: string[];
 };
 
 const ROLE_TEXT: Record<Lang, Record<string, string>> = {
@@ -124,6 +141,54 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
   let lines: string[] = [];
 
   switch (input.template) {
+    case "whatsapp_intro":
+      return {
+        subject: "",
+        body: whatsappIntro({
+          lang,
+          recipientName: input.recipientName,
+          senderName,
+          orgName,
+          links: input.links,
+          reason: idea
+            ? lang === "en"
+              ? `We are preparing a project ("${idea}") for ${program} and think your organization could be a great partner.`
+              : `Estamos preparando un proyecto ("${idea}") para ${program} y creemos que su organización podría ser un gran socio.`
+            : undefined,
+        }),
+      };
+    case "meeting_invite": {
+      const when =
+        input.meetingWhen?.trim() ||
+        (lang === "en" ? "[day and time, time zone]" : "[día y hora, zona horaria]");
+      subject =
+        lang === "en" ? `Meeting proposal: ${grant.title}` : `Propuesta de reunión: ${grant.title}`;
+      lines =
+        lang === "en"
+          ? [
+              hi,
+              "",
+              `I am writing on behalf of ${orgName} about ${program}${idea ? ` and the project "${idea}"` : ""}.`,
+              `I have just sent you an invitation for a meeting on ${when}. It is only a proposal: please feel free to suggest another time if it suits you better; we are happy to adjust.`,
+              `For reference, the deadline is ${deadline} and the funding available is ${amountText(grant)}.`,
+              "",
+              "Thank you, and I look forward to talking with you.",
+              "",
+              signoff,
+            ]
+          : [
+              hi,
+              "",
+              `Le escribo en nombre de ${orgName} en relación con ${program}${idea ? ` y el proyecto "${idea}"` : ""}.`,
+              `Le acabo de enviar una invitación para una reunión el ${when}. Es solo una propuesta: siéntase en libertad de sugerir otro horario si le acomoda mejor; con gusto nos ajustamos.`,
+              `Como referencia, la fecha límite es ${deadline} y el monto disponible es ${amountText(grant)}.`,
+              "",
+              "Muchas gracias; quedo atenta a su respuesta.",
+              "",
+              signoff,
+            ];
+      break;
+    }
     case "partner_intro":
       subject =
         lang === "en"
