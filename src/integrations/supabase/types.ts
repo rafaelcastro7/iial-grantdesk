@@ -3408,6 +3408,24 @@ export type Database = {
           },
         ]
       }
+      platform_staff: {
+        Row: {
+          created_at: string
+          email: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          role?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          role?: string
+        }
+        Relationships: []
+      }
       product_design_backlog: {
         Row: {
           category: string
