@@ -108,17 +108,21 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
     setDirty(true);
   };
 
+  const currentOrgName = useMemo(() => {
+    return data?.orgs.find((o) => o.id === orgId)?.name ?? "IIAL";
+  }, [data?.orgs, orgId]);
+
   const memo = useMemo(() => {
     if (!data || !ws) return null;
     const names = data.orgs.filter((o) => ws.applicant_org_ids.includes(o.id)).map((o) => o.name);
     return decisionMemo(data.grant, ws, {
       applicantNames: names,
-      orgName: names[0] ?? undefined,
+      orgName: names[0] ?? currentOrgName,
       eligibility: data.eligibility.filter(
         (e) => ws.applicant_org_ids.length === 0 || ws.applicant_org_ids.includes(e.orgId),
       ),
     });
-  }, [data, ws]);
+  }, [data, ws, currentOrgName]);
 
   const glossary = useMemo(
     () =>
@@ -129,10 +133,6 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       ]),
     [data, ws],
   );
-
-  const currentOrgName = useMemo(() => {
-    return data?.orgs.find((o) => o.id === orgId)?.name ?? "IIAL";
-  }, [data?.orgs, orgId]);
 
   const roadmap = useMemo(() => {
     if (!data?.grant) return null;

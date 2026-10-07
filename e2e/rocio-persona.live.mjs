@@ -91,8 +91,9 @@ await ask("Adopta la ruta sugerida (Ruta B / R&D o Consorcio) con un solo clic",
 
 await ask("Mensaje a Marcelo: de qué trata, WCIS, requisitos, plazos, monto, qué falta, qué gana IIAL", async () => {
   const memo = await pre("Decision memo");
-  for (const s of ["Hi Marcelo", "Money and dates", "What we are missing", "gets", "Recommendation"])
+  for (const s of ["Hi Marcelo", "Money and dates", "What we are missing", "Recommendation"])
     must(memo.includes(s), `memo missing "${s}"`);
+  must(/What .* get(s)?/i.test(memo), 'memo missing "What [Org] gets"');
 });
 
 await ask("Le mandé invitación por Teams el lunes 1 de junio 11am hora Perú; que sugiera otra hora", async () => {
