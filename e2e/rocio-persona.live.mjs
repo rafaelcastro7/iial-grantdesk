@@ -167,16 +167,17 @@ await ask("Resumen B1 para Marcelo de esta cooperativa, con servicios y link", a
   await shot("04-partners");
 });
 
-await ask("@Busca en la web: AI Web Scout button opens live search dialog with quick queries", async () => {
+await ask("@Busca en la web: AI Web Scout switches inline in Radar with quick query pills and live search bar", async () => {
   await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
-  const scoutBtn = page.getByRole("button", { name: "AI Web Scout" });
-  must(await scoutBtn.isVisible(), "AI Web Scout button not visible on radar");
-  await scoutBtn.click();
+  const scoutTab = page.getByRole("button", { name: /AI Web Scout/i });
+  must(await scoutTab.isVisible(), "AI Web Scout tab not visible on radar toolbar");
+  await scoutTab.click();
   await page.waitForTimeout(600);
-  const dialogTitle = page.getByText("AI Web Grant Scout");
-  must(await dialogTitle.isVisible(), "AI Web Grant Scout dialog did not open");
-  await shot("05-web-scout");
-  await page.keyboard.press("Escape");
+  const promptInput = page.getByPlaceholder(/Ask anything to search the live web/i);
+  must(await promptInput.isVisible(), "Live web search input not visible in Radar");
+  const quickPill = page.getByRole("button", { name: /Canada Agri-Food 2026/i }).first();
+  must(await quickPill.isVisible(), "Quick query pills not visible in Radar");
+  await shot("05-web-scout-inline");
 });
 
 fs.writeFileSync(path.join(OUT, "rocio-report.json"), JSON.stringify({ base: BASE, results, problems }, null, 2));
