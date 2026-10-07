@@ -14,35 +14,53 @@ export const listUserOrganizations = createServerFn({ method: "GET" })
     const supabase = await createSupabaseAdmin();
 
     // Check user roles and email for staff/consultant privileges
-    const [{ data: userRoles }, { data: authUser }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", context.userId),
-      supabase.auth.admin.getUserById(context.userId).catch(() => ({ data: { user: null } })),
-    ]);
+    let isStaff = false;
+    try {
+      const { data: userRoles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", context.userId);
+      if ((userRoles ?? []).some((r) => r.role === "admin" || r.role === "consultant")) {
+        isStaff = true;
+      }
+    } catch {
+      // Ignore error
+    }
 
-    const isStaff =
-      (userRoles ?? []).some((r) => r.role === "admin" || r.role === "consultant") ||
-      (authUser?.user?.email?.toLowerCase().includes("rocio") ?? false) ||
-      (authUser?.user?.email?.toLowerCase().endsWith("@iial.ca") ?? false);
+    if (!isStaff) {
+      try {
+        const { data: authUser } = await supabase.auth.admin.getUserById(context.userId);
+        const email = authUser?.user?.email?.toLowerCase() ?? "";
+        if (email.includes("rocio") || email.endsWith("@iial.ca")) {
+          isStaff = true;
+        }
+      } catch {
+        // Ignore error
+      }
+    }
 
     // If staff/consultant or Rocio, ensure both IIAL and Nahua Canada exist in user_organizations
     if (isStaff) {
-      const { data: allCoreOrgs } = await supabase
-        .from("organizations")
-        .select("id")
-        .in("slug", ["iial", "nahua-canada"]);
+      try {
+        const { data: allCoreOrgs } = await supabase
+          .from("organizations")
+          .select("id")
+          .in("slug", ["iial", "nahua-canada"]);
 
-      if (allCoreOrgs && allCoreOrgs.length > 0) {
-        await supabase
-          .from("user_organizations")
-          .upsert(
-            allCoreOrgs.map((o) => ({
-              user_id: context.userId,
-              org_id: o.id,
-              role: "admin",
-            })),
-            { onConflict: "user_id,org_id", ignoreDuplicates: true },
-          )
-          .catch(() => {});
+        if (allCoreOrgs && allCoreOrgs.length > 0) {
+          await supabase
+            .from("user_organizations")
+            .upsert(
+              allCoreOrgs.map((o) => ({
+                user_id: context.userId,
+                org_id: o.id,
+                role: "admin",
+              })),
+              { onConflict: "user_id,org_id", ignoreDuplicates: true },
+            );
+        }
+      } catch {
+        // Ignore upsert errors
       }
     }
 
@@ -104,21 +122,42 @@ export const getClientOrganization = createServerFn({ method: "GET" })
 
     if (!membership) {
       // Check if user is staff (admin, consultant, or Rocio)
-      const [{ data: userRoles }, { data: authUser }] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", context.userId),
-        supabase.auth.admin.getUserById(context.userId).catch(() => ({ data: { user: null } })),
-      ]);
+      let isStaff = false;
+      try {
+        const { data: userRoles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", context.userId);
+        if ((userRoles ?? []).some((r) => r.role === "admin" || r.role === "consultant")) {
+          isStaff = true;
+        }
+      } catch {
+        // Ignore error
+      }
 
-      const isStaff =
-        (userRoles ?? []).some((r) => r.role === "admin" || r.role === "consultant") ||
-        (authUser?.user?.email?.toLowerCase().includes("rocio") ?? false) ||
-        (authUser?.user?.email?.toLowerCase().endsWith("@iial.ca") ?? false);
+      if (!isStaff) {
+        try {
+          const { data: authUser } = await supabase.auth.admin.getUserById(context.userId);
+          const email = authUser?.user?.email?.toLowerCase() ?? "";
+          if (email.includes("rocio") || email.endsWith("@iial.ca")) {
+            isStaff = true;
+          }
+        } catch {
+          // Ignore error
+        }
+      }
 
       if (isStaff) {
-        await supabase
-          .from("user_organizations")
-          .upsert({ user_id: context.userId, org_id: data.orgId, role: "admin" })
-          .catch(() => {});
+        try {
+          await supabase
+            .from("user_organizations")
+            .upsert(
+              { user_id: context.userId, org_id: data.orgId, role: "admin" },
+              { onConflict: "user_id,org_id", ignoreDuplicates: true },
+            );
+        } catch {
+          // Ignore upsert error
+        }
         membership = { role: "admin" };
       } else {
         throw new Error("Access denied: not a member of this organization");
