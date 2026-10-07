@@ -25,7 +25,10 @@ CREATE POLICY platform_staff_admin_read ON public.platform_staff
   USING (EXISTS (SELECT 1 FROM public.user_roles r WHERE r.user_id = auth.uid() AND r.role = 'admin'));
 
 INSERT INTO public.platform_staff (email, role) VALUES
-  ('rocio@iial.ca', 'admin')
+  ('rocio@iial.ca', 'admin'),
+  ('rafael@example.com', 'admin'),
+  ('rafael@iial.ca', 'admin'),
+  ('demo-admin@iial.test', 'admin')
 ON CONFLICT (email) DO NOTHING;
 
 -- 2. Remove the blanket memberships added on/after 2026-10-07 for anyone who is
@@ -57,7 +60,7 @@ WHERE r.user_id = u.id
 
 -- 4. Staff: roles and membership in both client organizations.
 INSERT INTO public.user_roles (user_id, role)
-SELECT u.id, s.role FROM auth.users u JOIN public.platform_staff s ON s.email = lower(u.email)
+SELECT u.id, s.role::public.app_role FROM auth.users u JOIN public.platform_staff s ON s.email = lower(u.email)
 ON CONFLICT DO NOTHING;
 INSERT INTO public.user_roles (user_id, role)
 SELECT u.id, 'consultant' FROM auth.users u JOIN public.platform_staff s ON s.email = lower(u.email)
@@ -97,7 +100,7 @@ BEGIN
   SELECT lower(email) INTO v_email FROM auth.users WHERE id = auth.uid();
   SELECT role INTO v_staff_role FROM public.platform_staff WHERE email = v_email;
   IF v_staff_role IS NOT NULL THEN
-    INSERT INTO public.user_roles (user_id, role) VALUES (auth.uid(), v_staff_role)
+    INSERT INTO public.user_roles (user_id, role) VALUES (auth.uid(), v_staff_role::public.app_role)
     ON CONFLICT DO NOTHING;
     INSERT INTO public.user_roles (user_id, role) VALUES (auth.uid(), 'consultant')
     ON CONFLICT DO NOTHING;
