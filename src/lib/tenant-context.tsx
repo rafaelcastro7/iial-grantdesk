@@ -79,7 +79,7 @@ export function ActiveTenantProvider({ children }: { children: React.ReactNode }
       organizations,
       activeOrganization,
       activeOrgId: activeOrganization?.id ?? null,
-      activeOrgName: activeOrganization?.name ?? "Organización activa",
+      activeOrgName: activeOrganization?.name ?? "Active organization",
       isLoading,
       setActiveOrgId,
     }),

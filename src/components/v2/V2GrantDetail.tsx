@@ -697,7 +697,7 @@ export function V2GrantDetail({
         <main className="space-y-5 lg:col-span-8">
           {activeTab === "roadmap" && (
             <>
-              {/* 1. MATRIZ DE RUTAS DE POSTULACIÓN Y CONSORCIO */}
+              {/* 1. APPLICATION ROUTES & CONSORTIUM MATRIX */}
               <GrantConsortiumMatrix
                 routes={roadmap.routes}
                 recommendedRouteId={roadmap.recommendedRouteId}
@@ -705,16 +705,16 @@ export function V2GrantDetail({
                 onSelectRoute={(id) => setSelectedRouteId(id)}
               />
 
-              {/* 2. CONDICIONES FINANCIERAS Y BARRERAS CRÍTICAS */}
+              {/* 2. FINANCIAL CONDITIONS & CRITICAL HURDLES */}
               <GrantFinancialHurdles financial={roadmap.financial} />
 
-              {/* 3. RETORNO ESTRATÉGICO Y MODELO DE REVENUE */}
+              {/* 3. STRATEGIC RETURN & DOWNSTREAM REVENUE MODEL */}
               <GrantStrategicRevenue strategicReturn={roadmap.strategicReturn} />
 
-              {/* 4. EXECUTIVE BRIEF GO/NO-GO DE LA OPORTUNIDAD */}
+              {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
               <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
 
-              {/* 5. PLAN DE ACCIÓN OPERATIVO Y KIT DE ACERCAMIENTO */}
+              {/* 5. OPERATIONAL ACTION PLAN & STRATEGIC OUTREACH KIT */}
               <GrantOutreachKit
                 outreach={roadmap.outreach}
                 selectedRouteId={selectedRouteId}

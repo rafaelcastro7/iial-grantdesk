@@ -84,21 +84,21 @@ export function EligibilityCheckBar({
               disabled={isEvaluatingAll}
               onClick={onEvaluateAll}
               className="gap-1.5 font-medium"
-              title="Evalúa la compatibilidad de cada convocatoria usando el Evaluador con el perfil de la organización"
+              title="Evaluate fit for all listed grants using the Evaluator against the organization profile"
             >
               {isEvaluatingAll ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>
                     {evalProgress
-                      ? `Evaluando ${evalProgress.current}/${evalProgress.total}...`
-                      : "Evaluando..."}
+                      ? `Evaluating ${evalProgress.current}/${evalProgress.total}...`
+                      : "Evaluating..."}
                   </span>
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 text-amber-300" />
-                  <span>Auto-evaluar listadas</span>
+                  <span>Auto-evaluate listed</span>
                 </>
               )}
             </Button>

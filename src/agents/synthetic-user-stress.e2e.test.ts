@@ -35,6 +35,7 @@ import {
   type FitRules,
   type GrantForRules,
 } from "./fit-rules.server";
+import { DISMISS_REASONS } from "@/lib/grants.functions";
 
 // In-memory test database fixture mirroring production Postgres schema
 const db: InMemoryDb = createInMemoryDb({
@@ -858,5 +859,78 @@ describe("Synthetic User Stress: Zod Schema Boundaries (Manual Facts & Backlog)"
         value: "00000000-0000-0000-0000-000000000000",
       }),
     ).toThrow();
+  });
+});
+
+describe("Synthetic User Stress: Roadmap Resilience to Corrupt or Empty Grant Records", () => {
+  it("survives completely empty or null inputs without throwing and generates viable fallbacks", () => {
+    const corruptInputs = [
+      { id: "corrupt-1", title: "" },
+      { id: "corrupt-2", title: "Untitled Call", funderName: null, summary: null, amountCadMax: null, requirements: null },
+      { id: "corrupt-3", title: "   ", applicantTypes: null, sectors: null, deadline: null, deadlineKind: null },
+    ];
+
+    for (const input of corruptInputs) {
+      expect(() => {
+        const roadmap = synthesizeGrantRoadmap(input);
+        expect(roadmap.routes).toHaveLength(4);
+        expect(roadmap.financial).toBeDefined();
+        expect(roadmap.strategicReturn).toBeDefined();
+        expect(roadmap.outreach).toBeDefined();
+        expect(["direct", "academic", "territorial", "commercial"]).toContain(roadmap.recommendedRouteId);
+        expect(roadmap.financial.matchingFunds.label).toBeTruthy();
+        expect(roadmap.financial.auditLevel.label).toBeTruthy();
+      }).not.toThrow();
+    }
+  });
+});
+
+describe("Synthetic User Stress: Grant Dismissals Allowlist & Integrity", () => {
+  it("validates dismiss reasons allowlist and rejects unapproved dismissal keys", async () => {
+    const { z } = await import("zod");
+
+    const dismissSchema = z.object({
+      grantId: z.string().uuid(),
+      reason: z.enum(DISMISS_REASONS),
+      note: z.string().max(500).optional(),
+    });
+
+    const validId = "a0000001-0000-0000-0000-000000000001";
+
+    for (const reason of DISMISS_REASONS) {
+      expect(() =>
+        dismissSchema.parse({ grantId: validId, reason, note: "Verified not viable" }),
+      ).not.toThrow();
+    }
+
+    // Adversarial / invalid dismissal reasons
+    expect(() =>
+      dismissSchema.parse({ grantId: validId, reason: "boring_call" as any }),
+    ).toThrow();
+
+    expect(() =>
+      dismissSchema.parse({ grantId: validId, reason: "'; DROP TABLE grant_dismissals; --" as any }),
+    ).toThrow();
+  });
+});
+
+describe("Synthetic User Stress: Currency & Geographic Edge Cases", () => {
+  it("safely handles multi-currency and international grants without crashing", async () => {
+    const { grantCurrency, formatMoney } = await import("@/lib/grant-radar");
+
+    expect(grantCurrency({ currency: "USD", country: "US" })).toBe("USD");
+    expect(grantCurrency({ currency: "CAD", country: "CA" })).toBe("CAD");
+    expect(grantCurrency({ currency: null, country: "US" })).toBe("USD");
+    expect(grantCurrency({ currency: null, country: "CA" })).toBe("CAD");
+    expect(grantCurrency({ currency: null, country: "INTL" })).toBe("CAD"); // default Canadian baseline
+    expect(grantCurrency({ currency: null, country: null })).toBe("CAD");
+
+    // Money formatting boundaries
+    expect(formatMoney(null, "CAD")).toBe("Amount not published");
+    expect(formatMoney(0, "CAD")).toBe("$0");
+    expect(formatMoney(500000, "CAD")).toBe("$500K");
+    expect(formatMoney(1500000, "CAD")).toBe("$1.5M");
+    expect(formatMoney(20000000, "CAD")).toBe("$20M");
+    expect(formatMoney(750000, "USD")).toBe("US$750K");
   });
 });
