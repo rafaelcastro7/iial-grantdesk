@@ -3260,8 +3260,10 @@ export type Database = {
           activities: string[]
           annual_budget_cad: number | null
           applicant_types: string[]
+          audit_readiness_level: string | null
           business_number: string | null
           capabilities: string[]
+          consortium_roles: string[] | null
           cost_share_max_pct: number | null
           created_at: string
           employee_count: number | null
@@ -3269,6 +3271,7 @@ export type Database = {
           funding_max_cad: number | null
           funding_min_cad: number | null
           id: string
+          in_kind_capacity_cad: number | null
           indirect_cost_rate_pct: number | null
           jurisdictions: string[]
           languages: string[]
@@ -3277,12 +3280,15 @@ export type Database = {
           operating_regions: string[]
           org_id: string | null
           org_name: string
+          partner_network: string[] | null
+          past_funders: string[] | null
           populations_served: string[]
           profile_evidence: Json
           profile_updated_by: string | null
           registration_status: string | null
           sectors: string[]
           stage: Database["public"]["Enums"]["org_stage"]
+          strategic_standards: string[] | null
           updated_at: string
           user_id: string | null
           website: string | null
@@ -3292,8 +3298,10 @@ export type Database = {
           activities?: string[]
           annual_budget_cad?: number | null
           applicant_types?: string[]
+          audit_readiness_level?: string | null
           business_number?: string | null
           capabilities?: string[]
+          consortium_roles?: string[] | null
           cost_share_max_pct?: number | null
           created_at?: string
           employee_count?: number | null
@@ -3301,6 +3309,7 @@ export type Database = {
           funding_max_cad?: number | null
           funding_min_cad?: number | null
           id?: string
+          in_kind_capacity_cad?: number | null
           indirect_cost_rate_pct?: number | null
           jurisdictions?: string[]
           languages?: string[]
@@ -3309,12 +3318,15 @@ export type Database = {
           operating_regions?: string[]
           org_id?: string | null
           org_name: string
+          partner_network?: string[] | null
+          past_funders?: string[] | null
           populations_served?: string[]
           profile_evidence?: Json
           profile_updated_by?: string | null
           registration_status?: string | null
           sectors?: string[]
           stage?: Database["public"]["Enums"]["org_stage"]
+          strategic_standards?: string[] | null
           updated_at?: string
           user_id?: string | null
           website?: string | null
@@ -3324,8 +3336,10 @@ export type Database = {
           activities?: string[]
           annual_budget_cad?: number | null
           applicant_types?: string[]
+          audit_readiness_level?: string | null
           business_number?: string | null
           capabilities?: string[]
+          consortium_roles?: string[] | null
           cost_share_max_pct?: number | null
           created_at?: string
           employee_count?: number | null
@@ -3333,6 +3347,7 @@ export type Database = {
           funding_max_cad?: number | null
           funding_min_cad?: number | null
           id?: string
+          in_kind_capacity_cad?: number | null
           indirect_cost_rate_pct?: number | null
           jurisdictions?: string[]
           languages?: string[]
@@ -3341,12 +3356,15 @@ export type Database = {
           operating_regions?: string[]
           org_id?: string | null
           org_name?: string
+          partner_network?: string[] | null
+          past_funders?: string[] | null
           populations_served?: string[]
           profile_evidence?: Json
           profile_updated_by?: string | null
           registration_status?: string | null
           sectors?: string[]
           stage?: Database["public"]["Enums"]["org_stage"]
+          strategic_standards?: string[] | null
           updated_at?: string
           user_id?: string | null
           website?: string | null
