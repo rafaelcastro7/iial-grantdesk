@@ -94,7 +94,7 @@ export const DEFAULT_RULES: FitRules = {
   require_match_verification: true,
   rolling_intake_passes_runway: true,
   hard_fail_on_applicant_type: true,
-  hard_fail_on_runway: true,
+  hard_fail_on_runway: false, // timing is not eligibility: a closed call is "next cycle", not "not a fit"
   hard_fail_on_capability: false,
 };
 

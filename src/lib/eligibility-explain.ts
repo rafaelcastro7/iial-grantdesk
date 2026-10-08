@@ -56,8 +56,8 @@ const BY_ID: Array<{ match: RegExp; text: string; es: string }> = [
   },
   {
     match: /^sop_filter_5_runway$|runway/i,
-    text: "There is not enough time left before the deadline to prepare a strong application.",
-    es: "No queda tiempo suficiente antes del cierre para preparar una postulación sólida.",
+    text: "Not enough time left this cycle to prepare a strong application: plan for the next call.",
+    es: "No queda tiempo suficiente en este ciclo para preparar una postulación sólida: planifiquen para la próxima convocatoria.",
   },
   {
     match: /^deadline$|days until deadline/i,

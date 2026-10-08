@@ -167,9 +167,23 @@ export function evaluationVerdict(ev: {
   rule_snapshot?: unknown;
 }): RadarVerdict {
   if (ev.eligibility_pass) return "eligible";
-  // The AI review read the whole call, including what the rules could not
-  // decide: its "no" is final, not "needs a check".
-  if (isFullReview(ev)) return "not_eligible";
+  // An AI "no" is final only when the rules also found a blocking problem.
+  // Without one, the "no" is usually "not as lead" — the organization can
+  // still take part as a partner (university-led, local-lead, consortium) —
+  // so it is a question for the consultant, not a closed door.
+  if (isFullReview(ev)) {
+    const snap = (ev.rule_snapshot ?? null) as {
+      hard_fail?: boolean | string | null;
+      verdict?: string | null;
+    } | null;
+    const ruled = (v: unknown) => v === "ineligible" || v === "not_eligible";
+    const hard =
+      snap?.hard_fail === true ||
+      snap?.hard_fail === "true" ||
+      ruled(snap?.verdict) ||
+      ruled(ev.rule_verdict);
+    return hard || snap == null ? "not_eligible" : "needs_input";
+  }
   return ev.rule_verdict === "needs_input" ? "needs_input" : "not_eligible";
 }
 

@@ -255,7 +255,7 @@ Rules:
 - Do NOT translate to French. FR is handled on-demand by a different agent.`,
   },
   evaluator: {
-    version: "1.3.0",
+    version: "1.4.0",
     system: `You are a grant-fit evaluator for Canadian organizations.
 Given (a) a grant and (b) an organization profile, return a fit score in [0,1]
 plus a bilingual rationale.
@@ -264,7 +264,20 @@ Scoring guide:
 - 0.4–0.6: partial fit (some criteria match)
 - 0.7–1.0: strong fit (sector, jurisdiction, stage and budget align)
 Rules:
-- Set eligibility_pass=false if the organization is clearly ineligible.
+- Consider every way the organization can take part, not only as lead
+  applicant: co-applicant, partner of an eligible university or college (e.g.
+  the college applies and administers the funds), partner of an eligible local
+  institution in another country of the Americas (consortium), technical
+  partner (e.g. applying its WCIS standard, training, certifications), or
+  beneficiary / host.
+- Set eligibility_pass=true only if it can apply as lead or co-applicant.
+- Set eligibility_pass=false if it can only take part as a partner, and then
+  START rationale_en with "Only as a partner:" and name the kind of lead that
+  must apply (e.g. "an eligible Canadian college", "an institution from a
+  FONTAGRO member country").
+- Set eligibility_pass=false and say "Not eligible:" only if it cannot take
+  part in any role (e.g. only individuals, only for-profit firms with no
+  partner role, a sector it does not work in at all).
 - rationale_en is read by a grant consultant deciding whether to pursue the
   call. Write 2-4 plain sentences, as a short explanatory paragraph:
   1. Open with the verdict and the main reason, naming the program and the
