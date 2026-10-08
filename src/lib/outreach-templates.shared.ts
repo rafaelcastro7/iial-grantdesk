@@ -14,11 +14,13 @@ import {
 
 export const TEMPLATE_IDS = [
   "partner_intro",
+  "academic_partnership",
   "meeting_invite",
   "meeting_follow_up",
   "deadline_reminder",
   "portal_registration",
   "package_request",
+  "submission_step2",
   "program_officer",
   "whatsapp_intro",
 ] as const;
@@ -27,6 +29,11 @@ export type Lang = "en" | "es";
 
 export const TEMPLATE_LABEL: Record<TemplateId, { en: string; es: string; audience: string }> = {
   partner_intro: { en: "Partner invitation", es: "Invitación a socio", audience: "Partner" },
+  academic_partnership: {
+    en: "Academic partnership (applied research & WCIS)",
+    es: "Alianza académica (investigación aplicada y WCIS)",
+    audience: "Partner",
+  },
   meeting_invite: {
     en: "Meeting invitation (proposed time)",
     es: "Invitación a reunión (hora propuesta)",
@@ -47,14 +54,19 @@ export const TEMPLATE_LABEL: Record<TemplateId, { en: string; es: string; audien
     es: "Recordatorio de plazo / carta de apoyo",
     audience: "Partner",
   },
+  package_request: {
+    en: "Step 1: Request application package / Register intent",
+    es: "Paso 1: Solicitar paquete de aplicación / Registrar intención",
+    audience: "Funder",
+  },
+  submission_step2: {
+    en: "Step 2: Submit concept note & attestation package",
+    es: "Paso 2: Presentar paquete de nota conceptual y atestación",
+    audience: "Funder",
+  },
   portal_registration: {
     en: "Funder portal registration",
     es: "Registro en el portal del financiador",
-    audience: "Funder",
-  },
-  package_request: {
-    en: "Request the application package",
-    es: "Solicitar el paquete de aplicación",
     audience: "Funder",
   },
   program_officer: {
@@ -78,6 +90,8 @@ export type ComposeInput = {
   meetingWhen?: string;
   /** Links shared in the WhatsApp introduction (presentation, website). */
   links?: string[];
+  /** When true, includes Dr. Juan Marcelo Gómez's doctoral research reference and paper link. */
+  includeAcademicCredentials?: boolean;
 };
 
 const ROLE_TEXT: Record<Lang, Record<string, string>> = {
@@ -189,11 +203,66 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
             ];
       break;
     }
-    case "partner_intro":
+    case "academic_partnership": {
+      subject =
+        lang === "en"
+          ? `Academic collaboration & applied research: ${grant.title}`
+          : `Colaboración académica e investigación aplicada: ${grant.title}`;
+      const academicAngleEn =
+        "The initiative builds on the doctoral research of Dr. Juan Marcelo Gómez at Henley Business School (University of Reading, UK) on sustainable value chains, producer livelihoods, traceability, and market governance (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf).";
+      const academicAngleEs =
+        "La iniciativa se respalda en la investigación doctoral del Dr. Juan Marcelo Gómez en Henley Business School (Universidad de Reading, Reino Unido), enfocada en sostenibilidad en negocios internacionales, medios de vida de los productores, trazabilidad y gobernanza en cadenas de valor del cacao fino (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf).";
+      lines =
+        lang === "en"
+          ? [
+              hi,
+              "",
+              `I am writing on behalf of ${orgName}. Following up on our recent conversation, we would like to explore structured collaboration on ${program}, funded by ${funder}.`,
+              idea ? `Our project concept is "${idea}".` : "",
+              wcis
+                ? `Rather than conventional student exercises, ${orgName} anchors collaboration in the Whole-Chain International Standard (WCIS) and applied executive microcredentials (CSIP, CSCIP, CARP) to transfer measurable impact to agrifood value chains: ${wcis}`
+                : `${orgName} brings established applied learning programs (CSIP, CSCIP, CARP) and the Whole-Chain International Standard (WCIS) to translate research into field impact with producers and cooperatives.`,
+              academicAngleEn,
+              partnerRole
+                ? `We envision your institution as ${partnerRole}, focusing on scientific rigor and impact transfer, while leaving operational work packages open to co-design together.`
+                : "We would welcome defining research questions and work packages together based on your academic priorities.",
+              `The available funding is ${amountText(grant)} and the deadline is ${deadline}.`,
+              "",
+              "Could we schedule a 20-minute call this week to align on next steps?",
+              "",
+              signoff,
+            ]
+          : [
+              hi,
+              "",
+              `Le escribo en nombre de ${orgName}. Dando seguimiento a nuestro contacto previo, quisiéramos explorar una colaboración estructurada en torno a ${program}, financiado por ${funder}.`,
+              idea ? `El concepto de proyecto que proponemos es "${idea}".` : "",
+              wcis
+                ? `Más allá de proyectos capstone convencionales, ${orgName} estructura la colaboración con el Whole-Chain International Standard (WCIS) y sus programas profesionales aplicados (CSIP, CSCIP, CARP) para generar impacto verificable en cadenas agroalimentarias: ${wcis}`
+                : `${orgName} aporta programas profesionales aplicados (CSIP, CSCIP, CARP) y el estándar Whole-Chain International Standard (WCIS) para vincular investigación con productores y cooperativas en territorio.`,
+              academicAngleEs,
+              partnerRole
+                ? `Visualizamos a su institución como ${partnerRole}, aportando solidez científica y transferencia de conocimiento, manteniendo los roles abiertos a co-diseño conjunto.`
+                : "Nos gustaría co-diseñar los paquetes de trabajo y las líneas de acción conjuntamente según sus prioridades académicas.",
+              `El monto disponible es ${amountText(grant)} y la fecha límite es ${deadline}.`,
+              "",
+              "¿Tendría 20 minutos esta semana para coordinar los próximos pasos?",
+              "",
+              signoff,
+            ];
+      break;
+    }
+    case "partner_intro": {
       subject =
         lang === "en"
           ? `Collaboration opportunity: ${grant.title}`
           : `Oportunidad de colaboración: ${grant.title}`;
+      const credEn = input.includeAcademicCredentials
+        ? "The initiative builds on the doctoral research of Dr. Juan Marcelo Gómez at Henley Business School (University of Reading, UK) on sustainable value chains and traceability (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf)."
+        : "";
+      const credEs = input.includeAcademicCredentials
+        ? "El proyecto se apoya en la investigación doctoral del Dr. Juan Marcelo Gómez en Henley Business School (Universidad de Reading, Reino Unido) sobre cadenas de valor y trazabilidad (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf)."
+        : "";
       lines =
         lang === "en"
           ? [
@@ -204,6 +273,7 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               wcis
                 ? `${orgName} would contribute the Whole-Chain International Standard (WCIS) as the applied framework: ${wcis}`
                 : "",
+              credEn,
               partnerRole
                 ? `We see your organization as ${partnerRole}, and we are open to shaping the roles together.`
                 : "We would like to define the roles together, based on your priorities.",
@@ -221,6 +291,7 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               wcis
                 ? `${orgName} aportaría el Whole-Chain International Standard (WCIS) como marco aplicado: ${wcis}`
                 : "",
+              credEs,
               partnerRole
                 ? `Vemos a su organización como ${partnerRole}, y estamos abiertos a definir los roles juntos.`
                 : "Nos gustaría definir los roles juntos, según sus prioridades.",
@@ -231,6 +302,7 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               signoff,
             ];
       break;
+    }
     case "meeting_follow_up":
       subject = lang === "en" ? `Follow-up: ${grant.title}` : `Seguimiento: ${grant.title}`;
       lines =
@@ -342,6 +414,46 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               ourRole ? `Nuestra intención es participar como ${ourRole}.` : "",
               idea ? `El proyecto propuesto es "${idea}".` : "",
               "Muchas gracias de antemano por su ayuda.",
+              "",
+              signoff,
+            ];
+      break;
+    case "submission_step2":
+      subject =
+        lang === "en"
+          ? `Concept note submission — ${grant.title} (${orgName})`
+          : `Presentación de nota conceptual — ${grant.title} (${orgName})`;
+      lines =
+        lang === "en"
+          ? [
+              "Dear Program Officer,",
+              "",
+              `On behalf of ${orgName}, please find enclosed our formal submission package for ${program}${idea ? `, project "${idea}"` : ""}.`,
+              ourRole ? `We are submitting as ${ourRole}.` : "",
+              "Our application package includes:",
+              "1. Project concept note and operational summary",
+              "2. Organization Attestation form signed by our authorized officer",
+              "3. Proof of legal registration and CRA business documentation",
+              "4. Comparative financial statements for the past two completed fiscal years",
+              "",
+              "We remain at your disposal should you require any additional information or clarifications.",
+              "Kindly confirm receipt of this package.",
+              "",
+              signoff,
+            ]
+          : [
+              "Estimado/a oficial del programa:",
+              "",
+              `En nombre de ${orgName}, le hago llegar nuestro paquete formal de postulación para ${program}${idea ? `, proyecto "${idea}"` : ""}.`,
+              ourRole ? `Nos presentamos como ${ourRole}.` : "",
+              "El paquete adjunto incluye:",
+              "1. Nota conceptual y resumen operativo del proyecto",
+              "2. Formulario de atestación organizacional firmado por el responsable autorizado",
+              "3. Certificado de constitución y documentación de registro empresarial (CRA)",
+              "4. Estados financieros comparativos de los dos últimos años fiscales cerrados",
+              "",
+              "Quedamos a su entera disposición ante cualquier consulta o requerimiento adicional.",
+              "Agradeceremos confirmar la recepción de este paquete.",
               "",
               signoff,
             ];

@@ -127,6 +127,87 @@ export function explainTerms(texts: Array<string | null | undefined>): GlossaryE
 }
 
 // ---------------------------------------------------------------------------
+// Geographic / Country Eligibility quick-check.
+// Deterministic helper to answer queries like:
+// "within Cameroon, CAR, DRC, Equatorial Guinea, Gabon, Republic of Congo — is Madagascar in this?"
+// or "can Peru / Colombia / Mexico be the beneficiary country?"
+export type CountryCheckResult = {
+  country: string;
+  verdict: "explicit" | "regional_likely" | "not_mentioned";
+  detail: string;
+};
+
+export function checkCountryEligibility(
+  countryInput: string,
+  grantTexts: Array<string | null | undefined>,
+  lang: Lang = "en",
+): CountryCheckResult {
+  const query = (countryInput ?? "").trim().toLowerCase();
+  const es = lang === "es";
+  if (!query) {
+    return {
+      country: "",
+      verdict: "not_mentioned",
+      detail: es ? "Ingresa un país para verificar." : "Enter a country to check.",
+    };
+  }
+
+  const haystack = grantTexts.filter(Boolean).join(" ").toLowerCase();
+
+  // 1. Direct mention
+  if (haystack.includes(query)) {
+    return {
+      country: countryInput,
+      verdict: "explicit",
+      detail: es
+        ? `"${countryInput}" aparece mencionado explícitamente en la documentación de la convocatoria.`
+        : `"${countryInput}" is explicitly mentioned in the call documentation.`,
+    };
+  }
+
+  // 2. Specific geopolitical rules based on consultant prompts
+  if (query === "madagascar") {
+    const centralAfricaOnly = /central africa|afrique centrale/i.test(haystack);
+    if (centralAfricaOnly && !/east africa|southern africa|indian ocean/i.test(haystack)) {
+      return {
+        country: countryInput,
+        verdict: "not_mentioned",
+        detail: es
+          ? "Madagascar NO pertenece a África Central (es África Oriental / Océano Índico); no es elegible si la convocatoria es exclusiva para África Central."
+          : "Madagascar is in East Africa / Indian Ocean, not Central Africa; it is not eligible if the call is restricted to Central Africa.",
+      };
+    }
+  }
+
+  const LATAM_COUNTRIES = [
+    "peru", "perú", "colombia", "mexico", "méxico", "costa rica", "guatemala",
+    "honduras", "ecuador", "bolivia", "brasil", "brazil", "chile", "argentina",
+  ];
+  if (LATAM_COUNTRIES.includes(query)) {
+    const latamHits = /latin america|américa latina|latam|south america|sudamérica|lac\b|andean|andina/i.test(
+      haystack,
+    );
+    if (latamHits) {
+      return {
+        country: countryInput,
+        verdict: "regional_likely",
+        detail: es
+          ? `La convocatoria abarca América Latina / Sudamérica; ${countryInput} tiene alta viabilidad de elegibilidad regional.`
+          : `The call targets Latin America / South America; ${countryInput} is likely regionally eligible.`,
+      };
+    }
+  }
+
+  return {
+    country: countryInput,
+    verdict: "not_mentioned",
+    detail: es
+      ? `"${countryInput}" no aparece mencionado explícitamente en los requisitos disponibles.`
+      : `"${countryInput}" was not found in the available call text or requirements.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // One email to the decision maker about several grants at once.
 export type DigestEntry = {
   grant: WorkspaceGrant;

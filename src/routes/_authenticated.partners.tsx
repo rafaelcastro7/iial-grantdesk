@@ -3,7 +3,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { FileText, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { FileText, Pencil, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
@@ -15,6 +15,7 @@ import {
   deletePartner,
   listPartners,
   savePartner,
+  seedDefaultPartners,
   type DirectoryPartner,
 } from "@/lib/partner-directory.functions";
 import { partnerBrief } from "@/lib/consultant-desk.shared";
@@ -56,9 +57,11 @@ function PartnersPage() {
   const fetchList = useServerFn(listPartners);
   const save = useServerFn(savePartner);
   const remove = useServerFn(deletePartner);
+  const seed = useServerFn(seedDefaultPartners);
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [filter, setFilter] = useState("");
+  const [isSeeding, setIsSeeding] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ["partner-directory", activeOrgId],
     queryFn: () => fetchList({ data: { orgId: activeOrgId as string } }),
@@ -75,6 +78,25 @@ function PartnersPage() {
         ),
     );
   }, [data, filter]);
+
+  const onSeedRecommended = async () => {
+    if (!activeOrgId) return;
+    setIsSeeding(true);
+    try {
+      const res = await seed({ data: { orgId: activeOrgId } });
+      toast.success(
+        res.addedCount > 0
+          ? `Added ${res.addedCount} recommended partner(s) to directory.`
+          : "Recommended partners already present in directory.",
+      );
+      await qc.invalidateQueries({ queryKey: ["partner-directory", activeOrgId] });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(msg);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   const onSave = async () => {
     if (!draft || !activeOrgId) return;
@@ -109,14 +131,27 @@ function PartnersPage() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <Button
-          size="sm"
-          className="gap-1.5"
-          onClick={() => setDraft(emptyDraft())}
-          disabled={!activeOrgId}
-        >
-          <Plus className="h-4 w-4" /> Add partner
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={onSeedRecommended}
+            disabled={!activeOrgId || isSeeding}
+            title="Import Rocío's recommended network: Lambton College, UT Selva, U. del Rosario, Agrobosque, APP CACAO, SOCODEVI, UT Tulum"
+          >
+            <Sparkles className="h-4 w-4 text-primary" />
+            {isSeeding ? "Importing…" : "Import recommended network (7)"}
+          </Button>
+          <Button
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setDraft(emptyDraft())}
+            disabled={!activeOrgId}
+          >
+            <Plus className="h-4 w-4" /> Add partner
+          </Button>
+        </div>
       </div>
 
       {data && !data.available && (

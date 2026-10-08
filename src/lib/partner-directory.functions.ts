@@ -134,3 +134,130 @@ export const deletePartner = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const DEFAULT_PARTNERS: Array<Omit<DirectoryPartner, "id" | "org_id" | "updated_at">> = [
+  {
+    name: "Lambton College",
+    country: "Canada",
+    type: "College",
+    contact_name: "Research & Innovation Office",
+    contact_title: "Research Administration",
+    email: null,
+    phone: null,
+    website: "https://www.lambtoncollege.ca/",
+    languages: ["en"],
+    notes:
+      "Accredited Canadian postsecondary institution. Acts as Primary Applicant and fund administrator for SSHRC Connection Grants and Tri-Council programs (Route B).",
+  },
+  {
+    name: "Universidad Tecnológica de la Selva",
+    country: "Mexico",
+    type: "University",
+    contact_name: "Sr. Horacio Albores Ortiz",
+    contact_title: "Rector / Dirección Académica",
+    email: null,
+    phone: null,
+    website: "https://utselva.edu.mx/",
+    languages: ["es"],
+    notes:
+      "Chiapas, Mexico. Academic cooperation Canada-Mexico in sustainable agroforestry, cocoa, and applied technologies.",
+  },
+  {
+    name: "Universidad del Rosario",
+    country: "Colombia",
+    type: "University",
+    contact_name: "Dirección de Investigación y Extensión",
+    contact_title: "Coordinación de Proyectos",
+    email: null,
+    phone: null,
+    website: "https://urosario.edu.co/",
+    languages: ["es"],
+    notes:
+      "Bogotá, Colombia. Applied research in agrifood value chains and smallholder impact. Collaborative framework around applied research and WCIS.",
+  },
+  {
+    name: "Cooperativa Agrobosque",
+    country: "Peru",
+    type: "Cooperative / producers",
+    contact_name: "Gerencia General",
+    contact_title: "Gerente",
+    email: null,
+    phone: null,
+    website: "https://www.agrobosque.com.pe/",
+    languages: ["es"],
+    notes:
+      "San Martín, Peru. Cacao and coffee producers cooperative: collection, processing, and specialty export. Targeted beneficiary role for CFC and agroforestry grants without requiring cash co-funding.",
+  },
+  {
+    name: "APP CACAO",
+    country: "Peru",
+    type: "Cooperative / producers",
+    contact_name: "Dirección Ejecutiva",
+    contact_title: "Director Ejecutivo",
+    email: null,
+    phone: null,
+    website: "https://appcacao.org/",
+    languages: ["es"],
+    notes:
+      "National association in Peru representing 30,000+ smallholder cocoa producers across 25+ cooperatives in 10+ departments. Territorial beneficiary and grassroots pilot partner.",
+  },
+  {
+    name: "SOCODEVI",
+    country: "Canada",
+    type: "NGO / foundation",
+    contact_name: "Coordinación de Programas Perú / Canadá",
+    contact_title: "Coordinador de Alianzas",
+    email: null,
+    phone: null,
+    website: "https://socodevi.org/",
+    languages: ["en", "es", "fr"],
+    notes:
+      "Canadian cooperative development NGO with deep operational presence in Peru and Latin America. Provides institutional governance, financial oversight, and cooperative enterprise structuring (Route C lead/fiduciary).",
+  },
+  {
+    name: "Universidad Tecnológica de Tulum",
+    country: "Mexico",
+    type: "University",
+    contact_name: "Rectoría / Vinculación Internacional",
+    contact_title: "Vinculación Internacional",
+    email: null,
+    phone: null,
+    website: null,
+    languages: ["es"],
+    notes:
+      "Quintana Roo, Mexico. Academic partner for international exchange, sustainable food systems, and applied research.",
+  },
+];
+
+export const seedDefaultPartners = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ orgId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as unknown as Db;
+    await assertMember(db, context.userId, data.orgId);
+
+    const { data: existing, error } = await db
+      .from("partner_directory")
+      .select("name")
+      .eq("org_id", data.orgId);
+    if (error) {
+      if (missingTable(error.message)) throw new Error("directory_unavailable");
+      throw new Error(error.message);
+    }
+    const existingNames = new Set(
+      (existing ?? []).map((p: { name: string }) => p.name.trim().toLowerCase()),
+    );
+    const toInsert = DEFAULT_PARTNERS.filter(
+      (p) => !existingNames.has(p.name.trim().toLowerCase()),
+    ).map((p) => ({
+      ...p,
+      org_id: data.orgId,
+      created_by: context.userId,
+    }));
+
+    if (toInsert.length > 0) {
+      const { error: insertErr } = await db.from("partner_directory").insert(toInsert);
+      if (insertErr) throw new Error(insertErr.message);
+    }
+    return { addedCount: toInsert.length };
+  });

@@ -2,6 +2,7 @@
 // while working grants, answered by the app's deterministic tools (0 tokens).
 import { describe, expect, it } from "vitest";
 import {
+  checkCountryEligibility,
   explainTerms,
   grantsDigest,
   partnerBrief,
@@ -16,6 +17,7 @@ import {
 import { synthesizeGrantRoadmap } from "@/lib/grant-roadmap";
 import { buildRadar } from "@/lib/grant-radar";
 import { composeOutreach } from "@/lib/outreach-templates.shared";
+import { DEFAULT_PARTNERS } from "@/lib/partner-directory.functions";
 
 const sshrc: WorkspaceGrant = {
   id: "g-sshrc",
@@ -315,5 +317,94 @@ describe("Rocío's requests", () => {
     expect(ids).toContain("food-link");
     expect(ids).toContain("fontagro-2027");
     expect(ids).not.toContain("active-now");
+  });
+
+  it("'Citar la tesis doctoral del Dr. Juan Marcelo Gómez (Henley Business School / Univ. of Reading)' → academic credentials citation", () => {
+    const ws = plan(sshrc);
+    const e = composeOutreach({
+      template: "partner_intro",
+      lang: "es",
+      grant: sshrc,
+      workspace: ws,
+      orgName: "IIAL",
+      senderName: "Rocío Cruz",
+      recipientName: "Sr. Horacio Albores Ortiz",
+      includeAcademicCredentials: true,
+    });
+    expect(e.body).toContain("Dr. Juan Marcelo Gómez");
+    expect(e.body).toContain("Henley Business School");
+    expect(e.body).toContain("centaur.reading.ac.uk/115792/8/Gomez");
+    expect(e.body).toContain("trazabilidad");
+  });
+
+  it("'Alianza académica e investigación aplicada: más allá de proyectos capstone, programas CSIP/CSCIP/CARP y WCIS' → academic partnership template", () => {
+    const ws = plan(sshrc);
+    ws.project_title = "Applied Agrifood Traceability Network";
+    const e = composeOutreach({
+      template: "academic_partnership",
+      lang: "es",
+      grant: sshrc,
+      workspace: ws,
+      orgName: "IIAL",
+      senderName: "Rocío Cruz",
+      recipientName: "Universidad del Rosario",
+    });
+    expect(e.subject).toContain("Colaboración académica e investigación aplicada");
+    expect(e.body).toContain("Whole-Chain International Standard (WCIS)");
+    expect(e.body).toContain("CSIP, CSCIP, CARP");
+    expect(e.body).toContain("Dr. Juan Marcelo Gómez");
+    expect(e.body).toContain("Henley Business School");
+  });
+
+  it("'Paso 2: Presentación de paquete de nota conceptual, atestación, CRA y EEFF comparativos' → Step 2 submission", () => {
+    const ws = plan(gac);
+    const e = composeOutreach({
+      template: "submission_step2",
+      lang: "en",
+      grant: gac,
+      workspace: ws,
+      orgName: "IIAL",
+      senderName: "Rocío Cruz",
+    });
+    expect(e.subject).toMatch(/Concept note submission/i);
+    expect(e.body).toContain("Organization Attestation form");
+    expect(e.body).toContain("CRA business documentation");
+    expect(e.body).toContain("financial statements for the past two completed fiscal years");
+  });
+
+  it("'Directorio de socios: precargar la red de 7 aliados de Rocío' → DEFAULT_PARTNERS has verified profiles", () => {
+    const names = DEFAULT_PARTNERS.map((p) => p.name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "Lambton College",
+        "Universidad Tecnológica de la Selva",
+        "Universidad del Rosario",
+        "Cooperativa Agrobosque",
+        "APP CACAO",
+        "SOCODEVI",
+        "Universidad Tecnológica de Tulum",
+      ]),
+    );
+    const agrobosque = DEFAULT_PARTNERS.find((p) => p.name === "Cooperativa Agrobosque")!;
+    expect(agrobosque.website).toBe("https://www.agrobosque.com.pe/");
+    expect(agrobosque.country).toBe("Peru");
+  });
+
+  it("'Dentro de esto está Madagascar? / Quién es el país beneficiario?' → checkCountryEligibility", () => {
+    const centralAfricaText =
+      "Eligible countries: Cameroon, Central African Republic, Democratic Republic of Congo, Equatorial Guinea, Gabon, Republic of Congo. Restricted to Central Africa.";
+    const madagascarCheck = checkCountryEligibility("Madagascar", [centralAfricaText], "es");
+    expect(madagascarCheck.verdict).toBe("not_mentioned");
+    expect(madagascarCheck.detail).toMatch(/NO pertenece a África Central/);
+
+    const latamText =
+      "Call for proposals to strengthen agri-food value chains in Latin America and the Caribbean.";
+    const peruCheck = checkCountryEligibility("Peru", [latamText], "en");
+    expect(peruCheck.verdict).toBe("regional_likely");
+    expect(peruCheck.detail).toMatch(/Latin America/);
+
+    const explicitText = "Projects must directly benefit agricultural producers in Peru and Colombia.";
+    const explicitCheck = checkCountryEligibility("Peru", [explicitText], "es");
+    expect(explicitCheck.verdict).toBe("explicit");
   });
 });

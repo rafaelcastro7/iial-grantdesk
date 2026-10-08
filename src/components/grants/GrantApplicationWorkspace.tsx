@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Copy,
+  Globe2,
   Loader2,
   Mail,
   Plus,
@@ -25,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getGrantWorkspace, saveGrantWorkspace } from "@/lib/grant-workspace.functions";
-import { explainTerms } from "@/lib/consultant-desk.shared";
+import { checkCountryEligibility, explainTerms } from "@/lib/consultant-desk.shared";
 import { synthesizeGrantRoadmap } from "@/lib/grant-roadmap";
 import { listPartners, savePartner } from "@/lib/partner-directory.functions";
 import {
@@ -90,6 +91,8 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [senderName, setSenderName] = useState("Rocío Cruz");
   const [meetingWhen, setMeetingWhen] = useState("");
   const [links, setLinks] = useState("https://iial.ca");
+  const [includeAcademicCredentials, setIncludeAcademicCredentials] = useState(false);
+  const [countryQuery, setCountryQuery] = useState("");
   const [ws, setWs] = useState<Workspace | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -133,6 +136,20 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       ]),
     [data, ws],
   );
+
+  const countryCheck = useMemo(() => {
+    if (!countryQuery.trim() || !data?.grant) return null;
+    return checkCountryEligibility(
+      countryQuery,
+      [
+        data.grant.title,
+        data.grant.summary,
+        data.grant.country,
+        ...(data.grant.requirements ?? []).map((r) => r.requirement),
+      ],
+      lang,
+    );
+  }, [countryQuery, data?.grant, lang]);
 
   const roadmap = useMemo(() => {
     if (!data?.grant) return null;
@@ -840,8 +857,55 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               </div>
             ))}
           </dl>
-        </Section>
-      )}
+      {/* 5c. Geographic / Country Eligibility quick-check */}
+      <Section
+        icon={<Globe2 className="h-4 w-4" />}
+        title="Check country eligibility"
+        hint="Instant check for beneficiary countries (e.g. Peru, Colombia, Madagascar, Mexico)"
+      >
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={countryQuery}
+              placeholder="e.g. Peru, Colombia, Mexico, Costa Rica, Madagascar…"
+              onChange={(e) => setCountryQuery(e.target.value)}
+              className="max-w-md"
+            />
+            {countryQuery && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setCountryQuery("")}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          {countryCheck && countryQuery.trim() && (
+            <div
+              className={cn(
+                "rounded-md border p-3 text-xs leading-relaxed",
+                countryCheck.verdict === "explicit" &&
+                  "border-emerald-500/40 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200",
+                countryCheck.verdict === "regional_likely" &&
+                  "border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-200",
+                countryCheck.verdict === "not_mentioned" &&
+                  "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200",
+              )}
+            >
+              <div className="font-semibold mb-1">
+                {countryCheck.verdict === "explicit"
+                  ? "✓ Explicitly Eligible"
+                  : countryCheck.verdict === "regional_likely"
+                    ? "ℹ High Regional Viability"
+                    : "⚠️ Not Specifically Mentioned"}
+              </div>
+              <p>{countryCheck.detail}</p>
+            </div>
+          )}
+        </div>
+      </Section>
 
       {/* 6. Timeline */}
       <Section
@@ -923,6 +987,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             recipientName: known?.contact_name ?? undefined,
             meetingWhen,
             links: links.split(/[\s,]+/).filter(Boolean),
+            includeAcademicCredentials,
           });
           const isWhatsApp = template === "whatsapp_intro";
           const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
@@ -969,6 +1034,19 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   onChange={(e) => setSenderName(e.target.value)}
                 />
               </div>
+              {toPartner && (
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeAcademicCredentials}
+                    onChange={(e) => setIncludeAcademicCredentials(e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  <span>
+                    Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School / Univ. of Reading)
+                  </span>
+                </label>
+              )}
               {template === "meeting_invite" && (
                 <Input
                   value={meetingWhen}
