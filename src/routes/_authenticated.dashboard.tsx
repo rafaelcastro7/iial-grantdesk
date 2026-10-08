@@ -17,17 +17,9 @@ import { syncClientLocale } from "@/i18n/sync";
 import { AppTopBar } from "@/components/AppSidebar";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { PageTransition } from "@/components/PageTransition";
-import {
-  Activity,
-  ArrowRight,
-  CheckCircle2,
-  Clock3,
-  FolderKanban,
-  ShieldCheck,
-  Search,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
+import { ConsultantToday } from "@/components/v2/ConsultantToday";
+import { listGrantWorkspaces } from "@/lib/grant-workspace.functions";
+import { Activity, ArrowRight, Clock3, ShieldCheck, Search, TrendingUp } from "lucide-react";
 import "@/i18n";
 import { isActiveGrantStatus } from "@/agents/pipeline-stages.shared";
 
@@ -77,6 +69,12 @@ type NextStep =
 
 function Dashboard() {
   const { activeOrgId } = useActiveTenant();
+  const fetchPipeline = useServerFn(listGrantWorkspaces);
+  const { data: pipelineData } = useQuery({
+    queryKey: ["grant-pipeline", activeOrgId],
+    queryFn: () => fetchPipeline({ data: { orgId: activeOrgId as string } }),
+    enabled: !!activeOrgId,
+  });
   const [email, setEmail] = useState<string | null>(null);
   const [personName, setPersonName] = useState<string | null>(null);
 
@@ -153,8 +151,9 @@ function Dashboard() {
     const d = (new Date(g.deadline).getTime() - now) / DAY_MS;
     return d >= 0 && d <= 30;
   }).length;
-  const inPipeline = grants.filter((g) =>
-    ["shortlisted", "in_proposal", "submitted", "won"].includes(g.status),
+  // Same source as the Pipeline page: grants with an application plan.
+  const inPipeline = (pipelineData?.rows ?? []).filter(
+    (r) => r.workspace.priority !== "discard",
   ).length;
   // "Never enriched" (status still "discovered") looks identical to "checked,
   // nothing interesting" in a bare count — the enriched count disambiguates.
@@ -307,70 +306,7 @@ function DashboardV2({
     <PageTransition>
       <div className="min-h-screen text-foreground">
         <section className="mx-auto max-w-[1500px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
-          <div className="grid gap-4">
-            <section className="overflow-hidden rounded-md border bg-card shadow-sm">
-              <div className="grid min-h-[300px] lg:grid-cols-[minmax(0,1.35fr)_360px]">
-                <div className="flex flex-col justify-between p-5 sm:p-6">
-                  <div>
-                    <Badge variant="outline" className="gap-2 rounded-md px-2.5 py-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-teal-500" />
-                      Command center
-                    </Badge>
-                    <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-tight sm:text-4xl">
-                      {headlineGreeting}. Run the grant operation from one place.
-                    </h1>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                      Prioritize Canadian opportunities, see what needs action, and move strong
-                      matches from discovery to reporting without switching tools.
-                    </p>
-                  </div>
-
-                  <div className="mt-6 grid gap-2 sm:grid-cols-3">
-                    <V2PipelineCell icon={Search} label="Discover" value={`${grantsCount}`} />
-                    <V2PipelineCell icon={CheckCircle2} label="Qualify" value={`${eligible}`} />
-                    <V2PipelineCell icon={FolderKanban} label="Pursue" value={`${inPipeline}`} />
-                  </div>
-                </div>
-
-                <aside className="border-t bg-muted/35 p-5 lg:border-l lg:border-t-0">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-normal text-muted-foreground">
-                        Next best action
-                      </div>
-                      <div className="mt-1 text-lg font-semibold leading-snug">
-                        {nextStep.title}
-                      </div>
-                    </div>
-                    <Sparkles className="h-5 w-5 shrink-0 text-brand" />
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{nextStep.body}</p>
-                  <Button asChild className="mt-5 w-full gap-2">
-                    {nextStep.kind === "grant" ? (
-                      <Link to="/grants/$id" params={{ id: nextStep.id }}>
-                        {nextStep.cta} <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    ) : (
-                      <Link to={nextStep.to}>
-                        {nextStep.cta} <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    )}
-                  </Button>
-
-                  <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-md border bg-card p-3">
-                      <div className="text-muted-foreground">Scored</div>
-                      <div className="mt-1 text-xl font-semibold tabular-nums">{scored}</div>
-                    </div>
-                    <div className="rounded-md border bg-card p-3">
-                      <div className="text-muted-foreground">Known deadlines</div>
-                      <div className="mt-1 text-xl font-semibold tabular-nums">{withDeadline}</div>
-                    </div>
-                  </div>
-                </aside>
-              </div>
-            </section>
-          </div>
+          <ConsultantToday greeting={headlineGreeting} />
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <V2Metric
@@ -410,8 +346,8 @@ function DashboardV2({
               icon={TrendingUp}
               label="Pipeline"
               value={loading ? "-" : inPipeline}
-              detail="Shortlisted to awarded"
-              to="/proposals"
+              detail="Grants with an application plan"
+              to="/pipeline"
             />
           </div>
 
@@ -465,26 +401,6 @@ function DashboardV2({
         </section>
       </div>
     </PageTransition>
-  );
-}
-
-function V2PipelineCell({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-md border bg-background/70 p-3">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="h-4 w-4 text-primary" />
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
-    </div>
   );
 }
 

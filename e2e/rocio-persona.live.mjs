@@ -67,15 +67,21 @@ await ask("Analiza este grant: ¿se puede aplicar ahora? ¿IIAL o Nahua?", async
   await page.goto(`${BASE}${grantHref}`, { waitUntil: "networkidle", timeout: 60000 });
   await page.getByText("Who can apply").waitFor({ timeout: 30000 });
   const text = await page.locator("body").innerText();
-  must(/Eligible|To confirm|Not eligible|Needs/i.test(text), "no eligibility verdict per organization");
+  must(
+    /Eligible|To confirm|Not eligible|Needs/i.test(text),
+    "no eligibility verdict per organization",
+  );
   must(/deadline|intake|rolling|no fixed/i.test(text), "no call status / deadline");
 });
 
-await ask("¿A qué se refiere 'financial statements' y 'Organization Attestation'? Explícamelo simple", async () => {
-  await page.getByText("What these requirements mean").waitFor({ timeout: 15000 });
-  const t = await page.locator('section:has-text("What these requirements mean")').innerText();
-  must(/financial|CRA|registration|letter of support/i.test(t), "glossary is empty");
-});
+await ask(
+  "¿A qué se refiere 'financial statements' y 'Organization Attestation'? Explícamelo simple",
+  async () => {
+    await page.getByText("What these requirements mean").waitFor({ timeout: 15000 });
+    const t = await page.locator('section:has-text("What these requirements mean")').innerText();
+    must(/financial|CRA|registration|letter of support/i.test(t), "glossary is empty");
+  },
+);
 
 await ask("Adopta la ruta sugerida (Ruta B / R&D o Consorcio) con un solo clic", async () => {
   const routesSection = page.locator('section:has-text("Decision and route")');
@@ -89,25 +95,34 @@ await ask("Adopta la ruta sugerida (Ruta B / R&D o Consorcio) con un solo clic",
   }
 });
 
-await ask("Mensaje a Marcelo: de qué trata, WCIS, requisitos, plazos, monto, qué falta, qué gana IIAL", async () => {
-  const memo = await pre("Decision memo");
-  for (const s of ["Hi Marcelo", "Money and dates", "What we are missing", "Recommendation"])
-    must(memo.includes(s), `memo missing "${s}"`);
-  must(/What .* get(s)?/i.test(memo), 'memo missing "What [Org] gets"');
-});
+await ask(
+  "Mensaje a Marcelo: de qué trata, WCIS, requisitos, plazos, monto, qué falta, qué gana IIAL",
+  async () => {
+    const memo = await pre("Decision memo");
+    for (const s of ["Hi Marcelo", "Money and dates", "What we are missing", "Recommendation"])
+      must(memo.includes(s), `memo missing "${s}"`);
+    must(/What .* get(s)?/i.test(memo), 'memo missing "What [Org] gets"');
+  },
+);
 
-await ask("Le mandé invitación por Teams el lunes 1 de junio 11am hora Perú; que sugiera otra hora", async () => {
-  const emails = page.locator('section:has-text("Emails to partners and funders")');
-  await emails.locator("select").first().selectOption("meeting_invite");
-  await page
-    .getByPlaceholder(/Proposed meeting/)
-    .fill("lunes 1 de junio a las 11:00 (hora de Perú) por Teams");
-  const body = await emails.locator("pre").innerText();
-  must(body.includes("lunes 1 de junio a las 11:00 (hora de Perú) por Teams"), "meeting time not in email");
-  must(/sugerir otro horario/.test(body), "no 'suggest another time'");
-  must(!/audited|auditad/i.test(body), "internal blocker leaked");
-  await shot("02-meeting-invite");
-});
+await ask(
+  "Le mandé invitación por Teams el lunes 1 de junio 11am hora Perú; que sugiera otra hora",
+  async () => {
+    const emails = page.locator('section:has-text("Emails to partners and funders")');
+    await emails.locator("select").first().selectOption("meeting_invite");
+    await page
+      .getByPlaceholder(/Proposed meeting/)
+      .fill("lunes 1 de junio a las 11:00 (hora de Perú) por Teams");
+    const body = await emails.locator("pre").innerText();
+    must(
+      body.includes("lunes 1 de junio a las 11:00 (hora de Perú) por Teams"),
+      "meeting time not in email",
+    );
+    must(/sugerir otro horario/.test(body), "no 'suggest another time'");
+    must(!/audited|auditad/i.test(body), "internal blocker leaked");
+    await shot("02-meeting-invite");
+  },
+);
 
 await ask("Por WhatsApp mandarle quiénes somos y la presentación", async () => {
   const emails = page.locator('section:has-text("Emails to partners and funders")');
@@ -118,13 +133,19 @@ await ask("Por WhatsApp mandarle quiénes somos y la presentación", async () =>
   must(href?.startsWith("https://wa.me/?text="), "no WhatsApp link");
 });
 
-await ask("Dame el paso 1 y paso 2: solicitar el paquete y la inscripción (emails separados)", async () => {
-  const emails = page.locator('section:has-text("Emails to partners and funders")');
-  await emails.locator("select").first().selectOption("package_request");
-  must(/paquete de aplicación|application package/i.test(await emails.innerText()), "no package email");
-  await emails.locator("select").first().selectOption("portal_registration");
-  must(/registr/i.test(await emails.locator("pre").innerText()), "no registration email");
-});
+await ask(
+  "Dame el paso 1 y paso 2: solicitar el paquete y la inscripción (emails separados)",
+  async () => {
+    const emails = page.locator('section:has-text("Emails to partners and funders")');
+    await emails.locator("select").first().selectOption("package_request");
+    must(
+      /paquete de aplicación|application package/i.test(await emails.innerText()),
+      "no package email",
+    );
+    await emails.locator("select").first().selectOption("portal_registration");
+    must(/registr/i.test(await emails.locator("pre").innerText()), "no registration email");
+  },
+);
 
 await ask("Un solo email a Marcelo que hable de todos los grants", async () => {
   await page.goto(`${BASE}/pipeline`, { waitUntil: "networkidle", timeout: 60000 });
@@ -167,20 +188,44 @@ await ask("Resumen B1 para Marcelo de esta cooperativa, con servicios y link", a
   await shot("04-partners");
 });
 
-await ask("@Busca en la web: AI Web Scout switches inline in Radar with quick query pills and live search bar", async () => {
-  await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
-  const scoutTab = page.getByRole("button", { name: /AI Web Scout/i });
-  must(await scoutTab.isVisible(), "AI Web Scout tab not visible on radar toolbar");
-  await scoutTab.click();
-  await page.waitForTimeout(600);
-  const promptInput = page.getByPlaceholder(/Ask anything to search the live web/i);
-  must(await promptInput.isVisible(), "Live web search input not visible in Radar");
-  const quickPill = page.getByRole("button", { name: /Canada Agri-Food 2026/i }).first();
-  must(await quickPill.isVisible(), "Quick query pills not visible in Radar");
-  await shot("05-web-scout-inline");
+await ask(
+  "@Busca en la web: AI Web Scout switches inline in Radar with quick query pills and live search bar",
+  async () => {
+    await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
+    const scoutTab = page.getByRole("button", { name: /AI Web Scout/i });
+    must(await scoutTab.isVisible(), "AI Web Scout tab not visible on radar toolbar");
+    await scoutTab.click();
+    await page.waitForTimeout(600);
+    const promptInput = page.getByPlaceholder(/Ask anything to search the live web/i);
+    must(await promptInput.isVisible(), "Live web search input not visible in Radar");
+    const quickPill = page.getByRole("button", { name: /Canada Agri-Food 2026/i }).first();
+    must(await quickPill.isVisible(), "Quick query pills not visible in Radar");
+    await shot("05-web-scout-inline");
+  },
+);
+
+await ask("¿Qué tengo pendiente hoy? (plazos, documentos, socios por contactar)", async () => {
+  await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle", timeout: 60000 });
+  const today = page.getByRole("list", { name: "Today" });
+  await today.waitFor({ timeout: 30000 });
+  const t = await today.innerText();
+  must(
+    /missing|Contact|Follow up|Deadline|Decide|Overdue|Register/i.test(t),
+    "Today list is empty",
+  );
+  must(
+    !/Run the grant operation/i.test(await page.locator("body").innerText()),
+    "old hero still shown",
+  );
+  await shot("05-today");
 });
 
-fs.writeFileSync(path.join(OUT, "rocio-report.json"), JSON.stringify({ base: BASE, results, problems }, null, 2));
-console.log(`\n${results.filter((r) => r.ok).length}/${results.length} requests answered; ${problems.length} problems`);
+fs.writeFileSync(
+  path.join(OUT, "rocio-report.json"),
+  JSON.stringify({ base: BASE, results, problems }, null, 2),
+);
+console.log(
+  `\n${results.filter((r) => r.ok).length}/${results.length} requests answered; ${problems.length} problems`,
+);
 for (const p of [...new Set(problems)].slice(0, 20)) console.log("  -", p);
 await browser.close();

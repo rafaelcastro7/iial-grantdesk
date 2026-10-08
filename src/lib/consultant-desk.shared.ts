@@ -512,3 +512,69 @@ export const PRESET_COUNTRIES: Array<{ code: string; name: string; flag: string 
   { code: "MG", name: "Madagascar", flag: "🇲🇬" },
   { code: "CA", name: "Canada", flag: "🇨🇦" },
 ];
+
+// ---------------------------------------------------------------------------
+// "Today": what the consultant must act on, from the application plans.
+export type AgendaItem = {
+  grantId: string;
+  grantTitle: string;
+  kind: "deadline" | "milestone" | "missing" | "partner" | "decision";
+  date: string | null; // YYYY-MM-DD
+  text: string;
+};
+
+export function todayAgenda(
+  rows: Array<{ grant: WorkspaceGrant | null; workspace: Workspace }>,
+  today = new Date(),
+  horizonDays = 21,
+): AgendaItem[] {
+  const todayIso = today.toISOString().slice(0, 10);
+  const limit = new Date(today.getTime() + horizonDays * 86400000).toISOString().slice(0, 10);
+  const items: AgendaItem[] = [];
+  for (const { grant: g, workspace: ws } of rows) {
+    if (!g || ws.priority === "discard") continue;
+    const base = { grantId: g.id, grantTitle: g.title };
+    const dl = g.deadline?.slice(0, 10);
+    if (dl && dl >= todayIso && dl <= limit)
+      items.push({ ...base, kind: "deadline", date: dl, text: `Deadline: ${deadlineText(g, ws)}` });
+    for (const m of ws.milestones ?? [])
+      if (!m.done && m.date <= limit)
+        items.push({
+          ...base,
+          kind: "milestone",
+          date: m.date,
+          text: m.date < todayIso ? `Overdue: ${m.label}` : m.label,
+        });
+    const missing = (ws.checklist ?? []).filter((c) => c.status === "missing");
+    const critical = missing.filter((c) => c.critical);
+    if (missing.length && (ws.priority === "now" || ws.priority === "prepare"))
+      items.push({
+        ...base,
+        kind: "missing",
+        date: null,
+        text: `${missing.length} document${missing.length === 1 ? "" : "s"} missing${critical.length ? ` (${critical.length} critical)` : ""}`,
+      });
+    for (const p of ws.partners ?? [])
+      if (p.name?.trim() && (p.status === "to_contact" || p.status === "contacted" || !p.status))
+        items.push({
+          ...base,
+          kind: "partner",
+          date: null,
+          text:
+            p.status === "contacted"
+              ? `Follow up with ${p.name} (no answer yet)`
+              : `Contact ${p.name}`,
+        });
+    if ((ws.priority === "now" || ws.priority === "prepare") && !ws.route)
+      items.push({
+        ...base,
+        kind: "decision",
+        date: null,
+        text: "Decide our role (lead, partner…)",
+      });
+  }
+  const rank = { deadline: 0, milestone: 1, decision: 2, missing: 3, partner: 4 };
+  return items.sort(
+    (a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999") || rank[a.kind] - rank[b.kind],
+  );
+}

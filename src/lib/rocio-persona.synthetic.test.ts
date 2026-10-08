@@ -485,3 +485,34 @@ describe("Rocío's corrections to ChatGPT's emails", () => {
     expect(e.body).not.toMatch(/¿cómo estás\?/i); // formal "usted", never casual
   });
 });
+
+describe("Home 'Today' (what needs Rocío)", () => {
+  it("lists deadlines, overdue steps, missing documents, partners to chase and decisions, soonest first", async () => {
+    const { todayAgenda } = await import("@/lib/consultant-desk.shared");
+    const { emptyWorkspace } = await import("@/lib/grant-workspace.shared");
+    const today = new Date("2026-10-08T12:00:00Z");
+    const g = { id: "g1", title: "Food-Link Fund", deadline: "2026-10-20" };
+    const ws = emptyWorkspace("o", g);
+    ws.priority = "prepare";
+    ws.milestones = [{ id: "m", label: "Register in portal", date: "2026-10-05" }];
+    ws.partners = [{ id: "p", name: "Lambton College", status: "contacted" }];
+    const discarded = {
+      ...emptyWorkspace("o", { id: "g2", title: "Old" }),
+      priority: "discard" as const,
+    };
+    const a = todayAgenda(
+      [
+        { grant: g, workspace: ws },
+        { grant: { id: "g2", title: "Old", deadline: "2026-10-10" }, workspace: discarded },
+      ],
+      today,
+    );
+    expect(a[0]).toMatchObject({ kind: "milestone", text: "Overdue: Register in portal" });
+    expect(a[1]).toMatchObject({ kind: "deadline", date: "2026-10-20" });
+    expect(a.map((x) => x.kind)).toEqual(
+      expect.arrayContaining(["missing", "partner", "decision"]),
+    );
+    expect(a.some((x) => x.text.includes("Follow up with Lambton College"))).toBe(true);
+    expect(a.some((x) => x.grantId === "g2")).toBe(false);
+  });
+});
