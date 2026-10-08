@@ -560,3 +560,51 @@ export function adoptConsortiumRoute(
     partners: mergedPartners,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Labels in the interface language (the *_LABEL maps above are the English ones).
+type L = "en" | "es";
+const ES_PRIORITY: Record<Priority, string> = {
+  now: "Aplicar ya",
+  prepare: "Preparar",
+  monitor: "Monitorear",
+  discard: "Descartar",
+};
+const ES_ROUTE: Record<Route, string> = {
+  lead: "Aplicante principal",
+  co_lead: "Co-aplicante",
+  partner: "Socio (otra organización administra)",
+  beneficiary: "Beneficiario / anfitrión",
+};
+const ES_CALL_STATUS: Record<CallStatus, string> = {
+  open: "Abierta",
+  upcoming: "Próxima",
+  rolling: "Convocatoria continua",
+  closed_next_cycle: "Cerrada — próximo ciclo",
+  invite_only: "Por invitación",
+};
+const ES_INSTRUMENT: Record<Instrument, string> = {
+  grant: "Subvención",
+  contribution: "Contribución no reembolsable",
+  repayable_contribution: "Contribución reembolsable",
+  loan: "Préstamo",
+  cost_share: "Costo compartido",
+  tax_credit: "Crédito fiscal",
+  other: "Otro",
+};
+const ES_CHECK: Record<CheckStatus, string> = {
+  missing: "Falta",
+  in_progress: "En curso",
+  have: "Listo",
+  not_needed: "No se necesita",
+};
+export const priorityLabel = (p: Priority, lang: L = "en") =>
+  lang === "es" ? ES_PRIORITY[p] : PRIORITY_LABEL[p];
+export const routeLabel = (r: Route, lang: L = "en") =>
+  lang === "es" ? ES_ROUTE[r] : ROUTE_LABEL[r];
+export const callStatusLabel = (c: CallStatus, lang: L = "en") =>
+  lang === "es" ? ES_CALL_STATUS[c] : CALL_STATUS_LABEL[c];
+export const instrumentLabel = (i: Instrument, lang: L = "en") =>
+  lang === "es" ? ES_INSTRUMENT[i] : INSTRUMENT_LABEL[i];
+export const checkStatusLabel = (c: CheckStatus, lang: L = "en") =>
+  lang === "es" ? ES_CHECK[c] : CHECK_STATUS_LABEL[c];
