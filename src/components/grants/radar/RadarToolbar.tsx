@@ -339,8 +339,8 @@ export function RadarToolbar({
                 value={value.search}
                 onChange={(e) => set("search", e.target.value)}
                 placeholder={tr(
-                  "Grant name, funder or topic — or paste the call's link",
-                  "Nombre del grant, financiador o tema — o pegue el enlace de la convocatoria",
+                  "Search grants in the system and on the internet: name, funder, topic or a link (Enter)",
+                  "Buscar grants en el sistema y en internet: nombre, financiador, tema o un enlace (Enter)",
                 )}
                 aria-label={tr("Search grants", "Buscar grants")}
                 className="h-12 pl-10 text-base"

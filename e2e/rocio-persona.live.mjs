@@ -199,7 +199,7 @@ await ask("Busca en la web lo que no está en el sistema (un solo buscador)", as
   const box = page.getByRole("textbox", { name: "Search grants" });
   await box.waitFor({ timeout: 30000 });
   await box.fill("cooperativas de cacao Peru convocatoria 2027");
-  await page.getByRole("heading", { name: "From the web" }).waitFor({ timeout: 30000 });
+  await page.getByRole("heading", { name: "From the internet" }).waitFor({ timeout: 30000 });
   must(
     (await page.getByRole("button", { name: /Search the web for/ }).count()) > 0 ||
       (await page.getByText(/Browsing the live internet|Discovered|could not retrieve/i).count()) >

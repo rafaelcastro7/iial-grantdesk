@@ -1,6 +1,7 @@
 // The consultant's working sheet for one grant: who applies and how, the
 // decision, consortium, documents checklist, milestones and WCIS project idea,
 // saved per organization, plus the decision memo built from it.
+import { dossierToPlan, type Dossier } from "@/lib/grant-dossier.shared";
 import { getGrantDossier } from "@/lib/grant-dossier.functions";
 import { fitLabel, fitTone, type DossierFit } from "@/lib/grant-dossier.shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +59,7 @@ import {
   decisionMemo,
   defaultMilestones,
   missingFromCall,
+  applyPlanUpdate,
   mergeServerChanges,
   newId,
   type ChecklistItem,
@@ -88,6 +90,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const savedFit =
     (dossierData?.saved?.dossier as { fit?: DossierFit; fit_reason?: string } | undefined) ?? null;
   const dossierFit = savedFit?.fit ? { fit: savedFit.fit, reason: savedFit.fit_reason } : null;
+
   const fetchWs = useServerFn(getGrantWorkspace);
   const save = useServerFn(saveGrantWorkspace);
   const qc = useQueryClient();
@@ -143,6 +146,26 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       );
     }
   }, [data?.workspace]);
+
+  // An unsaved plan starts from the dossier: its real documents and dates
+  // replace the generic list (a saved or edited plan is never touched).
+  const seededFromDossier = useRef(false);
+  useEffect(() => {
+    const d = dossierData?.saved?.dossier;
+    if (!d || seededFromDossier.current || !ws || data?.saved || dirtyRef.current) return;
+    seededFromDossier.current = true;
+    const fromCall = ws.checklist.filter(
+      (c) =>
+        c.id.startsWith("req-") &&
+        !/^(project proposal narrative|detailed project budget|work plan with milestone|proof of organizational legal registration)/i.test(
+          c.item,
+        ),
+    );
+    let next: Workspace = { ...ws, checklist: fromCall };
+    next = applyPlanUpdate(next, dossierToPlan(d, "documents"));
+    if (d.timeline.some((t) => t.date)) next = applyPlanUpdate(next, dossierToPlan(d, "timeline"));
+    setWs(next);
+  }, [dossierData?.saved, ws, data?.saved]);
 
   const update = (patch: Partial<Workspace>) => {
     setWs((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -475,7 +498,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         icon={<ClipboardList className="h-4 w-4" />}
         title={tr("2. Our decision", "2. Nuestra decisión")}
       >
-        {roadmap && (
+        {roadmap && !dossierData?.saved && (
           <div className="mb-4 space-y-2 rounded-lg border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center justify-between gap-1.5">
               <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -1155,290 +1178,596 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         </div>
       </Section>
 
-      <Section
-        icon={<Mail className="h-4 w-4" />}
-        title={tr("5. Write", "5. Redactar")}
-        hint={tr(
-          "Emails never include the internal blockers; the memo does.",
-          "Los correos nunca incluyen los bloqueos internos; el memo sí.",
-        )}
-      >
-        <div className="mb-3 inline-flex rounded-lg border bg-muted/30 p-1 text-xs">
-          {(
-            [
-              ["outreach", tr("Partners and funders", "Socios y financiadores")],
-              ["memo", tr("Memo to Marcelo", "Memo para Marcelo")],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setWriteMode(k)}
-              className={cn(
-                "rounded-md px-3 py-1.5 font-semibold",
-                writeMode === k
-                  ? "bg-background text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground",
+      {dossierData?.saved && (dossierData.saved.dossier as Dossier).messages?.length ? (
+        <details className="rounded-lg border bg-card shadow-sm">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
+            {tr("5. More email templates and the memo", "5. Más plantillas de correo y el memo")}
+            <span className="ml-2 font-normal text-muted-foreground">
+              {tr(
+                "the dossier above already has the messages for this call",
+                "el dossier de arriba ya tiene los mensajes para esta convocatoria",
               )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {writeMode === "outreach" ? (
-          <>
-            {(() => {
-              const partner = ws.partners[partnerIdx] ?? null;
-              const known = partner
-                ? directoryByName.get(partner.name.trim().toLowerCase())
-                : undefined;
-              const orgName =
-                data.orgs.find((o) => o.id === orgId)?.name ??
-                tr("our organization", "nuestra organización");
-              const email = composeOutreach({
-                template,
-                lang,
-                grant: data.grant,
-                workspace: ws,
-                orgName,
-                senderName,
-                partner,
-                recipientName: known?.contact_name ?? undefined,
-                meetingWhen,
-                links: links.split(/[\s,]+/).filter(Boolean),
-                attachments: (attachmentsEdit ?? defaultAttachments(lang))
-                  .split(",")
-                  .map((x) => x.trim())
-                  .filter(Boolean),
-                includeAcademicCredentials,
-              });
-              const isWhatsApp = template === "whatsapp_intro";
-              const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
-              const mailto = `mailto:${toPartner && known?.email ? encodeURIComponent(known.email) : ""}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
-              return (
-                <div className="space-y-3">
-                  <div className="grid gap-2 sm:grid-cols-4">
-                    <select
-                      className={selectClass}
-                      value={template}
-                      onChange={(e) => setTemplate(e.target.value as TemplateId)}
+            </span>
+          </summary>
+          <Section
+            icon={<Mail className="h-4 w-4" />}
+            title={tr("5. Write", "5. Redactar")}
+            hint={tr(
+              "Emails never include the internal blockers; the memo does.",
+              "Los correos nunca incluyen los bloqueos internos; el memo sí.",
+            )}
+          >
+            <div className="mb-3 inline-flex rounded-lg border bg-muted/30 p-1 text-xs">
+              {(
+                [
+                  ["outreach", tr("Partners and funders", "Socios y financiadores")],
+                  ["memo", tr("Memo to Marcelo", "Memo para Marcelo")],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setWriteMode(k)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 font-semibold",
+                    writeMode === k
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {writeMode === "outreach" ? (
+              <>
+                {(() => {
+                  const partner = ws.partners[partnerIdx] ?? null;
+                  const known = partner
+                    ? directoryByName.get(partner.name.trim().toLowerCase())
+                    : undefined;
+                  const orgName =
+                    data.orgs.find((o) => o.id === orgId)?.name ??
+                    tr("our organization", "nuestra organización");
+                  const email = composeOutreach({
+                    template,
+                    lang,
+                    grant: data.grant,
+                    workspace: ws,
+                    orgName,
+                    senderName,
+                    partner,
+                    recipientName: known?.contact_name ?? undefined,
+                    meetingWhen,
+                    links: links.split(/[\s,]+/).filter(Boolean),
+                    attachments: (attachmentsEdit ?? defaultAttachments(lang))
+                      .split(",")
+                      .map((x) => x.trim())
+                      .filter(Boolean),
+                    includeAcademicCredentials,
+                  });
+                  const isWhatsApp = template === "whatsapp_intro";
+                  const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
+                  const mailto = `mailto:${toPartner && known?.email ? encodeURIComponent(known.email) : ""}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
+                  return (
+                    <div className="space-y-3">
+                      <div className="grid gap-2 sm:grid-cols-4">
+                        <select
+                          className={selectClass}
+                          value={template}
+                          onChange={(e) => setTemplate(e.target.value as TemplateId)}
+                        >
+                          {TEMPLATE_IDS.map((t) => (
+                            <option key={t} value={t}>
+                              {uiLang === "es" ? TEMPLATE_LABEL[t].es : TEMPLATE_LABEL[t].en}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          className={selectClass}
+                          value={lang}
+                          aria-label={tr("Recipient's language", "Idioma del destinatario")}
+                          onChange={(e) => setLang(e.target.value as Lang)}
+                        >
+                          <option value="es">{tr("Spanish", "Español")}</option>
+                          <option value="en">{tr("English", "Inglés")}</option>
+                        </select>
+                        {toPartner && (
+                          <select
+                            className={selectClass}
+                            value={partnerIdx}
+                            onChange={(e) => setPartnerIdx(Number(e.target.value))}
+                          >
+                            {ws.partners.length === 0 && (
+                              <option value={0}>
+                                {tr("No partners yet", "Aún no hay socios")}
+                              </option>
+                            )}
+                            {ws.partners.map((p, i) => (
+                              <option key={p.id} value={i}>
+                                {p.name || `${tr("Partner", "Socio")} ${i + 1}`}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <Input
+                          value={senderName}
+                          placeholder={tr("Sender", "Remitente")}
+                          onChange={(e) => setSenderName(e.target.value)}
+                        />
+                      </div>
+                      {toPartner && (
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={includeAcademicCredentials}
+                            onChange={(e) => setIncludeAcademicCredentials(e.target.checked)}
+                            className="rounded border-border"
+                          />
+                          <span>
+                            {tr(
+                              "Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School / Univ. of Reading)",
+                              "Incluir la cita de la tesis doctoral del Dr. Juan Marcelo Gómez (Henley Business School / Univ. of Reading)",
+                            )}
+                          </span>
+                        </label>
+                      )}
+                      {template === "meeting_invite" && (
+                        <Input
+                          value={meetingWhen}
+                          placeholder={tr(
+                            "Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams",
+                            "Reunión propuesta, p. ej. lunes 1 de junio a las 11:00 (hora de Perú) por Teams",
+                          )}
+                          onChange={(e) => setMeetingWhen(e.target.value)}
+                        />
+                      )}
+                      {template === "partner_intro" && (
+                        <Input
+                          value={attachmentsEdit ?? defaultAttachments(lang)}
+                          placeholder={tr(
+                            "Attachments, separated by commas (leave empty for none)",
+                            "Adjuntos, separados por comas (déjelo vacío si no hay)",
+                          )}
+                          onChange={(e) => setAttachments(e.target.value)}
+                        />
+                      )}
+                      {isWhatsApp && (
+                        <Input
+                          value={links}
+                          placeholder={tr(
+                            "Links to share (presentation, website)",
+                            "Enlaces para compartir (presentación, sitio web)",
+                          )}
+                          onChange={(e) => setLinks(e.target.value)}
+                        />
+                      )}
+                      {email.subject && (
+                        <div className="text-xs font-semibold">
+                          {tr("Subject:", "Asunto:")} {email.subject}
+                        </div>
+                      )}
+                      <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
+                        {email.body}
+                      </pre>
+                      {(() => {
+                        const phoneDigits = (known?.phone || partner?.contact || "").replace(
+                          /\D/g,
+                          "",
+                        );
+                        const waHref =
+                          phoneDigits.length >= 8
+                            ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(email.body)}`
+                            : `https://wa.me/?text=${encodeURIComponent(email.body)}`;
+
+                        return (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(
+                                    email.subject
+                                      ? `${lang === "es" ? "Asunto" : "Subject"}: ${email.subject}\n\n${email.body}`
+                                      : email.body,
+                                  );
+                                  setCopiedEmail(true);
+                                  toast.success(
+                                    isWhatsApp
+                                      ? tr("WhatsApp message copied", "Mensaje de WhatsApp copiado")
+                                      : tr("Email copied", "Correo copiado"),
+                                  );
+                                  setTimeout(() => setCopiedEmail(false), 3000);
+                                } catch {
+                                  toast.error(
+                                    tr(
+                                      "Could not copy; select the text instead.",
+                                      "No se pudo copiar; seleccione el texto.",
+                                    ),
+                                  );
+                                }
+                              }}
+                            >
+                              {copiedEmail ? (
+                                <>
+                                  <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                  <span>{tr("Copied! ✓", "¡Copiado! ✓")}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-4 w-4" />
+                                  <span>
+                                    {isWhatsApp
+                                      ? tr("Copy message", "Copiar mensaje")
+                                      : tr("Copy email", "Copiar correo")}
+                                  </span>
+                                </>
+                              )}
+                            </Button>
+                            {isWhatsApp ? (
+                              <Button
+                                asChild
+                                size="sm"
+                                className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                              >
+                                <a href={waHref} target="_blank" rel="noreferrer">
+                                  <MessageCircle className="h-4 w-4" />{" "}
+                                  {tr("Open in WhatsApp", "Abrir en WhatsApp")}
+                                </a>
+                              </Button>
+                            ) : (
+                              <Button asChild variant="outline" size="sm" className="gap-1.5">
+                                <a href={mailto}>
+                                  <Mail className="h-4 w-4 text-primary" />{" "}
+                                  {tr("Open in email app", "Abrir en la app de correo")}
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })()}
+              </>
+            ) : (
+              <>
+                <Field label={tr("Notes for the memo", "Notas para el memo")}>
+                  <Textarea
+                    rows={2}
+                    value={ws.decision_notes ?? ""}
+                    onChange={(e) => update({ decision_notes: e.target.value || null })}
+                  />
+                </Field>
+                {memo && (
+                  <div className="mt-3 space-y-2">
+                    <div className="text-xs font-semibold">
+                      {tr("Subject:", "Asunto:")} {memo.subject}
+                    </div>
+                    <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
+                      {memo.body}
+                    </pre>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(
+                            `${tr("Subject:", "Asunto:")} ${memo.subject}\n\n${memo.body}`,
+                          );
+                          toast.success(tr("Memo copied", "Memo copiado"));
+                        } catch {
+                          toast.error(
+                            tr(
+                              "Could not copy; select the text instead.",
+                              "No se pudo copiar; seleccione el texto.",
+                            ),
+                          );
+                        }
+                      }}
                     >
-                      {TEMPLATE_IDS.map((t) => (
-                        <option key={t} value={t}>
-                          {uiLang === "es" ? TEMPLATE_LABEL[t].es : TEMPLATE_LABEL[t].en}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className={selectClass}
-                      value={lang}
-                      aria-label={tr("Recipient's language", "Idioma del destinatario")}
-                      onChange={(e) => setLang(e.target.value as Lang)}
-                    >
-                      <option value="es">{tr("Spanish", "Español")}</option>
-                      <option value="en">{tr("English", "Inglés")}</option>
-                    </select>
-                    {toPartner && (
+                      <Copy className="h-4 w-4" /> {tr("Copy memo", "Copiar memo")}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </Section>
+        </details>
+      ) : (
+        <Section
+          icon={<Mail className="h-4 w-4" />}
+          title={tr("5. Write", "5. Redactar")}
+          hint={tr(
+            "Emails never include the internal blockers; the memo does.",
+            "Los correos nunca incluyen los bloqueos internos; el memo sí.",
+          )}
+        >
+          <div className="mb-3 inline-flex rounded-lg border bg-muted/30 p-1 text-xs">
+            {(
+              [
+                ["outreach", tr("Partners and funders", "Socios y financiadores")],
+                ["memo", tr("Memo to Marcelo", "Memo para Marcelo")],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setWriteMode(k)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 font-semibold",
+                  writeMode === k
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {writeMode === "outreach" ? (
+            <>
+              {(() => {
+                const partner = ws.partners[partnerIdx] ?? null;
+                const known = partner
+                  ? directoryByName.get(partner.name.trim().toLowerCase())
+                  : undefined;
+                const orgName =
+                  data.orgs.find((o) => o.id === orgId)?.name ??
+                  tr("our organization", "nuestra organización");
+                const email = composeOutreach({
+                  template,
+                  lang,
+                  grant: data.grant,
+                  workspace: ws,
+                  orgName,
+                  senderName,
+                  partner,
+                  recipientName: known?.contact_name ?? undefined,
+                  meetingWhen,
+                  links: links.split(/[\s,]+/).filter(Boolean),
+                  attachments: (attachmentsEdit ?? defaultAttachments(lang))
+                    .split(",")
+                    .map((x) => x.trim())
+                    .filter(Boolean),
+                  includeAcademicCredentials,
+                });
+                const isWhatsApp = template === "whatsapp_intro";
+                const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
+                const mailto = `mailto:${toPartner && known?.email ? encodeURIComponent(known.email) : ""}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
+                return (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 sm:grid-cols-4">
                       <select
                         className={selectClass}
-                        value={partnerIdx}
-                        onChange={(e) => setPartnerIdx(Number(e.target.value))}
+                        value={template}
+                        onChange={(e) => setTemplate(e.target.value as TemplateId)}
                       >
-                        {ws.partners.length === 0 && (
-                          <option value={0}>{tr("No partners yet", "Aún no hay socios")}</option>
-                        )}
-                        {ws.partners.map((p, i) => (
-                          <option key={p.id} value={i}>
-                            {p.name || `${tr("Partner", "Socio")} ${i + 1}`}
+                        {TEMPLATE_IDS.map((t) => (
+                          <option key={t} value={t}>
+                            {uiLang === "es" ? TEMPLATE_LABEL[t].es : TEMPLATE_LABEL[t].en}
                           </option>
                         ))}
                       </select>
-                    )}
-                    <Input
-                      value={senderName}
-                      placeholder={tr("Sender", "Remitente")}
-                      onChange={(e) => setSenderName(e.target.value)}
-                    />
-                  </div>
-                  {toPartner && (
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={includeAcademicCredentials}
-                        onChange={(e) => setIncludeAcademicCredentials(e.target.checked)}
-                        className="rounded border-border"
-                      />
-                      <span>
-                        {tr(
-                          "Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School / Univ. of Reading)",
-                          "Incluir la cita de la tesis doctoral del Dr. Juan Marcelo Gómez (Henley Business School / Univ. of Reading)",
-                        )}
-                      </span>
-                    </label>
-                  )}
-                  {template === "meeting_invite" && (
-                    <Input
-                      value={meetingWhen}
-                      placeholder={tr(
-                        "Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams",
-                        "Reunión propuesta, p. ej. lunes 1 de junio a las 11:00 (hora de Perú) por Teams",
-                      )}
-                      onChange={(e) => setMeetingWhen(e.target.value)}
-                    />
-                  )}
-                  {template === "partner_intro" && (
-                    <Input
-                      value={attachmentsEdit ?? defaultAttachments(lang)}
-                      placeholder={tr(
-                        "Attachments, separated by commas (leave empty for none)",
-                        "Adjuntos, separados por comas (déjelo vacío si no hay)",
-                      )}
-                      onChange={(e) => setAttachments(e.target.value)}
-                    />
-                  )}
-                  {isWhatsApp && (
-                    <Input
-                      value={links}
-                      placeholder={tr(
-                        "Links to share (presentation, website)",
-                        "Enlaces para compartir (presentación, sitio web)",
-                      )}
-                      onChange={(e) => setLinks(e.target.value)}
-                    />
-                  )}
-                  {email.subject && (
-                    <div className="text-xs font-semibold">
-                      {tr("Subject:", "Asunto:")} {email.subject}
-                    </div>
-                  )}
-                  <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
-                    {email.body}
-                  </pre>
-                  {(() => {
-                    const phoneDigits = (known?.phone || partner?.contact || "").replace(/\D/g, "");
-                    const waHref =
-                      phoneDigits.length >= 8
-                        ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(email.body)}`
-                        : `https://wa.me/?text=${encodeURIComponent(email.body)}`;
-
-                    return (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(
-                                email.subject
-                                  ? `${lang === "es" ? "Asunto" : "Subject"}: ${email.subject}\n\n${email.body}`
-                                  : email.body,
-                              );
-                              setCopiedEmail(true);
-                              toast.success(
-                                isWhatsApp
-                                  ? tr("WhatsApp message copied", "Mensaje de WhatsApp copiado")
-                                  : tr("Email copied", "Correo copiado"),
-                              );
-                              setTimeout(() => setCopiedEmail(false), 3000);
-                            } catch {
-                              toast.error(
-                                tr(
-                                  "Could not copy; select the text instead.",
-                                  "No se pudo copiar; seleccione el texto.",
-                                ),
-                              );
-                            }
-                          }}
+                      <select
+                        className={selectClass}
+                        value={lang}
+                        aria-label={tr("Recipient's language", "Idioma del destinatario")}
+                        onChange={(e) => setLang(e.target.value as Lang)}
+                      >
+                        <option value="es">{tr("Spanish", "Español")}</option>
+                        <option value="en">{tr("English", "Inglés")}</option>
+                      </select>
+                      {toPartner && (
+                        <select
+                          className={selectClass}
+                          value={partnerIdx}
+                          onChange={(e) => setPartnerIdx(Number(e.target.value))}
                         >
-                          {copiedEmail ? (
-                            <>
-                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                              <span>{tr("Copied! ✓", "¡Copiado! ✓")}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4" />
-                              <span>
-                                {isWhatsApp
-                                  ? tr("Copy message", "Copiar mensaje")
-                                  : tr("Copy email", "Copiar correo")}
-                              </span>
-                            </>
+                          {ws.partners.length === 0 && (
+                            <option value={0}>{tr("No partners yet", "Aún no hay socios")}</option>
                           )}
-                        </Button>
-                        {isWhatsApp ? (
-                          <Button
-                            asChild
-                            size="sm"
-                            className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                          >
-                            <a href={waHref} target="_blank" rel="noreferrer">
-                              <MessageCircle className="h-4 w-4" />{" "}
-                              {tr("Open in WhatsApp", "Abrir en WhatsApp")}
-                            </a>
-                          </Button>
-                        ) : (
-                          <Button asChild variant="outline" size="sm" className="gap-1.5">
-                            <a href={mailto}>
-                              <Mail className="h-4 w-4 text-primary" />{" "}
-                              {tr("Open in email app", "Abrir en la app de correo")}
-                            </a>
-                          </Button>
+                          {ws.partners.map((p, i) => (
+                            <option key={p.id} value={i}>
+                              {p.name || `${tr("Partner", "Socio")} ${i + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <Input
+                        value={senderName}
+                        placeholder={tr("Sender", "Remitente")}
+                        onChange={(e) => setSenderName(e.target.value)}
+                      />
+                    </div>
+                    {toPartner && (
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={includeAcademicCredentials}
+                          onChange={(e) => setIncludeAcademicCredentials(e.target.checked)}
+                          className="rounded border-border"
+                        />
+                        <span>
+                          {tr(
+                            "Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School / Univ. of Reading)",
+                            "Incluir la cita de la tesis doctoral del Dr. Juan Marcelo Gómez (Henley Business School / Univ. of Reading)",
+                          )}
+                        </span>
+                      </label>
+                    )}
+                    {template === "meeting_invite" && (
+                      <Input
+                        value={meetingWhen}
+                        placeholder={tr(
+                          "Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams",
+                          "Reunión propuesta, p. ej. lunes 1 de junio a las 11:00 (hora de Perú) por Teams",
                         )}
+                        onChange={(e) => setMeetingWhen(e.target.value)}
+                      />
+                    )}
+                    {template === "partner_intro" && (
+                      <Input
+                        value={attachmentsEdit ?? defaultAttachments(lang)}
+                        placeholder={tr(
+                          "Attachments, separated by commas (leave empty for none)",
+                          "Adjuntos, separados por comas (déjelo vacío si no hay)",
+                        )}
+                        onChange={(e) => setAttachments(e.target.value)}
+                      />
+                    )}
+                    {isWhatsApp && (
+                      <Input
+                        value={links}
+                        placeholder={tr(
+                          "Links to share (presentation, website)",
+                          "Enlaces para compartir (presentación, sitio web)",
+                        )}
+                        onChange={(e) => setLinks(e.target.value)}
+                      />
+                    )}
+                    {email.subject && (
+                      <div className="text-xs font-semibold">
+                        {tr("Subject:", "Asunto:")} {email.subject}
                       </div>
-                    );
-                  })()}
-                </div>
-              );
-            })()}
-          </>
-        ) : (
-          <>
-            <Field label={tr("Notes for the memo", "Notas para el memo")}>
-              <Textarea
-                rows={2}
-                value={ws.decision_notes ?? ""}
-                onChange={(e) => update({ decision_notes: e.target.value || null })}
-              />
-            </Field>
-            {memo && (
-              <div className="mt-3 space-y-2">
-                <div className="text-xs font-semibold">
-                  {tr("Subject:", "Asunto:")} {memo.subject}
-                </div>
-                <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
-                  {memo.body}
-                </pre>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(
-                        `${tr("Subject:", "Asunto:")} ${memo.subject}\n\n${memo.body}`,
+                    )}
+                    <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
+                      {email.body}
+                    </pre>
+                    {(() => {
+                      const phoneDigits = (known?.phone || partner?.contact || "").replace(
+                        /\D/g,
+                        "",
                       );
-                      toast.success(tr("Memo copied", "Memo copiado"));
-                    } catch {
-                      toast.error(
-                        tr(
-                          "Could not copy; select the text instead.",
-                          "No se pudo copiar; seleccione el texto.",
-                        ),
+                      const waHref =
+                        phoneDigits.length >= 8
+                          ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(email.body)}`
+                          : `https://wa.me/?text=${encodeURIComponent(email.body)}`;
+
+                      return (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(
+                                  email.subject
+                                    ? `${lang === "es" ? "Asunto" : "Subject"}: ${email.subject}\n\n${email.body}`
+                                    : email.body,
+                                );
+                                setCopiedEmail(true);
+                                toast.success(
+                                  isWhatsApp
+                                    ? tr("WhatsApp message copied", "Mensaje de WhatsApp copiado")
+                                    : tr("Email copied", "Correo copiado"),
+                                );
+                                setTimeout(() => setCopiedEmail(false), 3000);
+                              } catch {
+                                toast.error(
+                                  tr(
+                                    "Could not copy; select the text instead.",
+                                    "No se pudo copiar; seleccione el texto.",
+                                  ),
+                                );
+                              }
+                            }}
+                          >
+                            {copiedEmail ? (
+                              <>
+                                <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                <span>{tr("Copied! ✓", "¡Copiado! ✓")}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-4 w-4" />
+                                <span>
+                                  {isWhatsApp
+                                    ? tr("Copy message", "Copiar mensaje")
+                                    : tr("Copy email", "Copiar correo")}
+                                </span>
+                              </>
+                            )}
+                          </Button>
+                          {isWhatsApp ? (
+                            <Button
+                              asChild
+                              size="sm"
+                              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                            >
+                              <a href={waHref} target="_blank" rel="noreferrer">
+                                <MessageCircle className="h-4 w-4" />{" "}
+                                {tr("Open in WhatsApp", "Abrir en WhatsApp")}
+                              </a>
+                            </Button>
+                          ) : (
+                            <Button asChild variant="outline" size="sm" className="gap-1.5">
+                              <a href={mailto}>
+                                <Mail className="h-4 w-4 text-primary" />{" "}
+                                {tr("Open in email app", "Abrir en la app de correo")}
+                              </a>
+                            </Button>
+                          )}
+                        </div>
                       );
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4" /> {tr("Copy memo", "Copiar memo")}
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </Section>
+                    })()}
+                  </div>
+                );
+              })()}
+            </>
+          ) : (
+            <>
+              <Field label={tr("Notes for the memo", "Notas para el memo")}>
+                <Textarea
+                  rows={2}
+                  value={ws.decision_notes ?? ""}
+                  onChange={(e) => update({ decision_notes: e.target.value || null })}
+                />
+              </Field>
+              {memo && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs font-semibold">
+                    {tr("Subject:", "Asunto:")} {memo.subject}
+                  </div>
+                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
+                    {memo.body}
+                  </pre>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(
+                          `${tr("Subject:", "Asunto:")} ${memo.subject}\n\n${memo.body}`,
+                        );
+                        toast.success(tr("Memo copied", "Memo copiado"));
+                      } catch {
+                        toast.error(
+                          tr(
+                            "Could not copy; select the text instead.",
+                            "No se pudo copiar; seleccione el texto.",
+                          ),
+                        );
+                      }
+                    }}
+                  >
+                    <Copy className="h-4 w-4" /> {tr("Copy memo", "Copiar memo")}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </Section>
+      )}
     </div>
   );
 }

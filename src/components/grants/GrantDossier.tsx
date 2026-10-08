@@ -317,11 +317,14 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
                 <div className="font-medium">{t.step}</div>
                 <div className="text-xs text-muted-foreground">
                   {[t.date, t.when].filter(Boolean).join(" · ")}
-                  {t.money && (
-                    <span className="ml-2 font-semibold text-emerald-700 dark:text-emerald-400">
-                      {t.money}
-                    </span>
-                  )}
+                  {t.money &&
+                    !/^(n\/?a|none|ninguno|—|-|0|no aplica|sin costos?( directos?)?)$/i.test(
+                      t.money.trim(),
+                    ) && (
+                      <span className="ml-2 font-semibold text-emerald-700 dark:text-emerald-400">
+                        {t.money}
+                      </span>
+                    )}
                 </div>
               </li>
             ))}
@@ -347,26 +350,32 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
 
       {saved.sources.length > 0 && (
         <section className="rounded-xl border bg-card p-4 text-xs text-muted-foreground">
-          <span className="font-semibold">{tr("Sources", "Fuentes")}: </span>
-          {saved.sources.map((s, i) => (
-            <a
-              key={s.url}
-              href={s.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary hover:underline"
-            >
-              {i > 0 && " · "}
-              {s.title ||
-                (() => {
-                  try {
-                    return new URL(s.url).hostname;
-                  } catch {
-                    return s.url;
-                  }
-                })()}
-            </a>
-          ))}
+          <details>
+            <summary className="cursor-pointer font-semibold">
+              {tr(`Sources (${saved.sources.length})`, `Fuentes (${saved.sources.length})`)}
+            </summary>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {saved.sources.map((s) => (
+                <li key={s.url}>
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {s.title ||
+                      (() => {
+                        try {
+                          return new URL(s.url).hostname;
+                        } catch {
+                          return s.url;
+                        }
+                      })()}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
           <span className="block pt-1">
             {tr(
               "Prepared by AI from these sources; verify amounts and dates on the official page before sending.",

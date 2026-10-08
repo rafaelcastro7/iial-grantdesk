@@ -1,11 +1,21 @@
 // "Today" for the consultant: deadlines, overdue steps, missing documents,
 // partners waiting and pending decisions, built from the application plans.
 // Replaces the generic hero on Home. Deterministic, no AI.
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, CalendarClock, FileWarning, Mail, Radar, Scale, Users } from "lucide-react";
-import type { ComponentType } from "react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  FileWarning,
+  Mail,
+  Radar,
+  Scale,
+  Search,
+  Users,
+} from "lucide-react";
+import { useState, type ComponentType } from "react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { todayAgenda, type AgendaItem } from "@/lib/consultant-desk.shared";
 import { listGrantWorkspaces } from "@/lib/grant-workspace.functions";
@@ -23,6 +33,22 @@ const ICON: Record<AgendaItem["kind"], ComponentType<{ className?: string }>> = 
 
 export function ConsultantToday({ greeting }: { greeting: string }) {
   const tr = useTr();
+  const navigate = useNavigate();
+  const [q, setQ] = useState("");
+  // Search first: in the system and on the internet (Find grants runs both).
+  const search = () => {
+    const text = q.trim();
+    if (!text) return;
+    try {
+      const key = "grants.radar.filters.v1";
+      const prev = JSON.parse(window.sessionStorage.getItem(key) ?? "{}");
+      window.sessionStorage.setItem(key, JSON.stringify({ ...prev, search: text }));
+      if (!/^https?:\/\//i.test(text)) window.sessionStorage.setItem("grants.autoWeb", text);
+    } catch {
+      /* storage unavailable: Find grants still opens */
+    }
+    void navigate({ to: "/grants" });
+  };
   const lang = useUiLang();
   const { activeOrgId, activeOrgName } = useActiveTenant();
   const fetchRows = useServerFn(listGrantWorkspaces);
@@ -39,6 +65,28 @@ export function ConsultantToday({ greeting }: { greeting: string }) {
     <section className="overflow-hidden rounded-md border bg-card shadow-sm">
       <div className="grid lg:grid-cols-[minmax(0,1.5fr)_320px]">
         <div className="p-5 sm:p-6">
+          <form
+            className="relative mb-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              search();
+            }}
+          >
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label={tr("Search grants", "Buscar grants")}
+              placeholder={tr(
+                "Search grants in the system and on the internet: name, funder, topic or a link",
+                "Buscar grants en el sistema y en internet: nombre, financiador, tema o un enlace",
+              )}
+              className="h-12 pl-10 pr-28 text-base"
+            />
+            <Button type="submit" className="absolute right-1.5 top-1/2 h-9 -translate-y-1/2">
+              {tr("Search", "Buscar")}
+            </Button>
+          </form>
           <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">{greeting}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {activeOrgName ? `${activeOrgName} · ` : ""}

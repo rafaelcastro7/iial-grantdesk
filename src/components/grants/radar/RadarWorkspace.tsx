@@ -156,8 +156,24 @@ export function RadarWorkspace({
       return;
     }
     setWebQuery(q);
-    if (radar.items.length === 0) void handleExecuteWebSearch(q);
+    void handleExecuteWebSearch(q);
   };
+
+  // A search started on Today arrives here and runs on the internet at once.
+  useEffect(() => {
+    let q: string | null = null;
+    try {
+      q = window.sessionStorage.getItem("grants.autoWeb");
+      window.sessionStorage.removeItem("grants.autoWeb");
+    } catch {
+      /* storage unavailable */
+    }
+    if (q) {
+      setWebQuery(q);
+      void handleExecuteWebSearch(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // A search with nothing in the catalog goes to the web by itself (once per text).
   const autoWebFor = useRef("");
@@ -373,151 +389,156 @@ export function RadarWorkspace({
           }
         </div>
 
-        {/* Catalog results */}
-        {radar.items.length === 0 ? (
-          <EmptyState
-            hasAny={totalLoaded > 0}
-            isAdmin={isAdmin}
-            searchQuery={
-              filters.search ||
-              (filters.country !== "all" ? webQueryForCountry(filters.country) : "")
-            }
-            countryLabel={
-              filters.country !== "all" ? countryName(filters.country, lang) : undefined
-            }
-            onSearchWeb={(q) => {
-              setWebQuery(q);
-              handleExecuteWebSearch(q);
-            }}
-            onReset={() =>
-              onFiltersChange({
-                ...filters,
-                country: "all",
-                sector: "all",
-                verdict: "all",
-                status: "active",
-                minAmount: 0,
-                search: "",
-              })
-            }
-            onDiscover={admin.onDiscover}
-          />
-        ) : (
-          <div className="space-y-8 px-4 py-5 md:px-7">
-            {radar.groups.map((group) => (
-              <section key={group.country} className="space-y-3">
-                <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
-                  {countryName(group.country, lang)}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {group.items.length}
-                  </span>
-                </h2>
-                <div className="space-y-2.5">
-                  {group.items.map((item) => (
-                    <RadarCard
-                      key={item.grant.id}
-                      item={item}
-                      actions={actions}
-                      highlight={next?.grant.id === item.grant.id}
-                      simple={simple}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-col">
+          {/* Catalog results */}
+          {radar.items.length === 0 ? (
+            <EmptyState
+              hasAny={totalLoaded > 0}
+              isAdmin={isAdmin}
+              searchQuery={
+                filters.search ||
+                (filters.country !== "all" ? webQueryForCountry(filters.country) : "")
+              }
+              countryLabel={
+                filters.country !== "all" ? countryName(filters.country, lang) : undefined
+              }
+              onSearchWeb={(q) => {
+                setWebQuery(q);
+                handleExecuteWebSearch(q);
+              }}
+              onReset={() =>
+                onFiltersChange({
+                  ...filters,
+                  country: "all",
+                  sector: "all",
+                  verdict: "all",
+                  status: "active",
+                  minAmount: 0,
+                  search: "",
+                })
+              }
+              onDiscover={admin.onDiscover}
+            />
+          ) : (
+            <div className="space-y-8 px-4 py-5 md:px-7">
+              {radar.groups.map((group) => (
+                <section key={group.country} className="space-y-3">
+                  <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
+                    {countryName(group.country, lang)}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {group.items.length}
+                    </span>
+                  </h2>
+                  <div className="space-y-2.5">
+                    {group.items.map((item) => (
+                      <RadarCard
+                        key={item.grant.id}
+                        item={item}
+                        actions={actions}
+                        highlight={next?.grant.id === item.grant.id}
+                        simple={simple}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
 
-        {/* The same search on the web: always one click away, automatic when the catalog has nothing. */}
-        {(isWebSearching || webResults.length > 0 || !!webError || !!filters.search) && (
-          <div className="space-y-5 border-t px-4 py-5 md:px-7">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-              <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-                <Globe className="h-4 w-4 text-primary" />
-                {tr("From the web", "En la web")}
-              </h2>
-              {(webQuery || filters.search) && !isWebSearching && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-xs"
-                  onClick={() => handleExecuteWebSearch(webQuery || filters.search)}
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  {tr("Search the web for", "Buscar en la web")} &ldquo;{webQuery || filters.search}
-                  &rdquo;
-                </Button>
+          {/* The same search on the web: always one click away, automatic when the catalog has nothing. */}
+          {(isWebSearching || webResults.length > 0 || !!webError || !!filters.search) && (
+            <div
+              className={`space-y-5 px-4 py-5 md:px-7 ${isWebSearching || webResults.length > 0 || webError ? "order-first border-b" : "border-t"}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+                  <Globe className="h-4 w-4 text-primary" />
+                  {tr("From the internet", "En internet")}
+                </h2>
+                {(webQuery || filters.search) && !isWebSearching && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    onClick={() => handleExecuteWebSearch(webQuery || filters.search)}
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    {tr("Search the web for", "Buscar en la web")} &ldquo;
+                    {webQuery || filters.search}
+                    &rdquo;
+                  </Button>
+                )}
+              </div>
+              {/* Error display */}
+              {webError && (
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-semibold">
+                      {webError.startsWith("link:")
+                        ? tr("Could not add this link", "No se pudo agregar este enlace")
+                        : tr(
+                            "Web search could not retrieve opportunities",
+                            "La búsqueda web no pudo obtener oportunidades",
+                          )}
+                    </p>
+                    <p>{webError.replace(/^link:\s*/, "")}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Searching indicator */}
+              {isWebSearching && (
+                <div className="my-12 flex flex-col items-center justify-center gap-3 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      {tr(
+                        "Searching the internet… (up to a minute)",
+                        "Buscando en internet… (hasta un minuto)",
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-md">
+                      {tr(
+                        `Identifying active announcements, deadlines, amounts, and RFP requirements for ${orgName}.`,
+                        `Identificando convocatorias activas, fechas límite, montos y requisitos para ${orgName}.`,
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Discovered results list */}
+              {!isWebSearching && webResults.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b pb-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {tr(
+                        `Discovered ${webResults.length} funding opportunities on the live web`,
+                        `Se encontraron ${webResults.length} oportunidades de financiamiento en la web`,
+                      )}
+                    </span>
+                    <span>{tr(`Targeted for ${orgName}`, `Para ${orgName}`)}</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {webResults.map((grant) => (
+                      <WebScoutRadarCard
+                        key={grant.url}
+                        grant={grant}
+                        orgName={orgName}
+                        importedId={importedMap.get(grant.url)}
+                        isImporting={importingUrls.has(grant.url)}
+                        onImport={handleImportWebGrant}
+                        onOpenWorkspace={(id) => navigate({ to: "/grants/$id", params: { id } })}
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-            {/* Error display */}
-            {webError && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <div className="space-y-1">
-                  <p className="font-semibold">
-                    {webError.startsWith("link:")
-                      ? tr("Could not add this link", "No se pudo agregar este enlace")
-                      : tr(
-                          "Web search could not retrieve opportunities",
-                          "La búsqueda web no pudo obtener oportunidades",
-                        )}
-                  </p>
-                  <p>{webError.replace(/^link:\s*/, "")}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Searching indicator */}
-            {isWebSearching && (
-              <div className="my-12 flex flex-col items-center justify-center gap-3 text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">
-                    {tr(
-                      "Browsing the live internet via Google Search Grounding...",
-                      "Recorriendo la web en vivo con Google Search Grounding...",
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground max-w-md">
-                    {tr(
-                      `Identifying active announcements, deadlines, amounts, and RFP requirements for ${orgName}.`,
-                      `Identificando convocatorias activas, fechas límite, montos y requisitos para ${orgName}.`,
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Discovered results list */}
-            {!isWebSearching && webResults.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b pb-2 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">
-                    {tr(
-                      `Discovered ${webResults.length} funding opportunities on the live web`,
-                      `Se encontraron ${webResults.length} oportunidades de financiamiento en la web`,
-                    )}
-                  </span>
-                  <span>{tr(`Targeted for ${orgName}`, `Para ${orgName}`)}</span>
-                </div>
-
-                <div className="space-y-3">
-                  {webResults.map((grant) => (
-                    <WebScoutRadarCard
-                      key={grant.url}
-                      grant={grant}
-                      orgName={orgName}
-                      importedId={importedMap.get(grant.url)}
-                      isImporting={importingUrls.has(grant.url)}
-                      onImport={handleImportWebGrant}
-                      onOpenWorkspace={(id) => navigate({ to: "/grants/$id", params: { id } })}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </section>
 
       {isAdmin && !simple && (
@@ -570,9 +591,14 @@ function EmptyState({
               `No tracked grants for ${countryLabel} yet`,
               `Aún no hay grants seguidos para ${countryLabel}`,
             )
-          : hasAny
-            ? tr("No matching grants", "No hay grants que coincidan")
-            : tr("No grants in the radar yet", "Aún no hay grants en el radar")}
+          : searchQuery
+            ? tr(
+                `No grants in the system match "${searchQuery}"`,
+                `Ningún grant del sistema coincide con "${searchQuery}"`,
+              )
+            : hasAny
+              ? tr("No matching grants", "No hay grants que coincidan")
+              : tr("No grants in the system yet", "Aún no hay grants en el sistema")}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {countryLabel
@@ -580,10 +606,10 @@ function EmptyState({
               "Search the live web for calls in this country, then import the ones that fit.",
               "Busca convocatorias de este país en la web y luego importa las que encajen.",
             )
-          : hasAny
+          : searchQuery || hasAny
             ? tr(
-                "Try loosening filters, or scout the live web for newly announced calls.",
-                "Prueba con filtros más amplios o busca en la web convocatorias recién anunciadas.",
+                "The internet results are above. You can also loosen the filters.",
+                "Los resultados de internet están arriba. También puede ampliar los filtros.",
               )
             : tr(
                 "Tracked opportunities will appear here once ingested or imported.",

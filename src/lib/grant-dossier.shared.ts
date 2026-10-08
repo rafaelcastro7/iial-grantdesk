@@ -110,7 +110,11 @@ export function sanitizeDossier(raw: unknown): Dossier | null {
       step: clean(s(t.step, 200)),
       when: clean(s(t.when, 120)),
       date: /^\d{4}-\d{2}-\d{2}$/.test(s(t.date, 10)) ? s(t.date, 10) : undefined,
-      money: clean(s(t.money, 200)) || undefined,
+      money: /^(n\/?a|none|ninguno|—|-|0|\$0|no aplica|sin costo[s]?( directos?)?)$/i.test(
+        clean(s(t.money, 200)),
+      )
+        ? undefined
+        : clean(s(t.money, 200)) || undefined,
     }))
     .filter((t) => t.step);
   const messages = arr(r.messages, 5)

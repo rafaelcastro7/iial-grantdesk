@@ -179,11 +179,11 @@ Return ONLY a JSON object with this shape:
   "verdict": "3-5 sentences: what it really is, whether and how each of our organizations can take part, and the recommendation",
   "traps": [{ "title": "short name of a hidden condition", "detail": "what the brochure does not say and what it means for us", "source_url": "https://..." }],
   "routes": {
-    "criteria": ["Who applies", "Lead / partner required", "Our cash contribution", "In-kind accepted", "Approval time", "Risk / friction", "WCIS angle"],
+    "criteria": ["7 short criterion names, written in the output language: who applies, lead or partner required, our cash contribution, in-kind accepted, approval time, risk or friction, WCIS angle"],
     "options": [{ "name": "Route A: ...", "recommended": false, "values": ["one value per criterion"], "route": "lead | co_lead | partner | beneficiary", "lead": "organization that must lead, only if named in the sources or the partner list" }]
   },
   "documents": [{ "item": "official document or form name", "details": ["what goes in it / who signs"], "critical": true, "only_for": "route name if it only applies to one route" }],
-  "timeline": [{ "step": "...", "when": "e.g. week 1-2, after approval, day ~55", "date": "YYYY-MM-DD only if it can be computed from published dates", "money": "who pays what at this step, if any" }],
+  "timeline": [{ "step": "...", "when": "e.g. week 1-2, after approval, day ~55", "date": "YYYY-MM-DD only if it can be computed from published dates", "money": "who pays what at this step; omit the field when no money moves" }],
   "money_note": "net cost / cash flow summary for our organization",
   "messages": [
     { "channel": "email", "to": "funder advisor / program officer", "subject": "...", "body": "ready-to-send email" },
