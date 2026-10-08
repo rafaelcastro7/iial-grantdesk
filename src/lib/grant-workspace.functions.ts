@@ -195,10 +195,27 @@ export const saveGrantWorkspace = createServerFn({ method: "POST" })
     // Applicants can only be organizations this user works for.
     const allowed = new Set(orgs.map((o) => o.id));
     const applicant_org_ids = data.applicant_org_ids.filter((id) => allowed.has(id));
+    // One row per partner name and per blocker (repeated entries are noise).
+    const seenPartner = new Set<string>();
+    const partners = data.partners.filter((p) => {
+      const k = p.name.trim().toLowerCase();
+      if (!k) return true;
+      if (seenPartner.has(k)) return false;
+      seenPartner.add(k);
+      return true;
+    });
+    const blockers = [...new Set(data.blockers.map((b) => b.trim()).filter(Boolean))];
     const { data: row, error } = await db
       .from("grant_workspaces")
       .upsert(
-        { ...data, applicant_org_ids, updated_by: context.userId, created_by: context.userId },
+        {
+          ...data,
+          applicant_org_ids,
+          partners,
+          blockers,
+          updated_by: context.userId,
+          created_by: context.userId,
+        },
         { onConflict: "org_id,grant_id" },
       )
       .select("*")

@@ -72,7 +72,8 @@ for (const [n, route] of [
     await page.waitForTimeout(1500);
     if (!page.url().includes(route)) throw new Error(`redirected to ${page.url()}`);
     const text = await page.locator("body").innerText();
-    if (/something went wrong|application error|unexpected error/i.test(text)) throw new Error("error screen");
+    if (/something went wrong|application error|unexpected error/i.test(text))
+      throw new Error("error screen");
     await shot(n);
   });
 }
@@ -84,43 +85,58 @@ await step("radar lists grants and opens one", async () => {
   await link.waitFor({ timeout: 30000 });
   grantUrl = await link.getAttribute("href");
   await page.goto(`${BASE}${grantUrl}`, { waitUntil: "networkidle", timeout: 60000 });
-  await page.getByText("Application plan", { exact: false }).first().waitFor({ timeout: 30000 });
+  await page.getByText("1. Can we apply?").first().waitFor({ timeout: 30000 });
   await shot("09-grant-detail");
 });
 
 await step("application plan: fill and save", async () => {
-  await page.getByRole("button", { name: /Application plan/ }).first().click();
-  await page.getByText("Who can apply").waitFor({ timeout: 30000 });
-  const box = page.locator('label:has-text("Tick if this organization applies") input[type="checkbox"], label:has-text("Applies") input[type="checkbox"]').first();
+  await page.getByText("1. Can we apply?").waitFor({ timeout: 30000 });
+  const box = page
+    .locator(
+      'label:has-text("Tick if this organization applies") input[type="checkbox"], label:has-text("Applies") input[type="checkbox"]',
+    )
+    .first();
   if (!(await box.isChecked())) await box.check();
   await page.locator('label:has-text("Priority") select').selectOption("prepare");
   await page.getByPlaceholder("e.g. Lambton College").fill("Lambton College");
   await page.getByRole("button", { name: /Add partner/ }).click();
   await page.getByPlaceholder("Organization").last().fill("Universidad Tecnológica de Tulum");
   await page.getByPlaceholder("Country", { exact: true }).last().fill("Mexico");
-  await page.getByPlaceholder(/Role \(e\.g\./).last().fill("Mexican higher-education partner");
-  await page.getByPlaceholder(/Whole-Chain Integrity/).fill("Whole-Chain Integrity for Sustainable Agri-Food Systems");
-  await page.getByPlaceholder("e.g. No audited financial statements").fill("Audited statements not available");
+  await page
+    .getByPlaceholder(/Role \(e\.g\./)
+    .last()
+    .fill("Mexican higher-education partner");
+  await page
+    .getByPlaceholder(/Whole-Chain Integrity/)
+    .fill("Whole-Chain Integrity for Sustainable Agri-Food Systems");
+  await page
+    .getByPlaceholder("e.g. No audited financial statements")
+    .fill("Audited statements not available");
   await page.getByRole("button", { name: "Add", exact: true }).first().click();
   await shot("10-plan-filled");
   await page.getByRole("button", { name: /Save plan/ }).click();
-  await page.getByText(/Application plan saved|Saved/).first().waitFor({ timeout: 30000 });
+  await page
+    .getByText(/Application plan saved|Saved/)
+    .first()
+    .waitFor({ timeout: 30000 });
   await page.reload({ waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /Application plan/ }).first().click();
+  await page.getByText("1. Can we apply?").waitFor({ timeout: 30000 });
   const v = await page.getByPlaceholder("e.g. Lambton College").inputValue();
   if (v !== "Lambton College") throw new Error(`not persisted after reload (got "${v}")`);
   await shot("11-plan-saved-reloaded");
 });
 
 await step("emails never include the internal blocker", async () => {
-  const body = await page.locator("pre").allInnerTexts();
-  const emails = body.join("\n");
-  if (!emails.includes("Rocío") && !emails.includes("Saludos")) throw new Error("composer did not render");
-  const memoAndEmails = emails;
-  // The memo (internal) may list blockers; the email block is the first <pre> after the composer.
-  const emailPre = await page.locator('section:has-text("Emails to partners and funders") pre').innerText();
-  if (/Audited statements not available/i.test(emailPre)) throw new Error("blocker leaked into an email");
-  if (!/Audited statements not available/i.test(memoAndEmails)) throw new Error("memo is missing the blocker");
+  const write = page.locator('section:has-text("5. Write")');
+  const emailPre = await write.locator("pre").first().innerText();
+  if (!/Rocío|Saludos/.test(emailPre)) throw new Error("composer did not render");
+  if (/Audited statements not available/i.test(emailPre))
+    throw new Error("blocker leaked into an email");
+  await page.getByRole("button", { name: "Memo to Marcelo" }).click();
+  const memo = await write.locator("pre").first().innerText();
+  if (!/Audited statements not available/i.test(memo))
+    throw new Error("memo is missing the blocker");
+  await page.getByRole("button", { name: "Partners and funders" }).click();
   await shot("12-emails-memo");
 });
 
@@ -148,7 +164,12 @@ await step("partners: add and see the grant it belongs to", async () => {
   await shot("14-partners");
 });
 
-fs.writeFileSync(path.join(OUT, "report.json"), JSON.stringify({ base: BASE, results, problems }, null, 2));
-console.log(`\n${results.filter((r) => r.ok).length}/${results.length} steps passed; ${problems.length} problems logged`);
+fs.writeFileSync(
+  path.join(OUT, "report.json"),
+  JSON.stringify({ base: BASE, results, problems }, null, 2),
+);
+console.log(
+  `\n${results.filter((r) => r.ok).length}/${results.length} steps passed; ${problems.length} problems logged`,
+);
 for (const p of [...new Set(problems)].slice(0, 40)) console.log("  -", p);
 await browser.close();

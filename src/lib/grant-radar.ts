@@ -319,6 +319,10 @@ export function priorityOf(input: {
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 
+// Words an explanation uses when it actually gives a reason for "no".
+const NEGATIVE_CUE =
+  /\b(not|no|cannot|can't|isn't|ineligible|excluded?|only|however|but|lacks?|missing|closed|outside|restricted|requires?|fail(?:ed|s)?|unmet)\b/i;
+
 export function toRadarItem<T extends RadarGrant>(
   g: T,
   opts: Pick<RadarOptions, "leadTimeWeeks" | "searching" | "rules"> & { now: number },
@@ -332,10 +336,17 @@ export function toRadarItem<T extends RadarGrant>(
 
   if (g.evaluation) {
     verdict = evaluationVerdict(g.evaluation);
-    reason =
-      humanizeRationale((g.evaluation as { rationale_en?: string }).rationale_en) ??
-      ruled?.reason ??
-      null;
+    const rationale = humanizeRationale((g.evaluation as { rationale_en?: string }).rationale_en);
+    if (verdict === "not_eligible" && ruled?.verdict === "not_eligible" && ruled.reason) {
+      // The rules give the concrete, verifiable reason.
+      reason = ruled.reason;
+    } else if (verdict === "not_eligible" && rationale && !NEGATIVE_CUE.test(rationale)) {
+      // The saved "no" stays, but its explanation argues the opposite: say so.
+      reason =
+        "The review said no, but its explanation gives no reason. Open the grant and re-check fit.";
+    } else {
+      reason = rationale ?? ruled?.reason ?? null;
+    }
     isRuled = true;
   } else if (g.hardBlocked) {
     verdict = "not_eligible";

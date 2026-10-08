@@ -40,7 +40,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-import { useIsAdmin, useIsConsultant, isConsultantPath } from "@/lib/use-platform";
+import { CONSULTANT_MENU, useIsAdmin, useIsConsultant } from "@/lib/use-platform";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,21 +88,26 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         to: "/dashboard",
-        label: "Home",
-        description: "Today, priorities, intelligence",
+        label: "Today",
+        description: "Deadlines, missing items, follow-ups",
         icon: Home,
       },
-      { to: "/grants", label: "Grant radar", description: "Discover and qualify", icon: Radar },
+      {
+        to: "/grants",
+        label: "Find grants",
+        description: "Search and check if we can apply",
+        icon: Radar,
+      },
       {
         to: "/pipeline",
-        label: "Pipeline",
-        description: "Grants we are working, decisions, export",
+        label: "My grants",
+        description: "What we are working on, emails to Marcelo",
         icon: ListChecks,
       },
       {
         to: "/partners",
         label: "Partners",
-        description: "Universities, co-ops, chambers, contacts",
+        description: "Universities, co-ops and contacts",
         icon: Users,
       },
       {
@@ -265,7 +270,7 @@ export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) =>
-      isConsultant ? isConsultantPath(item.to) : !item.adminOnly || isAdmin,
+      isConsultant ? CONSULTANT_MENU.includes(item.to) : !item.adminOnly || isAdmin,
     ),
   })).filter((group) => group.items.length > 0);
   const activeItem = findActiveItem(currentPath, visibleGroups);

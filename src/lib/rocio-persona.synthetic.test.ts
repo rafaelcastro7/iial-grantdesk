@@ -516,3 +516,32 @@ describe("Home 'Today' (what needs Rocío)", () => {
     expect(a.some((x) => x.grantId === "g2")).toBe(false);
   });
 });
+
+describe("Find grants: what Rocío reads on each card", () => {
+  it("titles show readable text, not HTML entities", async () => {
+    const { cleanTitle } = await import("@/lib/html-text");
+    expect(cleanTitle("FY 2024 &ndash; 2026 Broad Agency  Announcement")).toBe(
+      "FY 2024 – 2026 Broad Agency Announcement",
+    );
+  });
+
+  it("a 'not a fit' never shows an explanation that argues the opposite", async () => {
+    const { toRadarItem } = await import("@/lib/grant-radar");
+    const g = {
+      id: "g",
+      title: "Call 2027",
+      status: "scored",
+      evaluation: {
+        fit_score: 0.2,
+        eligibility_pass: false,
+        model: "google/gemini-3-flash",
+        rule_snapshot: { verdict: "ineligible", is_exhaustive: true },
+        rationale_en:
+          "The Institute is a Canadian nonprofit focused on agriculture, which aligns well with the call goal, so the institute meets all stated eligibility criteria.",
+      },
+    };
+    const item = toRadarItem(g as never, { now: Date.now(), leadTimeWeeks: 4, searching: false });
+    expect(item.verdict).toBe("not_eligible");
+    expect(item.reason).toMatch(/gives no reason/);
+  });
+});

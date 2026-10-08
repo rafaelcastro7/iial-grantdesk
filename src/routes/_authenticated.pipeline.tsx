@@ -1,6 +1,7 @@
 // The consultant's pipeline: every grant an organization is working, with the
 // decision data from its application plan, in the columns the team uses to
 // decide (status, deadline, applicant, role, money, match, fit, priority).
+import { cleanTitle } from "@/lib/html-text";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -72,7 +73,7 @@ function PipelinePage() {
         const next = (ws.milestones ?? []).find((m) => !m.done && m.date >= today);
         return {
           grantId: g.id,
-          title: g.title,
+          title: cleanTitle(g.title),
           funder: g.funder?.name ?? "",
           status: ws.call_status ? CALL_STATUS_LABEL[ws.call_status] : "",
           deadline: deadlineText(g, ws),

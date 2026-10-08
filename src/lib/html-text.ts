@@ -174,3 +174,10 @@ export function relatedLinks(
   }
   return [...found];
 }
+
+/** A title as people should read it: HTML entities decoded, spaces collapsed. */
+export function cleanTitle(title: string | null | undefined): string {
+  return decodeEntities(title ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}

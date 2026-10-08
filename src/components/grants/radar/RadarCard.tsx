@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { cleanTitle } from "@/lib/html-text";
 import {
   AlertTriangle,
   ArrowRight,
@@ -118,7 +119,7 @@ export function RadarCard({
             params={{ id: g.id }}
             className="line-clamp-2 font-display text-base font-semibold leading-snug text-foreground hover:text-primary"
           >
-            {g.title || "Untitled opportunity"}
+            {cleanTitle(g.title) || "Untitled opportunity"}
           </Link>
           {funderName(g) && (
             <p className="mt-0.5 truncate text-sm text-muted-foreground">{funderName(g)}</p>

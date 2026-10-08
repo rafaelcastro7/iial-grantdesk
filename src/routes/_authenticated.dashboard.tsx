@@ -15,11 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { syncClientLocale } from "@/i18n/sync";
 import { AppTopBar } from "@/components/AppSidebar";
-import { ActivityFeed } from "@/components/ActivityFeed";
 import { PageTransition } from "@/components/PageTransition";
 import { ConsultantToday } from "@/components/v2/ConsultantToday";
 import { listGrantWorkspaces } from "@/lib/grant-workspace.functions";
-import { Activity, ArrowRight, Clock3, ShieldCheck, Search, TrendingUp } from "lucide-react";
+import { Activity, ArrowRight } from "lucide-react";
 import "@/i18n";
 import { isActiveGrantStatus } from "@/agents/pipeline-stages.shared";
 
@@ -308,61 +307,18 @@ function DashboardV2({
         <section className="mx-auto max-w-[1500px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
           <ConsultantToday greeting={headlineGreeting} />
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <V2Metric
-              icon={Search}
-              label="Active opportunities"
-              value={loading ? "-" : grantsCount}
-              detail={
-                loading
-                  ? "Loading grants"
-                  : funderCount != null
-                    ? `${enrichedCount} enriched · ${funderCount} funders watched`
-                    : `${enrichedCount} enriched`
-              }
-              to="/grants"
-            />
-            <V2Metric
-              icon={ShieldCheck}
-              label="Eligible"
-              value={loading ? "-" : eligible}
-              detail={
-                scored
-                  ? `of ${scored} open grants checked · ${needsInput} need a check · ${notEligible} not a fit`
-                  : "Run fit checks"
-              }
-              tone="success"
-              to="/grants"
-            />
-            <V2Metric
-              icon={Clock3}
-              label="Closing soon"
-              value={loading ? "-" : closingSoon}
-              detail="Deadline inside 30 days"
-              tone={closingSoon > 0 ? "warning" : "neutral"}
-              to="/grants"
-            />
-            <V2Metric
-              icon={TrendingUp}
-              label="Pipeline"
-              value={loading ? "-" : inPipeline}
-              detail="Grants with an application plan"
-              to="/pipeline"
-            />
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.8fr)]">
+          <div className="grid gap-4">
             <section className="rounded-md border bg-card shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
                 <div>
-                  <h2 className="text-base font-semibold">Opportunity queue</h2>
+                  <h2 className="text-base font-semibold">New grants that fit</h2>
                   <p className="text-sm text-muted-foreground">
-                    Best matches first, with deadline pressure visible.
+                    Best fit first. Open one to start its plan.
                   </p>
                 </div>
                 <Button asChild variant="outline" size="sm" className="gap-2">
                   <Link to="/grants">
-                    Open radar <ArrowRight className="h-4 w-4" />
+                    Find grants <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
               </div>
@@ -388,14 +344,6 @@ function DashboardV2({
                   topMatches.map((grant) => <V2MatchRow key={grant.id} grant={grant} now={now} />)
                 )}
               </div>
-            </section>
-
-            <section className="rounded-md border bg-card p-1 shadow-sm">
-              <div className="border-b px-4 py-3">
-                <h2 className="text-base font-semibold">Activity stream</h2>
-                <p className="text-sm text-muted-foreground">Recent system and team movement.</p>
-              </div>
-              <ActivityFeed />
             </section>
           </div>
         </section>

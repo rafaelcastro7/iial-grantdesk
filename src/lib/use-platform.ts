@@ -22,6 +22,8 @@ export function useModuleFlags() {
  * `/clients` is the tenant picker; membership still controls which tenants
  * are returned, so this does not grant cross-tenant access by itself.
  */
+// Pages a consultant may open (links from a grant, e.g. a proposal draft or a
+// client profile, keep working).
 export const CONSULTANT_PATHS = [
   "/dashboard",
   "/clients",
@@ -33,6 +35,8 @@ export const CONSULTANT_PATHS = [
   "/org",
   "/backlog",
 ];
+// The consultant's menu: only what she uses every day.
+export const CONSULTANT_MENU = ["/dashboard", "/grants", "/pipeline", "/partners", "/org"];
 export function isConsultantPath(path: string) {
   return CONSULTANT_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 }

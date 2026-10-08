@@ -53,9 +53,10 @@ await page.waitForURL((u) => !u.pathname.startsWith("/auth"), { timeout: 30000 }
 
 await ask("Busca grants donde IIAL pueda aplicar como principal (cacao, agri-food)", async () => {
   await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
+  await page.locator('a[href^="/grants/"]').first().waitFor({ timeout: 60000 });
   const search = page.getByPlaceholder(/search/i).first();
   await search.fill("agri");
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(8000);
   const n = await page.locator('a[href^="/grants/"]').count();
   must(n > 0, "no results for 'agri'");
   await shot("01-search");
@@ -65,7 +66,7 @@ let grantHref = null;
 await ask("Analiza este grant: ¿se puede aplicar ahora? ¿IIAL o Nahua?", async () => {
   grantHref = await page.locator('a[href^="/grants/"]').first().getAttribute("href");
   await page.goto(`${BASE}${grantHref}`, { waitUntil: "networkidle", timeout: 60000 });
-  await page.getByText("Who can apply").waitFor({ timeout: 30000 });
+  await page.getByText("1. Can we apply?").waitFor({ timeout: 30000 });
   const text = await page.locator("body").innerText();
   must(
     /Eligible|To confirm|Not eligible|Needs/i.test(text),
@@ -77,14 +78,16 @@ await ask("Analiza este grant: ¿se puede aplicar ahora? ¿IIAL o Nahua?", async
 await ask(
   "¿A qué se refiere 'financial statements' y 'Organization Attestation'? Explícamelo simple",
   async () => {
-    await page.getByText("What these requirements mean").waitFor({ timeout: 15000 });
-    const t = await page.locator('section:has-text("What these requirements mean")').innerText();
+    const sum = page.getByText("What these requirements mean");
+    await sum.waitFor({ timeout: 15000 });
+    await sum.click();
+    const t = await page.locator('details:has-text("What these requirements mean")').innerText();
     must(/financial|CRA|registration|letter of support/i.test(t), "glossary is empty");
   },
 );
 
 await ask("Adopta la ruta sugerida (Ruta B / R&D o Consorcio) con un solo clic", async () => {
-  const routesSection = page.locator('section:has-text("Decision and route")');
+  const routesSection = page.locator('section:has-text("2. Our decision")');
   await routesSection.getByText("Strategic suggested routes").waitFor({ timeout: 15000 });
   const adoptBtn = routesSection.getByRole("button", { name: /Adopt route/i }).first();
   if (await adoptBtn.isVisible()) {
@@ -98,7 +101,8 @@ await ask("Adopta la ruta sugerida (Ruta B / R&D o Consorcio) con un solo clic",
 await ask(
   "Mensaje a Marcelo: de qué trata, WCIS, requisitos, plazos, monto, qué falta, qué gana IIAL",
   async () => {
-    const memo = await pre("Decision memo");
+    await page.getByRole("button", { name: "Memo to Marcelo" }).click();
+    const memo = await pre("5. Write");
     for (const s of ["Hi Marcelo", "Money and dates", "What we are missing", "Recommendation"])
       must(memo.includes(s), `memo missing "${s}"`);
     must(/What .* get(s)?/i.test(memo), 'memo missing "What [Org] gets"');
@@ -108,7 +112,8 @@ await ask(
 await ask(
   "Le mandé invitación por Teams el lunes 1 de junio 11am hora Perú; que sugiera otra hora",
   async () => {
-    const emails = page.locator('section:has-text("Emails to partners and funders")');
+    await page.getByRole("button", { name: "Partners and funders" }).click();
+    const emails = page.locator('section:has-text("5. Write")');
     await emails.locator("select").first().selectOption("meeting_invite");
     await page
       .getByPlaceholder(/Proposed meeting/)
@@ -125,7 +130,7 @@ await ask(
 );
 
 await ask("Por WhatsApp mandarle quiénes somos y la presentación", async () => {
-  const emails = page.locator('section:has-text("Emails to partners and funders")');
+  const emails = page.locator('section:has-text("5. Write")');
   await emails.locator("select").first().selectOption("whatsapp_intro");
   const body = await emails.locator("pre").innerText();
   must(/WCIS/.test(body) && /iial\.ca/.test(body), "WhatsApp text lacks WCIS or link");
@@ -136,7 +141,7 @@ await ask("Por WhatsApp mandarle quiénes somos y la presentación", async () =>
 await ask(
   "Dame el paso 1 y paso 2: solicitar el paquete y la inscripción (emails separados)",
   async () => {
-    const emails = page.locator('section:has-text("Emails to partners and funders")');
+    const emails = page.locator('section:has-text("5. Write")');
     await emails.locator("select").first().selectOption("package_request");
     must(
       /paquete de aplicación|application package/i.test(await emails.innerText()),

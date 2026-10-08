@@ -150,13 +150,13 @@ export function RadarWorkspace({
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b px-5 py-5 sm:flex sm:flex-wrap sm:items-end sm:justify-between md:px-7">
           <div>
             <h1 className="font-display text-2xl font-semibold text-foreground md:text-3xl">
-              Grant Radar
+              Find grants
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               {sourceMode === "web"
                 ? `Live web exploration powered by Google AI Search · Targeting ${orgName}`
                 : simple
-                  ? `Every opportunity is already checked against ${orgName}'s rules. Start with the green ones.`
+                  ? `Each grant is already checked for ${orgName}. Green means you can apply.`
                   : "Search, deterministic validation and critical requirements in one operational view."}
             </p>
           </div>

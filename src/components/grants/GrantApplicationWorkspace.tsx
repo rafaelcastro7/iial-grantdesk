@@ -97,6 +97,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [partnerIdx, setPartnerIdx] = useState(0);
   const [senderName, setSenderName] = useState("Rocío Cruz");
   const [meetingWhen, setMeetingWhen] = useState("");
+  const [writeMode, setWriteMode] = useState<"outreach" | "memo">("outreach");
   const [links, setLinks] = useState("https://iial.ca");
   const [attachmentsEdit, setAttachments] = useState<string | null>(null);
   const [includeAcademicCredentials, setIncludeAcademicCredentials] = useState(false);
@@ -267,10 +268,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         </Button>
       </div>
 
-      {/* 1. Who can apply */}
       <Section
         icon={<Users className="h-4 w-4" />}
-        title="Who can apply"
+        title="1. Can we apply?"
         hint="Checked against each organization's profile and rules (no AI)."
       >
         <div className="grid gap-3 sm:grid-cols-2">
@@ -316,10 +316,78 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             );
           })}
         </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-medium text-primary">
+            Check a country (beneficiary or partner)
+          </summary>
+          <div className="mt-2">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  value={countryQuery}
+                  placeholder="e.g. Peru, Colombia, Mexico, Costa Rica, Madagascar…"
+                  onChange={(e) => setCountryQuery(e.target.value)}
+                  className="max-w-md"
+                />
+                {countryQuery && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCountryQuery("")}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {/* Quick preset country pills */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-[11px] text-muted-foreground mr-1">Quick check:</span>
+                {PRESET_COUNTRIES.map((c) => (
+                  <button
+                    key={c.code}
+                    type="button"
+                    onClick={() => setCountryQuery(c.name)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors cursor-pointer",
+                      countryQuery.toLowerCase() === c.name.toLowerCase()
+                        ? "border-primary bg-primary/10 font-semibold text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                    )}
+                  >
+                    <span>{c.flag}</span>
+                    <span>{c.name}</span>
+                  </button>
+                ))}
+              </div>
+              {countryCheck && countryQuery.trim() && (
+                <div
+                  className={cn(
+                    "rounded-md border p-3 text-xs leading-relaxed",
+                    countryCheck.verdict === "explicit" &&
+                      "border-emerald-500/40 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200",
+                    countryCheck.verdict === "regional_likely" &&
+                      "border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-200",
+                    countryCheck.verdict === "not_mentioned" &&
+                      "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200",
+                  )}
+                >
+                  <div className="font-semibold mb-1">
+                    {countryCheck.verdict === "explicit"
+                      ? "✓ Explicitly Eligible"
+                      : countryCheck.verdict === "regional_likely"
+                        ? "ℹ High Regional Viability"
+                        : "⚠️ Not Specifically Mentioned"}
+                  </div>
+                  <p>{countryCheck.detail}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </details>
       </Section>
 
-      {/* 2. Decision and route */}
-      <Section icon={<ClipboardList className="h-4 w-4" />} title="Decision and route">
+      <Section icon={<ClipboardList className="h-4 w-4" />} title="2. Our decision">
         {roadmap && (
           <div className="mb-4 space-y-2 rounded-lg border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center justify-between gap-1.5">
@@ -474,78 +542,85 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               onChange={(e) => update({ lead_institution: e.target.value || null })}
             />
           </Field>
-          <Field label="Who administers the funds">
-            <Input
-              value={ws.administrator ?? ""}
-              placeholder="e.g. the college's research office"
-              onChange={(e) => update({ administrator: e.target.value || null })}
-            />
-          </Field>
-          <Field label="Funding type">
-            <select
-              className={selectClass}
-              value={ws.instrument ?? ""}
-              onChange={(e) =>
-                update({ instrument: (e.target.value || null) as Workspace["instrument"] })
-              }
-            >
-              <option value="">Unknown</option>
-              {INSTRUMENTS.map((i) => (
-                <option key={i} value={i}>
-                  {INSTRUMENT_LABEL[i]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Deadline time">
-            <div className="flex gap-2">
+        </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-medium text-primary">
+            More details (funds administrator, funding type, time, match, verified on)
+          </summary>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Who administers the funds">
               <Input
-                value={ws.deadline_time ?? ""}
-                placeholder="12:00 p.m."
-                onChange={(e) => update({ deadline_time: e.target.value || null })}
+                value={ws.administrator ?? ""}
+                placeholder="e.g. the college's research office"
+                onChange={(e) => update({ administrator: e.target.value || null })}
               />
-              <Input
-                className="w-24"
-                value={ws.deadline_timezone ?? ""}
-                placeholder="ET"
-                onChange={(e) => update({ deadline_timezone: e.target.value || null })}
-              />
-            </div>
-          </Field>
-          <Field label="Our contribution (match %)">
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                value={ws.match_pct ?? ""}
-                onChange={(e) =>
-                  update({ match_pct: e.target.value === "" ? null : Number(e.target.value) })
-                }
-              />
+            </Field>
+            <Field label="Funding type">
               <select
-                className={cn(selectClass, "w-36")}
-                value={ws.match_in_kind_ok == null ? "" : ws.match_in_kind_ok ? "yes" : "no"}
+                className={selectClass}
+                value={ws.instrument ?? ""}
                 onChange={(e) =>
-                  update({
-                    match_in_kind_ok: e.target.value === "" ? null : e.target.value === "yes",
-                  })
+                  update({ instrument: (e.target.value || null) as Workspace["instrument"] })
                 }
               >
-                <option value="">In-kind?</option>
-                <option value="yes">In-kind OK</option>
-                <option value="no">Cash only</option>
+                <option value="">Unknown</option>
+                {INSTRUMENTS.map((i) => (
+                  <option key={i} value={i}>
+                    {INSTRUMENT_LABEL[i]}
+                  </option>
+                ))}
               </select>
-            </div>
-          </Field>
-          <Field label="Information verified on">
-            <Input
-              type="date"
-              value={ws.verified_at ?? ""}
-              onChange={(e) => update({ verified_at: e.target.value || null })}
-            />
-          </Field>
-        </div>
+            </Field>
+            <Field label="Deadline time">
+              <div className="flex gap-2">
+                <Input
+                  value={ws.deadline_time ?? ""}
+                  placeholder="12:00 p.m."
+                  onChange={(e) => update({ deadline_time: e.target.value || null })}
+                />
+                <Input
+                  className="w-24"
+                  value={ws.deadline_timezone ?? ""}
+                  placeholder="ET"
+                  onChange={(e) => update({ deadline_timezone: e.target.value || null })}
+                />
+              </div>
+            </Field>
+            <Field label="Our contribution (match %)">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={ws.match_pct ?? ""}
+                  onChange={(e) =>
+                    update({ match_pct: e.target.value === "" ? null : Number(e.target.value) })
+                  }
+                />
+                <select
+                  className={cn(selectClass, "w-36")}
+                  value={ws.match_in_kind_ok == null ? "" : ws.match_in_kind_ok ? "yes" : "no"}
+                  onChange={(e) =>
+                    update({
+                      match_in_kind_ok: e.target.value === "" ? null : e.target.value === "yes",
+                    })
+                  }
+                >
+                  <option value="">In-kind?</option>
+                  <option value="yes">In-kind OK</option>
+                  <option value="no">Cash only</option>
+                </select>
+              </div>
+            </Field>
+            <Field label="Information verified on">
+              <Input
+                type="date"
+                value={ws.verified_at ?? ""}
+                onChange={(e) => update({ verified_at: e.target.value || null })}
+              />
+            </Field>
+          </div>
+        </details>
         <div className="mt-3">
           <Field label="Blockers (internal — never copied into partner emails)">
             <div className="flex flex-wrap gap-1.5">
@@ -574,7 +649,8 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 size="sm"
                 disabled={!newBlocker.trim()}
                 onClick={() => {
-                  update({ blockers: [...ws.blockers, newBlocker.trim()] });
+                  if (!ws.blockers.includes(newBlocker.trim()))
+                    update({ blockers: [...ws.blockers, newBlocker.trim()] });
                   setNewBlocker("");
                 }}
               >
@@ -583,10 +659,28 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             </div>
           </Field>
         </div>
+        <div className="mt-4 grid gap-3">
+          <div className="grid gap-3">
+            <Field label="Working title">
+              <Input
+                value={ws.project_title ?? ""}
+                placeholder="e.g. Whole-Chain Integrity for Sustainable Agri-Food Systems"
+                onChange={(e) => update({ project_title: e.target.value || null })}
+              />
+            </Field>
+            <Field label="How we use WCIS">
+              <Textarea
+                rows={3}
+                value={ws.wcis_angle ?? ""}
+                placeholder="WCIS as the applied framework for traceability, integrity and market readiness…"
+                onChange={(e) => update({ wcis_angle: e.target.value || null })}
+              />
+            </Field>
+          </div>
+        </div>
       </Section>
 
-      {/* 3. Consortium */}
-      <Section icon={<Users className="h-4 w-4" />} title="Consortium and partners">
+      <Section icon={<Users className="h-4 w-4" />} title="3. Partners">
         {ws.partners.length === 0 && (
           <p className="text-sm text-muted-foreground">No partners yet.</p>
         )}
@@ -735,31 +829,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
           )}
       </Section>
 
-      {/* 4. Project idea */}
-      <Section icon={<ClipboardList className="h-4 w-4" />} title="Project idea">
-        <div className="grid gap-3">
-          <Field label="Working title">
-            <Input
-              value={ws.project_title ?? ""}
-              placeholder="e.g. Whole-Chain Integrity for Sustainable Agri-Food Systems"
-              onChange={(e) => update({ project_title: e.target.value || null })}
-            />
-          </Field>
-          <Field label="How we use WCIS">
-            <Textarea
-              rows={3}
-              value={ws.wcis_angle ?? ""}
-              placeholder="WCIS as the applied framework for traceability, integrity and market readiness…"
-              onChange={(e) => update({ wcis_angle: e.target.value || null })}
-            />
-          </Field>
-        </div>
-      </Section>
-
-      {/* 5. Documents checklist */}
       <Section
         icon={<CheckCircle2 className="h-4 w-4" />}
-        title="Documents and requirements"
+        title="4. Documents and dates"
         hint={`${ready} ready · ${missing} missing`}
       >
         <div className="divide-y rounded-lg border">
@@ -882,365 +954,318 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             Financials (2y), CRA/Charter, Attestation, Support Letter
           </span>
         </div>
-      </Section>
-
-      {/* 5b. Plain explanations of the funder's terms */}
-      {glossary.length > 0 && (
-        <Section
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          title="What these requirements mean"
-          hint="Plain explanations, no AI"
-        >
-          <dl className="space-y-2 text-sm">
-            {glossary.map((g) => (
-              <div key={g.term}>
-                <dt className="font-medium">{g.term}</dt>
-                <dd className="text-muted-foreground">{lang === "es" ? g.es : g.en}</dd>
-              </div>
-            ))}
-          </dl>
-        </Section>
-      )}
-
-      {/* 5c. Geographic / Country Eligibility quick-check */}
-      <Section
-        icon={<Globe2 className="h-4 w-4" />}
-        title="Check country eligibility"
-        hint="Instant check for beneficiary countries (e.g. Peru, Colombia, Madagascar, Mexico)"
-      >
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              value={countryQuery}
-              placeholder="e.g. Peru, Colombia, Mexico, Costa Rica, Madagascar…"
-              onChange={(e) => setCountryQuery(e.target.value)}
-              className="max-w-md"
-            />
-            {countryQuery && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setCountryQuery("")}>
-                Clear
-              </Button>
-            )}
-          </div>
-          {/* Quick preset country pills */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <span className="text-[11px] text-muted-foreground mr-1">Quick check:</span>
-            {PRESET_COUNTRIES.map((c) => (
-              <button
-                key={c.code}
-                type="button"
-                onClick={() => setCountryQuery(c.name)}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors cursor-pointer",
-                  countryQuery.toLowerCase() === c.name.toLowerCase()
-                    ? "border-primary bg-primary/10 font-semibold text-primary"
-                    : "border-border bg-background text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-                )}
-              >
-                <span>{c.flag}</span>
-                <span>{c.name}</span>
-              </button>
-            ))}
-          </div>
-          {countryCheck && countryQuery.trim() && (
-            <div
-              className={cn(
-                "rounded-md border p-3 text-xs leading-relaxed",
-                countryCheck.verdict === "explicit" &&
-                  "border-emerald-500/40 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200",
-                countryCheck.verdict === "regional_likely" &&
-                  "border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-200",
-                countryCheck.verdict === "not_mentioned" &&
-                  "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200",
-              )}
-            >
-              <div className="font-semibold mb-1">
-                {countryCheck.verdict === "explicit"
-                  ? "✓ Explicitly Eligible"
-                  : countryCheck.verdict === "regional_likely"
-                    ? "ℹ High Regional Viability"
-                    : "⚠️ Not Specifically Mentioned"}
-              </div>
-              <p>{countryCheck.detail}</p>
+        {glossary.length > 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-medium text-primary">
+              What these requirements mean
+            </summary>
+            <div className="mt-2">
+              <dl className="space-y-2 text-sm">
+                {glossary.map((g) => (
+                  <div key={g.term}>
+                    <dt className="font-medium">{g.term}</dt>
+                    <dd className="text-muted-foreground">{lang === "es" ? g.es : g.en}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
+          </details>
+        )}
+        <div className="mt-4 border-t pt-3">
+          <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Timeline</h4>
+          {ws.milestones.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              No milestones.{" "}
+              {data.grant.deadline && (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="px-0"
+                  onClick={() => update({ milestones: defaultMilestones(data.grant.deadline) })}
+                >
+                  Build them from the deadline
+                </Button>
+              )}
+            </div>
+          ) : (
+            <ol className="space-y-1.5">
+              {ws.milestones.map((m, idx) => (
+                <li key={m.id} className="flex items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={!!m.done}
+                    onChange={(e) =>
+                      update({
+                        milestones: ws.milestones.map((x, i) =>
+                          i === idx ? { ...x, done: e.target.checked } : x,
+                        ),
+                      })
+                    }
+                  />
+                  <Input
+                    type="date"
+                    className="w-40"
+                    value={m.date}
+                    onChange={(e) =>
+                      update({
+                        milestones: ws.milestones.map((x, i) =>
+                          i === idx ? { ...x, date: e.target.value } : x,
+                        ),
+                      })
+                    }
+                  />
+                  <span className={cn(m.done && "text-muted-foreground line-through")}>
+                    {m.label}
+                  </span>
+                </li>
+              ))}
+            </ol>
           )}
         </div>
       </Section>
 
-      {/* 6. Timeline */}
-      <Section
-        icon={<ClipboardList className="h-4 w-4" />}
-        title="Timeline"
-        hint={data.grant.deadline ? "Counted back from the deadline" : "No fixed deadline"}
-      >
-        {ws.milestones.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            No milestones.{" "}
-            {data.grant.deadline && (
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="px-0"
-                onClick={() => update({ milestones: defaultMilestones(data.grant.deadline) })}
-              >
-                Build them from the deadline
-              </Button>
-            )}
-          </div>
-        ) : (
-          <ol className="space-y-1.5">
-            {ws.milestones.map((m, idx) => (
-              <li key={m.id} className="flex items-center gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={!!m.done}
-                  onChange={(e) =>
-                    update({
-                      milestones: ws.milestones.map((x, i) =>
-                        i === idx ? { ...x, done: e.target.checked } : x,
-                      ),
-                    })
-                  }
-                />
-                <Input
-                  type="date"
-                  className="w-40"
-                  value={m.date}
-                  onChange={(e) =>
-                    update({
-                      milestones: ws.milestones.map((x, i) =>
-                        i === idx ? { ...x, date: e.target.value } : x,
-                      ),
-                    })
-                  }
-                />
-                <span className={cn(m.done && "text-muted-foreground line-through")}>
-                  {m.label}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Section>
-
-      {/* 8. Emails */}
       <Section
         icon={<Mail className="h-4 w-4" />}
-        title="Emails to partners and funders"
-        hint="Filled from this plan. Never includes the internal blockers."
+        title="5. Write"
+        hint="Emails never include the internal blockers; the memo does."
       >
-        {(() => {
-          const partner = ws.partners[partnerIdx] ?? null;
-          const known = partner
-            ? directoryByName.get(partner.name.trim().toLowerCase())
-            : undefined;
-          const orgName = data.orgs.find((o) => o.id === orgId)?.name ?? "our organization";
-          const email = composeOutreach({
-            template,
-            lang,
-            grant: data.grant,
-            workspace: ws,
-            orgName,
-            senderName,
-            partner,
-            recipientName: known?.contact_name ?? undefined,
-            meetingWhen,
-            links: links.split(/[\s,]+/).filter(Boolean),
-            attachments: (attachmentsEdit ?? defaultAttachments(lang))
-              .split(",")
-              .map((x) => x.trim())
-              .filter(Boolean),
-            includeAcademicCredentials,
-          });
-          const isWhatsApp = template === "whatsapp_intro";
-          const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
-          const mailto = `mailto:${toPartner && known?.email ? encodeURIComponent(known.email) : ""}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
-          return (
-            <div className="space-y-3">
-              <div className="grid gap-2 sm:grid-cols-4">
-                <select
-                  className={selectClass}
-                  value={template}
-                  onChange={(e) => setTemplate(e.target.value as TemplateId)}
-                >
-                  {TEMPLATE_IDS.map((t) => (
-                    <option key={t} value={t}>
-                      {TEMPLATE_LABEL[t].en}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className={selectClass}
-                  value={lang}
-                  onChange={(e) => setLang(e.target.value as Lang)}
-                >
-                  <option value="es">Spanish</option>
-                  <option value="en">English</option>
-                </select>
-                {toPartner && (
-                  <select
-                    className={selectClass}
-                    value={partnerIdx}
-                    onChange={(e) => setPartnerIdx(Number(e.target.value))}
-                  >
-                    {ws.partners.length === 0 && <option value={0}>No partners yet</option>}
-                    {ws.partners.map((p, i) => (
-                      <option key={p.id} value={i}>
-                        {p.name || `Partner ${i + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <Input
-                  value={senderName}
-                  placeholder="Sender"
-                  onChange={(e) => setSenderName(e.target.value)}
-                />
-              </div>
-              {toPartner && (
-                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includeAcademicCredentials}
-                    onChange={(e) => setIncludeAcademicCredentials(e.target.checked)}
-                    className="rounded border-border"
-                  />
-                  <span>
-                    Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School
-                    / Univ. of Reading)
-                  </span>
-                </label>
-              )}
-              {template === "meeting_invite" && (
-                <Input
-                  value={meetingWhen}
-                  placeholder="Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams"
-                  onChange={(e) => setMeetingWhen(e.target.value)}
-                />
-              )}
-              {template === "partner_intro" && (
-                <Input
-                  value={attachmentsEdit ?? defaultAttachments(lang)}
-                  placeholder="Attachments, separated by commas (leave empty for none)"
-                  onChange={(e) => setAttachments(e.target.value)}
-                />
-              )}
-              {isWhatsApp && (
-                <Input
-                  value={links}
-                  placeholder="Links to share (presentation, website)"
-                  onChange={(e) => setLinks(e.target.value)}
-                />
-              )}
-              {email.subject && (
-                <div className="text-xs font-semibold">Subject: {email.subject}</div>
-              )}
-              <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
-                {email.body}
-              </pre>
-              {(() => {
-                const phoneDigits = (known?.phone || partner?.contact || "").replace(/\D/g, "");
-                const waHref =
-                  phoneDigits.length >= 8
-                    ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(email.body)}`
-                    : `https://wa.me/?text=${encodeURIComponent(email.body)}`;
-
-                return (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(
-                            email.subject
-                              ? `Subject: ${email.subject}\n\n${email.body}`
-                              : email.body,
-                          );
-                          setCopiedEmail(true);
-                          toast.success(isWhatsApp ? "WhatsApp message copied" : "Email copied");
-                          setTimeout(() => setCopiedEmail(false), 3000);
-                        } catch {
-                          toast.error("Could not copy; select the text instead.");
-                        }
-                      }}
-                    >
-                      {copiedEmail ? (
-                        <>
-                          <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                          <span>Copied! ✓</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          <span>Copy {isWhatsApp ? "message" : "email"}</span>
-                        </>
-                      )}
-                    </Button>
-                    {isWhatsApp ? (
-                      <Button
-                        asChild
-                        size="sm"
-                        className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                      >
-                        <a href={waHref} target="_blank" rel="noreferrer">
-                          <MessageCircle className="h-4 w-4" /> Open in WhatsApp
-                        </a>
-                      </Button>
-                    ) : (
-                      <Button asChild variant="outline" size="sm" className="gap-1.5">
-                        <a href={mailto}>
-                          <Mail className="h-4 w-4 text-primary" /> Open in email app
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          );
-        })()}
-      </Section>
-
-      {/* 7. Decision memo */}
-      <Section
-        icon={<Mail className="h-4 w-4" />}
-        title="Decision memo"
-        hint="Plain English summary to send to the decision maker. Internal: it lists blockers."
-      >
-        <Field label="Notes for the memo">
-          <Textarea
-            rows={2}
-            value={ws.decision_notes ?? ""}
-            onChange={(e) => update({ decision_notes: e.target.value || null })}
-          />
-        </Field>
-        {memo && (
-          <div className="mt-3 space-y-2">
-            <div className="text-xs font-semibold">Subject: {memo.subject}</div>
-            <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
-              {memo.body}
-            </pre>
-            <Button
+        <div className="mb-3 inline-flex rounded-lg border bg-muted/30 p-1 text-xs">
+          {(
+            [
+              ["outreach", "Partners and funders"],
+              ["memo", "Memo to Marcelo"],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
               type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(`Subject: ${memo.subject}\n\n${memo.body}`);
-                  toast.success("Memo copied");
-                } catch {
-                  toast.error("Could not copy; select the text instead.");
-                }
-              }}
+              onClick={() => setWriteMode(k)}
+              className={cn(
+                "rounded-md px-3 py-1.5 font-semibold",
+                writeMode === k
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
             >
-              <Copy className="h-4 w-4" /> Copy memo
-            </Button>
-          </div>
+              {label}
+            </button>
+          ))}
+        </div>
+        {writeMode === "outreach" ? (
+          <>
+            {(() => {
+              const partner = ws.partners[partnerIdx] ?? null;
+              const known = partner
+                ? directoryByName.get(partner.name.trim().toLowerCase())
+                : undefined;
+              const orgName = data.orgs.find((o) => o.id === orgId)?.name ?? "our organization";
+              const email = composeOutreach({
+                template,
+                lang,
+                grant: data.grant,
+                workspace: ws,
+                orgName,
+                senderName,
+                partner,
+                recipientName: known?.contact_name ?? undefined,
+                meetingWhen,
+                links: links.split(/[\s,]+/).filter(Boolean),
+                attachments: (attachmentsEdit ?? defaultAttachments(lang))
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean),
+                includeAcademicCredentials,
+              });
+              const isWhatsApp = template === "whatsapp_intro";
+              const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
+              const mailto = `mailto:${toPartner && known?.email ? encodeURIComponent(known.email) : ""}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
+              return (
+                <div className="space-y-3">
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    <select
+                      className={selectClass}
+                      value={template}
+                      onChange={(e) => setTemplate(e.target.value as TemplateId)}
+                    >
+                      {TEMPLATE_IDS.map((t) => (
+                        <option key={t} value={t}>
+                          {TEMPLATE_LABEL[t].en}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className={selectClass}
+                      value={lang}
+                      onChange={(e) => setLang(e.target.value as Lang)}
+                    >
+                      <option value="es">Spanish</option>
+                      <option value="en">English</option>
+                    </select>
+                    {toPartner && (
+                      <select
+                        className={selectClass}
+                        value={partnerIdx}
+                        onChange={(e) => setPartnerIdx(Number(e.target.value))}
+                      >
+                        {ws.partners.length === 0 && <option value={0}>No partners yet</option>}
+                        {ws.partners.map((p, i) => (
+                          <option key={p.id} value={i}>
+                            {p.name || `Partner ${i + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <Input
+                      value={senderName}
+                      placeholder="Sender"
+                      onChange={(e) => setSenderName(e.target.value)}
+                    />
+                  </div>
+                  {toPartner && (
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={includeAcademicCredentials}
+                        onChange={(e) => setIncludeAcademicCredentials(e.target.checked)}
+                        className="rounded border-border"
+                      />
+                      <span>
+                        Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business
+                        School / Univ. of Reading)
+                      </span>
+                    </label>
+                  )}
+                  {template === "meeting_invite" && (
+                    <Input
+                      value={meetingWhen}
+                      placeholder="Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams"
+                      onChange={(e) => setMeetingWhen(e.target.value)}
+                    />
+                  )}
+                  {template === "partner_intro" && (
+                    <Input
+                      value={attachmentsEdit ?? defaultAttachments(lang)}
+                      placeholder="Attachments, separated by commas (leave empty for none)"
+                      onChange={(e) => setAttachments(e.target.value)}
+                    />
+                  )}
+                  {isWhatsApp && (
+                    <Input
+                      value={links}
+                      placeholder="Links to share (presentation, website)"
+                      onChange={(e) => setLinks(e.target.value)}
+                    />
+                  )}
+                  {email.subject && (
+                    <div className="text-xs font-semibold">Subject: {email.subject}</div>
+                  )}
+                  <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
+                    {email.body}
+                  </pre>
+                  {(() => {
+                    const phoneDigits = (known?.phone || partner?.contact || "").replace(/\D/g, "");
+                    const waHref =
+                      phoneDigits.length >= 8
+                        ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(email.body)}`
+                        : `https://wa.me/?text=${encodeURIComponent(email.body)}`;
+
+                    return (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(
+                                email.subject
+                                  ? `Subject: ${email.subject}\n\n${email.body}`
+                                  : email.body,
+                              );
+                              setCopiedEmail(true);
+                              toast.success(
+                                isWhatsApp ? "WhatsApp message copied" : "Email copied",
+                              );
+                              setTimeout(() => setCopiedEmail(false), 3000);
+                            } catch {
+                              toast.error("Could not copy; select the text instead.");
+                            }
+                          }}
+                        >
+                          {copiedEmail ? (
+                            <>
+                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                              <span>Copied! ✓</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4" />
+                              <span>Copy {isWhatsApp ? "message" : "email"}</span>
+                            </>
+                          )}
+                        </Button>
+                        {isWhatsApp ? (
+                          <Button
+                            asChild
+                            size="sm"
+                            className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                          >
+                            <a href={waHref} target="_blank" rel="noreferrer">
+                              <MessageCircle className="h-4 w-4" /> Open in WhatsApp
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button asChild variant="outline" size="sm" className="gap-1.5">
+                            <a href={mailto}>
+                              <Mail className="h-4 w-4 text-primary" /> Open in email app
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
+          </>
+        ) : (
+          <>
+            <Field label="Notes for the memo">
+              <Textarea
+                rows={2}
+                value={ws.decision_notes ?? ""}
+                onChange={(e) => update({ decision_notes: e.target.value || null })}
+              />
+            </Field>
+            {memo && (
+              <div className="mt-3 space-y-2">
+                <div className="text-xs font-semibold">Subject: {memo.subject}</div>
+                <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
+                  {memo.body}
+                </pre>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        `Subject: ${memo.subject}\n\n${memo.body}`,
+                      );
+                      toast.success("Memo copied");
+                    } catch {
+                      toast.error("Could not copy; select the text instead.");
+                    }
+                  }}
+                >
+                  <Copy className="h-4 w-4" /> Copy memo
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </Section>
     </div>

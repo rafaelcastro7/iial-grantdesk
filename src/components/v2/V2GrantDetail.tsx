@@ -1,56 +1,29 @@
 import { Link } from "@tanstack/react-router";
+import { cleanTitle } from "@/lib/html-text";
 import {
-  AlertCircle,
-  AlertTriangle,
   ArrowLeft,
-  ArrowRight,
-  BarChart3,
   Bot,
-  Building2,
-  CalendarClock,
-  CheckCircle2,
   ClipboardCheck,
-  Clock3,
-  DollarSign,
   ExternalLink,
-  FileCheck2,
   FileText,
-  Gauge,
-  Globe2,
-  History,
-  Info,
-  Landmark,
-  Layers,
-  Lightbulb,
   Link2,
-  ListChecks,
   Loader2,
-  MapPin,
-  NotebookText,
+  ChevronDown,
   RefreshCw,
-  Scale,
   SearchCheck,
   Send,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
-  Tags,
-  TrendingUp,
-  Users,
-  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { MAX_ENRICH_ATTEMPTS, isTerminalGrantStatus } from "@/agents/pipeline-stages.shared";
-import { EvaluationDetail } from "@/components/grants/EvaluationDetail";
-import { EvidenceChip } from "@/components/grants/EvidencePanel";
 import { FetchTrailPanel } from "@/components/grants/FetchTrailPanel";
 import { DismissGrantControl } from "@/components/grants/DismissGrantControl";
 import { EligibilityIssues } from "@/components/grants/EligibilityIssues";
 import { FitEvaluation } from "@/components/grants/FitEvaluation";
 import type { AxisScore } from "@/agents/fit-rules.shared";
 import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
-import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { OpportunityBriefPanel } from "@/components/grants/OpportunityBriefPanel";
 import { GrantCopilotSheet } from "@/components/grants/GrantCopilotSheet";
 import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
@@ -62,6 +35,12 @@ import { useActiveTenant } from "@/lib/tenant-context";
 import { GrantApplicationWorkspace } from "@/components/grants/GrantApplicationWorkspace";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import {
   FUNDING_KIND_LABEL,
@@ -209,6 +188,7 @@ export function V2GrantDetail({
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
   // The application plan (saved decisions) comes first: it is where the
   // consultant works; the roadmap and funder facts support it.
+  const [moreOpen, setMoreOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "plan" | "roadmap" | "funder_facts" | "technical_audit"
   >("plan");
@@ -330,690 +310,373 @@ export function V2GrantDetail({
 
   return (
     <div className="w-full max-w-[1700px] space-y-4 px-3 py-4 sm:px-6 lg:py-5">
-      {/* ----------------- TOP NAVBAR & CONTROL BAR ----------------- */}
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 shadow-xs">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button asChild variant="outline" size="sm" className="gap-1.5 font-medium h-8 text-xs">
-            <Link to="/grants">
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Grant Radar
-            </Link>
-          </Button>
-
-          <div className="h-4 w-px bg-border hidden sm:block" />
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge variant="secondary" className="rounded-md font-medium text-xs">
-              {FUNDING_KIND_LABEL[kind]}
-            </Badge>
-
-            {isRolling ? (
-              <Badge
-                variant="outline"
-                className="rounded-md border-blue-500/40 text-blue-700 dark:text-blue-300 bg-blue-500/10 text-xs font-semibold"
+      {/* One compact header: what it is, money, deadline, can we apply. */}
+      <header className="space-y-3 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Link
+            to="/grants"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Find grants
+          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {grant.url && (
+              <ExternalLinkPreview
+                url={grant.url}
+                className={buttonVariants({
+                  size: "sm",
+                  variant: "outline",
+                  className: "h-8 gap-1.5 text-xs",
+                })}
               >
-                Continuous Intake (Rolling)
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="rounded-md bg-muted/60 text-xs">
-                {STATUS_LABEL[grant.status] ?? humanizeKey(grant.status)}
-              </Badge>
+                <span>Official page</span>
+                <ExternalLink className="h-3 w-3" />
+              </ExternalLinkPreview>
             )}
-
-            {duplicateGroupSize > 1 && (
-              <Badge
-                variant="outline"
-                className="rounded-md border-amber-500/50 text-amber-700 text-xs"
-              >
-                {duplicateGroupSize} similar
-              </Badge>
-            )}
-
-            {activeOrgName && (
-              <Badge
-                variant="outline"
-                className="text-xs bg-primary/5 border-primary/30 text-primary"
-              >
-                Tenant: {activeOrgName}
-              </Badge>
-            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                  More <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  disabled={actionDisabled || !canEvaluate}
+                  onSelect={() => onEvaluate()}
+                >
+                  <SearchCheck className="mr-2 h-4 w-4" />
+                  {evaluation ? "Re-check fit" : "Check fit"}
+                </DropdownMenuItem>
+                {canFetch && (
+                  <DropdownMenuItem disabled={actionDisabled} onSelect={() => onFetchDetails()}>
+                    <RefreshCw className="mr-2 h-4 w-4" /> Fetch details from the official page
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={() => handleOpenCopilotWithPrompt()}>
+                  <Bot className="mr-2 h-4 w-4" /> Ask the Copilot (uses AI credits)
+                </DropdownMenuItem>
+                {existingProposalId ? (
+                  <DropdownMenuItem asChild>
+                    <Link to="/proposals/$id" params={{ id: existingProposalId }}>
+                      <FileText className="mr-2 h-4 w-4" /> Open proposal draft
+                    </Link>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    disabled={actionDisabled || !canDraft}
+                    onSelect={() => onDraft()}
+                  >
+                    <Send className="mr-2 h-4 w-4" /> Draft a proposal (AI)
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem disabled={busy === "share"} onSelect={() => onShare()}>
+                  <Link2 className="mr-2 h-4 w-4" />
+                  {shareUrl ? "Link copied" : "Copy a share link"}
+                </DropdownMenuItem>
+                {isAdmin && grant.status === "scored" && (
+                  <DropdownMenuItem disabled={busy === "shortlist"} onSelect={() => onShortlist()}>
+                    Shortlist
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DismissGrantControl
+              grantId={grant.id}
+              defaultReason={kind === "loan" ? "loan_not_grant" : "outside_field"}
+            />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5 h-8 text-xs"
-            disabled={busy === "share"}
-            onClick={onShare}
-          >
-            <Link2 className="h-3.5 w-3.5" />
-            {busy === "share" ? "Sharing..." : shareUrl ? "Link Copied" : "Share"}
-          </Button>
-
-          {grant.url && (
-            <ExternalLinkPreview
-              url={grant.url}
-              className={buttonVariants({
-                size: "sm",
-                variant: "outline",
-                className: "h-8 text-xs gap-1.5",
-              })}
-            >
-              <span>Official page</span>
-              <ExternalLink className="h-3 w-3" />
-            </ExternalLinkPreview>
-          )}
-
-          <DismissGrantControl
-            grantId={grant.id}
-            defaultReason={kind === "loan" ? "loan_not_grant" : "outside_field"}
-          />
+        <div>
+          <h1 className="font-display text-xl font-bold leading-tight tracking-tight sm:text-2xl lg:text-3xl">
+            {cleanTitle(grant.title)}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {[funderName, grant.funder?.jurisdiction, FUNDING_KIND_LABEL[kind]]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
         </div>
+
+        <dl className="grid gap-2 text-sm sm:grid-cols-3">
+          <div className="rounded-lg border bg-background/70 px-3 py-2">
+            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">Amount</dt>
+            <dd className="font-semibold">{amount}</dd>
+          </div>
+          <div className="rounded-lg border bg-background/70 px-3 py-2">
+            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">Deadline</dt>
+            <dd
+              className={cn(
+                "font-semibold",
+                deadline.days != null &&
+                  deadline.days <= 14 &&
+                  "text-amber-600 dark:text-amber-400",
+              )}
+            >
+              {isRolling ? "Continuous intake" : deadline.label}
+            </dd>
+          </div>
+          <div className="rounded-lg border bg-background/70 px-3 py-2">
+            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+              Can {activeOrgName || "we"} apply?
+            </dt>
+            <dd
+              className={cn(
+                "font-semibold",
+                evalVerdict === "eligible"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : evalVerdict === "needs_input"
+                    ? "text-amber-600 dark:text-amber-400"
+                    : evalVerdict === "not_eligible"
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-muted-foreground",
+              )}
+            >
+              {evalVerdict === "eligible"
+                ? `Yes${fitScore != null ? ` · fit ${fitScore}/100` : ""}`
+                : evalVerdict === "needs_input"
+                  ? "Maybe — check the points below"
+                  : evalVerdict === "not_eligible"
+                    ? "Not directly — only as a partner"
+                    : "Not checked yet"}
+            </dd>
+          </div>
+        </dl>
       </header>
 
-      {/* ----------------- ERROR / BUSY NOTICES ----------------- */}
       {err && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium">
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
           {err}
         </div>
       )}
       {busy === "enrich" && (
         <div className="flex items-center gap-2.5 rounded-md border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-900 dark:text-teal-200">
           <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
-          Fetching official guidelines and call requirements live (20-60s)...
+          Reading the official page (20–60 s)…
         </div>
       )}
 
-      {/* ----------------- HERO EXECUTIVE KPI STRIP ----------------- */}
-      <section className="rounded-xl border bg-card p-4 sm:p-5 shadow-sm space-y-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          {/* Grant Title & Funder Info */}
-          <div className="min-w-0 flex-1 space-y-2">
-            <h1 className="font-display text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-foreground leading-tight">
-              {grant.title}
-            </h1>
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                <Landmark className="h-4 w-4 text-primary" />
-                {funderName}
-              </span>
-              {grant.funder?.jurisdiction && (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                  {grant.funder.jurisdiction}
-                </span>
-              )}
-              {grant.funder_type && (
-                <span className="inline-flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                  {displayTag(grant.funder_type)}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1 uppercase">
-                <Globe2 className="h-3.5 w-3.5 text-muted-foreground" />
-                {grant.language}
-              </span>
-            </div>
-          </div>
-
-          {/* Action CTAs Cluster */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {canFetch && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 font-medium h-9 text-xs"
-                disabled={actionDisabled}
-                onClick={onFetchDetails}
-              >
-                {busy === "enrich" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-                Fetch details
-              </Button>
-            )}
-
-            <Button
-              size="sm"
-              variant={canFetch ? "outline" : "default"}
-              className="gap-1.5 font-semibold h-9 text-xs shadow-xs"
-              disabled={actionDisabled || !canEvaluate}
-              onClick={onEvaluate}
-              title={evaluateBlockedReason ?? undefined}
-            >
-              {busy === "eval" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <SearchCheck className="h-3.5 w-3.5" />
-              )}
-              {evaluation ? (isExhaustive ? "Re-check fit" : "Run AI review") : "Check fit"}
-            </Button>
-
-            {existingProposalId ? (
-              <Button
-                asChild
-                size="sm"
-                className="gap-1.5 font-semibold h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <Link to="/proposals/$id" params={{ id: existingProposalId }}>
-                  <FileText className="h-3.5 w-3.5" />
-                  Open proposal
-                </Link>
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                className="gap-1.5 font-semibold h-9 text-xs shadow-xs"
-                variant="default"
-                disabled={actionDisabled || !canDraft}
-                onClick={onDraft}
-                title={draftBlockedReason ?? undefined}
-              >
-                {busy === "draft" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Send className="h-3.5 w-3.5" />
-                )}
-                Draft proposal
-              </Button>
-            )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 font-semibold h-9 text-xs border-primary/40 hover:bg-primary/5 text-primary shadow-2xs"
-              onClick={() => handleOpenCopilotWithPrompt()}
-            >
-              <Bot className="h-3.5 w-3.5 text-primary" />
-              <span>Grant Copilot</span>
-            </Button>
-
-            {grant.status !== "discovered" && (
-              <NotebookLMBridge grantId={grant.id} label="Notebook" />
-            )}
-
-            {isAdmin && grant.status === "scored" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 text-xs"
-                disabled={busy === "shortlist"}
-                onClick={onShortlist}
-              >
-                Shortlist
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* 4-Column Executive KPI Cards */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-1">
-          {/* Card 1: Verdict and Fit */}
-          <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Verdict &amp; Score
-              </span>
-              <span className={cn("h-2.5 w-2.5 rounded-full", verdict.dot)} />
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span
-                className={cn(
-                  "text-2xl font-bold tabular-nums tracking-tight",
-                  evaluation?.eligibility_pass
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : fitScore == null
-                      ? "text-muted-foreground"
-                      : evalVerdict === "needs_input"
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-rose-600 dark:text-rose-400",
-                )}
-              >
-                {fitScore == null ? "—" : `${fitScore}/100`}
-              </span>
-              <Badge
-                variant={
-                  evalVerdict === "eligible"
-                    ? "secondary"
-                    : evalVerdict === "needs_input"
-                      ? "outline"
-                      : "destructive"
-                }
-                className="rounded-md font-semibold text-[10px] py-0 px-1.5"
-              >
-                {evalVerdict === "eligible"
-                  ? "Eligible"
-                  : evalVerdict === "needs_input"
-                    ? "Partner Required"
-                    : evalVerdict === "not_eligible"
-                      ? "Direct Ineligible"
-                      : "Unevaluated"}
-              </Badge>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground truncate" title={verdict.label}>
-              {verdict.label}
-            </p>
-          </div>
-
-          {/* Card 2: Maximum Funding Ceiling */}
-          <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Funding Ceiling
-              </span>
-              <DollarSign className="h-4 w-4 text-primary" />
-            </div>
-            <div className="mt-1.5 text-xl font-bold tracking-tight text-foreground truncate">
-              {amount}
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground truncate">
-              Does not represent 100% for IIAL (consortium allocation)
-            </p>
-          </div>
-
-          {/* Card 3: Intake / Deadline Window */}
-          <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Intake Window
-              </span>
-              <CalendarClock
-                className={cn(
-                  "h-4 w-4",
-                  deadline.days != null && deadline.days <= 14 ? "text-amber-500" : "text-primary",
-                )}
-              />
-            </div>
-            <div className="mt-1.5 text-xl font-bold tracking-tight truncate text-foreground">
-              {isRolling ? "Continuous Intake" : deadline.label}
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground truncate">
-              {isRolling ? "Open year-round window" : deadline.detail}
-            </p>
-          </div>
-
-          {/* Card 4: Recommended Consortium Route */}
-          <div className="rounded-lg border bg-background/80 p-3 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Suggested Route
-              </span>
-              <Workflow className="h-4 w-4 text-primary" />
-            </div>
-            <div className="mt-1.5 text-base sm:text-lg font-bold tracking-tight text-primary truncate">
-              {roadmap.routes
-                .find((r) => r.id === roadmap.recommendedRouteId)
-                ?.title.replace("Route ", "") || "Academic"}
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground truncate">
-              {roadmap.routes.find((r) => r.id === roadmap.recommendedRouteId)
-                ?.recommendedPartner || "Strategic Partner"}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ----------------- NAVIGATION WORKSPACE TABS ----------------- */}
-      <div className="flex items-center justify-between border-b pb-1 gap-2 flex-wrap">
-        <div className="inline-flex flex-wrap rounded-lg border bg-muted/30 p-1 text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveTab("plan")}
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold transition-all",
-              activeTab === "plan"
-                ? "bg-background text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <ClipboardCheck className="h-4 w-4 text-primary" />
-            <span>Application plan</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("roadmap")}
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold transition-all",
-              activeTab === "roadmap"
-                ? "bg-background text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Workflow className="h-4 w-4 text-primary" />
-            <span>Suggested routes</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("funder_facts")}
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold transition-all",
-              activeTab === "funder_facts"
-                ? "bg-background text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <FileText className="h-4 w-4 text-primary" />
-            <span>Funder facts</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("technical_audit")}
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold transition-all",
-              activeTab === "technical_audit"
-                ? "bg-background text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <History className="h-4 w-4 text-primary" />
-            <span>Technical audit</span>
-          </button>
-        </div>
-
-        <div className="text-xs text-muted-foreground">
-          Active route selected: <strong className="text-foreground">{selectedRoute.title}</strong>
-        </div>
-      </div>
-
       {/* ----------------- MAIN WIDESCREEN WORKSPACE (8 COLS MAIN + 4 COLS RAIL) ----------------- */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        {/* ================= LEFT MAIN COLUMN (8 COLS) ================= */}
-        <main className="space-y-5 lg:col-span-8">
-          {activeTab === "plan" &&
-            (activeOrgId ? (
-              <GrantApplicationWorkspace grantId={grant.id} orgId={activeOrgId} />
-            ) : (
-              <p className="rounded-lg border p-4 text-sm text-muted-foreground">
-                Choose the organization you are working for to open its application plan.
-              </p>
-            ))}
-          {activeTab === "roadmap" && (
-            <>
-              {/* 1. APPLICATION ROUTES & CONSORTIUM MATRIX */}
-              <GrantConsortiumMatrix
-                routes={roadmap.routes}
-                recommendedRouteId={roadmap.recommendedRouteId}
-                selectedRouteId={selectedRouteId}
-                onSelectRoute={(id) => setSelectedRouteId(id)}
-                orgName={activeOrgName}
-              />
+      {activeOrgId ? (
+        <GrantApplicationWorkspace grantId={grant.id} orgId={activeOrgId} />
+      ) : (
+        <p className="rounded-lg border p-4 text-sm text-muted-foreground">
+          Choose the organization you are working for to open its plan.
+        </p>
+      )}
 
-              {/* 2. FINANCIAL CONDITIONS & CRITICAL HURDLES */}
-              <GrantFinancialHurdles financial={roadmap.financial} orgName={activeOrgName} />
+      {/* Folded and lazy: nothing inside loads (or calls AI) until opened. */}
+      <details
+        className="group rounded-xl border bg-card shadow-sm"
+        onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold">
+          More about this grant
+          <span className="ml-2 font-normal text-muted-foreground">
+            fit analysis, suggested routes, funder facts, technical audit
+          </span>
+        </summary>
+        {moreOpen && (
+          <div className="space-y-5 border-t p-4 sm:p-5">
+            {
+              <>
+                {/* 1. APPLICATION ROUTES & CONSORTIUM MATRIX */}
+                <GrantConsortiumMatrix
+                  routes={roadmap.routes}
+                  recommendedRouteId={roadmap.recommendedRouteId}
+                  selectedRouteId={selectedRouteId}
+                  onSelectRoute={(id) => setSelectedRouteId(id)}
+                  orgName={activeOrgName}
+                />
 
-              {/* 3. STRATEGIC RETURN & DOWNSTREAM REVENUE MODEL */}
-              <GrantStrategicRevenue
-                strategicReturn={roadmap.strategicReturn}
-                orgName={activeOrgName}
-              />
+                {/* 2. FINANCIAL CONDITIONS & CRITICAL HURDLES */}
+                <GrantFinancialHurdles financial={roadmap.financial} orgName={activeOrgName} />
 
-              {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
-              <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
+                {/* 3. STRATEGIC RETURN & DOWNSTREAM REVENUE MODEL */}
+                <GrantStrategicRevenue
+                  strategicReturn={roadmap.strategicReturn}
+                  orgName={activeOrgName}
+                />
 
-              {/* Emails live in the Application plan (one composer, real partners). */}
-            </>
-          )}
+                {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
+                <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
 
-          {activeTab === "funder_facts" && (
-            <>
-              {/* OFFICIAL SUMMARY & SCOPE */}
-              <Panel
-                icon={FileText}
-                title="Program Scope &amp; Official Description"
-                description="Summary extracted from official funder documentation."
-              >
-                <div className="space-y-4">
-                  <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
-                    {grant.summary?.trim() ||
-                      "No detailed description extracted yet. Click 'Fetch details' or visit the official page."}
-                  </p>
+                {/* Emails live in the Application plan (one composer, real partners). */}
+              </>
+            }
 
-                  <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FactRow label="Who can apply" values={applicantTypes} />
-                    <FactRow label="Eligible uses of funds" values={fundingUses} />
-                    <FactRow label="Target populations" values={populations} />
-                    <FactRow label="Eligible sectors" values={sectors} />
+            {
+              <>
+                {/* OFFICIAL SUMMARY & SCOPE */}
+                <Panel
+                  icon={FileText}
+                  title="Program Scope &amp; Official Description"
+                  description="Summary extracted from official funder documentation."
+                >
+                  <div className="space-y-4">
+                    <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                      {grant.summary?.trim() ||
+                        "No detailed description extracted yet. Click 'Fetch details' or visit the official page."}
+                    </p>
+
+                    <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FactRow label="Who can apply" values={applicantTypes} />
+                      <FactRow label="Eligible uses of funds" values={fundingUses} />
+                      <FactRow label="Target populations" values={populations} />
+                      <FactRow label="Eligible sectors" values={sectors} />
+                    </div>
                   </div>
-                </div>
-              </Panel>
+                </Panel>
 
-              {/* FUNDER ELIGIBILITY RULES */}
-              <Panel
-                icon={ShieldCheck}
-                title="Eligibility Rules Declared by Funder"
-                description="Explicit conditions stated in call guidelines."
-              >
-                {eligibleGroups.length === 0 &&
-                eligibilityDetails.length === 0 &&
-                !grant.eligibility_note ? (
-                  <EmptyState
-                    icon={ShieldAlert}
-                    title="No textual eligibility rules extracted"
-                    body="Verify on the funder's official website before investing drafting time."
-                  />
-                ) : (
-                  <div className="space-y-4 text-sm">
-                    {grant.eligibility_note && (
-                      <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
-                        {grant.eligibility_note}
-                      </p>
-                    )}
-                    {eligibleGroups.length > 0 && (
-                      <div>
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
-                          Explicitly Eligible Groups
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {eligibleGroups.map((label) => (
-                            <Badge
-                              key={label}
-                              variant="secondary"
-                              className="rounded-md text-xs py-1 px-2.5"
-                            >
-                              {label}
-                            </Badge>
+                {/* FUNDER ELIGIBILITY RULES */}
+                <Panel
+                  icon={ShieldCheck}
+                  title="Eligibility Rules Declared by Funder"
+                  description="Explicit conditions stated in call guidelines."
+                >
+                  {eligibleGroups.length === 0 &&
+                  eligibilityDetails.length === 0 &&
+                  !grant.eligibility_note ? (
+                    <EmptyState
+                      icon={ShieldAlert}
+                      title="No textual eligibility rules extracted"
+                      body="Verify on the funder's official website before investing drafting time."
+                    />
+                  ) : (
+                    <div className="space-y-4 text-sm">
+                      {grant.eligibility_note && (
+                        <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
+                          {grant.eligibility_note}
+                        </p>
+                      )}
+                      {eligibleGroups.length > 0 && (
+                        <div>
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
+                            Explicitly Eligible Groups
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {eligibleGroups.map((label) => (
+                              <Badge
+                                key={label}
+                                variant="secondary"
+                                className="rounded-md text-xs py-1 px-2.5"
+                              >
+                                {label}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {eligibilityDetails.length > 0 && (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {eligibilityDetails.map(([key, value]) => (
+                            <div key={key} className="rounded-lg border bg-background/70 p-3">
+                              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                                {ELIGIBILITY_LABEL[key] ?? humanizeKey(key)}
+                              </span>
+                              <div className="mt-1 text-xs">
+                                {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                              </div>
+                            </div>
                           ))}
                         </div>
-                      </div>
+                      )}
+                    </div>
+                  )}
+                </Panel>
+
+                {/* SOURCES & PROVENANCE */}
+                <Panel
+                  icon={Link2}
+                  title="Official Sources &amp; Provenance"
+                  description="Verified web pages and observation timestamps."
+                >
+                  <div className="space-y-2.5 text-sm">
+                    {grant.url && (
+                      <SourceLink href={grant.url} label="Official Call Guidelines Page" />
                     )}
-                    {eligibilityDetails.length > 0 && (
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {eligibilityDetails.map(([key, value]) => (
-                          <div key={key} className="rounded-lg border bg-background/70 p-3">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
-                              {ELIGIBILITY_LABEL[key] ?? humanizeKey(key)}
-                            </span>
-                            <div className="mt-1 text-xs">
-                              {typeof value === "object" ? JSON.stringify(value) : String(value)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
+                      <SourceLink href={grant.funder.source_url} label="Main Funder Portal" />
                     )}
+                    {otherSources.map((url) => (
+                      <SourceLink
+                        key={url}
+                        href={url}
+                        label={url.replace(/^https?:\/\/(www\.)?/, "")}
+                      />
+                    ))}
+                    <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
+                      <span>Discovered: {formatDateTime(grant.discovered_at)}</span>
+                      <span>Last verified: {formatDateTime(grant.last_seen_at)}</span>
+                    </div>
+                  </div>
+                </Panel>
+              </>
+            }
+
+            {
+              <>
+                {/* SUBSANACIÓN MANUAL DE HECHOS */}
+                <ManualFactsPanel grant={grant} />
+
+                {/* DESGLOSE DE PUNTUACIÓN Y AUDITORÍA DE REGLAS */}
+                <FitEvaluation
+                  status={grant.status}
+                  discoveredAt={grant.discovered_at}
+                  enrichedAt={grant.enriched_at}
+                  scoredAt={grant.scored_at}
+                  evaluation={
+                    evaluation
+                      ? {
+                          fit_score: evaluation.fit_score,
+                          eligibility_pass: evaluation.eligibility_pass,
+                          rule_verdict:
+                            (evaluation.rule_snapshot as { verdict?: string } | null | undefined)
+                              ?.verdict ?? null,
+                          rationale_en: evaluation.rationale_en,
+                          rationale_fr: evaluation.rationale_fr ?? "",
+                          created_at: evaluation.created_at,
+                          axis_breakdown:
+                            (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
+                        }
+                      : null
+                  }
+                />
+
+                {/* TRAZA DE EVENTOS */}
+                <FetchTrailPanel
+                  grantId={grant.id}
+                  onRetry={onFetchDetails}
+                  retrying={busy === "enrich"}
+                />
+              </>
+            }
+            {/* AI FIT & DECISION RATIONALE */}
+            <Panel
+              icon={ClipboardCheck}
+              title="Fit Verdict &amp; Decisions"
+              description={
+                evaluation
+                  ? `Evaluated on ${formatDateTime(evaluation.created_at)}`
+                  : "Fit not evaluated yet."
+              }
+            >
+              <div className="space-y-3">
+                <p className="text-xs leading-relaxed text-muted-foreground">{verdict.detail}</p>
+
+                {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
+
+                {evaluation?.rationale_en && (
+                  <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed text-foreground">
+                    <span className="font-semibold block mb-1">Evaluation Engine Rationale:</span>
+                    {humanizeRationale(evaluation.rationale_en)}
                   </div>
                 )}
-              </Panel>
-
-              {/* SOURCES & PROVENANCE */}
-              <Panel
-                icon={Link2}
-                title="Official Sources &amp; Provenance"
-                description="Verified web pages and observation timestamps."
-              >
-                <div className="space-y-2.5 text-sm">
-                  {grant.url && (
-                    <SourceLink href={grant.url} label="Official Call Guidelines Page" />
-                  )}
-                  {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
-                    <SourceLink href={grant.funder.source_url} label="Main Funder Portal" />
-                  )}
-                  {otherSources.map((url) => (
-                    <SourceLink
-                      key={url}
-                      href={url}
-                      label={url.replace(/^https?:\/\/(www\.)?/, "")}
-                    />
-                  ))}
-                  <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
-                    <span>Discovered: {formatDateTime(grant.discovered_at)}</span>
-                    <span>Last verified: {formatDateTime(grant.last_seen_at)}</span>
-                  </div>
-                </div>
-              </Panel>
-            </>
-          )}
-
-          {activeTab === "technical_audit" && (
-            <>
-              {/* SUBSANACIÓN MANUAL DE HECHOS */}
-              <ManualFactsPanel grant={grant} />
-
-              {/* DESGLOSE DE PUNTUACIÓN Y AUDITORÍA DE REGLAS */}
-              <FitEvaluation
-                status={grant.status}
-                discoveredAt={grant.discovered_at}
-                enrichedAt={grant.enriched_at}
-                scoredAt={grant.scored_at}
-                evaluation={
-                  evaluation
-                    ? {
-                        fit_score: evaluation.fit_score,
-                        eligibility_pass: evaluation.eligibility_pass,
-                        rule_verdict:
-                          (evaluation.rule_snapshot as { verdict?: string } | null | undefined)
-                            ?.verdict ?? null,
-                        rationale_en: evaluation.rationale_en,
-                        rationale_fr: evaluation.rationale_fr ?? "",
-                        created_at: evaluation.created_at,
-                        axis_breakdown:
-                          (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
-                      }
-                    : null
-                }
-              />
-
-              {/* TRAZA DE EVENTOS */}
-              <FetchTrailPanel
-                grantId={grant.id}
-                onRetry={onFetchDetails}
-                retrying={busy === "enrich"}
-              />
-            </>
-          )}
-        </main>
-
-        {/* ================= RIGHT SIDEBAR / DECISION RAIL (4 COLS) ================= */}
-        <aside className="space-y-5 lg:col-span-4">
-          {/* STRATEGIC COPILOT & CONSORTIUM ADVISOR */}
-          <div className="rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-4 space-y-3 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-primary/15 p-2 text-primary">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                    Grant Copilot
-                    <Badge variant="outline" className="text-[10px] font-normal py-0">
-                      AI Advisor
-                    </Badge>
-                  </h4>
-                  <p className="text-[11px] text-muted-foreground">
-                    Consortia, WCIS &amp; Requirements
-                  </p>
-                </div>
               </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Contextual intelligence to apply in consortium with {selectedRoute.leadEntity} and
-              articulate the WCIS standard.
-            </p>
-
-            <div className="space-y-1.5 pt-1">
-              <button
-                type="button"
-                onClick={() =>
-                  handleOpenCopilotWithPrompt(
-                    `How should we structure ${selectedRoute.title} to maximize scoring in this call?`,
-                  )
-                }
-                className="w-full text-left text-[11px] p-2 rounded-md bg-background/80 border hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-between"
-              >
-                <span>Structure {selectedRoute.title}</span>
-                <ArrowRight className="h-3 w-3 shrink-0" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleOpenCopilotWithPrompt(
-                    "How can we position the WCIS standard as an in-kind contribution for this grant?",
-                  )
-                }
-                className="w-full text-left text-[11px] p-2 rounded-md bg-background/80 border hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-between"
-              >
-                <span>Justify in-kind match with WCIS</span>
-                <ArrowRight className="h-3 w-3 shrink-0" />
-              </button>
-            </div>
-
-            <div className="flex gap-2 pt-2 border-t border-border/50">
-              <Button
-                size="sm"
-                className="flex-1 text-xs gap-1.5 h-8 font-semibold shadow-xs"
-                onClick={() => handleOpenCopilotWithPrompt()}
-              >
-                <Bot className="h-3.5 w-3.5" />
-                <span>Consult Copilot</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-xs gap-1 h-8"
-                onClick={() => setBacklogModalOpen(true)}
-                title="Suggest product improvement for backlog"
-              >
-                <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
-                <span>Suggest improvement</span>
-              </Button>
-            </div>
+            </Panel>
           </div>
-
-          {/* AI FIT & DECISION RATIONALE */}
-          <Panel
-            icon={ClipboardCheck}
-            title="Fit Verdict &amp; Decisions"
-            description={
-              evaluation
-                ? `Evaluated on ${formatDateTime(evaluation.created_at)}`
-                : "Fit not evaluated yet."
-            }
-          >
-            <div className="space-y-3">
-              <p className="text-xs leading-relaxed text-muted-foreground">{verdict.detail}</p>
-
-              {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
-
-              {evaluation?.rationale_en && (
-                <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed text-foreground">
-                  <span className="font-semibold block mb-1">Evaluation Engine Rationale:</span>
-                  {humanizeRationale(evaluation.rationale_en)}
-                </div>
-              )}
-            </div>
-          </Panel>
-        </aside>
-      </div>
+        )}
+      </details>
 
       {/* ----------------- MODALS & SLIDE-OVER SHEETS ----------------- */}
       <GrantCopilotSheet

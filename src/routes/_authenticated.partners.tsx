@@ -241,17 +241,14 @@ function PartnersPage() {
         </section>
       )}
 
-      {data?.available && partners.length === 0 && !draft && (
-        filter.trim() ? (
+      {data?.available &&
+        partners.length === 0 &&
+        !draft &&
+        (filter.trim() ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground/60" />
             <p>No partners matching &ldquo;{filter}&rdquo;.</p>
-            <Button
-              variant="link"
-              size="sm"
-              className="mt-2 text-xs"
-              onClick={() => setFilter("")}
-            >
+            <Button variant="link" size="sm" className="mt-2 text-xs" onClick={() => setFilter("")}>
               Clear search filter
             </Button>
           </div>
@@ -265,7 +262,8 @@ function PartnersPage() {
             </h3>
             <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground leading-relaxed">
               Consortium grants (e.g. Canadian colleges, LAC territorial cooperatives, IDRC, GAC)
-              require verified partners. Start with Rocío&rsquo;s 7 recommended institutions or add your own.
+              require verified partners. Start with Rocío&rsquo;s 7 recommended institutions or add
+              your own.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <Button
@@ -288,8 +286,7 @@ function PartnersPage() {
               </Button>
             </div>
           </div>
-        )
-      )}
+        ))}
 
       <div className="grid gap-3 md:grid-cols-2">
         {partners.map((p) => {
@@ -370,14 +367,16 @@ function PartnersPage() {
               )}
               {used.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {used.map((u) => (
-                    <Link key={u.grantId} to="/grants/$id" params={{ id: u.grantId }}>
-                      <Badge variant="outline" className="font-normal hover:bg-accent">
-                        {u.title.slice(0, 40)}
-                        {u.status ? ` · ${u.status.replace("_", " ")}` : ""}
-                      </Badge>
-                    </Link>
-                  ))}
+                  {used
+                    .filter((u, i) => used.findIndex((x) => x.grantId === u.grantId) === i)
+                    .map((u) => (
+                      <Link key={u.grantId} to="/grants/$id" params={{ id: u.grantId }}>
+                        <Badge variant="outline" className="font-normal hover:bg-accent">
+                          {u.title.slice(0, 40)}
+                          {u.status ? ` · ${u.status.replace("_", " ")}` : ""}
+                        </Badge>
+                      </Link>
+                    ))}
                 </div>
               )}
             </article>
