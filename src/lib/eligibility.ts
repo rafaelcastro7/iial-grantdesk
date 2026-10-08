@@ -1,3 +1,4 @@
+import { BORDERLESS_CODES, isAmericas } from "@/lib/americas";
 import { fromClientStage, listApplicantTypes, type ApplicantType } from "./applicant-types";
 
 /**
@@ -64,7 +65,7 @@ export type EligibilityInput = {
 };
 
 /** Multilateral funders are not bound to one country's applicants. */
-const BORDERLESS = new Set(["INTL", "GLOBAL", "WORLD"]);
+const BORDERLESS = BORDERLESS_CODES;
 
 /**
  * "Foreign entities are eligible to apply" — read from the funder's own text,
@@ -143,6 +144,16 @@ function jurisdictionRule(input: EligibilityInput): RuleResult {
       detail:
         `Based in ${grantCountry}, but its own terms say foreign applicants are eligible — ` +
         `confirm this client qualifies before drafting.`,
+    };
+  }
+  // Funded elsewhere in the Americas for a client based in the Americas: the
+  // route is a consortium led by an eligible local institution.
+  if (isAmericas(grantCountry) && clientPlaces.some((p) => isAmericas(p))) {
+    return {
+      key: "jurisdiction",
+      status: "unknown",
+      isHardGate: true,
+      detail: `Funded in ${grantCountry}: take part as a partner in a consortium led by an eligible ${grantCountry} institution.`,
     };
   }
   return {

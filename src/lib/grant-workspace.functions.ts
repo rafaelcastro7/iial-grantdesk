@@ -74,8 +74,12 @@ async function eligibilityByOrg(
     const rules = rulesRow ?? deriveRulesFromOrg(profile, DEFAULT_RULES);
     const result = evaluateRules(rules, grant as never);
     const failed = result.checks.filter((c) => c.status === "fail" && c.hard);
+    // Blocking open questions, plus the geography route (warn, not blocking):
+    // "take part as a partner with an eligible local lead".
     const unclear = result.checks.filter(
-      (c) => (c.status === "warn" || c.status === "skip") && c.hard,
+      (c) =>
+        ((c.status === "warn" || c.status === "skip") && c.hard) ||
+        (c.id === "jurisdiction_required" && c.status === "warn"),
     );
     out.push({
       orgId: org.id,

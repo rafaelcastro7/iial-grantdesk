@@ -16,6 +16,7 @@ export {
   assessBudgetCapacity,
 } from "@/agents/fit-rules.shared";
 
+import { isAmericas, isBorderless } from "@/lib/americas";
 import type { FitRules } from "@/agents/fit-rules.shared";
 
 export type GrantForRules = {
@@ -192,8 +193,15 @@ const CANADIAN_SUBJURISDICTIONS = new Set([
   "nu",
 ]);
 
+export function isAmericasJurisdiction(raw: string): boolean {
+  return isAmericas(raw);
+}
+
 function jurisdictionMatches(requiredRaw: string, grantRaw: string): boolean {
   const required = normalizeJurisdiction(requiredRaw);
+  // A grant's country field holds ISO country codes: "PE" is Peru, not
+  // Prince Edward Island (which made Peruvian calls look Canadian).
+  if (grantRaw.trim().toUpperCase() === "PE") return required === "peru";
   const grant = normalizeJurisdiction(grantRaw);
   if (required === grant) return true;
   // A national opportunity is available to a province-based organization;
@@ -529,22 +537,48 @@ export function evaluateRules(rules: FitRules, g: GrantForRules, now = new Date(
 
   if (rules.required_jurisdictions.length > 0) {
     const normGrant = grantCountry ? normalizeJurisdiction(grantCountry) : "";
-    const ok = normGrant
-      ? rules.required_jurisdictions.some((required) => jurisdictionMatches(required, grantCountry))
-      : false;
+    const borderless = isBorderless(grantCountry);
+    const ok =
+      borderless ||
+      (normGrant
+        ? rules.required_jurisdictions.some((required) =>
+            jurisdictionMatches(required, grantCountry),
+          )
+        : false);
     const foreignAllowed = !ok && statesForeignEligibility(hay);
+    // Funded elsewhere in the Americas, for an organization based in the
+    // Americas: take part as a partner with an eligible local lead.
+    const americasPartner =
+      !ok &&
+      !foreignAllowed &&
+      !!normGrant &&
+      isAmericasJurisdiction(grantCountry) &&
+      // Between countries only: a provincial call (e.g. Ontario-only) stays
+      // restricted for an organization in another province.
+      !(CANADIAN_SUBJURISDICTIONS.has(normGrant) && grantCountry.trim().toUpperCase() !== "PE") &&
+      rules.required_jurisdictions.some((r) => isAmericasJurisdiction(r));
     checks.push({
       id: "jurisdiction_required",
       label: "Required jurisdiction",
-      status: !normGrant ? "skip" : ok ? "pass" : foreignAllowed ? "warn" : "fail",
-      hard: foreignAllowed ? false : rules.hard_fail_on_jurisdiction,
-      detail: ok
-        ? `${grantCountry} is in {${rules.required_jurisdictions.join(", ")}}`
-        : !normGrant
-          ? "Grant jurisdiction is unknown"
-          : foreignAllowed
-            ? "US federal program synopsis explicitly affirms foreign/international entities may apply; verify specific conditions."
-            : `${grantCountry} is incompatible with {${rules.required_jurisdictions.join(", ")}}`,
+      status: !normGrant
+        ? "skip"
+        : ok
+          ? "pass"
+          : foreignAllowed || americasPartner
+            ? "warn"
+            : "fail",
+      hard: foreignAllowed || americasPartner ? false : rules.hard_fail_on_jurisdiction,
+      detail: borderless
+        ? "International / multilateral call: not restricted to one country's applicants."
+        : ok
+          ? `${grantCountry} is in {${rules.required_jurisdictions.join(", ")}}`
+          : !normGrant
+            ? "Grant jurisdiction is unknown"
+            : foreignAllowed
+              ? "US federal program synopsis explicitly affirms foreign/international entities may apply; verify specific conditions."
+              : americasPartner
+                ? `Funded in ${grantCountry} (the Americas): take part as a partner in a consortium led by an eligible ${grantCountry} institution.`
+                : `${grantCountry} is incompatible with {${rules.required_jurisdictions.join(", ")}}`,
     });
   }
 

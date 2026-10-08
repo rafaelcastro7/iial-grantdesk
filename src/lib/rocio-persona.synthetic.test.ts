@@ -666,3 +666,25 @@ describe("Grant Copilot cannot invent organizations", () => {
     ).toBe("lambton college");
   });
 });
+
+describe("IIAL can take part in any call in the Americas", () => {
+  it("international calls pass; Latin American calls are 'as a partner', not 'no'; Europe stays 'no'", async () => {
+    const { evaluateRules, DEFAULT_RULES } = await import("@/agents/fit-rules.server");
+    const { explainCheck } = await import("@/lib/eligibility-explain");
+    const rules = { ...DEFAULT_RULES, required_jurisdictions: ["CA", "ON"] };
+    const check = (country: string) =>
+      evaluateRules(rules as never, { id: "g", title: "Call", country } as never).checks.find(
+        (c) => c.id === "jurisdiction_required",
+      )!;
+    expect(check("INTL").status).toBe("pass");
+    const peru = check("PE");
+    expect(peru.status).toBe("warn");
+    expect(peru.hard).toBe(false);
+    expect(explainCheck(peru, "es")).toMatch(
+      /socios en un consorcio liderado por una institución elegible de PE/,
+    );
+    expect(check("MX").status).toBe("warn");
+    expect(check("LATAM").status).toBe("warn");
+    expect(check("FR").status).toBe("fail");
+  });
+});
