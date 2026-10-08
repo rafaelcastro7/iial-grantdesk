@@ -171,6 +171,8 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
 Use ONLY facts from the official page text, the web research, the grant record and the organization profiles below. If something is not published, say so; never invent amounts, dates, contacts, form names or organizations. WCIS is the "Whole-Chain International Standard" (no version numbers). No placeholders like [Name] except for the recipient's personal name in emails when unknown.
 Return ONLY a JSON object with this shape:
 {
+  "fit": "lead (we can apply as lead or co-applicant) | partner_only (only as partner of an eligible lead) | not_eligible (no role possible) | next_cycle (eligible but the current call is closed or too close) | unclear (official text does not settle it)",
+  "fit_reason": "one short line with the decisive reason, for the page header",
   "verdict": "3-5 sentences: what it really is, whether and how each of our organizations can take part, and the recommendation",
   "traps": [{ "title": "short name of a hidden condition", "detail": "what the brochure does not say and what it means for us", "source_url": "https://..." }],
   "routes": {

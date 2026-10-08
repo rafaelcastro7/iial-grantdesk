@@ -1,4 +1,8 @@
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getGrantDossier } from "@/lib/grant-dossier.functions";
+import { fitLabel, fitTone, type DossierFit } from "@/lib/grant-dossier.shared";
 import { GrantDossier } from "@/components/grants/GrantDossier";
 import { CallFactsCard, type CallFacts } from "@/components/grants/CallFactsCard";
 import { cleanTitle } from "@/lib/html-text";
@@ -207,6 +211,17 @@ export function V2GrantDetail({
   // The application plan (saved decisions) comes first: it is where the
   // consultant works; the roadmap and funder facts support it.
   const [moreOpen, setMoreOpen] = useState(false);
+  // The dossier (official page + web) gives the authoritative "can we apply?".
+  const fetchDossier = useServerFn(getGrantDossier);
+  const { data: dossierData } = useQuery({
+    queryKey: ["grant-dossier", grant.id, activeOrgId, lang],
+    queryFn: () =>
+      fetchDossier({ data: { grantId: grant.id, orgId: activeOrgId as string, lang } }),
+    enabled: !!activeOrgId,
+  });
+  const savedFit =
+    (dossierData?.saved?.dossier as { fit?: DossierFit; fit_reason?: string } | undefined) ?? null;
+  const dossierFit = savedFit?.fit ? { fit: savedFit.fit, reason: savedFit.fit_reason } : null;
   const [activeTab, setActiveTab] = useState<
     "plan" | "roadmap" | "funder_facts" | "technical_audit"
   >("plan");
@@ -482,26 +497,50 @@ export function V2GrantDetail({
                 activeOrgName ? `¿Puede ${activeOrgName} postular?` : "¿Podemos postular?",
               )}
             </dt>
-            <dd
-              className={cn(
-                "font-semibold",
-                evalVerdict === "eligible"
-                  ? "text-emerald-600 dark:text-emerald-400"
+            {dossierFit ? (
+              <dd
+                className={cn(
+                  "font-semibold",
+                  fitTone(dossierFit.fit) === "good"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : fitTone(dossierFit.fit) === "warn"
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-rose-600 dark:text-rose-400",
+                )}
+                title={tr(
+                  "From the grant dossier (official page and web)",
+                  "Según el dossier del grant (página oficial y web)",
+                )}
+              >
+                {fitLabel(dossierFit.fit, lang)}
+                {dossierFit.reason && (
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {dossierFit.reason}
+                  </span>
+                )}
+              </dd>
+            ) : (
+              <dd
+                className={cn(
+                  "font-semibold",
+                  evalVerdict === "eligible"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : evalVerdict === "needs_input"
+                      ? "text-amber-600 dark:text-amber-400"
+                      : evalVerdict === "not_eligible"
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-muted-foreground",
+                )}
+              >
+                {evalVerdict === "eligible"
+                  ? `${tr("Yes", "Sí")}${fitScore != null ? ` · ${tr("fit", "encaje")} ${fitScore}/100` : ""}`
                   : evalVerdict === "needs_input"
-                    ? "text-amber-600 dark:text-amber-400"
+                    ? tr("Maybe — check the points below", "Tal vez — revise los puntos de abajo")
                     : evalVerdict === "not_eligible"
-                      ? "text-rose-600 dark:text-rose-400"
-                      : "text-muted-foreground",
-              )}
-            >
-              {evalVerdict === "eligible"
-                ? `${tr("Yes", "Sí")}${fitScore != null ? ` · ${tr("fit", "encaje")} ${fitScore}/100` : ""}`
-                : evalVerdict === "needs_input"
-                  ? tr("Maybe — check the points below", "Tal vez — revise los puntos de abajo")
-                  : evalVerdict === "not_eligible"
-                    ? tr("Not directly — only as a partner", "No directamente — solo como socio")
-                    : tr("Not checked yet", "Aún no revisado")}
-            </dd>
+                      ? tr("No — see the reasons below", "No — vea los motivos abajo")
+                      : tr("Not checked yet", "Aún no revisado")}
+              </dd>
+            )}
           </div>
         </dl>
       </header>

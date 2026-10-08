@@ -1,6 +1,8 @@
 // The consultant's working sheet for one grant: who applies and how, the
 // decision, consortium, documents checklist, milestones and WCIS project idea,
 // saved per organization, plus the decision memo built from it.
+import { getGrantDossier } from "@/lib/grant-dossier.functions";
+import { fitLabel, fitTone, type DossierFit } from "@/lib/grant-dossier.shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -77,6 +79,14 @@ const selectClass = "h-9 w-full rounded-md border bg-background px-2 text-sm";
 export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string; orgId: string }) {
   const tr = useTr();
   const uiLang = useUiLang();
+  const fetchDossier = useServerFn(getGrantDossier);
+  const { data: dossierData } = useQuery({
+    queryKey: ["grant-dossier", grantId, orgId, uiLang],
+    queryFn: () => fetchDossier({ data: { grantId, orgId, lang: uiLang } }),
+  });
+  const savedFit =
+    (dossierData?.saved?.dossier as { fit?: DossierFit; fit_reason?: string } | undefined) ?? null;
+  const dossierFit = savedFit?.fit ? { fit: savedFit.fit, reason: savedFit.fit_reason } : null;
   const fetchWs = useServerFn(getGrantWorkspace);
   const save = useServerFn(saveGrantWorkspace);
   const qc = useQueryClient();
@@ -297,6 +307,32 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
           "Verificado con el perfil y las reglas de cada organización (sin IA).",
         )}
       >
+        {dossierFit && (
+          <div
+            className={cn(
+              "mb-3 rounded-lg border p-3 text-sm",
+              fitTone(dossierFit.fit) === "good"
+                ? "border-emerald-500/40 bg-emerald-500/5"
+                : fitTone(dossierFit.fit) === "warn"
+                  ? "border-amber-500/40 bg-amber-500/5"
+                  : "border-rose-500/40 bg-rose-500/5",
+            )}
+          >
+            <span className="font-semibold">
+              {tr("Dossier (official page and web)", "Dossier (página oficial y web)")}:{" "}
+              {fitLabel(dossierFit.fit, uiLang)}
+            </span>
+            {dossierFit.reason && (
+              <span className="block text-muted-foreground">{dossierFit.reason}</span>
+            )}
+            <span className="block pt-1 text-xs text-muted-foreground">
+              {tr(
+                "The checks below use only your profile's rules; when they disagree, the dossier read the call itself.",
+                "Las verificaciones de abajo usan solo las reglas de su perfil; si no coinciden, el dossier leyó la convocatoria misma.",
+              )}
+            </span>
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           {data.eligibility.map((e) => {
             const chosen = ws.applicant_org_ids.includes(e.orgId);

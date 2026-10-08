@@ -29,7 +29,20 @@ export type DossierMessage = {
   channel: "email" | "whatsapp";
 };
 
+/** The dossier's answer to "can we apply?" for the active organization. */
+export type DossierFit = "lead" | "partner_only" | "not_eligible" | "next_cycle" | "unclear";
+export const DOSSIER_FITS: DossierFit[] = [
+  "lead",
+  "partner_only",
+  "not_eligible",
+  "next_cycle",
+  "unclear",
+];
+
 export type Dossier = {
+  fit: DossierFit;
+  /** One line: why, for the header. */
+  fit_reason?: string;
   verdict: string;
   traps: DossierTrap[];
   routes: { criteria: string[]; options: DossierRouteOption[] };
@@ -51,6 +64,9 @@ export function sanitizeDossier(raw: unknown): Dossier | null {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const verdict = clean(s(r.verdict, 1500));
   if (!verdict) return null;
+  const fitRaw = s(r.fit, 20) as DossierFit;
+  const fit: DossierFit = DOSSIER_FITS.includes(fitRaw) ? fitRaw : "unclear";
+  const fit_reason = clean(s(r.fit_reason, 240)) || undefined;
   const traps = arr(r.traps, 8)
     .map((t) => t as Record<string, unknown>)
     .map((t) => ({
@@ -107,6 +123,8 @@ export function sanitizeDossier(raw: unknown): Dossier | null {
     }))
     .filter((m) => m.body);
   return {
+    fit,
+    fit_reason,
     verdict,
     traps,
     routes: { criteria, options },
@@ -149,4 +167,29 @@ export function dossierToPlan(
         .map((t) => ({ label: t.step, date: t.date! })),
     };
   return { add_blockers: d.traps.map((t) => t.title) };
+}
+
+/** "Can we apply?" in words, and its colour. */
+export function fitLabel(fit: DossierFit, lang: "en" | "es" = "en"): string {
+  const es = lang === "es";
+  switch (fit) {
+    case "lead":
+      return es ? "Sí — como líder o co-aplicante" : "Yes — as lead or co-applicant";
+    case "partner_only":
+      return es ? "Solo como socio de un líder elegible" : "Only as partner of an eligible lead";
+    case "not_eligible":
+      return es ? "No — ningún rol posible" : "No — no role possible";
+    case "next_cycle":
+      return es ? "Sí, para el próximo ciclo" : "Yes, for the next cycle";
+    default:
+      return es ? "Por confirmar con el financiador" : "To confirm with the funder";
+  }
+}
+
+export function fitTone(fit: DossierFit): "good" | "warn" | "bad" | "muted" {
+  return fit === "lead" || fit === "next_cycle"
+    ? "good"
+    : fit === "partner_only" || fit === "unclear"
+      ? "warn"
+      : "bad";
 }

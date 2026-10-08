@@ -18,7 +18,7 @@ import {
   Scale,
   Sparkles,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { dossierToPlan, type Dossier } from "@/lib/grant-dossier.shared";
@@ -27,7 +27,7 @@ import {
   getGrantDossier,
   type SavedDossier,
 } from "@/lib/grant-dossier.functions";
-import { applyCopilotPlanUpdate } from "@/lib/grant-workspace.functions";
+import { applyCopilotPlanUpdate, getGrantWorkspace } from "@/lib/grant-workspace.functions";
 import { localeOf, useTr, useUiLang } from "@/lib/ui-lang";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +44,28 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
     queryFn: () => fetchDossier({ data: { grantId, orgId, lang } }),
   });
   const saved = local ?? data?.saved ?? null;
+  // A grant the team is working (it has a saved plan) gets its dossier
+  // automatically the first time it is opened; others wait for the button.
+  const fetchWs = useServerFn(getGrantWorkspace);
+  const { data: wsData } = useQuery({
+    queryKey: ["grant-workspace", grantId, orgId, lang],
+    queryFn: () => fetchWs({ data: { grantId, orgId, lang } }),
+  });
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (
+      autoStarted.current ||
+      isLoading ||
+      saved ||
+      busy ||
+      !wsData?.saved ||
+      data?.available === false
+    )
+      return;
+    autoStarted.current = true;
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, saved, wsData?.saved, data?.available]);
 
   const run = async () => {
     setBusy(true);
