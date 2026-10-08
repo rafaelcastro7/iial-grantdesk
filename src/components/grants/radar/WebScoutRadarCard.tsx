@@ -42,8 +42,8 @@ Hola Marcelo,
 Encontré esta oportunidad en la web que encaja con ${orgName}:
 - Programa: ${grant.title}
 - Financiador: ${grant.funder} (${grant.country})
-- Financiamiento: ${grant.amount_range}
-- Fecha límite: ${grant.deadline} (${grant.status})
+- Financiamiento (por verificar en la página oficial): ${grant.amount_range}
+- Fecha límite (por verificar): ${grant.deadline} (${grant.status})
 - Por qué encaja con ${orgName}: ${grant.applicant_fit || grant.summary}
 - Enlace oficial: ${grant.url}
 
@@ -58,8 +58,8 @@ Hi Marcelo,
 I found this opportunity on the web that fits ${orgName}:
 - Program: ${grant.title}
 - Funder: ${grant.funder} (${grant.country})
-- Funding: ${grant.amount_range}
-- Deadline: ${grant.deadline} (${grant.status})
+- Funding (to verify on the official page): ${grant.amount_range}
+- Deadline (to verify): ${grant.deadline} (${grant.status})
 - Why it fits ${orgName}: ${grant.applicant_fit || grant.summary}
 - Official link: ${grant.url}
 
@@ -204,15 +204,16 @@ Rocío`;
         </div>
 
         {/* Summary */}
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          {grant.summary}
-        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{grant.summary}</p>
 
         {/* Key figures */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground border-t pt-2">
           <div className="flex items-center gap-1 font-medium text-foreground">
             <DollarSign className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>{grant.amount_range}</span>
+            <span className="font-normal text-amber-700 dark:text-amber-400">
+              (AI estimate, verify)
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <Calendar className="h-3.5 w-3.5" />

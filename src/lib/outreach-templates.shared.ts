@@ -92,7 +92,45 @@ export type ComposeInput = {
   links?: string[];
   /** When true, includes Dr. Juan Marcelo Gómez's doctoral research reference and paper link. */
   includeAcademicCredentials?: boolean;
+  /** Documents attached to the email, e.g. ["IIAL presentation", "WCIS document"]. */
+  attachments?: string[];
 };
+
+const isIial = (orgName: string) => /\bIIAL\b|Innovation and Advanced Learning/i.test(orgName);
+
+/**
+ * Formal self-introduction: who is writing and what the organization is. For
+ * IIAL it names the certifications it already offers (not "to be developed").
+ */
+export function senderIntro(senderName: string, orgName: string, lang: Lang): string {
+  if (isIial(orgName)) {
+    return lang === "en"
+      ? `My name is ${senderName} and I work with the Institute of Innovation and Advanced Learning (IIAL), a Canadian not-for-profit organization based in Ontario. IIAL works on applied innovation, sustainability, applied research and stronger value chains, and offers the professional certifications CSIP, CSCIP and CARP, which we are always open to adapting together with partners.`
+      : `Mi nombre es ${senderName} y colaboro con el Institute of Innovation and Advanced Learning (IIAL), una organización canadiense sin fines de lucro con sede en Ontario. IIAL trabaja en innovación aplicada, sostenibilidad, investigación aplicada y fortalecimiento de cadenas de valor, y ofrece las certificaciones profesionales CSIP, CSCIP y CARP, que siempre estamos abiertos a adaptar junto con nuestros aliados.`;
+  }
+  return lang === "en"
+    ? `My name is ${senderName} and I am writing on behalf of ${orgName}.`
+    : `Mi nombre es ${senderName} y le escribo en nombre de ${orgName}.`;
+}
+
+function attachmentsLine(list: string[] | undefined, lang: Lang): string {
+  const items = (list ?? []).map((a) => a.trim()).filter(Boolean);
+  if (!items.length) return "";
+  const joined =
+    items.length === 1
+      ? items[0]
+      : `${items.slice(0, -1).join(", ")} ${lang === "en" ? "and" : "y"} ${items[items.length - 1]}`;
+  return lang === "en"
+    ? `I am attaching ${joined} for your reference.`
+    : `Adjunto ${joined} para su referencia.`;
+}
+
+/** Days until the deadline, or null when there is no fixed date. */
+function daysLeft(grant: WorkspaceGrant, today = new Date()): number | null {
+  if (!grant.deadline) return null;
+  const d = new Date(`${grant.deadline.slice(0, 10)}T12:00:00Z`).getTime();
+  return Math.ceil((d - today.getTime()) / 86400000);
+}
 
 const ROLE_TEXT: Record<Lang, Record<string, string>> = {
   en: {
@@ -253,22 +291,25 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
       break;
     }
     case "partner_intro": {
+      const left = daysLeft(grant);
+      const tight = left != null && left >= 0 && left <= 45;
       subject =
         lang === "en"
           ? `Collaboration opportunity: ${grant.title}`
           : `Oportunidad de colaboración: ${grant.title}`;
       const credEn = input.includeAcademicCredentials
-        ? "The initiative builds on the doctoral research of Dr. Juan Marcelo Gómez at Henley Business School (University of Reading, UK) on sustainable value chains and traceability (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf)."
+        ? "The initiative builds on the doctoral research of Dr. Juan Marcelo Gómez at Henley Business School (University of Reading, UK) on sustainability in the fine cacao and chocolate value chain (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf)."
         : "";
       const credEs = input.includeAcademicCredentials
-        ? "El proyecto se apoya en la investigación doctoral del Dr. Juan Marcelo Gómez en Henley Business School (Universidad de Reading, Reino Unido) sobre cadenas de valor y trazabilidad (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf)."
+        ? "El proyecto se apoya en la investigación doctoral del Dr. Juan Marcelo Gómez en Henley Business School (Universidad de Reading, Reino Unido) sobre sostenibilidad en la cadena de valor del cacao fino y chocolate (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf)."
         : "";
       lines =
         lang === "en"
           ? [
               hi,
               "",
-              `I am writing on behalf of ${orgName}. We are preparing an application to ${program}, funded by ${funder}, and we would like to explore whether your organization would join us.`,
+              senderIntro(senderName, orgName, "en"),
+              `We are preparing an application to ${program}, funded by ${funder}, and we would like to explore whether your organization would be interested in joining us.`,
               idea ? `The project we have in mind is "${idea}".` : "",
               wcis
                 ? `${orgName} would contribute the Whole-Chain International Standard (WCIS) as the applied framework: ${wcis}`
@@ -278,6 +319,10 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
                 ? `We see your organization as ${partnerRole}, and we are open to shaping the roles together.`
                 : "We would like to define the roles together, based on your priorities.",
               `The funding available is ${amountText(grant)} and the deadline is ${deadline}.`,
+              tight
+                ? "As the timeline is tight, we would be grateful to know of your interest as soon as possible."
+                : "",
+              attachmentsLine(input.attachments, "en"),
               "",
               "Would you have 20 minutes in the coming days for a short call?",
               "",
@@ -286,7 +331,8 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
           : [
               hi,
               "",
-              `Le escribo en nombre de ${orgName}. Estamos preparando una aplicación a ${program}, financiado por ${funder}, y nos gustaría explorar si su organización querría participar con nosotros.`,
+              senderIntro(senderName, orgName, "es"),
+              `Estamos preparando una aplicación a ${program}, financiado por ${funder}, y nos gustaría explorar si su organización tendría interés en participar con nosotros.`,
               idea ? `El proyecto que proponemos es "${idea}".` : "",
               wcis
                 ? `${orgName} aportaría el Whole-Chain International Standard (WCIS) como marco aplicado: ${wcis}`
@@ -296,6 +342,10 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
                 ? `Vemos a su organización como ${partnerRole}, y estamos abiertos a definir los roles juntos.`
                 : "Nos gustaría definir los roles juntos, según sus prioridades.",
               `El monto disponible es ${amountText(grant)} y la fecha límite es ${deadline}.`,
+              tight
+                ? "Dado que los plazos son ajustados, le agradeceríamos mucho conocer su interés a la brevedad."
+                : "",
+              attachmentsLine(input.attachments, "es"),
               "",
               "¿Tendría 20 minutos en los próximos días para una breve llamada?",
               "",

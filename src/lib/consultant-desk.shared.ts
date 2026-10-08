@@ -142,7 +142,12 @@ export function checkCountryEligibility(
   grantTexts: Array<string | null | undefined>,
   lang: Lang = "en",
 ): CountryCheckResult {
-  const query = (countryInput ?? "").trim().toLowerCase();
+  const fold = (t: string) =>
+    t
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  const query = fold((countryInput ?? "").trim());
   const es = lang === "es";
   if (!query) {
     return {
@@ -152,10 +157,27 @@ export function checkCountryEligibility(
     };
   }
 
-  const haystack = grantTexts.filter(Boolean).join(" ").toLowerCase();
+  const haystack = fold(grantTexts.filter(Boolean).join(" "));
 
-  // 1. Direct mention
-  if (haystack.includes(query)) {
+  // 1. Direct mention (whole word, accents ignored). A mention after
+  // "except / excluding / not eligible" is an exclusion, not an inclusion.
+  const esc = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const hit = new RegExp(`(^|[^a-z])${esc}([^a-z]|$)`).exec(haystack);
+  if (hit) {
+    const before = haystack.slice(Math.max(0, hit.index - 80), hit.index);
+    if (
+      /(except|excluding|excluded|not eligible|ineligible|excepto|salvo|excluye|no elegible)[^.;]*$/.test(
+        before,
+      )
+    ) {
+      return {
+        country: countryInput,
+        verdict: "not_mentioned",
+        detail: es
+          ? `"${countryInput}" aparece como EXCLUIDO en la convocatoria.`
+          : `"${countryInput}" appears as EXCLUDED in the call.`,
+      };
+    }
     return {
       country: countryInput,
       verdict: "explicit",
@@ -180,13 +202,27 @@ export function checkCountryEligibility(
   }
 
   const LATAM_COUNTRIES = [
-    "peru", "perú", "colombia", "mexico", "méxico", "costa rica", "guatemala",
-    "honduras", "ecuador", "bolivia", "brasil", "brazil", "chile", "argentina",
+    "peru",
+    "colombia",
+    "mexico",
+    "costa rica",
+    "guatemala",
+    "honduras",
+    "ecuador",
+    "bolivia",
+    "brasil",
+    "brazil",
+    "chile",
+    "argentina",
+    "panama",
+    "paraguay",
+    "uruguay",
   ];
   if (LATAM_COUNTRIES.includes(query)) {
-    const latamHits = /latin america|américa latina|latam|south america|sudamérica|lac\b|andean|andina/i.test(
-      haystack,
-    );
+    const latamHits =
+      /latin america|america latina|latam|south america|sudamerica|\blac\b|andean|andina/i.test(
+        haystack,
+      );
     if (latamHits) {
       return {
         country: countryInput,

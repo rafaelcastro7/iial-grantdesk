@@ -336,7 +336,7 @@ describe("Rocío's requests", () => {
     expect(e.body).toContain("Dr. Juan Marcelo Gómez");
     expect(e.body).toContain("Henley Business School");
     expect(e.body).toContain("centaur.reading.ac.uk/115792/8/Gomez");
-    expect(e.body).toContain("trazabilidad");
+    expect(e.body).toContain("cadena de valor del cacao fino y chocolate");
   });
 
   it("'Alianza académica e investigación aplicada: más allá de proyectos capstone, programas CSIP/CSCIP/CARP y WCIS' → academic partnership template", () => {
@@ -405,7 +405,8 @@ describe("Rocío's requests", () => {
     expect(peruCheck.verdict).toBe("regional_likely");
     expect(peruCheck.detail).toMatch(/Latin America/);
 
-    const explicitText = "Projects must directly benefit agricultural producers in Peru and Colombia.";
+    const explicitText =
+      "Projects must directly benefit agricultural producers in Peru and Colombia.";
     const explicitCheck = checkCountryEligibility("Peru", [explicitText], "es");
     expect(explicitCheck.verdict).toBe("explicit");
   });
@@ -429,5 +430,58 @@ describe("Rocío's requests", () => {
     const peru = PRESET_COUNTRIES.find((c) => c.code === "PE")!;
     expect(peru.flag).toBe("🇵🇪");
     expect(peru.name).toBe("Peru");
+  });
+});
+
+describe("Audit fixes (country check, seeded facts)", () => {
+  it("country check: accents ignored, whole words, exclusions detected", async () => {
+    const { checkCountryEligibility } = await import("@/lib/consultant-desk.shared");
+    expect(checkCountryEligibility("Perú", ["Open to Peru and Bolivia"]).verdict).toBe("explicit");
+    expect(checkCountryEligibility("Niger", ["Applicants from Nigeria only"]).verdict).toBe(
+      "not_mentioned",
+    );
+    const ex = checkCountryEligibility("Peru", ["All Latin American countries, excluding Peru."]);
+    expect(ex.verdict).toBe("not_mentioned");
+    expect(ex.detail).toMatch(/EXCLUDED/);
+  });
+
+  it("seeded partners carry no invented figures or placeholder contacts", async () => {
+    const { DEFAULT_PARTNERS } = await import("@/lib/partner-directory.functions");
+    const all = JSON.stringify(DEFAULT_PARTNERS);
+    expect(all).not.toMatch(/30,000|25\+ cooperatives/);
+    expect(
+      DEFAULT_PARTNERS.every(
+        (p) =>
+          !p.contact_name ||
+          !/Office|Dirección|Gerencia|Rectoría|Coordinación/.test(p.contact_name),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("Rocío's corrections to ChatGPT's emails", () => {
+  it("'Muy confianzudo: preséntame y presenta a IIAL; ya tenemos 3 programas; adjuntamos presentación y WCIS; plazos ajustados'", async () => {
+    const { composeOutreach } = await import("@/lib/outreach-templates.shared");
+    const { emptyWorkspace } = await import("@/lib/grant-workspace.shared");
+    const soon = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+    const grant = { id: "g", title: "Test call", deadline: soon, funder: { name: "Funder" } };
+    const e = composeOutreach({
+      template: "partner_intro",
+      lang: "es",
+      grant,
+      workspace: emptyWorkspace("o", grant),
+      orgName: "IIAL",
+      senderName: "Rocío Cruz",
+      recipientName: "Sr. Horacio Albores Ortiz",
+      attachments: ["la presentación general de IIAL", "el documento WCIS"],
+    });
+    expect(e.body).toContain(
+      "Mi nombre es Rocío Cruz y colaboro con el Institute of Innovation and Advanced Learning (IIAL)",
+    );
+    expect(e.body).toContain("CSIP, CSCIP y CARP");
+    expect(e.body).not.toMatch(/desarrollo conjunto/i);
+    expect(e.body).toContain("los plazos son ajustados");
+    expect(e.body).toContain("Adjunto la presentación general de IIAL y el documento WCIS");
+    expect(e.body).not.toMatch(/¿cómo estás\?/i); // formal "usted", never casual
   });
 });

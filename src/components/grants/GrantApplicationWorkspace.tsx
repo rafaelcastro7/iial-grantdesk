@@ -98,6 +98,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [senderName, setSenderName] = useState("Rocío Cruz");
   const [meetingWhen, setMeetingWhen] = useState("");
   const [links, setLinks] = useState("https://iial.ca");
+  const [attachmentsEdit, setAttachments] = useState<string | null>(null);
   const [includeAcademicCredentials, setIncludeAcademicCredentials] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
   const [copiedEmail, setCopiedEmail] = useState(false);
@@ -916,12 +917,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               className="max-w-md"
             />
             {countryQuery && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setCountryQuery("")}
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={() => setCountryQuery("")}>
                 Clear
               </Button>
             )}
@@ -1051,6 +1047,10 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             recipientName: known?.contact_name ?? undefined,
             meetingWhen,
             links: links.split(/[\s,]+/).filter(Boolean),
+            attachments: (attachmentsEdit ?? defaultAttachments(lang))
+              .split(",")
+              .map((x) => x.trim())
+              .filter(Boolean),
             includeAcademicCredentials,
           });
           const isWhatsApp = template === "whatsapp_intro";
@@ -1107,7 +1107,8 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                     className="rounded border-border"
                   />
                   <span>
-                    Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School / Univ. of Reading)
+                    Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School
+                    / Univ. of Reading)
                   </span>
                 </label>
               )}
@@ -1116,6 +1117,13 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   value={meetingWhen}
                   placeholder="Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams"
                   onChange={(e) => setMeetingWhen(e.target.value)}
+                />
+              )}
+              {template === "partner_intro" && (
+                <Input
+                  value={attachmentsEdit ?? defaultAttachments(lang)}
+                  placeholder="Attachments, separated by commas (leave empty for none)"
+                  onChange={(e) => setAttachments(e.target.value)}
                 />
               )}
               {isWhatsApp && (
@@ -1148,7 +1156,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                       onClick={async () => {
                         try {
                           await navigator.clipboard.writeText(
-                            email.subject ? `Subject: ${email.subject}\n\n${email.body}` : email.body,
+                            email.subject
+                              ? `Subject: ${email.subject}\n\n${email.body}`
+                              : email.body,
                           );
                           setCopiedEmail(true);
                           toast.success(isWhatsApp ? "WhatsApp message copied" : "Email copied");
@@ -1235,6 +1245,12 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       </Section>
     </div>
   );
+}
+
+function defaultAttachments(lang: Lang): string {
+  return lang === "es"
+    ? "la presentación general de IIAL, el documento WCIS"
+    : "IIAL's general presentation, the WCIS document";
 }
 
 function Section({

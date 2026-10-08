@@ -82,13 +82,13 @@ export function RadarWorkspace({
   const [importedMap, setImportedMap] = useState<Map<string, string>>(new Map());
 
   const { counts, next } = radar;
-  const { activeTenant, activeOrgId } = useActiveTenant();
+  const { activeOrgName, activeOrgId } = useActiveTenant();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const searchWebFn = useServerFn(searchWebGrants);
   const addGrantFn = useServerFn(addGrantByUrl);
-  const orgName = activeTenant?.legal_name || "IIAL";
+  const orgName = activeOrgName || "IIAL";
 
   const handleExecuteWebSearch = async (queryText?: string) => {
     const text = (queryText ?? webQuery).trim();
@@ -233,11 +233,7 @@ export function RadarWorkspace({
             />
             <Stat label="Active Client Scope" value={orgName} tone="text-foreground" />
             <Stat label="Scout Engine" value="Google Search" tone="text-emerald-600" />
-            <Stat
-              label="Pipeline Action"
-              value="1-Click Import"
-              tone="text-foreground"
-            />
+            <Stat label="Pipeline Action" value="1-Click Import" tone="text-foreground" />
           </div>
         ) : (
           <div
@@ -384,8 +380,9 @@ export function RadarWorkspace({
                   Live Web Grant Scout
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-lg mx-auto mb-5">
-                  Type any topic in the search bar above (just like you did in ChatGPT) or select one
-                  of the quick queries below to browse open and upcoming opportunities in real-time.
+                  Type any topic in the search bar above (just like you did in ChatGPT) or select
+                  one of the quick queries below to browse open and upcoming opportunities in
+                  real-time.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {QUICK_SCOUT_PROMPTS.map((p) => (
@@ -407,56 +404,54 @@ export function RadarWorkspace({
               </div>
             )}
           </div>
+        ) : /* Normal Catalog Groups */
+        radar.items.length === 0 ? (
+          <EmptyState
+            hasAny={totalLoaded > 0}
+            isAdmin={isAdmin}
+            searchQuery={filters.search}
+            onSearchWeb={(q) => {
+              setWebQuery(q);
+              setSourceMode("web");
+              handleExecuteWebSearch(q);
+            }}
+            onReset={() =>
+              onFiltersChange({
+                ...filters,
+                country: "all",
+                sector: "all",
+                verdict: "all",
+                status: "active",
+                minAmount: 0,
+                search: "",
+              })
+            }
+            onDiscover={admin.onDiscover}
+          />
         ) : (
-          /* Normal Catalog Groups */
-          radar.items.length === 0 ? (
-            <EmptyState
-              hasAny={totalLoaded > 0}
-              isAdmin={isAdmin}
-              searchQuery={filters.search}
-              onSearchWeb={(q) => {
-                setWebQuery(q);
-                setSourceMode("web");
-                handleExecuteWebSearch(q);
-              }}
-              onReset={() =>
-                onFiltersChange({
-                  ...filters,
-                  country: "all",
-                  sector: "all",
-                  verdict: "all",
-                  status: "active",
-                  minAmount: 0,
-                  search: "",
-                })
-              }
-              onDiscover={admin.onDiscover}
-            />
-          ) : (
-            <div className="space-y-8 px-4 py-5 md:px-7">
-              {radar.groups.map((group) => (
-                <section key={group.country} className="space-y-3">
-                  <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
-                    {countryName(group.country)}
-                    <span className="text-sm font-normal text-muted-foreground">
-                      {group.items.length}
-                    </span>
-                  </h2>
-                  <div className="space-y-2.5">
-                    {group.items.map((item) => (
-                      <RadarCard
-                        key={item.grant.id}
-                        item={item}
-                        actions={actions}
-                        highlight={next?.grant.id === item.grant.id}
-                        simple={simple}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )
+          <div className="space-y-8 px-4 py-5 md:px-7">
+            {radar.groups.map((group) => (
+              <section key={group.country} className="space-y-3">
+                <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
+                  {countryName(group.country)}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {group.items.length}
+                  </span>
+                </h2>
+                <div className="space-y-2.5">
+                  {group.items.map((item) => (
+                    <RadarCard
+                      key={item.grant.id}
+                      item={item}
+                      actions={actions}
+                      highlight={next?.grant.id === item.grant.id}
+                      simple={simple}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
         )}
       </section>
 
@@ -508,11 +503,7 @@ function EmptyState({
       </p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {searchQuery && onSearchWeb && (
-          <Button
-            size="sm"
-            onClick={() => onSearchWeb(searchQuery)}
-            className="gap-1.5 shadow-sm"
-          >
+          <Button size="sm" onClick={() => onSearchWeb(searchQuery)} className="gap-1.5 shadow-sm">
             <Globe className="h-4 w-4" />
             Search live web for &ldquo;{searchQuery}&rdquo;
           </Button>

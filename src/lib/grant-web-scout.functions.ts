@@ -29,7 +29,7 @@ export const searchWebGrants = createServerFn({ method: "POST" })
       const { data: profile } = await getOrgProfileForUser(supabase, userId, principal.orgId);
       if (profile?.legal_name) {
         orgName = profile.legal_name;
-        orgType = profile.org_type || "Organization";
+        orgType = profile.registration_status || "Organization";
       }
     }
 
