@@ -4,20 +4,22 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  AlertTriangle,
+  Check,
   CheckCircle2,
   ClipboardList,
   Copy,
   Globe2,
   Loader2,
   Mail,
+  MessageCircle,
   Plus,
   Save,
+  Sparkles,
   Trash2,
   Users,
-  XCircle,
-  AlertTriangle,
-  Sparkles,
   Workflow,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -26,7 +28,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getGrantWorkspace, saveGrantWorkspace } from "@/lib/grant-workspace.functions";
-import { checkCountryEligibility, explainTerms } from "@/lib/consultant-desk.shared";
+import {
+  checkCountryEligibility,
+  explainTerms,
+  PRESET_COUNTRIES,
+  STANDARD_COMPLIANCE_PACKAGE,
+} from "@/lib/consultant-desk.shared";
 import { synthesizeGrantRoadmap } from "@/lib/grant-roadmap";
 import { listPartners, savePartner } from "@/lib/partner-directory.functions";
 import {
@@ -93,6 +100,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [links, setLinks] = useState("https://iial.ca");
   const [includeAcademicCredentials, setIncludeAcademicCredentials] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
+  const [copiedEmail, setCopiedEmail] = useState(false);
   const [ws, setWs] = useState<Workspace | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -840,6 +848,39 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             Add
           </Button>
         </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs shadow-2xs"
+            onClick={() => {
+              const existingItems = new Set(ws.checklist.map((c) => c.item.trim().toLowerCase()));
+              const toAdd = STANDARD_COMPLIANCE_PACKAGE.filter(
+                (pkg) => !existingItems.has(pkg.item.trim().toLowerCase()),
+              ).map((pkg) => ({
+                id: newId("doc"),
+                item: pkg.item,
+                status: "missing" as const,
+                critical: pkg.critical,
+                owner: null,
+                due: null,
+              }));
+              if (toAdd.length === 0) {
+                toast.info("Standard compliance documents are already present in the checklist.");
+                return;
+              }
+              setChecklist([...ws.checklist, ...toAdd]);
+              toast.success(`Added ${toAdd.length} standard compliance document(s) to checklist.`);
+            }}
+          >
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            Add standard compliance package (4 docs)
+          </Button>
+          <span className="text-[11px] text-muted-foreground">
+            Financials (2y), CRA/Charter, Attestation, Support Letter
+          </span>
+        </div>
       </Section>
 
       {/* 5b. Plain explanations of the funder's terms */}
@@ -857,6 +898,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               </div>
             ))}
           </dl>
+        </Section>
+      )}
+
       {/* 5c. Geographic / Country Eligibility quick-check */}
       <Section
         icon={<Globe2 className="h-4 w-4" />}
@@ -881,6 +925,26 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 Clear
               </Button>
             )}
+          </div>
+          {/* Quick preset country pills */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="text-[11px] text-muted-foreground mr-1">Quick check:</span>
+            {PRESET_COUNTRIES.map((c) => (
+              <button
+                key={c.code}
+                type="button"
+                onClick={() => setCountryQuery(c.name)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors cursor-pointer",
+                  countryQuery.toLowerCase() === c.name.toLowerCase()
+                    ? "border-primary bg-primary/10 font-semibold text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                )}
+              >
+                <span>{c.flag}</span>
+                <span>{c.name}</span>
+              </button>
+            ))}
           </div>
           {countryCheck && countryQuery.trim() && (
             <div
@@ -1067,43 +1131,65 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
                 {email.body}
               </pre>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(
-                        email.subject ? `Subject: ${email.subject}\n\n${email.body}` : email.body,
-                      );
-                      toast.success("Email copied");
-                    } catch {
-                      toast.error("Could not copy; select the text instead.");
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4" /> Copy
-                </Button>
-                {isWhatsApp ? (
-                  <Button asChild variant="outline" size="sm" className="gap-1.5">
-                    <a
-                      href={`https://wa.me/?text=${encodeURIComponent(email.body)}`}
-                      target="_blank"
-                      rel="noreferrer"
+              {(() => {
+                const phoneDigits = (known?.phone || partner?.contact || "").replace(/\D/g, "");
+                const waHref =
+                  phoneDigits.length >= 8
+                    ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(email.body)}`
+                    : `https://wa.me/?text=${encodeURIComponent(email.body)}`;
+
+                return (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(
+                            email.subject ? `Subject: ${email.subject}\n\n${email.body}` : email.body,
+                          );
+                          setCopiedEmail(true);
+                          toast.success(isWhatsApp ? "WhatsApp message copied" : "Email copied");
+                          setTimeout(() => setCopiedEmail(false), 3000);
+                        } catch {
+                          toast.error("Could not copy; select the text instead.");
+                        }
+                      }}
                     >
-                      <Mail className="h-4 w-4" /> Open in WhatsApp
-                    </a>
-                  </Button>
-                ) : (
-                  <Button asChild variant="outline" size="sm" className="gap-1.5">
-                    <a href={mailto}>
-                      <Mail className="h-4 w-4" /> Open in email app
-                    </a>
-                  </Button>
-                )}
-              </div>
+                      {copiedEmail ? (
+                        <>
+                          <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                          <span>Copied! ✓</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" />
+                          <span>Copy {isWhatsApp ? "message" : "email"}</span>
+                        </>
+                      )}
+                    </Button>
+                    {isWhatsApp ? (
+                      <Button
+                        asChild
+                        size="sm"
+                        className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                      >
+                        <a href={waHref} target="_blank" rel="noreferrer">
+                          <MessageCircle className="h-4 w-4" /> Open in WhatsApp
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button asChild variant="outline" size="sm" className="gap-1.5">
+                        <a href={mailto}>
+                          <Mail className="h-4 w-4 text-primary" /> Open in email app
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}

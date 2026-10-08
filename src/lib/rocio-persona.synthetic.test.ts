@@ -6,6 +6,8 @@ import {
   explainTerms,
   grantsDigest,
   partnerBrief,
+  PRESET_COUNTRIES,
+  STANDARD_COMPLIANCE_PACKAGE,
   whatsappIntro,
 } from "@/lib/consultant-desk.shared";
 import {
@@ -406,5 +408,26 @@ describe("Rocío's requests", () => {
     const explicitText = "Projects must directly benefit agricultural producers in Peru and Colombia.";
     const explicitCheck = checkCountryEligibility("Peru", [explicitText], "es");
     expect(explicitCheck.verdict).toBe("explicit");
+  });
+
+  it("'Paquete de cumplimiento estándar (4 documentos de base)' → STANDARD_COMPLIANCE_PACKAGE", () => {
+    expect(STANDARD_COMPLIANCE_PACKAGE.length).toBe(4);
+    const items = STANDARD_COMPLIANCE_PACKAGE.map((p) => p.item);
+    expect(items).toContain("Comparative financial statements (last 2 fiscal years)");
+    expect(items).toContain("CRA Business Number & Certificate of Incorporation");
+    expect(items).toContain("Organization Attestation Form signed by authorized officer");
+    expect(items).toContain("Letter of Support from lead institutional / consortium partner");
+
+    const criticalItems = STANDARD_COMPLIANCE_PACKAGE.filter((p) => p.critical).map((p) => p.item);
+    expect(criticalItems).toContain("Comparative financial statements (last 2 fiscal years)");
+    expect(criticalItems).toContain("CRA Business Number & Certificate of Incorporation");
+  });
+
+  it("'Píldoras rápidas de países para chequeo geográfico' → PRESET_COUNTRIES covers key partner corridors", () => {
+    const codes = PRESET_COUNTRIES.map((c) => c.code);
+    expect(codes).toEqual(expect.arrayContaining(["PE", "CO", "MX", "CR", "MG", "CA"]));
+    const peru = PRESET_COUNTRIES.find((c) => c.code === "PE")!;
+    expect(peru.flag).toBe("🇵🇪");
+    expect(peru.name).toBe("Peru");
   });
 });

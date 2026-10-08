@@ -416,3 +416,63 @@ export function whatsappIntro(opts: {
       ];
   return lines.filter(Boolean).join("\n\n");
 }
+
+// ---------------------------------------------------------------------------
+// Standard compliance documents package for grant applications
+export type StandardDocRequirement = {
+  item: string;
+  critical: boolean;
+  category: "financial" | "legal" | "governance" | "consortium";
+  description: {
+    en: string;
+    es: string;
+  };
+};
+
+export const STANDARD_COMPLIANCE_PACKAGE: StandardDocRequirement[] = [
+  {
+    item: "Comparative financial statements (last 2 fiscal years)",
+    critical: true,
+    category: "financial",
+    description: {
+      en: "Balance sheet & income statement for the last 2 completed fiscal years (Notice to Reader or Audited by CPA).",
+      es: "Balance y estado de resultados de los últimos 2 años fiscales cerrados (Aviso al Lector o Auditados por CPA).",
+    },
+  },
+  {
+    item: "CRA Business Number & Certificate of Incorporation",
+    critical: true,
+    category: "legal",
+    description: {
+      en: "9-digit Canada Revenue Agency business registration and federal/provincial corporate charter.",
+      es: "Registro de 9 dígitos de la CRA y acta/certificado de constitución federal o provincial.",
+    },
+  },
+  {
+    item: "Organization Attestation Form signed by authorized officer",
+    critical: false,
+    category: "governance",
+    description: {
+      en: "Standard institutional declaration signed by director or financial officer attesting accuracy of organizational data.",
+      es: "Declaración institucional firmada por director o responsable financiero certificando la veracidad de datos.",
+    },
+  },
+  {
+    item: "Letter of Support from lead institutional / consortium partner",
+    critical: false,
+    category: "consortium",
+    description: {
+      en: "Signed letter on official letterhead from academic, territorial or community partner confirming project co-design.",
+      es: "Carta firmada en membrete oficial de socio académico, territorial o comunitario confirmando co-diseño.",
+    },
+  },
+];
+
+export const PRESET_COUNTRIES: Array<{ code: string; name: string; flag: string }> = [
+  { code: "PE", name: "Peru", flag: "🇵🇪" },
+  { code: "CO", name: "Colombia", flag: "🇨🇴" },
+  { code: "MX", name: "Mexico", flag: "🇲🇽" },
+  { code: "CR", name: "Costa Rica", flag: "🇨🇷" },
+  { code: "MG", name: "Madagascar", flag: "🇲🇬" },
+  { code: "CA", name: "Canada", flag: "🇨🇦" },
+];

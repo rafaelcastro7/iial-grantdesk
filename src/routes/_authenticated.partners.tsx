@@ -242,9 +242,53 @@ function PartnersPage() {
       )}
 
       {data?.available && partners.length === 0 && !draft && (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          <Users className="mx-auto mb-2 h-6 w-6" /> No partners yet.
-        </div>
+        filter.trim() ? (
+          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground/60" />
+            <p>No partners matching &ldquo;{filter}&rdquo;.</p>
+            <Button
+              variant="link"
+              size="sm"
+              className="mt-2 text-xs"
+              onClick={() => setFilter("")}
+            >
+              Clear search filter
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed bg-muted/20 p-8 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Users className="h-6 w-6" />
+            </div>
+            <h3 className="font-display text-base font-semibold text-foreground">
+              Build your Consortium Partner Network
+            </h3>
+            <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground leading-relaxed">
+              Consortium grants (e.g. Canadian colleges, LAC territorial cooperatives, IDRC, GAC)
+              require verified partners. Start with Rocío&rsquo;s 7 recommended institutions or add your own.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Button
+                size="sm"
+                onClick={onSeedRecommended}
+                disabled={!activeOrgId || isSeeding}
+                className="gap-1.5 shadow-sm"
+              >
+                <Sparkles className="h-4 w-4" />
+                {isSeeding ? "Importing…" : "Import recommended network (7)"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDraft(emptyDraft())}
+                disabled={!activeOrgId}
+                className="gap-1.5"
+              >
+                <Plus className="h-4 w-4" /> Add partner manually
+              </Button>
+            </div>
+          </div>
+        )
       )}
 
       <div className="grid gap-3 md:grid-cols-2">

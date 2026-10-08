@@ -30,9 +30,28 @@ export function WebScoutRadarCard({
   onOpenWorkspace?: (grantId: string) => void;
 }) {
   const [copiedBrief, setCopiedBrief] = useState(false);
+  const [briefLang, setBriefLang] = useState<"en" | "es">("en");
 
-  const handleCopyBrief = async () => {
-    const brief = `Subject: Opportunity: ${grant.title} (${grant.funder})
+  const handleCopyBrief = async (lang: "en" | "es" = briefLang) => {
+    const isEs = lang === "es";
+    const brief = isEs
+      ? `Asunto: Oportunidad: ${grant.title} (${grant.funder})
+
+Hola Marcelo,
+
+Encontré esta oportunidad en la web que encaja con ${orgName}:
+- Programa: ${grant.title}
+- Financiador: ${grant.funder} (${grant.country})
+- Financiamiento: ${grant.amount_range}
+- Fecha límite: ${grant.deadline} (${grant.status})
+- Por qué encaja con ${orgName}: ${grant.applicant_fit || grant.summary}
+- Enlace oficial: ${grant.url}
+
+¿Te parece si la priorizamos y exploramos socios de consorcio?
+
+Saludos,
+Rocío`
+      : `Subject: Opportunity: ${grant.title} (${grant.funder})
 
 Hi Marcelo,
 
@@ -95,25 +114,59 @@ Rocío`;
 
           {/* Action buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1 px-2.5 text-xs"
-              onClick={handleCopyBrief}
-            >
-              {copiedBrief ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                  Brief for Marcelo
-                </>
-              )}
-            </Button>
+            <div className="flex items-center rounded-md border border-input p-0.5 bg-background">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-6 gap-1 px-2 text-xs"
+                onClick={() => handleCopyBrief(briefLang)}
+              >
+                {copiedBrief ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Copied! ({briefLang.toUpperCase()})</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>Brief for Marcelo</span>
+                  </>
+                )}
+              </Button>
+              <div className="flex items-center border-l pl-0.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBriefLang("en");
+                    handleCopyBrief("en");
+                  }}
+                  className={`rounded px-1.5 py-0.5 font-medium transition-colors cursor-pointer ${
+                    briefLang === "en"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Copy brief in English"
+                >
+                  EN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBriefLang("es");
+                    handleCopyBrief("es");
+                  }}
+                  className={`rounded px-1.5 py-0.5 font-medium transition-colors cursor-pointer ${
+                    briefLang === "es"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Copy brief in Spanish"
+                >
+                  ES
+                </button>
+              </div>
+            </div>
 
             {importedId ? (
               <Button
