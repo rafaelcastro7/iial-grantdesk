@@ -33,6 +33,8 @@ export function serverEnv(): ServerEnv {
       process.env.SUPABASE_PUBLISHABLE_KEY ||
       process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
       "sb_publishable_MYWEgMbOfoqZcOdKPsq7gg_-PXnH2zU",
+    // Lovable Cloud names the Google AI Studio key GEMINI_API_KEY.
+    GOOGLE_AI_STUDIO_KEY: process.env.GOOGLE_AI_STUDIO_KEY || process.env.GEMINI_API_KEY,
   };
   const parsed = schema.safeParse(envMapped);
   if (!parsed.success) {
