@@ -14,7 +14,8 @@ function within<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 }
 
 type Db = { from: (table: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
-const missingTable = (m: string) => /grant_dossiers|schema cache|does not exist/i.test(m);
+const missingTable = (m: string) =>
+  /schema cache|relation .* does not exist|could not find the table/i.test(m);
 
 async function memberOrgs(db: Db, userId: string) {
   const { data, error } = await db
@@ -106,10 +107,7 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
         .select(
           "org_id, org_name, legal_name, registration_status, stage, years_operating, audit_readiness_level, applicant_types, jurisdictions, operating_regions, consortium_roles, partner_network, strategic_standards, mission, capabilities",
         )
-        .in(
-          "org_id",
-          orgs.map((o) => o.id),
-        )
+        .eq("org_id", data.orgId)
         .then((r: { data: unknown }) => (r.data ?? []) as Array<Record<string, unknown>>),
       db
         .from("grant_workspaces")
@@ -131,7 +129,12 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
           (r: { data: unknown }) => (r.data ?? []) as Array<Record<string, unknown>>,
           () => [],
         ),
-      eligibilityByOrg(db, grant, orgs, data.lang),
+      eligibilityByOrg(
+        db,
+        grant,
+        orgs.filter((o) => o.id === data.orgId),
+        data.lang,
+      ),
       grant.url
         ? within(
             import("@/lib/web-fetch.server")

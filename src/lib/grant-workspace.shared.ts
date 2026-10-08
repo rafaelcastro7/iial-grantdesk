@@ -421,7 +421,11 @@ export function defaultMilestones(
   });
 }
 
-export function emptyWorkspace(orgId: string, grant: WorkspaceGrant): Workspace {
+export function emptyWorkspace(
+  orgId: string,
+  grant: WorkspaceGrant,
+  lang: "en" | "es" = "en",
+): Workspace {
   return {
     org_id: orgId,
     grant_id: grant.id,
@@ -440,8 +444,8 @@ export function emptyWorkspace(orgId: string, grant: WorkspaceGrant): Workspace 
     wcis_angle: null,
     blockers: [],
     partners: [],
-    checklist: defaultChecklist(grant),
-    milestones: defaultMilestones(grant.deadline),
+    checklist: defaultChecklist(grant, lang),
+    milestones: defaultMilestones(grant.deadline, new Date(), lang),
     decision_notes: null,
     verified_at: null,
   };
@@ -1112,10 +1116,80 @@ export function applyPlanUpdate(ws: Workspace, u: PlanUpdate, today = new Date()
         .map((m) => ({ id: newId("ms"), label: m.label, date: m.date })),
     ].sort((a, b) => a.date.localeCompare(b.date));
   }
-  if (u.note) {
+  if (u.note && !(ws.decision_notes ?? "").includes(u.note)) {
     const stamp = today.toISOString().slice(0, 10);
     const line = `${stamp} (Copilot): ${u.note}`;
     next.decision_notes = ws.decision_notes ? `${ws.decision_notes}\n${line}` : line;
   }
-  return next;
+  return clampWorkspace(next);
+}
+
+/** The limits the plan is saved with (a plan over them could never be saved again). */
+export const PLAN_LIMITS = {
+  blockers: 20,
+  partners: 30,
+  checklist: 60,
+  milestones: 30,
+  notes: 4000,
+};
+
+export function clampWorkspace(ws: Workspace): Workspace {
+  const notes = ws.decision_notes ?? null;
+  return {
+    ...ws,
+    blockers: ws.blockers.slice(-PLAN_LIMITS.blockers),
+    partners: ws.partners.slice(0, PLAN_LIMITS.partners),
+    checklist: ws.checklist.slice(0, PLAN_LIMITS.checklist),
+    milestones: ws.milestones.slice(0, PLAN_LIMITS.milestones),
+    // Keep the most recent lines when the notes grow too long.
+    decision_notes:
+      notes && notes.length > PLAN_LIMITS.notes ? notes.slice(-PLAN_LIMITS.notes) : notes,
+  };
+}
+
+/**
+ * Merges what changed on the server (e.g. the dossier or the Copilot applied
+ * an update) into a plan with unsaved edits, so saving never erases it:
+ * fields the server changed take the server's value; items the server added
+ * to lists are added; local edits are kept.
+ */
+export function mergeServerChanges(
+  local: Workspace,
+  before: Workspace,
+  after: Workspace,
+): Workspace {
+  const out: Workspace = { ...local };
+  const scalar = [
+    "priority",
+    "route",
+    "lead_institution",
+    "administrator",
+    "call_status",
+    "instrument",
+    "match_pct",
+    "match_in_kind_ok",
+    "project_title",
+    "wcis_angle",
+    "deadline_time",
+    "deadline_timezone",
+    "verified_at",
+  ] as const;
+  for (const k of scalar)
+    if (JSON.stringify(after[k]) !== JSON.stringify(before[k]))
+      (out as Record<string, unknown>)[k] = after[k];
+  const addNew = <T extends { id: string }>(mine: T[], prev: T[], next: T[]) => {
+    const had = new Set([...prev, ...mine].map((x) => x.id));
+    return [...mine, ...next.filter((x) => !had.has(x.id))];
+  };
+  out.partners = addNew(local.partners, before.partners, after.partners);
+  out.checklist = addNew(local.checklist, before.checklist, after.checklist);
+  out.milestones = addNew(local.milestones, before.milestones, after.milestones);
+  const hadB = new Set([...before.blockers, ...local.blockers]);
+  out.blockers = [...local.blockers, ...after.blockers.filter((b) => !hadB.has(b))];
+  if ((after.decision_notes ?? "") !== (before.decision_notes ?? "")) {
+    const added = (after.decision_notes ?? "").slice((before.decision_notes ?? "").length).trim();
+    if (added && !(local.decision_notes ?? "").includes(added))
+      out.decision_notes = local.decision_notes ? `${local.decision_notes}\n${added}` : added;
+  }
+  return clampWorkspace(out);
 }

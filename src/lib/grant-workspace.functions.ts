@@ -158,7 +158,7 @@ export const getGrantWorkspace = createServerFn({ method: "GET" })
     const funder = Array.isArray(g.funder) ? g.funder[0] : g.funder;
     const workspace: Workspace = row
       ? (row as Workspace)
-      : emptyWorkspace(data.orgId, { ...g, funder });
+      : emptyWorkspace(data.orgId, { ...g, funder }, data.lang ?? "en");
     return {
       grant: { ...g, funder } as WorkspaceGrant,
       workspace,
@@ -297,7 +297,7 @@ export const listGrantWorkspaces = createServerFn({ method: "GET" })
       const { data: ev } = await db
         .from("grant_evaluations")
         .select("grant_id, fit_score, eligibility_pass, model, rule_snapshot")
-        .eq("user_id", context.userId)
+        .eq("org_id", data.orgId)
         .in("grant_id", grantIds);
       for (const e of ev ?? []) evals.set(e.grant_id, e);
     }
@@ -425,11 +425,13 @@ export const applyCopilotFacts = createServerFn({ method: "POST" })
     }
     if (Object.keys(profile).length) {
       // Lists (applicant types, regions, roles…) are added to, never replaced.
-      const { data: current } = await db
+      const { data: current, error: readErr } = await db
         .from("org_profiles")
         .select("applicant_types, jurisdictions, operating_regions, consortium_roles")
         .eq("org_id", data.orgId)
         .maybeSingle();
+      if (readErr) throw new Error(`profile: ${readErr.message}`);
+      if (!current) throw new Error("profile_missing");
       const merged: Record<string, unknown> = { ...profile };
       for (const k of [
         "applicant_types",

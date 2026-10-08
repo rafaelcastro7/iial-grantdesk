@@ -54,7 +54,7 @@ await page.waitForURL((u) => !u.pathname.startsWith("/auth"), { timeout: 30000 }
 await ask("Busca grants donde IIAL pueda aplicar como principal (cacao, agri-food)", async () => {
   await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
   await page.locator('a[href^="/grants/"]').first().waitFor({ timeout: 60000 });
-  const search = page.getByPlaceholder(/search/i).first();
+  const search = page.getByRole("textbox", { name: "Search grants" });
   await search.fill("agri");
   await page.waitForTimeout(8000);
   const n = await page.locator('a[href^="/grants/"]').count();
@@ -194,21 +194,24 @@ await ask("Resumen B1 para Marcelo de esta cooperativa, con servicios y link", a
   await shot("04-partners");
 });
 
-await ask(
-  "@Busca en la web: AI Web Scout switches inline in Radar with quick query pills and live search bar",
-  async () => {
-    await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
-    const scoutTab = page.getByRole("button", { name: /AI Web Scout/i });
-    must(await scoutTab.isVisible(), "AI Web Scout tab not visible on radar toolbar");
-    await scoutTab.click();
-    await page.waitForTimeout(600);
-    const promptInput = page.getByPlaceholder(/Ask anything to search the live web/i);
-    must(await promptInput.isVisible(), "Live web search input not visible in Radar");
-    const quickPill = page.getByRole("button", { name: /Canada Agri-Food 2026/i }).first();
-    must(await quickPill.isVisible(), "Quick query pills not visible in Radar");
-    await shot("05-web-scout-inline");
-  },
-);
+await ask("Busca en la web lo que no está en el sistema (un solo buscador)", async () => {
+  await page.goto(`${BASE}/grants`, { waitUntil: "networkidle", timeout: 60000 });
+  const box = page.getByRole("textbox", { name: "Search grants" });
+  await box.waitFor({ timeout: 30000 });
+  await box.fill("cooperativas de cacao Peru convocatoria 2027");
+  await page.getByRole("heading", { name: "From the web" }).waitFor({ timeout: 30000 });
+  must(
+    (await page.getByRole("button", { name: /Search the web for/ }).count()) > 0 ||
+      (await page.getByText(/Browsing the live internet|Discovered|could not retrieve/i).count()) >
+        0,
+    "the web is not one click away from the search",
+  );
+  must(
+    (await page.getByRole("button", { name: /AI Web Scout/ }).count()) === 0,
+    "old web tab still there",
+  );
+  await shot("05-one-search");
+});
 
 await ask("¿Qué tengo pendiente hoy? (plazos, documentos, socios por contactar)", async () => {
   await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle", timeout: 60000 });

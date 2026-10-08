@@ -147,6 +147,7 @@ export function RadarToolbar({
   webQuery = "",
   onWebQueryChange,
   onWebSearch,
+  onSubmitSearch,
   isWebSearching = false,
   totalCatalogLoaded = 0,
   focus,
@@ -161,6 +162,8 @@ export function RadarToolbar({
   webQuery?: string;
   onWebQueryChange?: (q: string) => void;
   onWebSearch?: (q?: string) => void;
+  /** Enter in the search box: a link opens or adds the grant; text searches (and the web if needed). */
+  onSubmitSearch?: (q: string) => void;
   isWebSearching?: boolean;
   totalCatalogLoaded?: number;
   /** Countries and sectors of the grants the organization is working on. */
@@ -324,19 +327,26 @@ export function RadarToolbar({
         /* Mode B: Tracked Catalog Filters */
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[220px] flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <form
+              className="relative min-w-[260px] basis-full"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onSubmitSearch?.(value.search);
+              }}
+            >
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={value.search}
                 onChange={(e) => set("search", e.target.value)}
                 placeholder={tr(
-                  "Search catalog by topic, funder or keyword",
-                  "Buscar en el catálogo por tema, financiador o palabra clave",
+                  "Grant name, funder or topic — or paste the call's link",
+                  "Nombre del grant, financiador o tema — o pegue el enlace de la convocatoria",
                 )}
                 aria-label={tr("Search grants", "Buscar grants")}
-                className="h-9 pl-9"
+                className="h-12 pl-10 text-base"
+                autoFocus
               />
-            </div>
+            </form>
             <Pick
               label={tr("Country", "País")}
               value={value.country}

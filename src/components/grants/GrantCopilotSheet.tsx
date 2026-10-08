@@ -9,8 +9,6 @@ import {
   Copy,
   Check,
   ChevronRight,
-  MessageSquare,
-  HelpCircle,
   ClipboardCheck,
 } from "lucide-react";
 import {
@@ -23,7 +21,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   askGrantCopilot,
   listGrantCopilotMessages,
@@ -598,7 +595,6 @@ function PlanUpdateCard({
             setState("saving");
             try {
               await apply({ data: { grantId, orgId, update } });
-              await recheck({ data: { grantId, orgId, force: true } }).catch(() => undefined);
               await Promise.all([
                 qc.invalidateQueries({ queryKey: ["grant-detail", grantId] }),
                 qc.invalidateQueries({ queryKey: ["grants"] }),
@@ -622,7 +618,7 @@ function PlanUpdateCard({
           ) : state === "saving" ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            tr("Apply to plan and re-check", "Aplicar al plan y revalidar")
+            tr("Apply to plan", "Aplicar al plan")
           )}
         </Button>
       </div>
@@ -694,6 +690,12 @@ function FactsUpdateCard({
             try {
               await apply({ data: { grantId, orgId, grantFacts: grant, profile } });
               await recheck({ data: { grantId, orgId, force: true } }).catch(() => undefined);
+              // The check runs in the background: refresh again when it is likely done.
+              for (const ms of [8000, 20000, 45000])
+                setTimeout(() => {
+                  void qc.invalidateQueries({ queryKey: ["grant-detail", grantId] });
+                  void qc.invalidateQueries({ queryKey: ["grants"] });
+                }, ms);
               await Promise.all([
                 qc.invalidateQueries({ queryKey: ["grant-detail", grantId] }),
                 qc.invalidateQueries({ queryKey: ["grant-workspace", grantId, orgId] }),

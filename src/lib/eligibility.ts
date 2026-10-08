@@ -148,7 +148,8 @@ function jurisdictionRule(input: EligibilityInput): RuleResult {
   }
   // Funded elsewhere in the Americas for a client based in the Americas: the
   // route is a consortium led by an eligible local institution.
-  if (isAmericas(grantCountry) && clientPlaces.some((p) => isAmericas(p))) {
+  const caProvince = /^(ON|QC|BC|AB|MB|SK|NS|NB|NL|PEI|YT|NT|NU)$/i.test(grantCountry);
+  if (!caProvince && isAmericas(grantCountry) && clientPlaces.some((p) => isAmericas(p))) {
     return {
       key: "jurisdiction",
       status: "unknown",

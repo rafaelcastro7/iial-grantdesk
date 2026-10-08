@@ -357,7 +357,14 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
               className="text-primary hover:underline"
             >
               {i > 0 && " · "}
-              {s.title || new URL(s.url).hostname}
+              {s.title ||
+                (() => {
+                  try {
+                    return new URL(s.url).hostname;
+                  } catch {
+                    return s.url;
+                  }
+                })()}
             </a>
           ))}
           <span className="block pt-1">

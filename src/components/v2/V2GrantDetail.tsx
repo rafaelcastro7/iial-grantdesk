@@ -558,7 +558,9 @@ export function V2GrantDetail({
       )}
 
       {/* ----------------- MAIN WIDESCREEN WORKSPACE (8 COLS MAIN + 4 COLS RAIL) ----------------- */}
-      {activeOrgId && <GrantDossier grantId={grant.id} orgId={activeOrgId} />}
+      {activeOrgId && (
+        <GrantDossier key={`${grant.id}:${activeOrgId}:${lang}`} grantId={grant.id} orgId={activeOrgId} />
+      )}
 
       <CallFactsCard
         facts={grant as unknown as CallFacts}

@@ -93,11 +93,18 @@ export function explainCheck(check: CheckLike, lang: Lang | number = "en"): stri
   const detail = (check as { detail?: string | null }).detail ?? "";
   // Geography that is not a "no": international call, or the Americas partner route.
   if (/^jurisdiction_required$/.test(key) && (check as { status?: string }).status === "warn") {
-    const m = /Funded in ([A-Z]{2,6})/.exec(detail);
+    const m = /Funded in ([A-Za-z .-]{2,30}?)(?: \(|:)/.exec(detail);
     if (m)
       return lang === "es"
         ? `Se financia en ${m[1]}: pueden participar como socios en un consorcio liderado por una institución elegible de ${m[1]}.`
         : `Funded in ${m[1]}: you can take part as a partner in a consortium led by an eligible ${m[1]} institution.`;
+    if (/foreign|international/i.test(detail))
+      return lang === "es"
+        ? "El financiador indica que pueden postular organizaciones extranjeras: confirme las condiciones."
+        : "The funder says foreign organizations may apply: confirm the conditions.";
+    return lang === "es"
+      ? "La ubicación no descarta la convocatoria, pero hay que confirmarla."
+      : "Location does not rule the call out, but it needs confirming.";
   }
   const hit = BY_ID.find((entry) => entry.match.test(key) || entry.match.test(check.label));
   const label = check.label.replace(/^SOP F\d\s*-\s*/i, "");

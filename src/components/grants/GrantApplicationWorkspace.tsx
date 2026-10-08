@@ -58,6 +58,7 @@ import {
   decisionMemo,
   defaultMilestones,
   missingFromCall,
+  mergeServerChanges,
   newId,
   type ChecklistItem,
   type Partner,
@@ -125,11 +126,21 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [newBlocker, setNewBlocker] = useState("");
   const [newItem, setNewItem] = useState("");
 
+  // The server copy last seen, to tell what changed on the server meanwhile.
+  const serverRef = useRef<Workspace | null>(null);
   useEffect(() => {
-    // A reload (e.g. after switching language) never overwrites unsaved edits.
-    if (data?.workspace && !dirtyRef.current) {
+    if (!data?.workspace) return;
+    const before = serverRef.current;
+    serverRef.current = data.workspace;
+    if (!dirtyRef.current || !before) {
       setWs(data.workspace);
       setDirty(false);
+    } else {
+      // Unsaved edits + a change applied elsewhere (dossier, Copilot): merge,
+      // so the next "Save plan" keeps both.
+      setWs((local) =>
+        local ? mergeServerChanges(local, before, data.workspace) : data.workspace,
+      );
     }
   }, [data?.workspace]);
 

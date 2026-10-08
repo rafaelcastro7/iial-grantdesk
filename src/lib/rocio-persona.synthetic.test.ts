@@ -746,3 +746,51 @@ describe("Documents follow each call (not a fixed list)", () => {
     expect(cfc).not.toContain("Concept note (first step)");
   });
 });
+
+describe("Review fixes: plan never loses applied changes", () => {
+  it("merges a change applied by the dossier into unsaved edits", async () => {
+    const { emptyWorkspace, applyPlanUpdate, mergeServerChanges } =
+      await import("@/lib/grant-workspace.shared");
+    const g = { id: "g", title: "Mitacs" };
+    const server0 = emptyWorkspace("o", g);
+    const local = {
+      ...server0,
+      project_title: "Mi título sin guardar",
+      blockers: ["Bloqueo local"],
+    };
+    const server1 = applyPlanUpdate(server0, {
+      route: "partner",
+      add_checklist: [{ item: "Carta de la incubadora", critical: true }],
+      add_blockers: ["Requiere incubadora"],
+      note: "Ruta B",
+    });
+    const merged = mergeServerChanges(local, server0, server1);
+    expect(merged.project_title).toBe("Mi título sin guardar"); // local edit kept
+    expect(merged.route).toBe("partner"); // server change applied
+    expect(merged.blockers).toEqual(["Bloqueo local", "Requiere incubadora"]);
+    expect(merged.checklist.some((c) => c.item === "Carta de la incubadora")).toBe(true);
+    expect(merged.decision_notes).toMatch(/Ruta B/);
+  });
+
+  it("applying many times never exceeds the save limits, nor repeats a note", async () => {
+    const { emptyWorkspace, applyPlanUpdate, PLAN_LIMITS } =
+      await import("@/lib/grant-workspace.shared");
+    let ws = emptyWorkspace("o", { id: "g", title: "x" });
+    for (let i = 0; i < 30; i++)
+      ws = applyPlanUpdate(ws, {
+        add_blockers: [`b${i}`],
+        add_checklist: [{ item: `doc ${i}` }, { item: `doc ${i}b` }, { item: `doc ${i}c` }],
+        note: "Same note",
+      });
+    expect(ws.blockers.length).toBeLessThanOrEqual(PLAN_LIMITS.blockers);
+    expect(ws.checklist.length).toBeLessThanOrEqual(PLAN_LIMITS.checklist);
+    expect((ws.decision_notes ?? "").match(/Same note/g)).toHaveLength(1);
+  });
+
+  it("an unsaved plan opens in Spanish for a Spanish user", async () => {
+    const { emptyWorkspace } = await import("@/lib/grant-workspace.shared");
+    const ws = emptyWorkspace("o", { id: "g", title: "x", deadline: "2027-06-01" }, "es");
+    expect(ws.checklist.map((c) => c.item)).toContain("Constancia de constitución");
+    expect(ws.milestones[0].label).toBe("Decisión de aplicar o no");
+  });
+});

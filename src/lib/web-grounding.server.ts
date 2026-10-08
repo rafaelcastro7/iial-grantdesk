@@ -14,7 +14,11 @@ const cooldownUntil = new Map<string, number>();
 const cool = (name: string, ms: number) => cooldownUntil.set(name, Date.now() + ms);
 const cooling = (name: string) => (cooldownUntil.get(name) ?? 0) > Date.now();
 
-async function viaGemini(apiKey: string, question: string): Promise<WebResult | null> {
+async function viaGemini(
+  apiKey: string,
+  question: string,
+  maxChars: number,
+): Promise<WebResult | null> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
@@ -46,10 +50,15 @@ async function viaGemini(apiKey: string, question: string): Promise<WebResult | 
     .map((g) => ({ title: g.web?.title ?? "", url: g.web?.uri ?? "" }))
     .filter((x) => x.url)
     .slice(0, 8);
-  return text ? { text: text.slice(0, 5000), sources, provider: "gemini-google-search" } : null;
+  return text ? { text: text.slice(0, maxChars), sources, provider: "gemini-google-search" } : null;
 }
 
-async function viaGroq(apiKey: string, model: string, question: string): Promise<WebResult | null> {
+async function viaGroq(
+  apiKey: string,
+  model: string,
+  question: string,
+  maxChars: number,
+): Promise<WebResult | null> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -93,7 +102,7 @@ async function viaGroq(apiKey: string, model: string, question: string): Promise
     .filter((x, i, a) => a.findIndex((y) => y.url === x.url) === i)
     .slice(0, 8);
   return text
-    ? { text: text.slice(0, 5000), sources, provider: `groq-browser-search:${model}` }
+    ? { text: text.slice(0, maxChars), sources, provider: `groq-browser-search:${model}` }
     : null;
 }
 
@@ -101,14 +110,18 @@ async function viaGroq(apiKey: string, model: string, question: string): Promise
  * Searches the web and answers `question` from what it finds, trying each
  * configured provider in turn. Returns null only if none can answer.
  */
-export async function searchWebGrounded(question: string): Promise<WebResult | null> {
+export async function searchWebGrounded(
+  question: string,
+  opts: { maxChars?: number } = {},
+): Promise<WebResult | null> {
+  const maxChars = opts.maxChars ?? 6000;
   const env = serverEnv();
   const attempts: Array<[string, () => Promise<WebResult | null>]> = [];
   if (env.GOOGLE_AI_STUDIO_KEY)
-    attempts.push(["gemini", () => viaGemini(env.GOOGLE_AI_STUDIO_KEY!, question)]);
+    attempts.push(["gemini", () => viaGemini(env.GOOGLE_AI_STUDIO_KEY!, question, maxChars)]);
   if (env.GROQ_API_KEY)
     for (const model of ["openai/gpt-oss-20b", "openai/gpt-oss-120b"])
-      attempts.push([`groq:${model}`, () => viaGroq(env.GROQ_API_KEY!, model, question)]);
+      attempts.push([`groq:${model}`, () => viaGroq(env.GROQ_API_KEY!, model, question, maxChars)]);
   for (const [name, run] of attempts) {
     if (cooling(name)) continue;
     try {

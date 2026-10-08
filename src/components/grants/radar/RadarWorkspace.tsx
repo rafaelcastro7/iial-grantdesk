@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
-import { AlertCircle, Globe, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
+import { AlertCircle, Globe, Loader2, RefreshCw, X } from "lucide-react";
 import type { GrantRowData } from "@/components/grants/GrantRow";
 import { DiscoveryProgress } from "@/components/grants/DiscoveryProgress";
 import { EventLog } from "@/components/grants/EventLog";
@@ -10,20 +10,9 @@ import { FunderSelector } from "@/components/grants/FunderSelector";
 import { AddGrantModal } from "@/components/grants/AddGrantModal";
 import { NotebookLMBridge } from "@/components/grants/NotebookLMBridge";
 import { Button } from "@/components/ui/button";
-import {
-  countryName,
-  formatMoney,
-  nextActionLabel,
-  type RadarFocus,
-  type RadarResult,
-} from "@/lib/grant-radar";
+import { countryName, formatMoney, type RadarFocus, type RadarResult } from "@/lib/grant-radar";
 import { RadarCard, type RadarActions } from "./RadarCard";
-import {
-  RadarToolbar,
-  QUICK_SCOUT_PROMPTS,
-  webQueryForCountry,
-  type RadarFilterState,
-} from "./RadarToolbar";
+import { RadarToolbar, webQueryForCountry, type RadarFilterState } from "./RadarToolbar";
 import { WebScoutRadarCard } from "./WebScoutRadarCard";
 import { searchWebGrants, type DiscoveredWebGrant } from "@/lib/grant-web-scout.functions";
 import { addGrantByUrl } from "@/lib/grants.functions";
@@ -137,6 +126,53 @@ export function RadarWorkspace({
       setIsWebSearching(false);
     }
   };
+
+  const handleSubmitSearch = async (raw: string) => {
+    const q = raw.trim();
+    if (!q) return;
+    if (/^https?:\/\//i.test(q)) {
+      const norm = (u: string) =>
+        u
+          .trim()
+          .replace(/[#?].*$/, "")
+          .replace(/\/+$/, "")
+          .toLowerCase();
+      const known = radar.items.find((i) => i.grant.url && norm(i.grant.url) === norm(q));
+      if (known) {
+        void navigate({ to: "/grants/$id", params: { id: known.grant.id } });
+        return;
+      }
+      try {
+        const res = await addGrantFn({ data: { url: q } });
+        await queryClient.invalidateQueries({ queryKey: ["grants"] });
+        void navigate({
+          to: "/grants/$id",
+          params: { id: res.grantId },
+          search: { analyze: "1" } as never,
+        });
+      } catch (err) {
+        setWebError(`link: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return;
+    }
+    setWebQuery(q);
+    if (radar.items.length === 0) void handleExecuteWebSearch(q);
+  };
+
+  // A search with nothing in the catalog goes to the web by itself (once per text).
+  const autoWebFor = useRef("");
+  useEffect(() => {
+    const q = filters.search.trim();
+    if (q.length < 4 || /^https?:/i.test(q) || radar.items.length > 0 || isWebSearching) return;
+    if (autoWebFor.current === q) return;
+    const t = setTimeout(() => {
+      autoWebFor.current = q;
+      setWebQuery(q);
+      void handleExecuteWebSearch(q);
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.search, radar.items.length]);
 
   const handleImportWebGrant = async (grant: DiscoveredWebGrant) => {
     setImportingUrls((prev) => new Set(prev).add(grant.url));
@@ -256,31 +292,8 @@ export function RadarWorkspace({
 
         {!simple && reviewProgress}
 
-        {/* Dynamic stats row */}
-        {sourceMode === "web" ? (
-          <div className="grid grid-cols-2 border-b md:grid-cols-4 md:divide-x bg-muted/20">
-            <Stat
-              label={tr("Live Web Discoveries", "Hallazgos en la web")}
-              value={webResults.length}
-              tone="text-primary font-bold"
-            />
-            <Stat
-              label={tr("Active Client Scope", "Cliente activo")}
-              value={orgName}
-              tone="text-foreground"
-            />
-            <Stat
-              label={tr("Scout Engine", "Motor de búsqueda")}
-              value="Google Search"
-              tone="text-emerald-600"
-            />
-            <Stat
-              label={tr("Pipeline Action", "Acción en el pipeline")}
-              value={tr("1-Click Import", "Importar con 1 clic")}
-              tone="text-foreground"
-            />
-          </div>
-        ) : (
+        {/* Counters */}
+        {
           <div
             className={`grid border-b md:divide-x ${simple ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 md:grid-cols-5"}`}
           >
@@ -314,26 +327,7 @@ export function RadarWorkspace({
               />
             )}
           </div>
-        )}
-
-        {next && sourceMode === "catalog" && (
-          <section className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-start gap-3">
-              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-primary">
-                  {tr("Do this next", "Haz esto a continuación")}
-                </p>
-                <p className="font-medium text-foreground">
-                  {simple
-                    ? tr("Best match right now", "Mejor opción ahora")
-                    : nextActionLabel(next.nextAction, lang)}
-                  : {next.grant.title}
-                </p>
-              </div>
-            </div>
-          </section>
-        )}
+        }
 
         {/* Integrated Toolbar */}
         <div className="space-y-2 border-b px-4 py-4 md:px-7">
@@ -342,8 +336,8 @@ export function RadarWorkspace({
             onChange={onFiltersChange}
             countries={countries}
             sectors={sectors}
-            sourceMode={sourceMode}
-            onSourceModeChange={setSourceMode}
+            sourceMode="catalog"
+            onSubmitSearch={handleSubmitSearch}
             webQuery={webQuery}
             onWebQueryChange={setWebQuery}
             onWebSearch={handleExecuteWebSearch}
@@ -353,7 +347,7 @@ export function RadarWorkspace({
             moreFilters={simple ? undefined : moreFilters}
           />
 
-          {sourceMode === "catalog" && (
+          {
             <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
               <span data-search-mode={searchMode ?? undefined}>
                 {searchMode &&
@@ -376,24 +370,99 @@ export function RadarWorkspace({
                   )}
               </span>
             </div>
-          )}
+          }
         </div>
 
-        {/* MAIN BODY: SourceMode Switch */}
-        {sourceMode === "web" ? (
-          <div className="space-y-5 px-4 py-5 md:px-7">
+        {/* Catalog results */}
+        {radar.items.length === 0 ? (
+          <EmptyState
+            hasAny={totalLoaded > 0}
+            isAdmin={isAdmin}
+            searchQuery={
+              filters.search ||
+              (filters.country !== "all" ? webQueryForCountry(filters.country) : "")
+            }
+            countryLabel={
+              filters.country !== "all" ? countryName(filters.country, lang) : undefined
+            }
+            onSearchWeb={(q) => {
+              setWebQuery(q);
+              handleExecuteWebSearch(q);
+            }}
+            onReset={() =>
+              onFiltersChange({
+                ...filters,
+                country: "all",
+                sector: "all",
+                verdict: "all",
+                status: "active",
+                minAmount: 0,
+                search: "",
+              })
+            }
+            onDiscover={admin.onDiscover}
+          />
+        ) : (
+          <div className="space-y-8 px-4 py-5 md:px-7">
+            {radar.groups.map((group) => (
+              <section key={group.country} className="space-y-3">
+                <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
+                  {countryName(group.country, lang)}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {group.items.length}
+                  </span>
+                </h2>
+                <div className="space-y-2.5">
+                  {group.items.map((item) => (
+                    <RadarCard
+                      key={item.grant.id}
+                      item={item}
+                      actions={actions}
+                      highlight={next?.grant.id === item.grant.id}
+                      simple={simple}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {/* The same search on the web: always one click away, automatic when the catalog has nothing. */}
+        {(isWebSearching || webResults.length > 0 || !!webError || !!filters.search) && (
+          <div className="space-y-5 border-t px-4 py-5 md:px-7">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+              <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+                <Globe className="h-4 w-4 text-primary" />
+                {tr("From the web", "En la web")}
+              </h2>
+              {(webQuery || filters.search) && !isWebSearching && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  onClick={() => handleExecuteWebSearch(webQuery || filters.search)}
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  {tr("Search the web for", "Buscar en la web")} &ldquo;{webQuery || filters.search}
+                  &rdquo;
+                </Button>
+              )}
+            </div>
             {/* Error display */}
             {webError && (
               <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div className="space-y-1">
                   <p className="font-semibold">
-                    {tr(
-                      "Web search could not retrieve opportunities",
-                      "La búsqueda web no pudo obtener oportunidades",
-                    )}
+                    {webError.startsWith("link:")
+                      ? tr("Could not add this link", "No se pudo agregar este enlace")
+                      : tr(
+                          "Web search could not retrieve opportunities",
+                          "La búsqueda web no pudo obtener oportunidades",
+                        )}
                   </p>
-                  <p>{webError}</p>
+                  <p>{webError.replace(/^link:\s*/, "")}</p>
                 </div>
               </div>
             )}
@@ -447,93 +516,6 @@ export function RadarWorkspace({
                 </div>
               </div>
             )}
-
-            {/* Empty web state / prompt guide */}
-            {!isWebSearching && webResults.length === 0 && !webError && (
-              <div className="my-10 rounded-xl border border-dashed p-8 text-center bg-muted/20">
-                <Globe className="mx-auto h-10 w-10 text-muted-foreground/60 mb-3" />
-                <h3 className="font-display text-lg font-semibold text-foreground mb-1">
-                  {tr("Live Web Grant Scout", "Búsqueda de grants en la web")}
-                </h3>
-                <p className="text-xs text-muted-foreground max-w-lg mx-auto mb-5">
-                  {tr(
-                    "Type any topic in the search bar above (just like you did in ChatGPT) or select one of the quick queries below to browse open and upcoming opportunities in real-time.",
-                    "Escribe cualquier tema en la barra de búsqueda (como lo harías en ChatGPT) o elige una de las consultas rápidas para explorar oportunidades abiertas y próximas en tiempo real.",
-                  )}
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {QUICK_SCOUT_PROMPTS.map((p) => (
-                    <Button
-                      key={p.label}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setWebQuery(p.query);
-                        handleExecuteWebSearch(p.query);
-                      }}
-                      className="text-xs"
-                    >
-                      {lang === "es" ? p.labelEs : p.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : /* Normal Catalog Groups */
-        radar.items.length === 0 ? (
-          <EmptyState
-            hasAny={totalLoaded > 0}
-            isAdmin={isAdmin}
-            searchQuery={
-              filters.search ||
-              (filters.country !== "all" ? webQueryForCountry(filters.country) : "")
-            }
-            countryLabel={
-              filters.country !== "all" ? countryName(filters.country, lang) : undefined
-            }
-            onSearchWeb={(q) => {
-              setWebQuery(q);
-              setSourceMode("web");
-              handleExecuteWebSearch(q);
-            }}
-            onReset={() =>
-              onFiltersChange({
-                ...filters,
-                country: "all",
-                sector: "all",
-                verdict: "all",
-                status: "active",
-                minAmount: 0,
-                search: "",
-              })
-            }
-            onDiscover={admin.onDiscover}
-          />
-        ) : (
-          <div className="space-y-8 px-4 py-5 md:px-7">
-            {radar.groups.map((group) => (
-              <section key={group.country} className="space-y-3">
-                <h2 className="flex items-baseline gap-2 border-b pb-2 font-display text-lg font-semibold text-foreground">
-                  {countryName(group.country, lang)}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {group.items.length}
-                  </span>
-                </h2>
-                <div className="space-y-2.5">
-                  {group.items.map((item) => (
-                    <RadarCard
-                      key={item.grant.id}
-                      item={item}
-                      actions={actions}
-                      highlight={next?.grant.id === item.grant.id}
-                      simple={simple}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
           </div>
         )}
       </section>

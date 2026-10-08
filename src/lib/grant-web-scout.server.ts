@@ -92,7 +92,7 @@ Return ONLY valid JSON.`;
   try {
     // Google first, then Groq's built-in browser search: never tied to one API.
     const { searchWebGrounded } = await import("@/lib/web-grounding.server");
-    const found = await searchWebGrounded(prompt);
+    const found = await searchWebGrounded(prompt, { maxChars: 60000 });
     if (!found) {
       throw new Error(
         "No web search provider could answer right now (quota or network). Try again in a few minutes.",

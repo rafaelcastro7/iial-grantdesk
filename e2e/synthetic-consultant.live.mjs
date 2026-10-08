@@ -84,7 +84,7 @@ await step("radar lists grants and opens one", async () => {
   const link = page.locator('a[href^="/grants/"]').first();
   await link.waitFor({ timeout: 30000 });
   grantUrl = await link.getAttribute("href");
-  await page.goto(`${BASE}${grantUrl}`, { waitUntil: "networkidle", timeout: 60000 });
+  await page.goto(`${BASE}${grantUrl}`, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.getByText("1. Can we apply?").first().waitFor({ timeout: 30000 });
   await shot("09-grant-detail");
 });
@@ -119,7 +119,7 @@ await step("application plan: fill and save", async () => {
     .getByText(/Application plan saved|Saved/)
     .first()
     .waitFor({ timeout: 30000 });
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByText("1. Can we apply?").waitFor({ timeout: 30000 });
   const v = await page.getByPlaceholder("e.g. Lambton College").inputValue();
   if (v !== "Lambton College") throw new Error(`not persisted after reload (got "${v}")`);
