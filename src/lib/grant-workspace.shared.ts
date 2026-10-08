@@ -137,17 +137,193 @@ const slug = (s: string) =>
     .slice(0, 48) || "item";
 
 /** Documents almost every Canadian call asks for, plus the grant's own requirements. */
-const STD_DOCS_ES: Record<string, string> = {
-  "Proof of incorporation": "Constancia de constitución",
-  "CRA business number": "Número de empresa de la CRA (BN)",
-  "Financial statements (last 2 years)": "Estados financieros (últimos 2 años)",
-  "Funder portal registration": "Registro en el portal del financiador",
-  "Letters of support from partners": "Cartas de apoyo de los socios",
-  "Project budget (funder template)": "Presupuesto del proyecto (plantilla del financiador)",
-  "Concept note / project description": "Nota conceptual / descripción del proyecto",
-  "CVs of key personnel": "CV del personal clave",
+/**
+ * Documents the call actually asks for, detected from its own text
+ * (requirements, eligibility note, summary, funder) — no AI. Each entry: when
+ * it applies, its label in both languages, and whether it is critical.
+ */
+type DocRule = {
+  key: string;
+  en: string;
+  es: string;
+  when: (t: string, g: WorkspaceGrant) => boolean;
+  critical?: boolean | ((t: string) => boolean);
 };
+// From the grant's country and funder only: a call's text may mention Canada
+// without being Canadian ("Canada is not a FONTAGRO member").
+const isCanadianFunder = (g: WorkspaceGrant, _t?: string) =>
+  (g.country ?? "").toUpperCase() === "CA" ||
+  /\b(canada|canadian|sshrc|nserc|cihr|mitacs|feddev|global affairs|agriculture and agri-food|aafc|nrc|irap)\b/i.test(
+    `${g.funder?.name ?? ""} ${(g as { title?: string }).title ?? ""}`,
+  );
+const DOC_RULES: DocRule[] = [
+  {
+    key: "incorporation",
+    en: "Proof of incorporation",
+    es: "Constancia de constitución",
+    when: () => true,
+  },
+  {
+    key: "cra",
+    en: "CRA business number",
+    es: "Número de empresa de la CRA (BN)",
+    when: (t, g) => isCanadianFunder(g, t),
+  },
+  {
+    key: "eoi",
+    en: "Expression of Interest (first step)",
+    es: "Expresión de interés (primer paso)",
+    when: (t) => /expression of interest|\beoi\b|manifestaci[oó]n de inter[eé]s/.test(t),
+    critical: true,
+  },
+  {
+    key: "concept",
+    en: "Concept note (first step)",
+    es: "Nota conceptual (primer paso)",
+    when: (t) => /concept note|nota conceptual|unsolicited/.test(t),
+    critical: true,
+  },
+  {
+    key: "loi",
+    en: "Letter / notice of intent",
+    es: "Carta / aviso de intención",
+    when: (t) => /letter of intent|notice of intent|\bloi\b|\bnoi\b|carta de intenci[oó]n/.test(t),
+    critical: true,
+  },
+  {
+    key: "partners_intl",
+    en: "Registration in Partners@International",
+    es: "Registro en Partners@International",
+    when: (t) => /partners@international|global affairs|unsolicited (proposal|concept)/.test(t),
+    critical: true,
+  },
+  {
+    key: "portal",
+    en: "Funder portal registration (allow 10+ business days)",
+    es: "Registro en el portal del financiador (prever 10+ días hábiles)",
+    when: (t) => /\bportal\b|register|registration|convergence|research portal|registro/.test(t),
+  },
+  {
+    key: "audited",
+    en: "Audited financial statements",
+    es: "Estados financieros auditados",
+    when: (t) => /audited|audit report|auditad/.test(t),
+    critical: true,
+  },
+  {
+    key: "fs",
+    en: "Financial statements (last 2 years)",
+    es: "Estados financieros (últimos 2 años)",
+    when: (t, g) =>
+      !/audited|audit report|auditad/.test(t) &&
+      (/financial statement|estados financieros|financial capacity/.test(t) ||
+        isCanadianFunder(g, t)),
+  },
+  {
+    key: "attestation",
+    en: "Organization attestation form (signed by the financial officer)",
+    es: "Declaración de la organización (firmada por el responsable financiero)",
+    when: (t) => /attestation/.test(t),
+  },
+  {
+    key: "lead_commitment",
+    en: "Commitment letter from the lead institution (administers the funds)",
+    es: "Carta de compromiso de la institución líder (administra los fondos)",
+    when: (t) =>
+      /eligible (postsecondary )?institution|postsecondary|post-secondary|administer(ed|s)? (by|the funds)|research office|member countr|led by|lead applicant must/.test(
+        t,
+      ),
+    critical: true,
+  },
+  {
+    key: "consortium",
+    en: "Consortium agreement / MOU with partners",
+    es: "Acuerdo de consorcio / MOU con los socios",
+    when: (t) => /consorti|multi-country|at least two (countries|organizations)|alianza/.test(t),
+    critical: true,
+  },
+  {
+    key: "support",
+    en: "Letters of support from partners",
+    es: "Cartas de apoyo de los socios",
+    when: (t) => /partner|consorti|collaborat|co-applicant|letter of support|socio|alianza/.test(t),
+  },
+  {
+    key: "match",
+    en: "Match / cost-share plan (who pays what)",
+    es: "Plan de contrapartida (quién aporta qué)",
+    when: (t) =>
+      /\bmatch(ing)?\b|cost[- ]?shar|co-?fund|cofinanc|contrapartida|at least \d+ ?%/.test(t),
+    critical: true,
+  },
+  {
+    key: "inkind",
+    en: "In-kind contribution table (hours, services, WCIS)",
+    es: "Tabla de aportes en especie (horas, servicios, WCIS)",
+    when: (t) => /in-?kind|en especie/.test(t),
+  },
+  {
+    key: "workplan",
+    en: "Workplan and results framework",
+    es: "Plan de trabajo y marco de resultados",
+    when: (t) =>
+      /work ?plan|logic model|results framework|indicators|monitoring|marco de resultados/.test(t),
+  },
+  {
+    key: "gender",
+    en: "Gender equality analysis",
+    es: "Análisis de igualdad de género",
+    when: (t) => /feminist|gender|g[eé]nero/.test(t),
+  },
+  {
+    key: "indigenous",
+    en: "Letter from the Indigenous community or organization involved",
+    es: "Carta de la comunidad u organización indígena involucrada",
+    when: (t) => /indigenous|ind[ií]gena/.test(t),
+  },
+  {
+    key: "loan",
+    en: "Repayment plan / financial projections (this is a loan)",
+    es: "Plan de pago / proyecciones financieras (es un préstamo)",
+    when: (t) => /\bloan|repayable|debt|pr[eé]stamo/.test(t),
+    critical: true,
+  },
+  {
+    key: "budget",
+    en: "Project budget (funder template)",
+    es: "Presupuesto del proyecto (plantilla del financiador)",
+    when: () => true,
+  },
+  {
+    key: "proposal",
+    en: "Project description / full proposal",
+    es: "Descripción del proyecto / propuesta completa",
+    when: () => true,
+  },
+  { key: "cvs", en: "CVs of key personnel", es: "CV del personal clave", when: () => true },
+];
 
+/** The text a call is described with, for document detection. */
+function callText(grant: WorkspaceGrant): string {
+  const g = grant as WorkspaceGrant & { eligibility_note?: string | null; title?: string };
+  return [
+    g.title,
+    g.summary,
+    g.eligibility_note,
+    g.funder?.name,
+    ...(grant.requirements ?? []).map((r) => r.requirement),
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+}
+
+/**
+ * The documents for this call: its own extracted requirements first, then the
+ * documents its text calls for (a concept note for Global Affairs Canada, a
+ * consortium agreement for FONTAGRO, the lead institution's commitment for a
+ * university-led call…), without duplicates.
+ */
 export function defaultChecklist(grant: WorkspaceGrant, lang: "en" | "es" = "en"): ChecklistItem[] {
   const fromGrant = (grant.requirements ?? [])
     .map((r) => (r.requirement ?? "").trim())
@@ -158,27 +334,49 @@ export function defaultChecklist(grant: WorkspaceGrant, lang: "en" | "es" = "en"
       status: "missing" as const,
       critical: !!grant.requirements?.[i]?.isCritical,
     }));
-  const standard = [
-    "Proof of incorporation",
-    "CRA business number",
-    "Financial statements (last 2 years)",
-    "Funder portal registration",
-    "Letters of support from partners",
-    "Project budget (funder template)",
-    "Concept note / project description",
-    "CVs of key personnel",
-  ].map((item) => ({
-    id: `std-${slug(item)}`,
-    item: lang === "es" ? (STD_DOCS_ES[item] ?? item) : item,
+  const t = callText(grant);
+  const detected = DOC_RULES.filter((r) => r.when(t, grant)).map((r) => ({
+    id: `std-${slug(r.en)}`,
+    item: lang === "es" ? r.es : r.en,
     status: "missing" as const,
+    critical: typeof r.critical === "function" ? r.critical(t) : !!r.critical,
   }));
+  // A requirement already extracted from the call covers the detected item
+  // when one contains the other's key words (e.g. "Letters of support from partners").
+  const words = (s: string) =>
+    new Set(
+      s
+        .toLowerCase()
+        .split(/[^a-záéíóúñ@]+/)
+        .filter((w) => w.length > 4),
+    );
+  const covered = (d: { item: string }) =>
+    fromGrant.some((g) => {
+      const a = words(g.item);
+      const b = [...words(d.item)];
+      return b.length > 0 && b.filter((w) => a.has(w)).length / b.length >= 0.6;
+    });
   const seen = new Set<string>();
-  return [...fromGrant, ...standard].filter((c) => {
+  return [...fromGrant, ...detected.filter((d) => !covered(d))].filter((c) => {
     const k = c.item.toLowerCase();
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
   });
+}
+
+/** Items the call asks for that a saved plan does not have yet (for "Update from the call"). */
+export function missingFromCall(
+  grant: WorkspaceGrant,
+  checklist: ChecklistItem[],
+  lang: "en" | "es" = "en",
+): ChecklistItem[] {
+  const have = new Set(checklist.map((c) => c.item.trim().toLowerCase()));
+  const haveIds = new Set(checklist.map((c) => c.id));
+  // Standard items may have been saved in the other language: match by id too.
+  return defaultChecklist(grant, lang).filter(
+    (c) => !have.has(c.item.trim().toLowerCase()) && !haveIds.has(c.id),
+  );
 }
 
 const addDays = (iso: string, days: number) => {

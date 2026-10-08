@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { CallFactsCard, type CallFacts } from "@/components/grants/CallFactsCard";
 import { cleanTitle } from "@/lib/html-text";
 import {
   ArrowLeft,
@@ -517,6 +518,19 @@ export function V2GrantDetail({
       )}
 
       {/* ----------------- MAIN WIDESCREEN WORKSPACE (8 COLS MAIN + 4 COLS RAIL) ----------------- */}
+      <CallFactsCard
+        facts={grant as unknown as CallFacts}
+        onFetchDetails={() => onFetchDetails()}
+        fetching={busy === "enrich"}
+        onAskCopilot={() =>
+          handleOpenCopilotWithPrompt(
+            lang === "es"
+              ? "Verifica en la web la información oficial de esta convocatoria (qué financia, quién puede aplicar, monto, fechas, requisitos y la página oficial del programa) y propón correcciones para lo que falte o esté mal."
+              : "Check this call's official information on the web (what it funds, who can apply, amount, dates, requirements and the program's own official page) and propose corrections for anything missing or wrong.",
+          )
+        }
+      />
+
       {activeOrgId ? (
         <GrantApplicationWorkspace grantId={grant.id} orgId={activeOrgId} />
       ) : (

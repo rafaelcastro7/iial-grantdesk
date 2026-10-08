@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Copy,
-  Globe2,
   Loader2,
   Mail,
   MessageCircle,
@@ -32,7 +31,6 @@ import {
   checkCountryEligibility,
   explainTerms,
   PRESET_COUNTRIES,
-  STANDARD_COMPLIANCE_PACKAGE,
 } from "@/lib/consultant-desk.shared";
 import { synthesizeGrantRoadmap } from "@/lib/grant-roadmap";
 import { listPartners, savePartner } from "@/lib/partner-directory.functions";
@@ -57,6 +55,7 @@ import {
   routeLabel,
   decisionMemo,
   defaultMilestones,
+  missingFromCall,
   newId,
   type ChecklistItem,
   type Partner,
@@ -1003,22 +1002,12 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             size="sm"
             className="gap-1.5 text-xs shadow-2xs"
             onClick={() => {
-              const existingItems = new Set(ws.checklist.map((c) => c.item.trim().toLowerCase()));
-              const toAdd = STANDARD_COMPLIANCE_PACKAGE.filter(
-                (pkg) => !existingItems.has(pkg.item.trim().toLowerCase()),
-              ).map((pkg) => ({
-                id: newId("doc"),
-                item: pkg.item,
-                status: "missing" as const,
-                critical: pkg.critical,
-                owner: null,
-                due: null,
-              }));
+              const toAdd = missingFromCall(data.grant, ws.checklist, uiLang);
               if (toAdd.length === 0) {
                 toast.info(
                   tr(
-                    "Standard compliance documents are already present in the checklist.",
-                    "Los documentos estándar de cumplimiento ya están en la lista.",
+                    "The list already has everything this call asks for.",
+                    "La lista ya tiene todo lo que pide esta convocatoria.",
                   ),
                 );
                 return;
@@ -1026,22 +1015,19 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               setChecklist([...ws.checklist, ...toAdd]);
               toast.success(
                 tr(
-                  `Added ${toAdd.length} standard compliance document(s) to checklist.`,
-                  `Se agregaron ${toAdd.length} documento(s) estándar de cumplimiento a la lista.`,
+                  `Added ${toAdd.length} document(s) this call asks for.`,
+                  `Se agregaron ${toAdd.length} documento(s) que pide esta convocatoria.`,
                 ),
               );
             }}
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            {tr(
-              "Add standard compliance package (4 docs)",
-              "Agregar paquete estándar de cumplimiento (4 docs)",
-            )}
+            {tr("Update from the call", "Actualizar según la convocatoria")}
           </Button>
           <span className="text-[11px] text-muted-foreground">
             {tr(
-              "Financials (2y), CRA/Charter, Attestation, Support Letter",
-              "Estados financieros (2 años), CRA/Constitución, Declaración, Carta de apoyo",
+              "Adds what this call's own text asks for (concept note, consortium, match…). Removes nothing.",
+              "Agrega lo que pide el texto de esta convocatoria (nota conceptual, consorcio, contrapartida…). No quita nada.",
             )}
           </span>
         </div>

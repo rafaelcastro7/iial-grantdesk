@@ -688,3 +688,61 @@ describe("IIAL can take part in any call in the Americas", () => {
     expect(check("FR").status).toBe("fail");
   });
 });
+
+describe("Documents follow each call (not a fixed list)", () => {
+  it("Global Affairs, FONTAGRO and a CFC loan ask for different things", async () => {
+    const { defaultChecklist } = await import("@/lib/grant-workspace.shared");
+    const items = (g: object) => defaultChecklist(g as never).map((c) => c.item);
+    const gac = items({
+      id: "gac",
+      title: "Global Affairs Canada — Unsolicited Concept Notes",
+      country: "CA",
+      summary:
+        "Two steps: a concept note, then a full proposal. Feminist International Assistance Policy.",
+      eligibility_note:
+        "Submitted through Partners@International. At least 5% of eligible costs must come from the organization.",
+      requirements: [
+        {
+          requirement:
+            "Financial statements for the last two completed fiscal years and the Organization Attestation form",
+        },
+      ],
+    });
+    expect(gac).toEqual(
+      expect.arrayContaining([
+        "Concept note (first step)",
+        "Registration in Partners@International",
+        "CRA business number",
+        "Match / cost-share plan (who pays what)",
+        "Gender equality analysis",
+      ]),
+    );
+    expect(gac.filter((i) => /financial statements/i.test(i))).toHaveLength(1); // the call's own wording covers it
+    const fontagro = items({
+      id: "f",
+      title: "FONTAGRO — Call for Proposals",
+      country: "INTL",
+      eligibility_note:
+        "Members: Argentina, Bolivia, Chile… (Canada is not a member: IIAL would join as a partner).",
+      requirements: [
+        {
+          requirement: "Consortium of organizations from at least two FONTAGRO member countries",
+          isCritical: true,
+        },
+      ],
+    });
+    expect(fontagro).not.toContain("CRA business number");
+    expect(fontagro).toContain(
+      "Commitment letter from the lead institution (administers the funds)",
+    );
+    expect(fontagro).toContain("Letters of support from partners");
+    const cfc = items({
+      id: "c",
+      title: "Common Fund for Commodities",
+      country: "INTL",
+      summary: "Loans and other debt instruments.",
+    });
+    expect(cfc).toContain("Repayment plan / financial projections (this is a loan)");
+    expect(cfc).not.toContain("Concept note (first step)");
+  });
+});
