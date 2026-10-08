@@ -47,6 +47,7 @@ async function eligibilityByOrg(
   db: Db,
   grant: Record<string, unknown>,
   orgs: Array<{ id: string; name: string }>,
+  lang: "en" | "es" = "en",
 ): Promise<ApplicantEligibility[]> {
   const { DEFAULT_RULES, evaluateRules, deriveRulesFromOrg } =
     await import("@/agents/fit-rules.server");
@@ -62,7 +63,11 @@ async function eligibilityByOrg(
         orgId: org.id,
         orgName: org.name,
         verdict: "needs_input",
-        reasons: ["Complete this organization's profile first."],
+        reasons: [
+          lang === "es"
+            ? "Primero completa el perfil de esta organización."
+            : "Complete this organization's profile first.",
+        ],
       });
       continue;
     }
@@ -80,8 +85,36 @@ async function eligibilityByOrg(
         : result.verdict === "needs_input"
           ? "needs_input"
           : "eligible",
-      reasons: (result.hard_fail ? failed : unclear).slice(0, 3).map((c) => explainCheck(c)),
+      reasons: reasonsFor(),
     });
+    // A "no" must always say why: blocking checks first, then any failed
+    // check, then what the call itself says (closed call, eligibility note).
+    function reasonsFor(): string[] {
+      const primary = result.hard_fail ? failed : unclear;
+      const list = (primary.length ? primary : result.checks.filter((c) => c.status === "fail"))
+        .slice(0, 3)
+        .map((c) => explainCheck(c, lang));
+      if (list.length || !(result.hard_fail || result.verdict === "needs_input")) return list;
+      const closed =
+        grant.deadline_kind === "closed" ||
+        (typeof grant.deadline === "string" &&
+          grant.deadline.slice(0, 10) < new Date().toISOString().slice(0, 10));
+      if (closed)
+        list.push(
+          lang === "es"
+            ? "La convocatoria está cerrada: queda para el próximo ciclo."
+            : "The call is closed: it is for the next cycle.",
+        );
+      const note = typeof grant.eligibility_note === "string" ? grant.eligibility_note.trim() : "";
+      if (note) list.push(note.length > 280 ? `${note.slice(0, 277)}…` : note);
+      if (!list.length)
+        list.push(
+          lang === "es"
+            ? "Las reglas no lo aceptan, pero no indican el motivo: revisa la página oficial."
+            : "The rules do not accept it but give no reason: check the official page.",
+        );
+      return list;
+    }
   }
   return out;
 }
@@ -89,7 +122,13 @@ async function eligibilityByOrg(
 export const getGrantWorkspace = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    z.object({ grantId: z.string().uuid(), orgId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        grantId: z.string().uuid(),
+        orgId: z.string().uuid(),
+        lang: z.enum(["en", "es"]).optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     const db = context.supabase as unknown as Db;
@@ -122,7 +161,7 @@ export const getGrantWorkspace = createServerFn({ method: "GET" })
       saved: !!row,
       available: !tableMissing,
       orgs,
-      eligibility: await eligibilityByOrg(db, g, orgs),
+      eligibility: await eligibilityByOrg(db, g, orgs, data.lang ?? "en"),
     };
   });
 
@@ -288,4 +327,127 @@ export const listGrantWorkspaces = createServerFn({ method: "GET" })
       orgs,
       available: true,
     };
+  });
+
+/**
+ * Applies a plan update proposed by the Grant Copilot, after the user clicked
+ * "Apply to plan". Fields are validated again here; lists are merged without
+ * duplicates. Creates the plan if the grant had none yet.
+ */
+export const applyCopilotPlanUpdate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z
+      .object({ grantId: z.string().uuid(), orgId: z.string().uuid(), update: z.unknown() })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { applyPlanUpdate, sanitizePlanUpdate, isEmptyPlanUpdate, emptyWorkspace } =
+      await import("@/lib/grant-workspace.shared");
+    const db = context.supabase as unknown as Db;
+    await assertMember(db, context.userId, data.orgId);
+    const update = sanitizePlanUpdate(data.update);
+    if (isEmptyPlanUpdate(update)) throw new Error("empty_update");
+    const [{ data: row, error }, { data: grant, error: grantError }] = await Promise.all([
+      db
+        .from("grant_workspaces")
+        .select("*")
+        .eq("org_id", data.orgId)
+        .eq("grant_id", data.grantId)
+        .maybeSingle(),
+      db.from("grants").select(GRANT_COLUMNS).eq("id", data.grantId).maybeSingle(),
+    ]);
+    if (error) throw new Error(error.message);
+    if (grantError || !grant) throw new Error("grant_not_found");
+    const current: Workspace = row
+      ? (row as Workspace)
+      : emptyWorkspace(data.orgId, grant as WorkspaceGrant);
+    const next = applyPlanUpdate(current, update);
+    const { id: _id, updated_at: _u, ...rest } = next as Workspace & Record<string, unknown>;
+    void _id;
+    void _u;
+    const { data: saved, error: saveError } = await db
+      .from("grant_workspaces")
+      .upsert(
+        {
+          ...rest,
+          org_id: data.orgId,
+          grant_id: data.grantId,
+          updated_by: context.userId,
+          created_by: context.userId,
+        },
+        { onConflict: "org_id,grant_id" },
+      )
+      .select("*")
+      .single();
+    if (saveError) throw new Error(saveError.message);
+    return { workspace: saved as Workspace, applied: update };
+  });
+
+/**
+ * Applies grant facts and organization-profile changes proposed by the Grant
+ * Copilot, after the user clicked "Apply and re-check". Grant facts go through
+ * the manual-facts loop (set_grant_manual_field, with the source as note), so
+ * they win over later automatic enrichment. The caller then re-checks the fit.
+ */
+export const applyCopilotFacts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z
+      .object({
+        grantId: z.string().uuid(),
+        orgId: z.string().uuid(),
+        grantFacts: z.unknown().optional(),
+        profile: z.unknown().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { sanitizeGrantFacts, sanitizeProfileUpdate, grantFactFields } =
+      await import("@/lib/copilot-actions.shared");
+    const db = context.supabase as unknown as Db;
+    await assertMember(db, context.userId, data.orgId);
+    const facts = sanitizeGrantFacts(data.grantFacts);
+    const profile = sanitizeProfileUpdate(data.profile);
+    const applied: string[] = [];
+    const note = facts.source_url ? `Copilot · ${facts.source_url}` : "Copilot";
+    for (const field of grantFactFields(facts)) {
+      const { error } = await context.supabase.rpc(
+        "set_grant_manual_field" as never,
+        { p_grant_id: data.grantId, p_field: field, p_value: facts[field], p_note: note } as never,
+      );
+      if (error) throw new Error(`${field}: ${error.message}`);
+      applied.push(`grant.${field}`);
+    }
+    if (Object.keys(profile).length) {
+      // Lists (applicant types, regions, roles…) are added to, never replaced.
+      const { data: current } = await db
+        .from("org_profiles")
+        .select("applicant_types, jurisdictions, operating_regions, consortium_roles")
+        .eq("org_id", data.orgId)
+        .maybeSingle();
+      const merged: Record<string, unknown> = { ...profile };
+      for (const k of [
+        "applicant_types",
+        "jurisdictions",
+        "operating_regions",
+        "consortium_roles",
+      ] as const) {
+        const add = profile[k];
+        if (add)
+          merged[k] = [
+            ...new Set([
+              ...(((current ?? {}) as Record<string, string[] | null>)[k] ?? []),
+              ...add,
+            ]),
+          ];
+      }
+      const { error } = await db
+        .from("org_profiles")
+        .update({ ...merged, updated_at: new Date().toISOString() })
+        .eq("org_id", data.orgId);
+      if (error) throw new Error(`profile: ${error.message}`);
+      applied.push(...Object.keys(profile).map((k) => `profile.${k}`));
+    }
+    return { applied };
   });

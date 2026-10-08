@@ -115,6 +115,7 @@ await ask(
     await page.getByRole("button", { name: "Partners and funders" }).click();
     const emails = page.locator('section:has-text("5. Write")');
     await emails.locator("select").first().selectOption("meeting_invite");
+    await emails.locator("select").nth(1).selectOption("es");
     await page
       .getByPlaceholder(/Proposed meeting/)
       .fill("lunes 1 de junio a las 11:00 (hora de Perú) por Teams");

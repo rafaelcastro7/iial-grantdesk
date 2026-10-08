@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, Bot, Regex, FileCheck2, Calendar } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
+import { useTr, useUiLang, localeOf } from "@/lib/ui-lang";
 
 type Span = {
   id: string;
@@ -54,6 +55,8 @@ export function EvidencePanel({
   onOpenChange: (o: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const tr = useTr();
+  const lang = useUiLang();
   const fetchEvidence = useServerFn(getGrantEvidence);
   const { data, isLoading, error } = useQuery({
     queryKey: ["evidence", grantId, field],
@@ -79,10 +82,13 @@ export function EvidencePanel({
       <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="text-base">
-            Evidence for <span className="font-mono">{field}</span>
+            {tr("Evidence for", "Evidencia de")} <span className="font-mono">{field}</span>
           </SheetTitle>
           <SheetDescription className="text-xs">
-            Source citations supporting this field.
+            {tr(
+              "Source citations supporting this field.",
+              "Citas de fuentes que respaldan este campo.",
+            )}
           </SheetDescription>
         </SheetHeader>
 
@@ -91,7 +97,10 @@ export function EvidencePanel({
           {error && <p className="text-xs text-destructive">{String(error)}</p>}
           {!isLoading && spans.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              No linked citation is currently available for this field.
+              {tr(
+                "No linked citation is currently available for this field.",
+                "Por ahora no hay ninguna cita vinculada para este campo.",
+              )}
             </p>
           )}
           {spans.map((s) => {
@@ -106,7 +115,7 @@ export function EvidencePanel({
                     <span className="text-muted-foreground"> · {s.agent}</span>
                   </div>
                   <Badge variant="outline" className={`text-[10px] ${confColor(s.confidence)}`}>
-                    {Math.round(s.confidence * 100)}% confidence
+                    {Math.round(s.confidence * 100)}% {tr("confidence", "de confianza")}
                   </Badge>
                 </div>
 
@@ -129,7 +138,7 @@ export function EvidencePanel({
                   {s.source_url}
                 </ExternalLinkPreview>
                 <p className="text-[10px] text-muted-foreground">
-                  {new Date(s.created_at).toLocaleString("en-CA")}
+                  {new Date(s.created_at).toLocaleString(localeOf(lang))}
                 </p>
               </div>
             );
@@ -151,12 +160,13 @@ export function EvidenceChip({
   onClick: (field: string) => void;
   count?: number;
 }) {
+  const tr = useTr();
   return (
     <button
       type="button"
       onClick={() => onClick(field)}
       className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors"
-      title={`View citations for ${field}`}
+      title={`${tr("View citations for", "Ver citas de")} ${field}`}
     >
       <ShieldCheck className="h-3 w-3" />
       {label}

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useTr } from "@/lib/ui-lang";
 import type { ConsortiumRoute, RouteId } from "@/lib/grant-roadmap";
 
 const ROUTE_ICONS: Record<RouteId, React.ComponentType<{ className?: string }>> = {
@@ -27,7 +28,7 @@ export function GrantConsortiumMatrix({
   recommendedRouteId,
   selectedRouteId,
   onSelectRoute,
-  orgName = "Organization",
+  orgName: orgNameProp,
 }: {
   routes: ConsortiumRoute[];
   recommendedRouteId: RouteId;
@@ -35,6 +36,8 @@ export function GrantConsortiumMatrix({
   onSelectRoute: (id: RouteId) => void;
   orgName?: string;
 }) {
+  const tr = useTr();
+  const orgName = orgNameProp ?? tr("Organization", "Organización");
   return (
     <Card className="border-primary/25 shadow-sm overflow-hidden bg-card">
       <CardHeader className="bg-muted/20 border-b px-4 py-3 sm:px-5">
@@ -42,15 +45,28 @@ export function GrantConsortiumMatrix({
           <div>
             <CardTitle className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
               <Workflow className="h-5 w-5 text-primary" />
-              Consortium &amp; Application Routes Matrix
+              {tr(
+                "Consortium & Application Routes Matrix",
+                "Matriz de consorcio y rutas de postulación",
+              )}
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Comparative strategy: determines administrative lead, {orgName}'s delivery role, and how to bypass audit or territorial representation hurdles.
+              {tr(
+                `Comparative strategy: determines administrative lead, ${orgName}'s delivery role, and how to bypass audit or territorial representation hurdles.`,
+                `Estrategia comparativa: define el líder administrativo, el rol de ejecución de ${orgName} y cómo superar los obstáculos de auditoría o de representación territorial.`,
+              )}
             </p>
           </div>
-          <Badge variant="outline" className="text-xs bg-primary/10 border-primary/30 text-primary self-start sm:self-auto py-1">
+          <Badge
+            variant="outline"
+            className="text-xs bg-primary/10 border-primary/30 text-primary self-start sm:self-auto py-1"
+          >
             <Sparkles className="h-3 w-3 mr-1" />
-            Recommended: {routes.find((r) => r.id === recommendedRouteId)?.title.split(":")[1]?.trim() || "Academic R&D"}
+            {tr("Recommended:", "Recomendada:")}{" "}
+            {routes
+              .find((r) => r.id === recommendedRouteId)
+              ?.title.split(":")[1]
+              ?.trim() || tr("Academic R&D", "I+D académica")}
           </Badge>
         </div>
       </CardHeader>
@@ -76,10 +92,14 @@ export function GrantConsortiumMatrix({
                 {/* Header card */}
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className={cn(
-                      "rounded-lg p-2 shrink-0",
-                      isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                    )}>
+                    <div
+                      className={cn(
+                        "rounded-lg p-2 shrink-0",
+                        isSelected
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground",
+                      )}
+                    >
                       <Icon className="h-4 w-4" />
                     </div>
 
@@ -94,15 +114,21 @@ export function GrantConsortiumMatrix({
                         }
                         className={cn(
                           "text-[10px] font-semibold py-0.5 px-2",
-                          route.viability === "high" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
-                          route.viability === "conditional" && "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
+                          route.viability === "high" &&
+                            "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+                          route.viability === "conditional" &&
+                            "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
                         )}
                       >
-                        {route.viability === "high" ? "Viable" : route.viability === "conditional" ? "Conditional" : "Blocked Directly"}
+                        {route.viability === "high"
+                          ? tr("Viable", "Viable")
+                          : route.viability === "conditional"
+                            ? tr("Conditional", "Condicional")
+                            : tr("Blocked Directly", "Bloqueada en forma directa")}
                       </Badge>
                       {isRecommended && (
                         <span className="text-[10px] font-bold text-primary flex items-center gap-0.5">
-                          ★ Recommended
+                          ★ {tr("Recommended", "Recomendada")}
                         </span>
                       )}
                     </div>
@@ -116,7 +142,7 @@ export function GrantConsortiumMatrix({
                   <div className="space-y-2 mt-3 text-xs">
                     <div className="rounded-md bg-muted/40 p-2 border border-border/40">
                       <span className="text-[10px] font-bold uppercase text-muted-foreground block mb-0.5">
-                        Lead Applicant (Fiduciary)
+                        {tr("Lead Applicant (Fiduciary)", "Solicitante principal (fiduciario)")}
                       </span>
                       <span className="font-semibold text-foreground text-xs leading-tight block">
                         {route.leadEntity}
@@ -125,7 +151,7 @@ export function GrantConsortiumMatrix({
 
                     <div className="rounded-md bg-muted/40 p-2 border border-border/40">
                       <span className="text-[10px] font-bold uppercase text-muted-foreground block mb-0.5">
-                        {orgName} Delivery Role
+                        {tr(`${orgName} Delivery Role`, `Rol de ejecución de ${orgName}`)}
                       </span>
                       <span className="text-xs text-foreground/90 leading-tight block">
                         {route.iialRole}
@@ -135,7 +161,7 @@ export function GrantConsortiumMatrix({
                     {/* Key Strategic Partner */}
                     <div className="pt-1">
                       <span className="text-[10px] font-bold uppercase text-muted-foreground block mb-0.5">
-                        Key Partner
+                        {tr("Key Partner", "Socio clave")}
                       </span>
                       <span className="text-xs font-medium text-foreground block">
                         {route.recommendedPartner}
@@ -145,7 +171,7 @@ export function GrantConsortiumMatrix({
                     {/* Tactical Value */}
                     <div className="pt-1">
                       <span className="text-[10px] font-bold uppercase text-muted-foreground block mb-0.5">
-                        Strategy &amp; Barrier Unlock
+                        {tr("Strategy & Barrier Unlock", "Estrategia y desbloqueo de barreras")}
                       </span>
                       <p className="text-[11px] text-muted-foreground leading-relaxed">
                         {route.tacticalValue}
@@ -156,7 +182,8 @@ export function GrantConsortiumMatrix({
                     {route.keyBarrier && (
                       <div className="pt-1 border-t border-border/40">
                         <span className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-400 block mb-0.5 flex items-center gap-1">
-                          <ShieldAlert className="h-3 w-3" /> Pre-Condition:
+                          <ShieldAlert className="h-3 w-3" />{" "}
+                          {tr("Pre-Condition:", "Condición previa:")}
                         </span>
                         <p className="text-[11px] text-muted-foreground leading-relaxed">
                           {route.keyBarrier}
@@ -171,10 +198,7 @@ export function GrantConsortiumMatrix({
                   <Button
                     size="sm"
                     variant={isSelected ? "default" : "outline"}
-                    className={cn(
-                      "w-full text-xs h-7.5 font-semibold",
-                      isSelected && "shadow-xs"
-                    )}
+                    className={cn("w-full text-xs h-7.5 font-semibold", isSelected && "shadow-xs")}
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelectRoute(route.id);
@@ -183,11 +207,11 @@ export function GrantConsortiumMatrix({
                     {isSelected ? (
                       <>
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-white" />
-                        Active Route
+                        {tr("Active Route", "Ruta activa")}
                       </>
                     ) : (
                       <>
-                        Select Route
+                        {tr("Select Route", "Seleccionar ruta")}
                         <ArrowRight className="h-3.5 w-3.5 ml-1" />
                       </>
                     )}

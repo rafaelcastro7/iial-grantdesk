@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { explainEnrichmentResult } from "@/lib/enrichment-message";
+import { useTr, useUiLang, localeOf } from "@/lib/ui-lang";
 
 const ENGINE_LABEL: Record<string, string> = {
   scrape_engine: "Local engine (Readability)",
@@ -17,6 +18,13 @@ const ENGINE_LABEL: Record<string, string> = {
   archive_today: "archive.today",
   firecrawl: "Firecrawl",
   firecrawl_json: "Firecrawl JSON",
+};
+
+const ENGINE_LABEL_ES: Record<string, string> = {
+  ...ENGINE_LABEL,
+  scrape_engine: "Motor local (Readability)",
+  raw_html: "HTML sin procesar (UA de Chrome)",
+  raw_html_googlebot: "HTML sin procesar (UA de Googlebot)",
 };
 
 export function FetchTrailPanel({
@@ -30,6 +38,10 @@ export function FetchTrailPanel({
   retrying?: boolean;
   errorMsg?: string | null;
 }) {
+  const tr = useTr();
+  const lang = useUiLang();
+  const locale = localeOf(lang);
+  const engineLabels = lang === "es" ? ENGINE_LABEL_ES : ENGINE_LABEL;
   const getTrail = useServerFn(getFetchTrail);
   const [open, setOpen] = useState(true);
   const { data, refetch } = useQuery({
@@ -55,20 +67,29 @@ export function FetchTrailPanel({
             className="h-auto px-0 text-left"
           >
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            Retrieval history
+            {tr("Retrieval history", "Historial de obtención")}
             {attempts.length > 0 && (
               <Badge variant={failed ? "destructive" : "secondary"} className="ml-2">
-                {attempts.length} engine{attempts.length === 1 ? "" : "s"}
+                {attempts.length}{" "}
+                {attempts.length === 1 ? tr("engine", "motor") : tr("engines", "motores")}
               </Badge>
             )}
           </Button>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={() => refetch()} title="Refresh">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => refetch()}
+              title={tr("Refresh", "Actualizar")}
+              aria-label={tr("Refresh", "Actualizar")}
+            >
               <RefreshCw className="h-3.5 w-3.5" />
             </Button>
             {onRetry && (
               <Button size="sm" variant="outline" onClick={onRetry} disabled={retrying}>
-                {retrying ? "Retrying..." : "Retry retrieval"}
+                {retrying
+                  ? tr("Retrying...", "Reintentando...")
+                  : tr("Retry retrieval", "Reintentar obtención")}
               </Button>
             )}
           </div>
@@ -83,14 +104,25 @@ export function FetchTrailPanel({
               {data?.nextRetryAfter && (
                 <div className="mt-1.5 flex items-center gap-1 text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  Auto-retry recommended after {new Date(data.nextRetryAfter).toLocaleString()}
+                  {tr("Auto-retry recommended after", "Se recomienda reintentar después de")}{" "}
+                  {new Date(data.nextRetryAfter).toLocaleString(locale)}
                 </div>
               )}
             </div>
           )}
           {attempts.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No retrieval attempts recorded yet. Select <b>Fetch details</b> above to start one.
+              {lang === "es" ? (
+                <>
+                  Aún no hay intentos de obtención registrados. Selecciona <b>Fetch details</b>{" "}
+                  arriba para iniciar uno.
+                </>
+              ) : (
+                <>
+                  No retrieval attempts recorded yet. Select <b>Fetch details</b> above to start
+                  one.
+                </>
+              )}
             </p>
           ) : (
             <div className="space-y-1.5">
@@ -102,13 +134,15 @@ export function FetchTrailPanel({
                     <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium">{ENGINE_LABEL[a.engine] ?? a.engine}</div>
+                    <div className="font-medium">{engineLabels[a.engine] ?? a.engine}</div>
                     <div className="tabular-nums text-muted-foreground">
                       {a.http_status ? `HTTP ${a.http_status} | ` : ""}
                       {a.latency_ms}ms
-                      {a.bytes ? ` | ${a.bytes.toLocaleString()} chars` : ""}
+                      {a.bytes
+                        ? ` | ${a.bytes.toLocaleString(locale)} ${tr("chars", "caracteres")}`
+                        : ""}
                       {" | "}
-                      {a.ts ? new Date(a.ts).toLocaleTimeString() : ""}
+                      {a.ts ? new Date(a.ts).toLocaleTimeString(locale) : ""}
                     </div>
                     {a.error && (
                       <div className="break-all font-mono text-[10px] text-destructive">
@@ -117,7 +151,7 @@ export function FetchTrailPanel({
                     )}
                     {a.url_used && a.url_used !== grantId && (
                       <div className="truncate font-mono text-[10px] text-muted-foreground">
-                        Resolved URL: {a.url_used}
+                        {tr("Resolved URL:", "URL resuelta:")} {a.url_used}
                       </div>
                     )}
                   </div>
@@ -127,8 +161,8 @@ export function FetchTrailPanel({
           )}
           {data?.runId && (
             <div className="font-mono text-[10px] text-muted-foreground">
-              run {data.runId.slice(0, 8)} | {data.totalLatencyMs}ms total |{" "}
-              {lastTs && new Date(lastTs).toLocaleString()}
+              {tr("run", "ejecución")} {data.runId.slice(0, 8)} | {data.totalLatencyMs}ms{" "}
+              {tr("total", "en total")} | {lastTs && new Date(lastTs).toLocaleString(locale)}
             </div>
           )}
         </CardContent>

@@ -233,7 +233,7 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               "",
               `Le escribo en nombre de ${orgName} en relación con ${program}${idea ? ` y el proyecto "${idea}"` : ""}.`,
               `Le acabo de enviar una invitación para una reunión el ${when}. Es solo una propuesta: siéntase en libertad de sugerir otro horario si le acomoda mejor; con gusto nos ajustamos.`,
-              `Como referencia, la fecha límite es ${deadline} y el monto disponible es ${amountText(grant)}.`,
+              `Como referencia, la fecha límite es ${deadline} y el monto disponible es ${amountText(grant, "es")}.`,
               "",
               "Muchas gracias; quedo atenta a su respuesta.",
               "",
@@ -282,7 +282,7 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               partnerRole
                 ? `Visualizamos a su institución como ${partnerRole}, aportando solidez científica y transferencia de conocimiento, manteniendo los roles abiertos a co-diseño conjunto.`
                 : "Nos gustaría co-diseñar los paquetes de trabajo y las líneas de acción conjuntamente según sus prioridades académicas.",
-              `El monto disponible es ${amountText(grant)} y la fecha límite es ${deadline}.`,
+              `El monto disponible es ${amountText(grant, "es")} y la fecha límite es ${deadline}.`,
               "",
               "¿Tendría 20 minutos esta semana para coordinar los próximos pasos?",
               "",
@@ -341,7 +341,7 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               partnerRole
                 ? `Vemos a su organización como ${partnerRole}, y estamos abiertos a definir los roles juntos.`
                 : "Nos gustaría definir los roles juntos, según sus prioridades.",
-              `El monto disponible es ${amountText(grant)} y la fecha límite es ${deadline}.`,
+              `El monto disponible es ${amountText(grant, "es")} y la fecha límite es ${deadline}.`,
               tight
                 ? "Dado que los plazos son ajustados, le agradeceríamos mucho conocer su interés a la brevedad."
                 : "",

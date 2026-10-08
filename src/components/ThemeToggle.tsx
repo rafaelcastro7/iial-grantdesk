@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTr } from "@/lib/ui-lang";
 
 type Theme = "light" | "dark" | "system";
 
@@ -24,6 +25,7 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeToggle() {
+  const tr = useTr();
   const [theme, setTheme] = useState<Theme>(getTheme);
 
   useEffect(() => {
@@ -57,7 +59,9 @@ export function ThemeToggle() {
       ) : (
         <span className="text-xs font-medium">OS</span>
       )}
-      <span className="sr-only">Toggle theme (current: {theme})</span>
+      <span className="sr-only">
+        {tr("Toggle theme", "Cambiar tema")} ({tr("current", "actual")}: {theme})
+      </span>
     </Button>
   );
 }

@@ -56,6 +56,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult> {
   let ok = false;
   let errMsg: string | undefined;
   let text = "";
+  let used: { provider?: string; model?: string; attempts?: string[] } = {};
 
   try {
     const result = await callGatewayLlm({
@@ -68,6 +69,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult> {
       freeOnly: opts.freeOnly,
     });
     text = result.text;
+    used = { provider: result.provider, model: result.model, attempts: result.attempts };
     ok = true;
     return {
       text,
@@ -80,8 +82,10 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult> {
     throw error;
   } finally {
     logGenAI({
-      "gen_ai.system": "lovable",
-      "gen_ai.request.model": "openai/gpt-6-astra",
+      // The provider that actually answered (free tier or the paid Lovable floor).
+      "gen_ai.system": (used.provider ?? "none") as never,
+      "gen_ai.request.model": (used.model ?? "none") as never,
+      ...(used.attempts?.length ? { attempts: used.attempts.join(" | ").slice(0, 300) } : {}),
       "gen_ai.operation.name": "chat",
       latency_ms: Date.now() - t0,
       ok,

@@ -13,11 +13,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { listGrantWorkspaces } from "@/lib/grant-workspace.functions";
 import {
-  CALL_STATUS_LABEL,
-  INSTRUMENT_LABEL,
   PRIORITIES,
-  PRIORITY_LABEL,
-  ROUTE_LABEL,
+  callStatusLabel,
+  instrumentLabel,
+  priorityLabel,
+  routeLabel,
   amountText,
   deadlineText,
   pipelineCsv,
@@ -27,6 +27,7 @@ import {
 import { evaluationVerdict, realFit } from "@/lib/grant-radar";
 import { grantsDigest, type Lang } from "@/lib/consultant-desk.shared";
 import { useActiveTenant } from "@/lib/tenant-context";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 
 export const Route = createFileRoute("/_authenticated/pipeline")({
   component: PipelinePage,
@@ -44,7 +45,10 @@ function PipelinePage() {
   const fetchRows = useServerFn(listGrantWorkspaces);
   const [priority, setPriority] = useState<Priority | "all" | "upcoming">("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [digestLang, setDigestLang] = useState<Lang>("en");
+  const tr = useTr();
+  const lang = useUiLang();
+  const [digestLangChoice, setDigestLang] = useState<Lang | null>(null);
+  const digestLang: Lang = digestLangChoice ?? lang;
   const { data, isLoading, error } = useQuery({
     queryKey: ["grant-pipeline", activeOrgId],
     queryFn: () => fetchRows({ data: { orgId: activeOrgId as string } }),
@@ -75,34 +79,35 @@ function PipelinePage() {
           grantId: g.id,
           title: cleanTitle(g.title),
           funder: g.funder?.name ?? "",
-          status: ws.call_status ? CALL_STATUS_LABEL[ws.call_status] : "",
-          deadline: deadlineText(g, ws),
+          status: ws.call_status ? callStatusLabel(ws.call_status, lang) : "",
+          deadline: deadlineText(g, ws, lang),
           applicant: ws.applicant_org_ids
             .map((id) => nameById.get(id) ?? "")
             .filter(Boolean)
             .join(" + "),
-          role: ws.route ? ROUTE_LABEL[ws.route] : "",
-          amount: amountText(g),
-          instrument: ws.instrument ? INSTRUMENT_LABEL[ws.instrument] : "",
+          role: ws.route ? routeLabel(ws.route, lang) : "",
+          amount: amountText(g, lang),
+          instrument: ws.instrument ? instrumentLabel(ws.instrument, lang) : "",
           match:
             ws.match_pct != null
-              ? `${ws.match_pct}%${ws.match_in_kind_ok ? " (in-kind OK)" : ""}`
+              ? `${ws.match_pct}%${ws.match_in_kind_ok ? tr(" (in-kind OK)", " (en especie OK)") : ""}`
               : "",
           fit:
             verdict === "eligible"
-              ? `Eligible${fit != null ? ` · ${fit}/100` : ""}`
+              ? `${tr("Eligible", "Elegible")}${fit != null ? ` · ${fit}/100` : ""}`
               : verdict === "needs_input"
-                ? "To confirm"
+                ? tr("To confirm", "Por confirmar")
                 : verdict === "not_eligible"
-                  ? "Not a fit"
-                  : "Not checked",
-          priority: PRIORITY_LABEL[ws.priority],
+                  ? tr("Not a fit", "No encaja")
+                  : tr("Not checked", "Sin revisar"),
+          priority: priorityLabel(ws.priority, lang),
+          priorityKey: ws.priority,
           missing: (ws.checklist ?? []).filter((c) => c.status === "missing").length,
           nextStep: next ? `${next.label} (${next.date})` : "",
           link: g.url ?? "",
         };
       });
-  }, [data, priority]);
+  }, [data, priority, lang, tr]);
 
   const digest = useMemo(() => {
     if (!data || selected.size === 0) return null;
@@ -143,8 +148,11 @@ function PipelinePage() {
     <PageContainer>
       <PageHeader
         eyebrow="Pipeline"
-        title={`Grants we are working${activeOrgName ? ` — ${activeOrgName}` : ""}`}
-        description="Every opportunity with an application plan: who applies, in what role, money, deadline and what is still missing. Open a grant and fill its Application plan to add it here."
+        title={`${tr("Grants we are working", "Mis grants")}${activeOrgName ? ` — ${activeOrgName}` : ""}`}
+        description={tr(
+          "Every opportunity with an application plan: who applies, in what role, money, deadline and what is still missing. Open a grant and fill its Application plan to add it here.",
+          "Cada oportunidad con plan de postulación: quién postula, en qué rol, monto, fecha límite y qué falta. Abre un grant y completa su Plan de postulación para agregarlo aquí.",
+        )}
       />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
@@ -155,7 +163,11 @@ function PipelinePage() {
               variant={priority === p ? "default" : "outline"}
               onClick={() => setPriority(p)}
             >
-              {p === "all" ? "All" : p === "upcoming" ? "Upcoming cycles" : PRIORITY_LABEL[p]}
+              {p === "all"
+                ? tr("All", "Todos")
+                : p === "upcoming"
+                  ? tr("Upcoming cycles", "Próximos ciclos")
+                  : priorityLabel(p, lang)}
             </Button>
           ))}
         </div>
@@ -166,28 +178,36 @@ function PipelinePage() {
           disabled={rows.length === 0}
           onClick={download}
         >
-          <Download className="h-4 w-4" /> Export to Excel (CSV)
+          <Download className="h-4 w-4" /> {tr("Export to Excel (CSV)", "Exportar a Excel (CSV)")}
         </Button>
       </div>
 
       {!activeOrgId && (
-        <p className="text-sm text-muted-foreground">Choose an organization first.</p>
+        <p className="text-sm text-muted-foreground">
+          {tr("Choose an organization first.", "Primero elige una organización.")}
+        </p>
       )}
-      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">{tr("Loading…", "Cargando…")}</p>}
       {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
       {data && !data.available && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-          The pipeline needs the database update 20261007110000_grant_workspaces.sql.
+          {tr(
+            "The pipeline needs the database update 20261007110000_grant_workspaces.sql.",
+            "El pipeline necesita la actualización de base de datos 20261007110000_grant_workspaces.sql.",
+          )}
         </p>
       )}
       {data?.available && rows.length === 0 && (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           <ListChecks className="mx-auto mb-2 h-6 w-6" />
-          No grants in the pipeline yet. Open a grant from the{" "}
+          {tr(
+            "No grants in the pipeline yet. Open a grant from the",
+            "Aún no hay grants en el pipeline. Abre un grant desde el",
+          )}{" "}
           <Link to="/grants" className="text-primary underline-offset-4 hover:underline">
             radar
           </Link>{" "}
-          and save its Application plan.
+          {tr("and save its Application plan.", "y guarda su Plan de postulación.")}
         </div>
       )}
 
@@ -199,7 +219,7 @@ function PipelinePage() {
                 <th className="px-3 py-2">
                   <input
                     type="checkbox"
-                    aria-label="Select all"
+                    aria-label={tr("Select all", "Seleccionar todo")}
                     checked={rows.length > 0 && rows.every((r) => selected.has(r.grantId))}
                     onChange={(e) =>
                       setSelected(
@@ -209,17 +229,17 @@ function PipelinePage() {
                   />
                 </th>
                 {[
-                  "Opportunity",
-                  "Status",
-                  "Deadline",
-                  "Applicant",
-                  "Role",
-                  "Amount",
-                  "Match",
-                  "Fit",
-                  "Priority",
-                  "Missing",
-                  "Next step",
+                  tr("Opportunity", "Oportunidad"),
+                  tr("Status", "Estado"),
+                  tr("Deadline", "Fecha límite"),
+                  tr("Applicant", "Postulante"),
+                  tr("Role", "Rol"),
+                  tr("Amount", "Monto"),
+                  tr("Match", "Contrapartida"),
+                  tr("Fit", "Encaje"),
+                  tr("Priority", "Prioridad"),
+                  tr("Missing", "Faltan"),
+                  tr("Next step", "Próximo paso"),
                 ].map((h) => (
                   <th key={h} className="px-3 py-2 font-semibold">
                     {h}
@@ -229,14 +249,13 @@ function PipelinePage() {
             </thead>
             <tbody className="divide-y">
               {rows.map((r) => {
-                const p = (Object.entries(PRIORITY_LABEL).find(([, l]) => l === r.priority)?.[0] ??
-                  "monitor") as Priority;
+                const p = (r as { priorityKey?: Priority }).priorityKey ?? "monitor";
                 return (
                   <tr key={r.grantId} className="align-top hover:bg-accent/40">
                     <td className="px-3 py-2">
                       <input
                         type="checkbox"
-                        aria-label={`Select ${r.title}`}
+                        aria-label={`${tr("Select", "Seleccionar")} ${r.title}`}
                         checked={selected.has(r.grantId)}
                         onChange={() => toggle(r.grantId)}
                       />
@@ -280,25 +299,33 @@ function PipelinePage() {
         <section className="mt-6 rounded-lg border bg-card p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <Mail className="h-4 w-4" /> One email to Marcelo about the selected grants
+              <Mail className="h-4 w-4" />{" "}
+              {tr(
+                "One email to Marcelo about the selected grants",
+                "Un correo a Marcelo sobre los grants seleccionados",
+              )}
             </h2>
             <select
               className="h-9 rounded-md border bg-background px-2 text-sm"
               value={digestLang}
               onChange={(e) => setDigestLang(e.target.value as Lang)}
             >
-              <option value="en">English (simple)</option>
-              <option value="es">Spanish</option>
+              <option value="en">{tr("English (simple)", "Inglés (simple)")}</option>
+              <option value="es">{tr("Spanish", "Español")}</option>
             </select>
           </div>
           {!digest ? (
             <p className="text-sm text-muted-foreground">
-              Tick the grants in the table to build one summary email: process, what we need,
-              partners, deadlines and what we gain, for each one.
+              {tr(
+                "Tick the grants in the table to build one summary email: process, what we need, partners, deadlines and what we gain, for each one.",
+                "Marca los grants en la tabla para armar un solo correo resumen: proceso, qué necesitamos, socios, fechas límite y qué ganamos, para cada uno.",
+              )}
             </p>
           ) : (
             <div className="space-y-2">
-              <div className="text-xs font-semibold">Subject: {digest.subject}</div>
+              <div className="text-xs font-semibold">
+                {tr("Subject", "Asunto")}: {digest.subject}
+              </div>
               <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
                 {digest.body}
               </pre>
@@ -309,15 +336,20 @@ function PipelinePage() {
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(
-                      `Subject: ${digest.subject}\n\n${digest.body}`,
+                      `${digestLang === "es" ? "Asunto" : "Subject"}: ${digest.subject}\n\n${digest.body}`,
                     );
-                    toast.success("Email copied");
+                    toast.success(tr("Email copied", "Correo copiado"));
                   } catch {
-                    toast.error("Could not copy; select the text instead.");
+                    toast.error(
+                      tr(
+                        "Could not copy; select the text instead.",
+                        "No se pudo copiar; selecciona el texto.",
+                      ),
+                    );
                   }
                 }}
               >
-                <Copy className="h-4 w-4" /> Copy email
+                <Copy className="h-4 w-4" /> {tr("Copy email", "Copiar correo")}
               </Button>
             </div>
           )}

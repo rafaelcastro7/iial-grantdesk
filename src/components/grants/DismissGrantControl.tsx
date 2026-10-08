@@ -4,6 +4,7 @@ import { EyeOff, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { dismissGrant, restoreGrant } from "@/lib/grants.functions";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 
 const REASONS = [
   { value: "loan_not_grant", label: "It's a loan, not a grant" },
@@ -12,6 +13,13 @@ const REASONS = [
   { value: "not_eligible", label: "We are not eligible" },
   { value: "other", label: "Other reason" },
 ] as const;
+const REASON_ES: Record<string, string> = {
+  loan_not_grant: "Es un préstamo, no un grant",
+  outside_field: "Fuera de nuestro campo",
+  too_small: "Demasiado pequeño para que valga la pena",
+  not_eligible: "No somos elegibles",
+  other: "Otro motivo",
+};
 type Reason = (typeof REASONS)[number]["value"];
 
 /** Lets a consultant take a grant off their list, with a reason, and undo it. */
@@ -22,6 +30,8 @@ export function DismissGrantControl({
   grantId: string;
   defaultReason?: Reason;
 }) {
+  const tr = useTr();
+  const lang = useUiLang();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<Reason>(defaultReason);
   const [dismissed, setDismissed] = useState(false);
@@ -43,7 +53,10 @@ export function DismissGrantControl({
       const message = e instanceof Error ? e.message : String(e);
       setError(
         /grant_dismissals|schema cache|does not exist/i.test(message)
-          ? "Not available yet: the database update that enables it has not been applied."
+          ? tr(
+              "Not available yet: the database update that enables it has not been applied.",
+              "Aún no disponible: no se ha aplicado la actualización de la base de datos que lo habilita.",
+            )
           : message,
       );
     } finally {
@@ -54,7 +67,12 @@ export function DismissGrantControl({
   if (dismissed) {
     return (
       <div className="rounded-md border bg-background p-3 text-xs">
-        <p className="font-medium">Marked as not relevant — removed from your list.</p>
+        <p className="font-medium">
+          {tr(
+            "Marked as not relevant — removed from your list.",
+            "Marcado como no relevante — quitado de tu lista.",
+          )}
+        </p>
         <Button
           size="sm"
           variant="ghost"
@@ -62,7 +80,7 @@ export function DismissGrantControl({
           disabled={busy}
           onClick={() => act(() => restore({ data: { grantId } }), false)}
         >
-          <Undo2 className="mr-1 h-3.5 w-3.5" /> Undo
+          <Undo2 className="mr-1 h-3.5 w-3.5" /> {tr("Undo", "Deshacer")}
         </Button>
       </div>
     );
@@ -72,12 +90,13 @@ export function DismissGrantControl({
     <div className="text-xs">
       {!open ? (
         <Button variant="ghost" size="sm" className="w-full gap-2" onClick={() => setOpen(true)}>
-          <EyeOff className="h-4 w-4" /> Not relevant for us
+          <EyeOff className="h-4 w-4" />{" "}
+          {tr("Not relevant for us", "No es relevante para nosotros")}
         </Button>
       ) : (
         <div className="space-y-2 rounded-md border bg-background p-3">
           <label className="block font-medium" htmlFor={`dismiss-${grantId}`}>
-            Why is it not relevant?
+            {tr("Why is it not relevant?", "¿Por qué no es relevante?")}
           </label>
           <select
             id={`dismiss-${grantId}`}
@@ -87,7 +106,7 @@ export function DismissGrantControl({
           >
             {REASONS.map((item) => (
               <option key={item.value} value={item.value}>
-                {item.label}
+                {lang === "es" ? REASON_ES[item.value] : item.label}
               </option>
             ))}
           </select>
@@ -97,10 +116,10 @@ export function DismissGrantControl({
               disabled={busy}
               onClick={() => act(() => dismiss({ data: { grantId, reason } }), true)}
             >
-              Remove from my list
+              {tr("Remove from my list", "Quitar de mi lista")}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
+              {tr("Cancel", "Cancelar")}
             </Button>
           </div>
         </div>

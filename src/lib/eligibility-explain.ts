@@ -6,86 +6,108 @@
 
 type CheckLike = { id?: string; label: string; status?: string };
 
-const BY_ID: Array<{ match: RegExp; text: string }> = [
+type Lang = "en" | "es";
+
+const BY_ID: Array<{ match: RegExp; text: string; es: string }> = [
   {
     match: /^sop_filter_1_legal$|legal eligibility/i,
     text: "Your organization type is not one of the applicant types this program accepts.",
+    es: "El tipo de tu organización no está entre los tipos de postulante que acepta este programa.",
   },
   {
     match: /^sectors_required$|required sectors/i,
     text: "The program's focus areas do not match your organization's sectors.",
+    es: "Las áreas prioritarias del programa no coinciden con los sectores de tu organización.",
   },
   {
     match: /^sectors_excluded$|excluded sectors/i,
     text: "The program funds a sector your profile marks as excluded.",
+    es: "El programa financia un sector que tu perfil marca como excluido.",
   },
   {
     match: /^jurisdiction_required$|required jurisdiction/i,
     text: "The program is not open to organizations in your country or region.",
+    es: "El programa no está abierto a organizaciones de tu país o región.",
   },
   {
     match: /^jurisdiction_excluded$|excluded jurisdiction/i,
     text: "The program's location is one your profile excludes.",
+    es: "La ubicación del programa es una que tu perfil excluye.",
   },
   {
     match: /^required_university_partner$|university partnership/i,
     text: "It requires a university research partner, and none is confirmed in your profile.",
+    es: "Exige un socio universitario de investigación y tu perfil no tiene ninguno confirmado.",
   },
   {
     match: /^sop_filter_3_costshare$|cost share/i,
     text: "It requires your organization to cover a larger share of the costs than your profile allows.",
+    es: "Exige que tu organización cubra una parte de los costos mayor de la que permite tu perfil.",
   },
   {
     match: /^sop_filter_3_match_verify$|cash-match/i,
     text: "It requires a cash contribution that still needs to be confirmed.",
+    es: "Exige un aporte en efectivo que aún debe confirmarse.",
   },
   {
     match: /^sop_filter_4_strategic$|strategic fit/i,
     text: "It does not line up with your organization's capabilities and priorities.",
+    es: "No se alinea con las capacidades y prioridades de tu organización.",
   },
   {
     match: /^sop_filter_5_runway$|runway/i,
     text: "There is not enough time left before the deadline to prepare a strong application.",
+    es: "No queda tiempo suficiente antes del cierre para preparar una postulación sólida.",
   },
   {
     match: /^deadline$|days until deadline/i,
     text: "The deadline is too close (or has passed) to apply well.",
+    es: "La fecha límite está demasiado cerca (o ya pasó) para postular bien.",
   },
   {
     match: /^amount_min$|amount >=/i,
     text: "The award is smaller than the minimum amount worth pursuing for your organization.",
+    es: "El monto es menor que el mínimo que vale la pena para tu organización.",
   },
   {
     match: /^amount_max$|amount <=/i,
     text: "The award is larger than your organization can take on.",
+    es: "El monto es mayor de lo que tu organización puede asumir.",
   },
   {
     match: /^keywords_required$|required keywords/i,
     text: "It does not mention the topics your profile requires.",
+    es: "No menciona los temas que exige tu perfil.",
   },
   {
     match: /^keywords_excluded$|excluded keywords/i,
     text: "It mentions a topic your profile excludes.",
+    es: "Menciona un tema que tu perfil excluye.",
   },
 ];
 
 /** One plain sentence for a failed rule check. */
-export function explainCheck(check: CheckLike): string {
+// `lang` also tolerates the index Array.map passes (`checks.map(explainCheck)`).
+export function explainCheck(check: CheckLike, lang: Lang | number = "en"): string {
   const key = check.id ?? "";
   const hit = BY_ID.find((entry) => entry.match.test(key) || entry.match.test(check.label));
-  return (
-    hit?.text ??
-    `It does not meet the "${check.label.replace(/^SOP F\d\s*-\s*/i, "")}" requirement.`
-  );
+  const label = check.label.replace(/^SOP F\d\s*-\s*/i, "");
+  if (lang === "es") return hit?.es ?? `No cumple el requisito "${label}".`;
+  return hit?.text ?? `It does not meet the "${label}" requirement.`;
 }
 
 /** Human summary for a set of failed checks. */
-export function explainFailures(checks: CheckLike[]): string {
-  const sentences = [...new Set(checks.map(explainCheck))];
-  if (sentences.length === 0) return "It does not meet your organization's eligibility rules.";
+export function explainFailures(checks: CheckLike[], lang: Lang = "en"): string {
+  const sentences = [...new Set(checks.map((c) => explainCheck(c, lang)))];
+  const es = lang === "es";
+  if (sentences.length === 0)
+    return es
+      ? "No cumple las reglas de elegibilidad de tu organización."
+      : "It does not meet your organization's eligibility rules.";
+  const head = es ? "No encaja" : "Not a fit";
   return sentences.length === 1
-    ? `Not a fit: ${sentences[0]}`
-    : `Not a fit:\n• ${sentences.join("\n• ")}`;
+    ? `${head}: ${sentences[0]}`
+    : `${head}:\n• ${sentences.join("\n• ")}`;
 }
 
 const TECHNICAL_RATIONALE =
@@ -96,90 +118,114 @@ const TECHNICAL_RATIONALE =
  * Legal eligibility: FAIL; Required sectors: FAIL.") into plain language.
  * Model-written rationales are returned unchanged.
  */
-export function humanizeRationale(rationale: string | null | undefined): string | null {
+export function humanizeRationale(
+  rationale: string | null | undefined,
+  lang: Lang = "en",
+): string | null {
   if (!rationale) return null;
   if (!TECHNICAL_RATIONALE.test(rationale)) return rationale;
   const failed = [...rationale.matchAll(/([^:;.]+?(?:[^:;]*?)):\s*FAIL/gi)]
     .map((m) => m[1].replace(/^.*(?:criteria|checks):\s*/i, "").trim())
     .filter(Boolean)
     .map((label) => ({ label }));
-  return explainFailures(failed);
+  return explainFailures(failed, lang);
 }
 
-const ACTIONS: Array<{ match: RegExp; text: string }> = [
+const ACTIONS: Array<{ match: RegExp; text: string; es: string }> = [
   {
     match: /^sop_filter_4_strategic$|strategic fit/i,
     text: "Align project narrative: Frame core capabilities around the funder's priority themes in the proposal scope.",
+    es: "Alinear la narrativa del proyecto: presenta las capacidades clave en torno a los temas prioritarios del financiador.",
   },
   {
     match: /^sectors_required$|required sectors/i,
     text: "Verify sector coverage: Ensure your specific application topic fits within the funder's active eligible domains.",
+    es: "Verificar la cobertura sectorial: asegúrate de que el tema de la postulación entre en los ámbitos elegibles del financiador.",
   },
   {
     match: /^sop_filter_1_legal$|legal eligibility/i,
     text: "Confirm legal structure: Ensure your specific organization type (e.g. non-profit, SME, research entity) is recognized by the call.",
+    es: "Confirmar la forma jurídica: asegúrate de que la convocatoria reconozca tu tipo de organización (p. ej., sin fines de lucro, pyme, entidad de investigación).",
   },
   {
     match: /^jurisdiction_required$|required jurisdiction/i,
     text: "Confirm geographic eligibility: Ensure applicant headquarters or operational project site qualifies in this jurisdiction.",
+    es: "Confirmar la elegibilidad geográfica: asegúrate de que la sede del postulante o el lugar del proyecto califiquen en esta jurisdicción.",
   },
   {
     match: /^sop_filter_3_match_verify$|cash-match/i,
     text: "Validate matching funds: Confirm internal budget availability or external co-sponsors for required cost-share contributions.",
+    es: "Validar la contrapartida: confirma el presupuesto interno o los cofinanciadores externos para el aporte requerido.",
   },
   {
     match: /^sop_filter_5_runway$|runway/i,
     text: "Fast-track drafting timeline: Submission deadline is approaching; prioritize core narrative and mandatory letters immediately.",
+    es: "Acelerar la redacción: el cierre se acerca; prioriza ya la narrativa central y las cartas obligatorias.",
   },
   {
     match: /^required_university_partner$|university partnership/i,
     text: "Academic partner needed: Identify an eligible postsecondary research co-applicant and secure an institutional commitment letter.",
+    es: "Se necesita un socio académico: identifica una institución de educación superior elegible como copostulante y consigue su carta de compromiso.",
   },
   {
     match: /^deadline$|days until deadline/i,
     text: "Verify portal cut-off: Check the official deadline time zone and portal maintenance windows to avoid last-minute lockouts.",
+    es: "Verificar el cierre del portal: revisa la zona horaria oficial y los mantenimientos del portal para evitar bloqueos de último minuto.",
   },
   {
     match: /^amount_min$|amount >=/i,
     text: "Validate ROI: Confirm grant size justifies the administrative effort and overhead of the application.",
+    es: "Validar el retorno: confirma que el monto justifica el esfuerzo administrativo de la postulación.",
   },
 ];
 
 /** What a consultant should do about a soft failure or warning. */
-export function explainCondition(check: CheckLike): string {
+export function explainCondition(check: CheckLike, lang: Lang = "en"): string {
   const key = check.id ?? "";
   const hit = ACTIONS.find((entry) => entry.match.test(key) || entry.match.test(check.label));
+  if (lang === "es") return hit?.es ?? `Revisar: ${explainCheck(check, "es").replace(/\.$/, "")}.`;
   return hit?.text ?? `Review: ${explainCheck(check).replace(/\.$/, "")}.`;
 }
 
 /** Rewrites stored brief reasons written in the old technical wording. */
-export function humanizeBriefReason(reason: string): string {
+export function humanizeBriefReason(reason: string, lang: Lang = "en"): string {
+  const es = lang === "es";
   if (/soft fail\(s\)|warning\(s\)/i.test(reason))
-    return "Worth pursuing once the operational points below are confirmed.";
+    return es
+      ? "Vale la pena una vez confirmados los puntos operativos de abajo."
+      : "Worth pursuing once the operational points below are confirmed.";
   const hard = reason.match(/^Hard fail on \d+ filter\(s\):\s*(.+)$/i);
   if (hard) {
     const labels = hard[1].split(";").map((label) => ({ label: label.trim() }));
-    return `Not recommended: ${[...new Set(labels.map(explainCheck))].join(" ")}`;
+    const why = [...new Set(labels.map((l) => explainCheck(l, lang)))].join(" ");
+    return es ? `No recomendado: ${why}` : `Not recommended: ${why}`;
   }
   if (/filters passed; rule score/i.test(reason)) {
-    return "Recommended: Strong strategic alignment and satisfies all organization eligibility criteria.";
+    return es
+      ? "Recomendado: fuerte alineación estratégica y cumple todos los criterios de elegibilidad de la organización."
+      : "Recommended: Strong strategic alignment and satisfies all organization eligibility criteria.";
   }
   return reason;
 }
 
 /** Rewrites stored brief conditions ("SOP F4 - Strategic fit (...): detail"). */
-export function humanizeBriefCondition(condition: string): string {
+export function humanizeBriefCondition(condition: string, lang: Lang = "en"): string {
+  const es = lang === "es";
   const borderline = condition.match(/^Borderline fit \(rule score (\d+)\/100/i);
   if (borderline) {
-    return `Moderate alignment (${borderline[1]}/100): Schedule a 15-minute concept call with the Program Officer to validate scope before writing.`;
+    return es
+      ? `Alineación moderada (${borderline[1]}/100): agenda una llamada de 15 minutos con el oficial del programa para validar el alcance antes de redactar.`
+      : `Moderate alignment (${borderline[1]}/100): Schedule a 15-minute concept call with the Program Officer to validate scope before writing.`;
   }
   const cash = condition.match(/^Confirm cash-match availability \(~(\d+)%\)/i);
   if (cash)
-    return `Co-funding sign-off: Confirm internal or partner commitment for ~${cash[1]}% matching contribution.`;
+    return es
+      ? `Visto bueno del cofinanciamiento: confirma el compromiso interno o de socios para una contrapartida de ~${cash[1]}%.`
+      : `Co-funding sign-off: Confirm internal or partner commitment for ~${cash[1]}% matching contribution.`;
   const labelled = condition.match(
     /^(SOP F\d[^:]*|Required [^:]+|Excluded [^:]+|Amount [^:]+|>= [^:]+):\s/i,
   );
-  return labelled ? explainCondition({ label: labelled[1] }) : condition;
+  return labelled ? explainCondition({ label: labelled[1] }, lang) : condition;
 }
 
 export type CheckExplanation = {
@@ -364,7 +410,12 @@ export function describeCheck(check: FullCheck): CheckExplanation {
 }
 
 /** Plain-language reading of the combined fit score against the pass mark. */
-export function explainFitScore(fit: number, threshold: number): string {
+export function explainFitScore(fit: number, threshold: number, lang: Lang = "en"): string {
+  if (lang === "es") {
+    return fit >= threshold
+      ? `Buen encaje: ${fit}/100, por encima del ${threshold} necesario para recomendarlo.`
+      : `Aún no recomendado: el encaje general es ${fit}/100, por debajo del ${threshold} necesario. No incumple ninguna regla de elegibilidad estricta, pero muy poco de tu perfil (sectores, capacidades, prioridades) coincide con lo que financia esta convocatoria.`;
+  }
   if (fit >= threshold) {
     return `Good match: ${fit}/100, above the ${threshold} needed to recommend it.`;
   }

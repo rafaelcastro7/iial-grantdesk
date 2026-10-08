@@ -20,21 +20,23 @@ import {
 } from "@/lib/partner-directory.functions";
 import { partnerBrief } from "@/lib/consultant-desk.shared";
 import { useActiveTenant } from "@/lib/tenant-context";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 
 export const Route = createFileRoute("/_authenticated/partners")({
   component: PartnersPage,
 });
 
-const TYPES = [
-  "University",
-  "College",
-  "Research centre",
-  "Cooperative / producers",
-  "Chamber of commerce",
-  "Company",
-  "Government / agency",
-  "NGO / foundation",
-  "Other",
+// Stored value (English) and its Spanish display label.
+const TYPES: Array<[string, string]> = [
+  ["University", "Universidad"],
+  ["College", "College / instituto"],
+  ["Research centre", "Centro de investigación"],
+  ["Cooperative / producers", "Cooperativa / productores"],
+  ["Chamber of commerce", "Cámara de comercio"],
+  ["Company", "Empresa"],
+  ["Government / agency", "Gobierno / agencia"],
+  ["NGO / foundation", "ONG / fundación"],
+  ["Other", "Otro"],
 ];
 
 type Draft = Omit<DirectoryPartner, "id" | "org_id" | "updated_at"> & { id?: string };
@@ -59,6 +61,8 @@ function PartnersPage() {
   const remove = useServerFn(deletePartner);
   const seed = useServerFn(seedDefaultPartners);
   const qc = useQueryClient();
+  const tr = useTr();
+  const lang = useUiLang();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [filter, setFilter] = useState("");
   const [isSeeding, setIsSeeding] = useState(false);
@@ -86,13 +90,19 @@ function PartnersPage() {
       const res = await seed({ data: { orgId: activeOrgId } });
       toast.success(
         res.addedCount > 0
-          ? `Added ${res.addedCount} recommended partner(s) to directory.`
-          : "Recommended partners already present in directory.",
+          ? tr(
+              `Added ${res.addedCount} recommended partner(s) to directory.`,
+              `Se agregaron ${res.addedCount} socio(s) recomendado(s) al directorio.`,
+            )
+          : tr(
+              "Recommended partners already present in directory.",
+              "Los socios recomendados ya están en el directorio.",
+            ),
       );
       await qc.invalidateQueries({ queryKey: ["partner-directory", activeOrgId] });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast.error(msg);
+      toast.error(errorText(msg));
     } finally {
       setIsSeeding(false);
     }
@@ -102,32 +112,46 @@ function PartnersPage() {
     if (!draft || !activeOrgId) return;
     try {
       await save({ data: { ...draft, org_id: activeOrgId } });
-      toast.success("Partner saved");
+      toast.success(tr("Partner saved", "Socio guardado"));
       setDraft(null);
       await qc.invalidateQueries({ queryKey: ["partner-directory", activeOrgId] });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast.error(
-        msg.includes("directory_unavailable")
-          ? "Needs the database update 20261007120000_partner_directory.sql."
-          : msg,
-      );
+      toast.error(errorText(msg));
     }
   };
+
+  const errorText = (msg: string) =>
+    msg.includes("directory_unavailable")
+      ? tr(
+          "Needs the database update 20261007120000_partner_directory.sql.",
+          "Requiere la actualización de base de datos 20261007120000_partner_directory.sql.",
+        )
+      : msg.includes("already exists")
+        ? tr("A partner with this name already exists.", "Ya existe un socio con este nombre.")
+        : msg.startsWith("Forbidden")
+          ? tr(
+              "You are not a member of this organization.",
+              "No eres miembro de esta organización.",
+            )
+          : msg;
 
   const set = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
 
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Partners"
-        title={`Partner directory${activeOrgName ? ` — ${activeOrgName}` : ""}`}
-        description="Universities, colleges, cooperatives, chambers and companies you work with. Add them to a grant's consortium from its Application plan."
+        eyebrow={tr("Partners", "Socios")}
+        title={`${tr("Partner directory", "Directorio de socios")}${activeOrgName ? ` — ${activeOrgName}` : ""}`}
+        description={tr(
+          "Universities, colleges, cooperatives, chambers and companies you work with. Add them to a grant's consortium from its Application plan.",
+          "Universidades, colleges, cooperativas, cámaras y empresas con las que trabajas. Agrégalas al consorcio de un grant desde su Plan de postulación.",
+        )}
       />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Input
           className="max-w-xs"
-          placeholder="Search name, country, type…"
+          placeholder={tr("Search name, country, type…", "Buscar nombre, país, tipo…")}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -138,10 +162,15 @@ function PartnersPage() {
             className="gap-1.5"
             onClick={onSeedRecommended}
             disabled={!activeOrgId || isSeeding}
-            title="Import Rocío's recommended network: Lambton College, UT Selva, U. del Rosario, Agrobosque, APP CACAO, SOCODEVI, UT Tulum"
+            title={tr(
+              "Import Rocío's recommended network: Lambton College, UT Selva, U. del Rosario, Agrobosque, APP CACAO, SOCODEVI, UT Tulum",
+              "Importar la red recomendada por Rocío: Lambton College, UT Selva, U. del Rosario, Agrobosque, APP CACAO, SOCODEVI, UT Tulum",
+            )}
           >
             <Sparkles className="h-4 w-4 text-primary" />
-            {isSeeding ? "Importing…" : "Import recommended network (7)"}
+            {isSeeding
+              ? tr("Importing…", "Importando…")
+              : tr("Import recommended network (7)", "Importar red recomendada (7)")}
           </Button>
           <Button
             size="sm"
@@ -149,30 +178,35 @@ function PartnersPage() {
             onClick={() => setDraft(emptyDraft())}
             disabled={!activeOrgId}
           >
-            <Plus className="h-4 w-4" /> Add partner
+            <Plus className="h-4 w-4" /> {tr("Add partner", "Agregar socio")}
           </Button>
         </div>
       </div>
 
       {data && !data.available && (
         <p className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-          The directory needs the database update 20261007120000_partner_directory.sql.
+          {tr(
+            "The directory needs the database update 20261007120000_partner_directory.sql.",
+            "El directorio necesita la actualización de base de datos 20261007120000_partner_directory.sql.",
+          )}
         </p>
       )}
-      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-      {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">{tr("Loading…", "Cargando…")}</p>}
+      {error && <p className="text-sm text-destructive">{errorText((error as Error).message)}</p>}
 
       {draft && (
         <section className="mb-5 space-y-3 rounded-lg border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">{draft.id ? "Edit partner" : "New partner"}</h2>
+          <h2 className="text-sm font-semibold">
+            {draft.id ? tr("Edit partner", "Editar socio") : tr("New partner", "Nuevo socio")}
+          </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Input
-              placeholder="Organization name *"
+              placeholder={tr("Organization name *", "Nombre de la organización *")}
               value={draft.name}
               onChange={(e) => set({ name: e.target.value })}
             />
             <Input
-              placeholder="Country"
+              placeholder={tr("Country", "País")}
               value={draft.country ?? ""}
               onChange={(e) => set({ country: e.target.value || null })}
             />
@@ -181,35 +215,38 @@ function PartnersPage() {
               value={draft.type ?? ""}
               onChange={(e) => set({ type: e.target.value || null })}
             >
-              <option value="">Type</option>
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              <option value="">{tr("Type", "Tipo")}</option>
+              {TYPES.map(([en, es]) => (
+                <option key={en} value={en}>
+                  {tr(en, es)}
                 </option>
               ))}
             </select>
             <Input
-              placeholder="Contact person"
+              placeholder={tr("Contact person", "Persona de contacto")}
               value={draft.contact_name ?? ""}
               onChange={(e) => set({ contact_name: e.target.value || null })}
             />
             <Input
-              placeholder="Title (e.g. Rector, Research Director)"
+              placeholder={tr(
+                "Title (e.g. Rector, Research Director)",
+                "Cargo (ej. Rector, Director de investigación)",
+              )}
               value={draft.contact_title ?? ""}
               onChange={(e) => set({ contact_title: e.target.value || null })}
             />
             <Input
-              placeholder="Email"
+              placeholder={tr("Email", "Correo")}
               value={draft.email ?? ""}
               onChange={(e) => set({ email: e.target.value || null })}
             />
             <Input
-              placeholder="Phone / WhatsApp"
+              placeholder={tr("Phone / WhatsApp", "Teléfono / WhatsApp")}
               value={draft.phone ?? ""}
               onChange={(e) => set({ phone: e.target.value || null })}
             />
             <Input
-              placeholder="Website"
+              placeholder={tr("Website", "Sitio web")}
               value={draft.website ?? ""}
               onChange={(e) => set({ website: e.target.value || null })}
             />
@@ -218,24 +255,27 @@ function PartnersPage() {
               value={draft.languages[0] ?? ""}
               onChange={(e) => set({ languages: e.target.value ? [e.target.value] : [] })}
             >
-              <option value="">Preferred language</option>
-              <option value="es">Spanish</option>
-              <option value="en">English</option>
-              <option value="fr">French</option>
+              <option value="">{tr("Preferred language", "Idioma preferido")}</option>
+              <option value="es">{tr("Spanish", "Español")}</option>
+              <option value="en">{tr("English", "Inglés")}</option>
+              <option value="fr">{tr("French", "Francés")}</option>
             </select>
           </div>
           <Textarea
             rows={3}
-            placeholder="Notes: meetings, interests, what they can bring…"
+            placeholder={tr(
+              "Notes: meetings, interests, what they can bring…",
+              "Notas: reuniones, intereses, qué pueden aportar…",
+            )}
             value={draft.notes ?? ""}
             onChange={(e) => set({ notes: e.target.value || null })}
           />
           <div className="flex gap-2">
             <Button size="sm" onClick={onSave} disabled={!draft.name.trim()}>
-              Save
+              {tr("Save", "Guardar")}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
-              Cancel
+              {tr("Cancel", "Cancelar")}
             </Button>
           </div>
         </section>
@@ -247,9 +287,12 @@ function PartnersPage() {
         (filter.trim() ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground/60" />
-            <p>No partners matching &ldquo;{filter}&rdquo;.</p>
+            <p>
+              {tr("No partners matching", "No hay socios que coincidan con")} &ldquo;{filter}
+              &rdquo;.
+            </p>
             <Button variant="link" size="sm" className="mt-2 text-xs" onClick={() => setFilter("")}>
-              Clear search filter
+              {tr("Clear search filter", "Limpiar búsqueda")}
             </Button>
           </div>
         ) : (
@@ -258,12 +301,13 @@ function PartnersPage() {
               <Users className="h-6 w-6" />
             </div>
             <h3 className="font-display text-base font-semibold text-foreground">
-              Build your Consortium Partner Network
+              {tr("Build your Consortium Partner Network", "Arma tu red de socios para consorcios")}
             </h3>
             <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground leading-relaxed">
-              Consortium grants (e.g. Canadian colleges, LAC territorial cooperatives, IDRC, GAC)
-              require verified partners. Start with Rocío&rsquo;s 7 recommended institutions or add
-              your own.
+              {tr(
+                "Consortium grants (e.g. Canadian colleges, LAC territorial cooperatives, IDRC, GAC) require verified partners. Start with Rocío’s 7 recommended institutions or add your own.",
+                "Los grants en consorcio (ej. colleges canadienses, cooperativas territoriales de ALC, IDRC, GAC) requieren socios verificados. Empieza con las 7 instituciones recomendadas por Rocío o agrega las tuyas.",
+              )}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <Button
@@ -273,7 +317,9 @@ function PartnersPage() {
                 className="gap-1.5 shadow-sm"
               >
                 <Sparkles className="h-4 w-4" />
-                {isSeeding ? "Importing…" : "Import recommended network (7)"}
+                {isSeeding
+                  ? tr("Importing…", "Importando…")
+                  : tr("Import recommended network (7)", "Importar red recomendada (7)")}
               </Button>
               <Button
                 size="sm"
@@ -282,7 +328,8 @@ function PartnersPage() {
                 disabled={!activeOrgId}
                 className="gap-1.5"
               >
-                <Plus className="h-4 w-4" /> Add partner manually
+                <Plus className="h-4 w-4" />{" "}
+                {tr("Add partner manually", "Agregar socio manualmente")}
               </Button>
             </div>
           </div>
@@ -302,26 +349,38 @@ function PartnersPage() {
                 <div className="min-w-0">
                   <h3 className="font-semibold">{p.name}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {[p.type, p.country].filter(Boolean).join(" · ") || "—"}
+                    {[
+                      p.type
+                        ? tr(p.type, TYPES.find(([en]) => en === p.type)?.[1] ?? p.type)
+                        : null,
+                      p.country,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
                   </p>
                 </div>
                 <div className="flex gap-1">
                   <Button
                     size="icon"
                     variant="ghost"
-                    aria-label="Copy brief for Marcelo"
-                    title="Copy a short brief for Marcelo"
+                    aria-label={tr("Copy brief for Marcelo", "Copiar resumen para Marcelo")}
+                    title={tr(
+                      "Copy a short brief for Marcelo",
+                      "Copiar un resumen breve para Marcelo",
+                    )}
                     onClick={async () => {
                       const b = partnerBrief(
                         p,
                         used.map((u) => u.title),
-                        { lang: "en" },
+                        { lang },
                       );
                       try {
-                        await navigator.clipboard.writeText(`Subject: ${b.subject}\n\n${b.body}`);
-                        toast.success("Brief copied");
+                        await navigator.clipboard.writeText(
+                          `${lang === "es" ? "Asunto" : "Subject"}: ${b.subject}\n\n${b.body}`,
+                        );
+                        toast.success(tr("Brief copied", "Resumen copiado"));
                       } catch {
-                        toast.error("Could not copy");
+                        toast.error(tr("Could not copy", "No se pudo copiar"));
                       }
                     }}
                   >
@@ -330,7 +389,7 @@ function PartnersPage() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    aria-label="Edit"
+                    aria-label={tr("Edit", "Editar")}
                     onClick={() => setDraft({ ...p })}
                   >
                     <Pencil className="h-4 w-4" />
@@ -338,9 +397,17 @@ function PartnersPage() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    aria-label="Delete"
+                    aria-label={tr("Delete", "Eliminar")}
                     onClick={async () => {
-                      if (!activeOrgId || !window.confirm(`Delete ${p.name} from the directory?`))
+                      if (
+                        !activeOrgId ||
+                        !window.confirm(
+                          tr(
+                            `Delete ${p.name} from the directory?`,
+                            `¿Eliminar ${p.name} del directorio?`,
+                          ),
+                        )
+                      )
                         return;
                       await remove({ data: { id: p.id, orgId: activeOrgId } });
                       await qc.invalidateQueries({ queryKey: ["partner-directory", activeOrgId] });

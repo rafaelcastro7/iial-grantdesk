@@ -268,3 +268,57 @@ describe("fundingKindOf", () => {
     expect(fundingKindOf({ title: "Alliance grants" })).toBe("grant");
   });
 });
+
+describe("radar language and focus", () => {
+  it("keeps English by default and speaks Spanish when asked", async () => {
+    const { countryName, timingLabel, formatMoney, translateRuleText, toRadarItem } =
+      await import("./grant-radar");
+    expect(countryName("INTL")).toBe("International");
+    expect(countryName("INTL", "es")).toBe("Internacional");
+    expect(countryName("LATAM", "es")).toBe("América Latina y el Caribe");
+    expect(timingLabel({ timing: "closed", daysLeft: -3 }, "es")).toBe("Cerrado");
+    expect(formatMoney(null)).toBe("Amount not published");
+    expect(formatMoney(null, "CAD", "es")).toBe("Monto no publicado");
+    expect(translateRuleText("This call has closed.", "es")).toBe("Esta convocatoria ya cerró.");
+    expect(translateRuleText("Unknown sentence.", "es")).toBe("Unknown sentence.");
+    const item = toRadarItem(
+      { id: "x", ...base, hardBlocked: true },
+      { now: NOW, leadTimeWeeks: 4, lang: "es" },
+    );
+    expect(item.reason).toBe("Excluido por las reglas institucionales de elegibilidad.");
+  });
+
+  it("offers a fixed country list plus catalog countries", async () => {
+    const { radarCountryOptions } = await import("./grant-radar");
+    const list = radarCountryOptions(["CA", "FR", "INT"], "DE");
+    expect(list.slice(0, 3)).toEqual(["CA", "US", "MX"]);
+    expect(list).toContain("PE");
+    expect(list).toContain("LATAM");
+    expect(list).toContain("FR");
+    expect(list).toContain("DE");
+    expect(list.filter((c) => c === "CA")).toHaveLength(1);
+    expect(list).not.toContain("INT");
+  });
+
+  it("derives focus countries and sectors from the pipeline", async () => {
+    const { focusFromWorkspaces, countryCodeOf } = await import("./grant-radar");
+    expect(countryCodeOf("Perú")).toBe("PE");
+    expect(countryCodeOf("Colombia (Cauca)")).toBe("CO");
+    const focus = focusFromWorkspaces([
+      {
+        workspace: { priority: "pursue", partners: [{ country: "Peru" }, { country: "CO" }] },
+        grant: { country: "CA", sectors: ["agri-food"] },
+      },
+      {
+        workspace: { priority: "monitor", partners: [{ country: "Perú" }] },
+        grant: { country: "CA", sectors: ["Agri-food", "climate"] },
+      },
+      {
+        workspace: { priority: "discard", partners: [] },
+        grant: { country: "US", sectors: ["x"] },
+      },
+    ]);
+    expect(focus.countries).toEqual(["CA", "PE", "CO"]);
+    expect(focus.sectors).toEqual(["agri-food", "climate"]);
+  });
+});

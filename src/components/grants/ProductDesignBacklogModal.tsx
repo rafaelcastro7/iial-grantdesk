@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { submitProductDesignBacklogItem } from "@/lib/grant-copilot.functions";
 import { useActiveTenant } from "@/lib/tenant-context";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 
 type Props = {
   open: boolean;
@@ -21,7 +22,14 @@ type Props = {
   grantId?: string;
   defaultTitle?: string;
   defaultDescription?: string;
-  defaultCategory?: "consorcio_rutas" | "fuentes_latam" | "contrapartida_fondos" | "filtros_busqueda" | "ui_ux" | "moneda_region" | "otro";
+  defaultCategory?:
+    | "consorcio_rutas"
+    | "fuentes_latam"
+    | "contrapartida_fondos"
+    | "filtros_busqueda"
+    | "ui_ux"
+    | "moneda_region"
+    | "otro";
   onSuccess?: () => void;
 };
 
@@ -35,6 +43,16 @@ const CATEGORIES = [
   { id: "otro", label: "Other Enhancement" },
 ] as const;
 
+const CATEGORY_ES: Record<string, string> = {
+  consorcio_rutas: "Consorcios y rutas",
+  fuentes_latam: "Fuentes de las Américas e internacionales",
+  contrapartida_fondos: "Contrapartida y aportes en especie",
+  filtros_busqueda: "Búsqueda y filtros",
+  ui_ux: "Experiencia UI / UX",
+  moneda_region: "Moneda y región",
+  otro: "Otra mejora",
+};
+
 export function ProductDesignBacklogModal({
   open,
   onOpenChange,
@@ -45,6 +63,8 @@ export function ProductDesignBacklogModal({
   onSuccess,
 }: Props) {
   const { activeOrgId } = useActiveTenant();
+  const tr = useTr();
+  const lang = useUiLang();
   const [title, setTitle] = useState(defaultTitle);
   const [description, setDescription] = useState(defaultDescription);
   const [category, setCategory] = useState<typeof defaultCategory>(defaultCategory);
@@ -56,7 +76,12 @@ export function ProductDesignBacklogModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
-      setError("Please provide both a title and description for this request.");
+      setError(
+        tr(
+          "Please provide both a title and description for this request.",
+          "Indica un título y una descripción para esta solicitud.",
+        ),
+      );
       return;
     }
 
@@ -80,7 +105,11 @@ export function ProductDesignBacklogModal({
         onSuccess?.();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error saving backlog request.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : tr("Error saving backlog request.", "Error al guardar la solicitud en el backlog."),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -96,10 +125,16 @@ export function ProductDesignBacklogModal({
             </div>
             <div>
               <DialogTitle className="text-base font-bold">
-                Log Request in Product Design Backlog
+                {tr(
+                  "Log Request in Product Design Backlog",
+                  "Registrar solicitud en el backlog de diseño de producto",
+                )}
               </DialogTitle>
               <DialogDescription className="text-xs">
-                Record an operational requirement, unaddressed consortium scenario, or feature request for the GrantDesk roadmap.
+                {tr(
+                  "Record an operational requirement, unaddressed consortium scenario, or feature request for the GrantDesk roadmap.",
+                  "Registra un requisito operativo, un escenario de consorcio no cubierto o una solicitud de funcionalidad para la hoja de ruta de GrantDesk.",
+                )}
               </DialogDescription>
             </div>
           </div>
@@ -108,9 +143,14 @@ export function ProductDesignBacklogModal({
         {success ? (
           <div className="py-8 text-center space-y-2">
             <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-            <h4 className="text-sm font-semibold">Request recorded successfully!</h4>
+            <h4 className="text-sm font-semibold">
+              {tr("Request recorded successfully!", "¡Solicitud registrada con éxito!")}
+            </h4>
             <p className="text-xs text-muted-foreground">
-              Added to the system product backlog for team prioritization.
+              {tr(
+                "Added to the system product backlog for team prioritization.",
+                "Agregada al backlog del producto para que el equipo la priorice.",
+              )}
             </p>
           </div>
         ) : (
@@ -124,12 +164,15 @@ export function ProductDesignBacklogModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Enhancement or Need Title
+                {tr("Enhancement or Need Title", "Título de la mejora o necesidad")}
               </label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Compare two consortium routes for the same opportunity"
+                placeholder={tr(
+                  "e.g. Compare two consortium routes for the same opportunity",
+                  "p. ej., Comparar dos rutas de consorcio para la misma oportunidad",
+                )}
                 className="text-sm"
                 required
               />
@@ -137,7 +180,7 @@ export function ProductDesignBacklogModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Category
+                {tr("Category", "Categoría")}
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {CATEGORIES.map((cat) => (
@@ -147,7 +190,7 @@ export function ProductDesignBacklogModal({
                     className="cursor-pointer text-xs py-1 px-2.5 transition-all"
                     onClick={() => setCategory(cat.id)}
                   >
-                    {cat.label}
+                    {lang === "es" ? CATEGORY_ES[cat.id] : cat.label}
                   </Badge>
                 ))}
               </div>
@@ -155,12 +198,18 @@ export function ProductDesignBacklogModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Detailed Description &amp; Expected Outcome
+                {tr(
+                  "Detailed Description & Expected Outcome",
+                  "Descripción detallada y resultado esperado",
+                )}
               </label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Explain the operational challenge encountered, why it matters, and how GrantDesk should resolve it..."
+                placeholder={tr(
+                  "Explain the operational challenge encountered, why it matters, and how GrantDesk should resolve it...",
+                  "Explica el desafío operativo encontrado, por qué importa y cómo debería resolverlo GrantDesk...",
+                )}
                 rows={4}
                 className="text-sm leading-relaxed"
                 required
@@ -169,13 +218,13 @@ export function ProductDesignBacklogModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Priority Impact Level
+                {tr("Priority Impact Level", "Nivel de impacto")}
               </label>
               <div className="flex gap-2">
                 {[
-                  { id: "alto", label: "High Impact" },
-                  { id: "medio", label: "Medium Impact" },
-                  { id: "bajo", label: "Low Impact" },
+                  { id: "alto", label: tr("High Impact", "Impacto alto") },
+                  { id: "medio", label: tr("Medium Impact", "Impacto medio") },
+                  { id: "bajo", label: tr("Low Impact", "Impacto bajo") },
                 ].map((lvl) => (
                   <Button
                     key={lvl.id}
@@ -199,7 +248,7 @@ export function ProductDesignBacklogModal({
                 onClick={() => onOpenChange(false)}
                 disabled={submitting}
               >
-                Cancel
+                {tr("Cancel", "Cancelar")}
               </Button>
               <Button type="submit" size="sm" disabled={submitting} className="gap-1.5">
                 {submitting ? (
@@ -207,7 +256,7 @@ export function ProductDesignBacklogModal({
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                <span>Save to Backlog</span>
+                <span>{tr("Save to Backlog", "Guardar en el backlog")}</span>
               </Button>
             </DialogFooter>
           </form>

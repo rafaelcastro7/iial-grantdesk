@@ -16,16 +16,18 @@ import {
 } from "@/components/grants/GrantFeedbackControls";
 import { Button } from "@/components/ui/button";
 import {
-  NEXT_ACTION_LABELS,
-  VERDICT_LABELS,
   countryName,
   formatMoney,
+  fundingKindLabel,
+  fundingKindOf,
   grantCurrency,
+  nextActionLabel,
   timingLabel,
+  verdictLabel,
   type RadarItem,
 } from "@/lib/grant-radar";
-import { FUNDING_KIND_LABEL, fundingKindOf } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 
 export type RadarActions = {
   pending: string | null;
@@ -58,6 +60,8 @@ export function RadarCard({
   highlight?: boolean;
   simple?: boolean;
 }) {
+  const tr = useTr();
+  const lang = useUiLang();
   const g = item.grant;
   const criticalRequirements = (g.requirements ?? []).filter(
     (requirement) => requirement.isCritical,
@@ -98,19 +102,21 @@ export function RadarCard({
                 VERDICT_STYLE[item.verdict],
               )}
             >
-              {VERDICT_LABELS[item.verdict]}
+              {verdictLabel(item.verdict, lang)}
             </span>
             {item.fit != null && !simple && (
-              <span className="text-xs font-medium text-muted-foreground">Fit {item.fit}%</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {tr("Fit", "Encaje")} {item.fit}%
+              </span>
             )}
             {g.isNewSinceLastReview && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                New
+                {tr("New", "Nuevo")}
               </span>
             )}
             {fundingKindOf(g) !== "grant" && (
               <span className="rounded-full border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                {FUNDING_KIND_LABEL[fundingKindOf(g)]}
+                {fundingKindLabel(fundingKindOf(g), lang)}
               </span>
             )}
           </div>
@@ -119,7 +125,7 @@ export function RadarCard({
             params={{ id: g.id }}
             className="line-clamp-2 font-display text-base font-semibold leading-snug text-foreground hover:text-primary"
           >
-            {cleanTitle(g.title) || "Untitled opportunity"}
+            {cleanTitle(g.title) || tr("Untitled opportunity", "Oportunidad sin título")}
           </Link>
           {funderName(g) && (
             <p className="mt-0.5 truncate text-sm text-muted-foreground">{funderName(g)}</p>
@@ -137,10 +143,10 @@ export function RadarCard({
               <p className="line-clamp-3 whitespace-pre-line">
                 <span className="font-semibold text-foreground">
                   {item.verdict === "not_eligible"
-                    ? "Why it is not a fit: "
+                    ? tr("Why it is not a fit: ", "Por qué no encaja: ")
                     : simple
-                      ? "Why: "
-                      : "Check: "}
+                      ? tr("Why: ", "Por qué: ")
+                      : tr("Check: ", "Revisar: ")}
                 </span>
                 {item.reason}
               </p>
@@ -150,8 +156,12 @@ export function RadarCard({
             <div className="mt-2 border-l-2 border-warning pl-3">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-warning">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                {criticalRequirements.length} critical requirement
-                {criticalRequirements.length === 1 ? "" : "s"}
+                {criticalRequirements.length === 1
+                  ? tr("1 critical requirement", "1 requisito crítico")
+                  : tr(
+                      `${criticalRequirements.length} critical requirements`,
+                      `${criticalRequirements.length} requisitos críticos`,
+                    )}
               </p>
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                 {criticalRequirements.map((requirement) => requirement.requirement).join(" · ")}
@@ -161,20 +171,28 @@ export function RadarCard({
           {g.reviewState && !simple && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-full border bg-secondary px-2 py-0.5 font-medium text-secondary-foreground">
-                Evidence {g.reviewState.coverage_pct}%
+                {tr("Evidence", "Evidencia")} {g.reviewState.coverage_pct}%
               </span>
               {g.reviewState.status === "applicable" ? (
-                <span className="text-eligible">Strict review passed</span>
+                <span className="text-eligible">
+                  {tr("Strict review passed", "Revisión estricta aprobada")}
+                </span>
               ) : g.reviewState.status === "remediable" ? (
-                <span className="text-needs-input">Can be remediated</span>
+                <span className="text-needs-input">
+                  {tr("Can be remediated", "Se puede subsanar")}
+                </span>
               ) : g.reviewState.status === "ineligible" ? (
-                <span className="text-ineligible">Rule-based exclusion</span>
+                <span className="text-ineligible">
+                  {tr("Rule-based exclusion", "Excluido por reglas")}
+                </span>
               ) : (
-                <span className="text-muted-foreground">Needs source verification</span>
+                <span className="text-muted-foreground">
+                  {tr("Needs source verification", "Requiere verificar la fuente")}
+                </span>
               )}
               {g.reviewState.next_action && (
                 <span className="line-clamp-1 text-muted-foreground">
-                  Next: {g.reviewState.next_action}
+                  {tr("Next:", "Siguiente:")} {g.reviewState.next_action}
                 </span>
               )}
             </div>
@@ -182,18 +200,19 @@ export function RadarCard({
           <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <span className={cn("inline-flex items-center gap-1", timingTone)}>
               <CalendarClock className="h-3.5 w-3.5" />
-              {timingLabel(item)}
+              {timingLabel(item, lang)}
             </span>
             <span className="inline-flex items-center gap-1 text-muted-foreground">
               <Wallet className="h-3.5 w-3.5" />
               {formatMoney(
                 item.amount,
                 grantCurrency(g as { currency?: string | null; country?: string | null }),
+                lang,
               )}
             </span>
             <span className="inline-flex items-center gap-1 text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
-              {countryName(item.country)}
+              {countryName(item.country, lang)}
             </span>
           </div>
         </div>
@@ -202,7 +221,8 @@ export function RadarCard({
           {simple || item.nextAction === "open" ? (
             <Button asChild size="sm" variant="outline">
               <Link to="/grants/$id" params={{ id: g.id }}>
-                {simple ? "View details" : "Open"} <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                {simple ? tr("View details", "Ver detalles") : tr("Open", "Abrir")}{" "}
+                <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </Link>
             </Button>
           ) : (
@@ -212,7 +232,7 @@ export function RadarCard({
               ) : (
                 <ArrowRight className="mr-1 h-3.5 w-3.5" />
               )}
-              {NEXT_ACTION_LABELS[item.nextAction]}
+              {nextActionLabel(item.nextAction, lang)}
             </Button>
           )}
           {g.url && (
@@ -222,7 +242,7 @@ export function RadarCard({
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
-              Official page <ExternalLink className="h-3 w-3" />
+              {tr("Official page", "Página oficial")} <ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>

@@ -14,7 +14,7 @@
 # GrantDesk — project rules
 
 - Server functions live in `src/lib/*.functions.ts`; import `src/server/` modules dynamically inside handlers (client bundle safety).
-- Text AI: configured free-tier providers first (Gemini → Groq → Cerebras, only when their key is set), Lovable AI Gateway as the paid floor; embeddings Lovable `google/gemini-embedding-2` @768. User chose cost-first ordering (Sep 30 2026); with no external secrets in Lovable Cloud, Lovable AI is effectively the only provider.
+- Text AI: configured free-tier providers first (Gemini via `GOOGLE_AI_STUDIO_KEY` or Lovable's `GEMINI_API_KEY` → Groq → Cerebras, only when their key is set), Lovable AI Gateway as the paid floor; embeddings Lovable `google/gemini-embedding-2` @768. User chose cost-first ordering (Sep 30 2026); with no external secrets in Lovable Cloud, Lovable AI is effectively the only provider.
 - No client deadlines on AI calls (aborted generations still bill); live AI tests only with `LIVE_CLOUD=1`.
 - Eligibility is deterministic in `src/lib/eligibility.ts`; `unknown` is valid; soft-check failures are surfaced without changing verdicts.
 - Evaluator never aborts batches: on LLM failure fall back to `rules-engine-deterministic`; normalize `fit_score` to [0,1]; persisted `grant_evaluations` override heuristics in `toRadarItem`; short-circuit hard fails with deterministic rules (0 tokens) before calling LLM.
@@ -38,4 +38,4 @@
 - Multi-client staff access: only users listed in `public.platform_staff` (managed by an admin) are members of both `IIAL` and `Nahua Canada`; `ensure_current_user()` never adds org memberships for anyone else.
 - Security (never regress): no roles or memberships derived from email patterns; never auto-join a user to an org passed in a request; no blanket `INSERT ... SELECT FROM auth.users` memberships; no `org_id IS NULL` RLS escapes (NULL = private to owner); no credentials, password hashes or plaintext passwords in code, migrations, scripts or comments; no destructive data scripts (DELETE/TRUNCATE on user data) in the repo.
 - Application plan: per-grant decisions live in `grant_workspaces` (`src/lib/grant-workspace.*`); the Pipeline (`/pipeline`) reads it. Don't duplicate this state in new panels.
-- Language: All UI screens, product design backlog, AI Copilot defaults, and generated artifacts must be in English.
+- Language: the interface is bilingual English/Spanish, chosen with the EN/ES toggle in the top bar (`src/lib/ui-lang.ts`). Every user-visible string uses `tr("English", "Español")` (components, via `useTr()`) or a `lang` parameter (pure helpers, default `"en"`); never hard-code a single language. Data from the catalog or AI (titles, summaries, rationales) is shown as is. Emails keep their own recipient-language selector, defaulting to the UI language.

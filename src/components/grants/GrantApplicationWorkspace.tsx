@@ -21,7 +21,7 @@ import {
   Workflow,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,16 +45,16 @@ import {
 } from "@/lib/outreach-templates.shared";
 import {
   CALL_STATUSES,
-  CALL_STATUS_LABEL,
   CHECK_STATUSES,
-  CHECK_STATUS_LABEL,
   INSTRUMENTS,
-  INSTRUMENT_LABEL,
   PRIORITIES,
-  PRIORITY_LABEL,
   ROUTES,
-  ROUTE_LABEL,
   adoptConsortiumRoute,
+  callStatusLabel,
+  checkStatusLabel,
+  instrumentLabel,
+  priorityLabel,
+  routeLabel,
   decisionMemo,
   defaultMilestones,
   newId,
@@ -62,25 +62,28 @@ import {
   type Partner,
   type Workspace,
 } from "@/lib/grant-workspace.shared";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 import { cn } from "@/lib/utils";
 
-const PARTNER_STATUS: Array<[NonNullable<Partner["status"]>, string]> = [
-  ["to_contact", "To contact"],
-  ["contacted", "Contacted"],
-  ["interested", "Interested"],
-  ["confirmed", "Confirmed"],
-  ["declined", "Declined"],
+const PARTNER_STATUS: Array<[NonNullable<Partner["status"]>, string, string]> = [
+  ["to_contact", "To contact", "Por contactar"],
+  ["contacted", "Contacted", "Contactado"],
+  ["interested", "Interested", "Interesado"],
+  ["confirmed", "Confirmed", "Confirmado"],
+  ["declined", "Declined", "Declinó"],
 ];
 
 const selectClass = "h-9 w-full rounded-md border bg-background px-2 text-sm";
 
 export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string; orgId: string }) {
+  const tr = useTr();
+  const uiLang = useUiLang();
   const fetchWs = useServerFn(getGrantWorkspace);
   const save = useServerFn(saveGrantWorkspace);
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
-    queryKey: ["grant-workspace", grantId, orgId],
-    queryFn: () => fetchWs({ data: { grantId, orgId } }),
+    queryKey: ["grant-workspace", grantId, orgId, uiLang],
+    queryFn: () => fetchWs({ data: { grantId, orgId, lang: uiLang } }),
   });
   const fetchDirectory = useServerFn(listPartners);
   const saveToDirectory = useServerFn(savePartner);
@@ -93,7 +96,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
     [directory],
   );
   const [template, setTemplate] = useState<TemplateId>("partner_intro");
-  const [lang, setLang] = useState<Lang>("es");
+  // Recipient's language for emails: follows the interface language until changed.
+  const [langOverride, setLang] = useState<Lang | null>(null);
+  const lang: Lang = langOverride ?? uiLang;
   const [partnerIdx, setPartnerIdx] = useState(0);
   const [senderName, setSenderName] = useState("Rocío Cruz");
   const [meetingWhen, setMeetingWhen] = useState("");
@@ -105,12 +110,15 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [ws, setWs] = useState<Workspace | null>(null);
   const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
   const [saving, setSaving] = useState(false);
   const [newBlocker, setNewBlocker] = useState("");
   const [newItem, setNewItem] = useState("");
 
   useEffect(() => {
-    if (data?.workspace) {
+    // A reload (e.g. after switching language) never overwrites unsaved edits.
+    if (data?.workspace && !dirtyRef.current) {
       setWs(data.workspace);
       setDirty(false);
     }
@@ -134,8 +142,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       eligibility: data.eligibility.filter(
         (e) => ws.applicant_org_ids.length === 0 || ws.applicant_org_ids.includes(e.orgId),
       ),
+      lang: uiLang,
     });
-  }, [data, ws, currentOrgName]);
+  }, [data, ws, currentOrgName, uiLang]);
 
   const glossary = useMemo(
     () =>
@@ -157,32 +166,36 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         data.grant.country,
         ...(data.grant.requirements ?? []).map((r) => r.requirement),
       ],
-      lang,
+      uiLang,
     );
-  }, [countryQuery, data?.grant, lang]);
+  }, [countryQuery, data?.grant, uiLang]);
 
   const roadmap = useMemo(() => {
     if (!data?.grant) return null;
-    return synthesizeGrantRoadmap({
-      id: data.grant.id,
-      title: data.grant.title,
-      funderName: data.grant.funder?.name,
-      summary: data.grant.summary,
-      amountCadMax: data.grant.amount_cad_max,
-      deadline: data.grant.deadline,
-      deadlineKind: data.grant.deadline_kind,
-      requirements: data.grant.requirements?.map((r) => ({
-        requirement: r.requirement ?? "",
-        isCritical: r.isCritical,
-      })),
-      orgName: currentOrgName,
-    });
-  }, [data?.grant, currentOrgName]);
+    return synthesizeGrantRoadmap(
+      {
+        id: data.grant.id,
+        title: data.grant.title,
+        funderName: data.grant.funder?.name,
+        summary: data.grant.summary,
+        amountCadMax: data.grant.amount_cad_max,
+        deadline: data.grant.deadline,
+        deadlineKind: data.grant.deadline_kind,
+        requirements: data.grant.requirements?.map((r) => ({
+          requirement: r.requirement ?? "",
+          isCritical: r.isCritical,
+        })),
+        orgName: currentOrgName,
+      },
+      uiLang,
+    );
+  }, [data?.grant, currentOrgName, uiLang]);
 
   if (isLoading || !ws) {
     return (
       <div className="flex items-center gap-2 rounded-lg border p-6 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading the application plan…
+        <Loader2 className="h-4 w-4 animate-spin" />{" "}
+        {tr("Loading the application plan…", "Cargando el plan de postulación…")}
       </div>
     );
   }
@@ -226,14 +239,17 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       );
       await save({ data: clean as never });
       setDirty(false);
-      toast.success("Application plan saved");
+      toast.success(tr("Application plan saved", "Plan de postulación guardado"));
       await qc.invalidateQueries({ queryKey: ["grant-workspace", grantId, orgId] });
       await qc.invalidateQueries({ queryKey: ["grant-pipeline"] });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error(
         msg.includes("workspace_unavailable")
-          ? "Saving needs the database update 20261007110000_grant_workspaces.sql to be applied."
+          ? tr(
+              "Saving needs the database update 20261007110000_grant_workspaces.sql to be applied.",
+              "Para guardar hay que aplicar la actualización de base de datos 20261007110000_grant_workspaces.sql.",
+            )
           : msg,
       );
     } finally {
@@ -250,28 +266,37 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
     <div className="space-y-5">
       {!data.available && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
-          The application plan can be edited here, but saving needs the database update
-          20261007110000_grant_workspaces.sql to be applied.
+          {tr(
+            "The application plan can be edited here, but saving needs the database update 20261007110000_grant_workspaces.sql to be applied.",
+            "El plan de postulación se puede editar aquí, pero para guardar hay que aplicar la actualización de base de datos 20261007110000_grant_workspaces.sql.",
+          )}
         </p>
       )}
 
       {/* Save bar */}
       <div className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card/95 px-4 py-2 shadow-sm backdrop-blur">
         <div className="text-xs text-muted-foreground">
-          {dirty ? "Unsaved changes" : data.saved ? "Saved" : "Not saved yet — fill in and save"}
+          {dirty
+            ? tr("Unsaved changes", "Cambios sin guardar")
+            : data.saved
+              ? tr("Saved", "Guardado")
+              : tr("Not saved yet — fill in and save", "Aún no guardado — complete y guarde")}
           {" · "}
-          {ready}/{ws.checklist.length} documents ready
+          {ready}/{ws.checklist.length} {tr("documents ready", "documentos listos")}
         </div>
         <Button size="sm" className="gap-1.5" disabled={saving || !dirty} onClick={onSave}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save plan
+          {tr("Save plan", "Guardar plan")}
         </Button>
       </div>
 
       <Section
         icon={<Users className="h-4 w-4" />}
-        title="1. Can we apply?"
-        hint="Checked against each organization's profile and rules (no AI)."
+        title={tr("1. Can we apply?", "1. ¿Podemos aplicar?")}
+        hint={tr(
+          "Checked against each organization's profile and rules (no AI).",
+          "Verificado con el perfil y las reglas de cada organización (sin IA).",
+        )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
           {data.eligibility.map((e) => {
@@ -299,7 +324,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 <div className="min-w-0 text-sm">
                   <div className="flex items-center gap-2 font-semibold">
                     {e.orgName}
-                    <VerdictBadge verdict={e.verdict} />
+                    <VerdictBadge verdict={e.verdict} tr={tr} />
                   </div>
                   {e.reasons.length > 0 && (
                     <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
@@ -309,7 +334,12 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                     </ul>
                   )}
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    {chosen ? "Applies" : "Tick if this organization applies"}
+                    {chosen
+                      ? tr("Applies", "Aplica")
+                      : tr(
+                          "Tick if this organization applies",
+                          "Marque si esta organización aplica",
+                        )}
                   </p>
                 </div>
               </label>
@@ -318,14 +348,20 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         </div>
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-medium text-primary">
-            Check a country (beneficiary or partner)
+            {tr(
+              "Check a country (beneficiary or partner)",
+              "Verificar un país (beneficiario o socio)",
+            )}
           </summary>
           <div className="mt-2">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Input
                   value={countryQuery}
-                  placeholder="e.g. Peru, Colombia, Mexico, Costa Rica, Madagascar…"
+                  placeholder={tr(
+                    "e.g. Peru, Colombia, Mexico, Costa Rica, Madagascar…",
+                    "p. ej. Perú, Colombia, México, Costa Rica, Madagascar…",
+                  )}
                   onChange={(e) => setCountryQuery(e.target.value)}
                   className="max-w-md"
                 />
@@ -336,13 +372,15 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                     size="sm"
                     onClick={() => setCountryQuery("")}
                   >
-                    Clear
+                    {tr("Clear", "Limpiar")}
                   </Button>
                 )}
               </div>
               {/* Quick preset country pills */}
               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="text-[11px] text-muted-foreground mr-1">Quick check:</span>
+                <span className="text-[11px] text-muted-foreground mr-1">
+                  {tr("Quick check:", "Verificación rápida:")}
+                </span>
                 {PRESET_COUNTRIES.map((c) => (
                   <button
                     key={c.code}
@@ -374,10 +412,10 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 >
                   <div className="font-semibold mb-1">
                     {countryCheck.verdict === "explicit"
-                      ? "✓ Explicitly Eligible"
+                      ? tr("✓ Explicitly Eligible", "✓ Elegible explícitamente")
                       : countryCheck.verdict === "regional_likely"
-                        ? "ℹ High Regional Viability"
-                        : "⚠️ Not Specifically Mentioned"}
+                        ? tr("ℹ High Regional Viability", "ℹ Alta viabilidad regional")
+                        : tr("⚠️ Not Specifically Mentioned", "⚠️ No mencionado específicamente")}
                   </div>
                   <p>{countryCheck.detail}</p>
                 </div>
@@ -387,21 +425,24 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         </details>
       </Section>
 
-      <Section icon={<ClipboardList className="h-4 w-4" />} title="2. Our decision">
+      <Section
+        icon={<ClipboardList className="h-4 w-4" />}
+        title={tr("2. Our decision", "2. Nuestra decisión")}
+      >
         {roadmap && (
           <div className="mb-4 space-y-2 rounded-lg border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center justify-between gap-1.5">
               <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
                 <Workflow className="h-3.5 w-3.5 text-primary" />
-                Strategic suggested routes
+                {tr("Strategic suggested routes", "Rutas estratégicas sugeridas")}
               </span>
               <span className="text-xs text-muted-foreground">
-                Recommended:{" "}
+                {tr("Recommended:", "Recomendada:")}{" "}
                 <strong className="text-primary">
                   {roadmap.routes
                     .find((r) => r.id === roadmap.recommendedRouteId)
                     ?.title.split(":")[1]
-                    ?.trim() ?? "Academic"}
+                    ?.trim() ?? tr("Academic", "Académica")}
                 </strong>
               </span>
             </div>
@@ -446,10 +487,10 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                           className="px-1.5 py-0 text-[10px] font-normal"
                         >
                           {r.viability === "high"
-                            ? "Viable"
+                            ? tr("Viable", "Viable")
                             : r.viability === "conditional"
-                              ? "Conditional"
-                              : "Blocked"}
+                              ? tr("Conditional", "Condicional")
+                              : tr("Blocked", "Bloqueada")}
                         </Badge>
                       </div>
                       <p className="mb-1 font-medium leading-tight text-foreground line-clamp-1">
@@ -459,13 +500,14 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                         {r.tacticalValue}
                       </p>
                       <div className="text-[10px] text-muted-foreground">
-                        <strong>Lead:</strong> {r.leadEntity.split("(")[0]?.trim()}
+                        <strong>{tr("Lead:", "Líder:")}</strong>{" "}
+                        {r.leadEntity.split("(")[0]?.trim()}
                       </div>
                     </div>
                     <div className="mt-2.5 border-t border-border/40 pt-2">
                       {isAdopted ? (
                         <span className="flex items-center justify-center gap-1 py-0.5 text-[11px] font-semibold text-primary">
-                          <CheckCircle2 className="h-3 w-3" /> Active route
+                          <CheckCircle2 className="h-3 w-3" /> {tr("Active route", "Ruta activa")}
                         </span>
                       ) : (
                         <Button
@@ -477,10 +519,10 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                             const next = adoptConsortiumRoute(ws, r, currentOrgName);
                             setWs(next);
                             setDirty(true);
-                            toast.success(`Adopted ${r.title}`);
+                            toast.success(`${tr("Adopted", "Ruta adoptada:")} ${r.title}`);
                           }}
                         >
-                          Adopt route
+                          {tr("Adopt route", "Adoptar ruta")}
                         </Button>
                       )}
                     </div>
@@ -492,7 +534,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         )}
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Priority">
+          <Field label={tr("Priority", "Prioridad")}>
             <select
               className={selectClass}
               value={ws.priority}
@@ -500,26 +542,26 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             >
               {PRIORITIES.map((p) => (
                 <option key={p} value={p}>
-                  {PRIORITY_LABEL[p]}
+                  {priorityLabel(p, uiLang)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Our role">
+          <Field label={tr("Our role", "Nuestro rol")}>
             <select
               className={selectClass}
               value={ws.route ?? ""}
               onChange={(e) => update({ route: (e.target.value || null) as Workspace["route"] })}
             >
-              <option value="">Not decided</option>
+              <option value="">{tr("Not decided", "Sin decidir")}</option>
               {ROUTES.map((r) => (
                 <option key={r} value={r}>
-                  {ROUTE_LABEL[r]}
+                  {routeLabel(r, uiLang)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Call status">
+          <Field label={tr("Call status", "Estado de la convocatoria")}>
             <select
               className={selectClass}
               value={ws.call_status ?? ""}
@@ -527,35 +569,41 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 update({ call_status: (e.target.value || null) as Workspace["call_status"] })
               }
             >
-              <option value="">Unknown</option>
+              <option value="">{tr("Unknown", "Desconocido")}</option>
               {CALL_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {CALL_STATUS_LABEL[s]}
+                  {callStatusLabel(s, uiLang)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Lead institution">
+          <Field label={tr("Lead institution", "Institución líder")}>
             <Input
               value={ws.lead_institution ?? ""}
-              placeholder="e.g. Lambton College"
+              placeholder={tr("e.g. Lambton College", "p. ej. Lambton College")}
               onChange={(e) => update({ lead_institution: e.target.value || null })}
             />
           </Field>
         </div>
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-medium text-primary">
-            More details (funds administrator, funding type, time, match, verified on)
+            {tr(
+              "More details (funds administrator, funding type, time, match, verified on)",
+              "Más detalles (administrador de fondos, tipo de financiamiento, hora, contrapartida, verificado el)",
+            )}
           </summary>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Who administers the funds">
+            <Field label={tr("Who administers the funds", "Quién administra los fondos")}>
               <Input
                 value={ws.administrator ?? ""}
-                placeholder="e.g. the college's research office"
+                placeholder={tr(
+                  "e.g. the college's research office",
+                  "p. ej. la oficina de investigación del college",
+                )}
                 onChange={(e) => update({ administrator: e.target.value || null })}
               />
             </Field>
-            <Field label="Funding type">
+            <Field label={tr("Funding type", "Tipo de financiamiento")}>
               <select
                 className={selectClass}
                 value={ws.instrument ?? ""}
@@ -563,15 +611,15 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   update({ instrument: (e.target.value || null) as Workspace["instrument"] })
                 }
               >
-                <option value="">Unknown</option>
+                <option value="">{tr("Unknown", "Desconocido")}</option>
                 {INSTRUMENTS.map((i) => (
                   <option key={i} value={i}>
-                    {INSTRUMENT_LABEL[i]}
+                    {instrumentLabel(i, uiLang)}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Deadline time">
+            <Field label={tr("Deadline time", "Hora límite")}>
               <div className="flex gap-2">
                 <Input
                   value={ws.deadline_time ?? ""}
@@ -586,7 +634,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 />
               </div>
             </Field>
-            <Field label="Our contribution (match %)">
+            <Field label={tr("Our contribution (match %)", "Nuestro aporte (% de contrapartida)")}>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -606,13 +654,13 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                     })
                   }
                 >
-                  <option value="">In-kind?</option>
-                  <option value="yes">In-kind OK</option>
-                  <option value="no">Cash only</option>
+                  <option value="">{tr("In-kind?", "¿En especie?")}</option>
+                  <option value="yes">{tr("In-kind OK", "En especie OK")}</option>
+                  <option value="no">{tr("Cash only", "Solo efectivo")}</option>
                 </select>
               </div>
             </Field>
-            <Field label="Information verified on">
+            <Field label={tr("Information verified on", "Información verificada el")}>
               <Input
                 type="date"
                 value={ws.verified_at ?? ""}
@@ -622,14 +670,19 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
           </div>
         </details>
         <div className="mt-3">
-          <Field label="Blockers (internal — never copied into partner emails)">
+          <Field
+            label={tr(
+              "Blockers (internal — never copied into partner emails)",
+              "Bloqueos (internos — nunca se copian en los correos a socios)",
+            )}
+          >
             <div className="flex flex-wrap gap-1.5">
               {ws.blockers.map((b) => (
                 <Badge key={b} variant="outline" className="gap-1">
                   {b}
                   <button
                     type="button"
-                    aria-label="Remove"
+                    aria-label={tr("Remove", "Quitar")}
                     onClick={() => update({ blockers: ws.blockers.filter((x) => x !== b) })}
                   >
                     <XCircle className="h-3 w-3" />
@@ -640,7 +693,10 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             <div className="mt-2 flex gap-2">
               <Input
                 value={newBlocker}
-                placeholder="e.g. No audited financial statements"
+                placeholder={tr(
+                  "e.g. No audited financial statements",
+                  "p. ej. No tenemos estados financieros auditados",
+                )}
                 onChange={(e) => setNewBlocker(e.target.value)}
               />
               <Button
@@ -654,25 +710,31 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   setNewBlocker("");
                 }}
               >
-                Add
+                {tr("Add", "Agregar")}
               </Button>
             </div>
           </Field>
         </div>
         <div className="mt-4 grid gap-3">
           <div className="grid gap-3">
-            <Field label="Working title">
+            <Field label={tr("Working title", "Título provisional")}>
               <Input
                 value={ws.project_title ?? ""}
-                placeholder="e.g. Whole-Chain Integrity for Sustainable Agri-Food Systems"
+                placeholder={tr(
+                  "e.g. Whole-Chain Integrity for Sustainable Agri-Food Systems",
+                  "p. ej. Integridad de toda la cadena para sistemas agroalimentarios sostenibles",
+                )}
                 onChange={(e) => update({ project_title: e.target.value || null })}
               />
             </Field>
-            <Field label="How we use WCIS">
+            <Field label={tr("How we use WCIS", "Cómo usamos el WCIS")}>
               <Textarea
                 rows={3}
                 value={ws.wcis_angle ?? ""}
-                placeholder="WCIS as the applied framework for traceability, integrity and market readiness…"
+                placeholder={tr(
+                  "WCIS as the applied framework for traceability, integrity and market readiness…",
+                  "El WCIS como marco aplicado de trazabilidad, integridad y preparación para el mercado…",
+                )}
                 onChange={(e) => update({ wcis_angle: e.target.value || null })}
               />
             </Field>
@@ -680,9 +742,11 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         </div>
       </Section>
 
-      <Section icon={<Users className="h-4 w-4" />} title="3. Partners">
+      <Section icon={<Users className="h-4 w-4" />} title={tr("3. Partners", "3. Socios")}>
         {ws.partners.length === 0 && (
-          <p className="text-sm text-muted-foreground">No partners yet.</p>
+          <p className="text-sm text-muted-foreground">
+            {tr("No partners yet.", "Aún no hay socios.")}
+          </p>
         )}
         <div className="space-y-2">
           {ws.partners.map((p, idx) => (
@@ -692,7 +756,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             >
               <Input
                 value={p.name}
-                placeholder="Organization"
+                placeholder={tr("Organization", "Organización")}
                 list="partner-directory-names"
                 onChange={(e) => {
                   const known = directoryByName.get(e.target.value.trim().toLowerCase());
@@ -720,7 +784,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               />
               <Input
                 value={p.country ?? ""}
-                placeholder="Country"
+                placeholder={tr("Country", "País")}
                 onChange={(e) =>
                   setPartners(
                     ws.partners.map((x, i) => (i === idx ? { ...x, country: e.target.value } : x)),
@@ -729,7 +793,10 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               />
               <Input
                 value={p.role ?? ""}
-                placeholder="Role (e.g. administers the grant)"
+                placeholder={tr(
+                  "Role (e.g. administers the grant)",
+                  "Rol (p. ej. administra el grant)",
+                )}
                 onChange={(e) =>
                   setPartners(
                     ws.partners.map((x, i) => (i === idx ? { ...x, role: e.target.value } : x)),
@@ -738,7 +805,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               />
               <Input
                 value={p.contact ?? ""}
-                placeholder="Contact"
+                placeholder={tr("Contact", "Contacto")}
                 onChange={(e) =>
                   setPartners(
                     ws.partners.map((x, i) => (i === idx ? { ...x, contact: e.target.value } : x)),
@@ -756,9 +823,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   )
                 }
               >
-                {PARTNER_STATUS.map(([v, l]) => (
+                {PARTNER_STATUS.map(([v, en, es]) => (
                   <option key={v} value={v}>
-                    {l}
+                    {tr(en, es)}
                   </option>
                 ))}
               </select>
@@ -766,7 +833,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Remove partner"
+                aria-label={tr("Remove partner", "Quitar socio")}
                 onClick={() => setPartners(ws.partners.filter((_, i) => i !== idx))}
               >
                 <Trash2 className="h-4 w-4" />
@@ -783,7 +850,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             setPartners([...ws.partners, { id: newId("partner"), name: "", status: "to_contact" }])
           }
         >
-          <Plus className="h-4 w-4" /> Add partner
+          <Plus className="h-4 w-4" /> {tr("Add partner", "Agregar socio")}
         </Button>
         <datalist id="partner-directory-names">
           {(directory?.partners ?? []).map((d) => (
@@ -821,18 +888,26 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   }).catch(() => undefined);
                 }
                 await qc.invalidateQueries({ queryKey: ["partner-directory", orgId] });
-                toast.success(`${fresh.length} partner(s) added to the directory`);
+                toast.success(
+                  tr(
+                    `${fresh.length} partner(s) added to the directory`,
+                    `${fresh.length} socio(s) agregado(s) al directorio`,
+                  ),
+                );
               }}
             >
-              Save new partners to the directory
+              {tr(
+                "Save new partners to the directory",
+                "Guardar los socios nuevos en el directorio",
+              )}
             </Button>
           )}
       </Section>
 
       <Section
         icon={<CheckCircle2 className="h-4 w-4" />}
-        title="4. Documents and dates"
-        hint={`${ready} ready · ${missing} missing`}
+        title={tr("4. Documents and dates", "4. Documentos y fechas")}
+        hint={tr(`${ready} ready · ${missing} missing`, `${ready} listos · ${missing} faltan`)}
       >
         <div className="divide-y rounded-lg border">
           {ws.checklist.map((c, idx) => (
@@ -844,7 +919,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 {c.item}
                 {c.critical && (
                   <Badge variant="destructive" className="ml-2 text-[10px]">
-                    critical
+                    {tr("critical", "crítico")}
                   </Badge>
                 )}
               </div>
@@ -861,13 +936,13 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               >
                 {CHECK_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {CHECK_STATUS_LABEL[s]}
+                    {checkStatusLabel(s, uiLang)}
                   </option>
                 ))}
               </select>
               <Input
                 value={c.owner ?? ""}
-                placeholder="Owner"
+                placeholder={tr("Owner", "Responsable")}
                 onChange={(e) =>
                   setChecklist(
                     ws.checklist.map((x, i) =>
@@ -891,7 +966,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Remove item"
+                aria-label={tr("Remove item", "Quitar elemento")}
                 onClick={() => setChecklist(ws.checklist.filter((_, i) => i !== idx))}
               >
                 <Trash2 className="h-4 w-4" />
@@ -902,7 +977,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         <div className="mt-2 flex gap-2">
           <Input
             value={newItem}
-            placeholder="Add a requirement or document"
+            placeholder={tr("Add a requirement or document", "Agregar un requisito o documento")}
             onChange={(e) => setNewItem(e.target.value)}
           />
           <Button
@@ -918,7 +993,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               setNewItem("");
             }}
           >
-            Add
+            {tr("Add", "Agregar")}
           </Button>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5">
@@ -940,31 +1015,47 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 due: null,
               }));
               if (toAdd.length === 0) {
-                toast.info("Standard compliance documents are already present in the checklist.");
+                toast.info(
+                  tr(
+                    "Standard compliance documents are already present in the checklist.",
+                    "Los documentos estándar de cumplimiento ya están en la lista.",
+                  ),
+                );
                 return;
               }
               setChecklist([...ws.checklist, ...toAdd]);
-              toast.success(`Added ${toAdd.length} standard compliance document(s) to checklist.`);
+              toast.success(
+                tr(
+                  `Added ${toAdd.length} standard compliance document(s) to checklist.`,
+                  `Se agregaron ${toAdd.length} documento(s) estándar de cumplimiento a la lista.`,
+                ),
+              );
             }}
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Add standard compliance package (4 docs)
+            {tr(
+              "Add standard compliance package (4 docs)",
+              "Agregar paquete estándar de cumplimiento (4 docs)",
+            )}
           </Button>
           <span className="text-[11px] text-muted-foreground">
-            Financials (2y), CRA/Charter, Attestation, Support Letter
+            {tr(
+              "Financials (2y), CRA/Charter, Attestation, Support Letter",
+              "Estados financieros (2 años), CRA/Constitución, Declaración, Carta de apoyo",
+            )}
           </span>
         </div>
         {glossary.length > 0 && (
           <details className="mt-3">
             <summary className="cursor-pointer text-xs font-medium text-primary">
-              What these requirements mean
+              {tr("What these requirements mean", "Qué significan estos requisitos")}
             </summary>
             <div className="mt-2">
               <dl className="space-y-2 text-sm">
                 {glossary.map((g) => (
                   <div key={g.term}>
                     <dt className="font-medium">{g.term}</dt>
-                    <dd className="text-muted-foreground">{lang === "es" ? g.es : g.en}</dd>
+                    <dd className="text-muted-foreground">{uiLang === "es" ? g.es : g.en}</dd>
                   </div>
                 ))}
               </dl>
@@ -972,19 +1063,25 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
           </details>
         )}
         <div className="mt-4 border-t pt-3">
-          <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Timeline</h4>
+          <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+            {tr("Timeline", "Cronograma")}
+          </h4>
           {ws.milestones.length === 0 ? (
             <div className="text-sm text-muted-foreground">
-              No milestones.{" "}
+              {tr("No milestones.", "Sin hitos.")}{" "}
               {data.grant.deadline && (
                 <Button
                   type="button"
                   variant="link"
                   size="sm"
                   className="px-0"
-                  onClick={() => update({ milestones: defaultMilestones(data.grant.deadline) })}
+                  onClick={() =>
+                    update({
+                      milestones: defaultMilestones(data.grant.deadline, new Date(), uiLang),
+                    })
+                  }
                 >
-                  Build them from the deadline
+                  {tr("Build them from the deadline", "Generarlos desde la fecha límite")}
                 </Button>
               )}
             </div>
@@ -1027,14 +1124,17 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
 
       <Section
         icon={<Mail className="h-4 w-4" />}
-        title="5. Write"
-        hint="Emails never include the internal blockers; the memo does."
+        title={tr("5. Write", "5. Redactar")}
+        hint={tr(
+          "Emails never include the internal blockers; the memo does.",
+          "Los correos nunca incluyen los bloqueos internos; el memo sí.",
+        )}
       >
         <div className="mb-3 inline-flex rounded-lg border bg-muted/30 p-1 text-xs">
           {(
             [
-              ["outreach", "Partners and funders"],
-              ["memo", "Memo to Marcelo"],
+              ["outreach", tr("Partners and funders", "Socios y financiadores")],
+              ["memo", tr("Memo to Marcelo", "Memo para Marcelo")],
             ] as const
           ).map(([k, label]) => (
             <button
@@ -1059,7 +1159,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               const known = partner
                 ? directoryByName.get(partner.name.trim().toLowerCase())
                 : undefined;
-              const orgName = data.orgs.find((o) => o.id === orgId)?.name ?? "our organization";
+              const orgName =
+                data.orgs.find((o) => o.id === orgId)?.name ??
+                tr("our organization", "nuestra organización");
               const email = composeOutreach({
                 template,
                 lang,
@@ -1090,17 +1192,18 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                     >
                       {TEMPLATE_IDS.map((t) => (
                         <option key={t} value={t}>
-                          {TEMPLATE_LABEL[t].en}
+                          {uiLang === "es" ? TEMPLATE_LABEL[t].es : TEMPLATE_LABEL[t].en}
                         </option>
                       ))}
                     </select>
                     <select
                       className={selectClass}
                       value={lang}
+                      aria-label={tr("Recipient's language", "Idioma del destinatario")}
                       onChange={(e) => setLang(e.target.value as Lang)}
                     >
-                      <option value="es">Spanish</option>
-                      <option value="en">English</option>
+                      <option value="es">{tr("Spanish", "Español")}</option>
+                      <option value="en">{tr("English", "Inglés")}</option>
                     </select>
                     {toPartner && (
                       <select
@@ -1108,17 +1211,19 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                         value={partnerIdx}
                         onChange={(e) => setPartnerIdx(Number(e.target.value))}
                       >
-                        {ws.partners.length === 0 && <option value={0}>No partners yet</option>}
+                        {ws.partners.length === 0 && (
+                          <option value={0}>{tr("No partners yet", "Aún no hay socios")}</option>
+                        )}
                         {ws.partners.map((p, i) => (
                           <option key={p.id} value={i}>
-                            {p.name || `Partner ${i + 1}`}
+                            {p.name || `${tr("Partner", "Socio")} ${i + 1}`}
                           </option>
                         ))}
                       </select>
                     )}
                     <Input
                       value={senderName}
-                      placeholder="Sender"
+                      placeholder={tr("Sender", "Remitente")}
                       onChange={(e) => setSenderName(e.target.value)}
                     />
                   </div>
@@ -1131,34 +1236,47 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                         className="rounded border-border"
                       />
                       <span>
-                        Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business
-                        School / Univ. of Reading)
+                        {tr(
+                          "Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School / Univ. of Reading)",
+                          "Incluir la cita de la tesis doctoral del Dr. Juan Marcelo Gómez (Henley Business School / Univ. of Reading)",
+                        )}
                       </span>
                     </label>
                   )}
                   {template === "meeting_invite" && (
                     <Input
                       value={meetingWhen}
-                      placeholder="Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams"
+                      placeholder={tr(
+                        "Proposed meeting, e.g. Monday, June 1 at 11:00 (Peru time) on Teams",
+                        "Reunión propuesta, p. ej. lunes 1 de junio a las 11:00 (hora de Perú) por Teams",
+                      )}
                       onChange={(e) => setMeetingWhen(e.target.value)}
                     />
                   )}
                   {template === "partner_intro" && (
                     <Input
                       value={attachmentsEdit ?? defaultAttachments(lang)}
-                      placeholder="Attachments, separated by commas (leave empty for none)"
+                      placeholder={tr(
+                        "Attachments, separated by commas (leave empty for none)",
+                        "Adjuntos, separados por comas (déjelo vacío si no hay)",
+                      )}
                       onChange={(e) => setAttachments(e.target.value)}
                     />
                   )}
                   {isWhatsApp && (
                     <Input
                       value={links}
-                      placeholder="Links to share (presentation, website)"
+                      placeholder={tr(
+                        "Links to share (presentation, website)",
+                        "Enlaces para compartir (presentación, sitio web)",
+                      )}
                       onChange={(e) => setLinks(e.target.value)}
                     />
                   )}
                   {email.subject && (
-                    <div className="text-xs font-semibold">Subject: {email.subject}</div>
+                    <div className="text-xs font-semibold">
+                      {tr("Subject:", "Asunto:")} {email.subject}
+                    </div>
                   )}
                   <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
                     {email.body}
@@ -1181,28 +1299,39 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                             try {
                               await navigator.clipboard.writeText(
                                 email.subject
-                                  ? `Subject: ${email.subject}\n\n${email.body}`
+                                  ? `${lang === "es" ? "Asunto" : "Subject"}: ${email.subject}\n\n${email.body}`
                                   : email.body,
                               );
                               setCopiedEmail(true);
                               toast.success(
-                                isWhatsApp ? "WhatsApp message copied" : "Email copied",
+                                isWhatsApp
+                                  ? tr("WhatsApp message copied", "Mensaje de WhatsApp copiado")
+                                  : tr("Email copied", "Correo copiado"),
                               );
                               setTimeout(() => setCopiedEmail(false), 3000);
                             } catch {
-                              toast.error("Could not copy; select the text instead.");
+                              toast.error(
+                                tr(
+                                  "Could not copy; select the text instead.",
+                                  "No se pudo copiar; seleccione el texto.",
+                                ),
+                              );
                             }
                           }}
                         >
                           {copiedEmail ? (
                             <>
                               <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                              <span>Copied! ✓</span>
+                              <span>{tr("Copied! ✓", "¡Copiado! ✓")}</span>
                             </>
                           ) : (
                             <>
                               <Copy className="h-4 w-4" />
-                              <span>Copy {isWhatsApp ? "message" : "email"}</span>
+                              <span>
+                                {isWhatsApp
+                                  ? tr("Copy message", "Copiar mensaje")
+                                  : tr("Copy email", "Copiar correo")}
+                              </span>
                             </>
                           )}
                         </Button>
@@ -1213,13 +1342,15 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                             className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                           >
                             <a href={waHref} target="_blank" rel="noreferrer">
-                              <MessageCircle className="h-4 w-4" /> Open in WhatsApp
+                              <MessageCircle className="h-4 w-4" />{" "}
+                              {tr("Open in WhatsApp", "Abrir en WhatsApp")}
                             </a>
                           </Button>
                         ) : (
                           <Button asChild variant="outline" size="sm" className="gap-1.5">
                             <a href={mailto}>
-                              <Mail className="h-4 w-4 text-primary" /> Open in email app
+                              <Mail className="h-4 w-4 text-primary" />{" "}
+                              {tr("Open in email app", "Abrir en la app de correo")}
                             </a>
                           </Button>
                         )}
@@ -1232,7 +1363,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
           </>
         ) : (
           <>
-            <Field label="Notes for the memo">
+            <Field label={tr("Notes for the memo", "Notas para el memo")}>
               <Textarea
                 rows={2}
                 value={ws.decision_notes ?? ""}
@@ -1241,7 +1372,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
             </Field>
             {memo && (
               <div className="mt-3 space-y-2">
-                <div className="text-xs font-semibold">Subject: {memo.subject}</div>
+                <div className="text-xs font-semibold">
+                  {tr("Subject:", "Asunto:")} {memo.subject}
+                </div>
                 <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed">
                   {memo.body}
                 </pre>
@@ -1253,15 +1386,20 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(
-                        `Subject: ${memo.subject}\n\n${memo.body}`,
+                        `${tr("Subject:", "Asunto:")} ${memo.subject}\n\n${memo.body}`,
                       );
-                      toast.success("Memo copied");
+                      toast.success(tr("Memo copied", "Memo copiado"));
                     } catch {
-                      toast.error("Could not copy; select the text instead.");
+                      toast.error(
+                        tr(
+                          "Could not copy; select the text instead.",
+                          "No se pudo copiar; seleccione el texto.",
+                        ),
+                      );
                     }
                   }}
                 >
-                  <Copy className="h-4 w-4" /> Copy memo
+                  <Copy className="h-4 w-4" /> {tr("Copy memo", "Copiar memo")}
                 </Button>
               </div>
             )}
@@ -1312,17 +1450,24 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function VerdictBadge({ verdict }: { verdict: "eligible" | "needs_input" | "not_eligible" }) {
-  if (verdict === "eligible") return <Badge className="bg-emerald-600 text-[10px]">Eligible</Badge>;
+function VerdictBadge({
+  verdict,
+  tr,
+}: {
+  verdict: "eligible" | "needs_input" | "not_eligible";
+  tr: (en: string, es: string) => string;
+}) {
+  if (verdict === "eligible")
+    return <Badge className="bg-emerald-600 text-[10px]">{tr("Eligible", "Elegible")}</Badge>;
   if (verdict === "needs_input")
     return (
       <Badge variant="outline" className="gap-1 text-[10px] text-amber-700">
-        <AlertTriangle className="h-3 w-3" /> To confirm
+        <AlertTriangle className="h-3 w-3" /> {tr("To confirm", "Por confirmar")}
       </Badge>
     );
   return (
     <Badge variant="destructive" className="text-[10px]">
-      Not eligible
+      {tr("Not eligible", "No elegible")}
     </Badge>
   );
 }

@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { AxisScore } from "@/agents/fit-rules.shared";
 import { humanizeRationale } from "@/lib/eligibility-explain";
+import { useTr, useUiLang, localeOf } from "@/lib/ui-lang";
 
 type Stage = "discovered" | "enriched" | "evaluated" | "verdict";
 
@@ -113,6 +114,7 @@ function ScoreGauge({ value }: { value: number }) {
   const c = 2 * Math.PI * r;
   const dash = c * pct;
   const t = tier(value);
+  const tr = useTr();
   return (
     <div className="relative h-24 w-24 shrink-0">
       <svg viewBox="0 0 88 88" className="h-full w-full -rotate-90">
@@ -131,7 +133,9 @@ function ScoreGauge({ value }: { value: number }) {
         <span className={cn("text-xl font-bold tabular-nums", t.color)}>
           {Math.round(pct * 100)}
         </span>
-        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">fit score</span>
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          {tr("fit score", "ajuste")}
+        </span>
       </div>
     </div>
   );
@@ -184,10 +188,59 @@ const LABELS = {
   },
 } as const;
 
-function formatTs(iso: string | null) {
+const LABELS_ES: typeof LABELS = {
+  stages: {
+    discovered: "Descubierto",
+    enriched: "Enriquecido",
+    evaluated: "Evaluado",
+    verdict: "Veredicto",
+  },
+  stageDesc: {
+    discovered: "Obtenido del financiador",
+    enriched: "Normalizado",
+    evaluated: "Análisis de ajuste con IA",
+    verdict: "Recomendación",
+  },
+  verdict: { strong: "Ajuste alto", partial: "Ajuste parcial", poor: "Ajuste bajo" },
+  eligiblePass: "Elegible",
+  eligibleFail: "No elegible",
+  rationale: "Justificación",
+  waitingProfile:
+    "Configura el perfil de tu organización para activar la evaluación de ajuste con IA.",
+  waitingEnrich: "Esperando el enriquecimiento...",
+  evaluating: "La IA está evaluando el ajuste...",
+  showDetails: "Ver qué pasó en cada paso",
+  hideDetails: "Ocultar detalles de los pasos",
+  at: "el",
+  detail: {
+    discovered: {
+      done: "Encontramos esta oportunidad de financiamiento en el sitio web del financiador y la guardamos en tu catálogo. Aún sin interpretación de IA: solo el aviso original.",
+      active: "Revisando el sitio web del financiador en busca de nuevos programas...",
+      pending: "Aún no ha comenzado.",
+    },
+    enriched: {
+      done: "La IA depuró la publicación: convirtió la fecha límite en una fecha real y normalizó los montos a dólares canadienses para poder compararla con otros grants.",
+      active: "La IA está estandarizando los detalles del grant en este momento...",
+      pending: "Se ejecutará automáticamente cuando se descubra el grant.",
+    },
+    evaluated: {
+      done: "La IA comparó la elegibilidad, los sectores, la jurisdicción y la etapa de este grant con el perfil de tu organización, y luego generó un puntaje de ajuste de 0 a 100 y una justificación escrita.",
+      active: "Comparando los requisitos del grant con el perfil de tu organización...",
+      pending:
+        "Se ejecutará en cuanto termine el enriquecimiento (y tengas un perfil de organización).",
+    },
+    verdict: {
+      done: "Recomendación final basada en el puntaje de ajuste y la verificación de elegibilidad. Lee la justificación de arriba para ver el razonamiento de la IA.",
+      active: "Redactando el veredicto final...",
+      pending: "Esperando a que termine la evaluación.",
+    },
+  },
+} as unknown as typeof LABELS;
+
+function formatTs(iso: string | null, locale = "en-CA") {
   if (!iso) return null;
   try {
-    return new Intl.DateTimeFormat("en-CA", {
+    return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(iso));
@@ -197,7 +250,9 @@ function formatTs(iso: string | null) {
 }
 
 export function FitEvaluation(props: Props) {
-  const L = LABELS;
+  const lang = useUiLang();
+  const tr = useTr();
+  const L = lang === "es" ? LABELS_ES : LABELS;
   const e = props.evaluation;
   const t = e ? tier(e.fit_score) : null;
   const VerdictIcon = t?.icon;
@@ -286,15 +341,16 @@ export function FitEvaluation(props: Props) {
                   {e.eligibility_pass
                     ? L.eligiblePass
                     : e.rule_verdict === "needs_input"
-                      ? "Eligibility unclear"
+                      ? tr("Eligibility unclear", "Elegibilidad incierta")
                       : L.eligibleFail}
                 </span>
               </div>
               {thinCoverage && cov && (
                 <p className="mt-1.5 flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-500">
                   <AlertTriangle className="h-3 w-3 shrink-0" />
-                  Based on {cov.assessed} of {cov.total} factors — the rest need more info to
-                  assess. Treat this score as preliminary.
+                  {lang === "es"
+                    ? `Basado en ${cov.assessed} de ${cov.total} factores — el resto necesita más información para evaluarse. Toma este puntaje como preliminar.`
+                    : `Based on ${cov.assessed} of ${cov.total} factors — the rest need more info to assess. Treat this score as preliminary.`}
                 </p>
               )}
               <p className="mt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -345,7 +401,7 @@ export function FitEvaluation(props: Props) {
             {STAGE_ORDER.map((s) => {
               const state = stageReached(s, props);
               const Icon = STAGE_ICON[s];
-              const ts = formatTs(stageTs[s]);
+              const ts = formatTs(stageTs[s], localeOf(lang));
               const text = L.detail[s][state];
               return (
                 <li key={s} className="flex gap-3">

@@ -31,7 +31,14 @@ import {
   DEFAULT_RADAR_FILTERS,
   type RadarFilterState,
 } from "@/components/grants/radar/RadarToolbar";
-import { buildRadar, isFullReview } from "@/lib/grant-radar";
+import {
+  buildRadar,
+  focusFromWorkspaces,
+  isFullReview,
+  radarCountryOptions,
+} from "@/lib/grant-radar";
+import { listGrantWorkspaces } from "@/lib/grant-workspace.functions";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 import { listRadarProfiles } from "@/lib/radar.functions";
 import { EligibilityCheckBar } from "@/components/grants/radar/EligibilityCheckBar";
 import { StrictReviewProgress } from "@/components/grants/StrictReviewProgress";
@@ -104,6 +111,8 @@ function TenantGrantsPage() {
 
 function GrantsPage({ orgId }: { orgId: string }) {
   const navigate = useNavigate();
+  const tr = useTr();
+  const lang = useUiLang();
   const isAdmin = useIsAdmin();
   const isConsultant = useIsConsultant();
   const qc = useQueryClient();
@@ -247,8 +256,26 @@ function GrantsPage({ orgId }: { orgId: string }) {
         searching,
         rules: checkProfile,
         hideIneligible,
+        lang,
       }),
-    [grants, filters, searching, checkProfile, hideIneligible],
+    [grants, filters, searching, checkProfile, hideIneligible, lang],
+  );
+
+  // "Your focus": countries, sectors and partner countries of the grants the
+  // organization is working on (pipeline). Offered as one-click suggestions,
+  // never applied on their own. Deterministic, no AI.
+  const fetchPipeline = useServerFn(listGrantWorkspaces);
+  const { data: pipeline } = useQuery({
+    queryKey: ["grant-pipeline", orgId],
+    queryFn: () => fetchPipeline({ data: { orgId } }),
+    staleTime: 60_000,
+  });
+  const focus = useMemo(
+    () =>
+      focusFromWorkspaces(
+        (pipeline?.rows ?? []) as unknown as Parameters<typeof focusFromWorkspaces>[0],
+      ),
+    [pipeline],
   );
 
   // Free pre-check of the whole list: grants without any evaluation are
@@ -289,12 +316,12 @@ function GrantsPage({ orgId }: { orgId: string }) {
     };
   }, [hasGrants, autoEval, orgId, qc]);
   const sectors = useMemo(() => collectSectors(grants), [grants]);
-  const countries = useMemo(() => {
-    const list = data.availableCountries ?? [];
-    return filters.country !== "all" && !list.includes(filters.country)
-      ? [filters.country, ...list]
-      : list;
-  }, [data.availableCountries, filters.country]);
+  // A fixed list of useful countries plus any other in the catalog; a country
+  // with no grants yet can still be chosen (the empty state offers web search).
+  const countries = useMemo(
+    () => radarCountryOptions(data.availableCountries ?? [], filters.country),
+    [data.availableCountries, filters.country],
+  );
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
   const refresh = async () => {
@@ -303,7 +330,13 @@ function GrantsPage({ orgId }: { orgId: string }) {
 
   const feedbackMutation = useMutation({
     mutationFn: ({ grant, decision }: { grant: GrantRowData; decision: GrantFeedbackDecision }) => {
-      if (!searchProfileId) throw new Error("Select a project profile before saving feedback.");
+      if (!searchProfileId)
+        throw new Error(
+          tr(
+            "Select a project profile before saving feedback.",
+            "Selecciona un perfil de proyecto antes de guardar la retroalimentación.",
+          ),
+        );
       return recordSearchFeedback({
         data: {
           profile_id: searchProfileId,
@@ -323,7 +356,12 @@ function GrantsPage({ orgId }: { orgId: string }) {
       });
     },
     onSuccess: async () => {
-      setInfo("Feedback saved for this project profile.");
+      setInfo(
+        tr(
+          "Feedback saved for this project profile.",
+          "Retroalimentación guardada para este perfil de proyecto.",
+        ),
+      );
       await refresh();
     },
     onError: fail,
@@ -331,11 +369,19 @@ function GrantsPage({ orgId }: { orgId: string }) {
 
   const reviewMutation = useMutation({
     mutationFn: () => {
-      if (!searchProfileId) throw new Error("Select a project profile first.");
+      if (!searchProfileId)
+        throw new Error(
+          tr("Select a project profile first.", "Primero selecciona un perfil de proyecto."),
+        );
       return markProfileReviewed({ data: { id: searchProfileId } });
     },
     onSuccess: async () => {
-      setInfo("Results marked as reviewed. New discoveries will be labelled New.");
+      setInfo(
+        tr(
+          "Results marked as reviewed. New discoveries will be labelled New.",
+          "Resultados marcados como revisados. Los nuevos hallazgos se marcarán como Nuevo.",
+        ),
+      );
       await qc.invalidateQueries({ queryKey: ["grant-search-profiles"] });
       await refresh();
     },
@@ -382,12 +428,22 @@ function GrantsPage({ orgId }: { orgId: string }) {
       );
     });
     if (targets.length === 0) {
-      setInfo("Every listed grant already has an AI review.");
+      setInfo(
+        tr(
+          "Every listed grant already has an AI review.",
+          "Todos los grants listados ya tienen una revisión con IA.",
+        ),
+      );
       return;
     }
     setEvaluatingAll(true);
     setError(null);
-    setInfo(`Running the AI review on ${targets.length} grants…`);
+    setInfo(
+      tr(
+        `Running the AI review on ${targets.length} grants…`,
+        `Ejecutando la revisión con IA en ${targets.length} grants…`,
+      ),
+    );
     let count = 0;
     try {
       for (const item of targets) {
@@ -408,7 +464,7 @@ function GrantsPage({ orgId }: { orgId: string }) {
         }
       }
       await refresh();
-      setInfo(`Done: ${count} grants reviewed.`);
+      setInfo(tr(`Done: ${count} grants reviewed.`, `Listo: ${count} grants revisados.`));
     } catch (e) {
       fail(e);
     } finally {
@@ -424,10 +480,20 @@ function GrantsPage({ orgId }: { orgId: string }) {
         await navigate({ to: "/proposals/$id", params: { id: r.proposalId } });
       } catch (e) {
         if (e instanceof Error && e.message.includes("org_profile_missing")) {
-          throw new Error("Complete the IIAL organization profile before starting a proposal.");
+          throw new Error(
+            tr(
+              "Complete the IIAL organization profile before starting a proposal.",
+              "Completa el perfil de la organización IIAL antes de iniciar una propuesta.",
+            ),
+          );
         }
         if (e instanceof Error && /not_eligible|not_evaluated/.test(e.message)) {
-          throw new Error("Drafting is only available for grants your fit check found eligible.");
+          throw new Error(
+            tr(
+              "Drafting is only available for grants your fit check found eligible.",
+              "La redacción solo está disponible para grants que tu verificación de encaje consideró elegibles.",
+            ),
+          );
         }
         throw e;
       }
@@ -436,20 +502,39 @@ function GrantsPage({ orgId }: { orgId: string }) {
   const onEnrich = (grantId: string) =>
     run(`${grantId}:enrich`, async () => {
       const r = await enrichOne({ data: { grantId } });
-      if (!r.ok) throw new Error(`Could not read the source: ${r.error ?? "unknown error"}`);
+      if (!r.ok)
+        throw new Error(
+          tr(
+            `Could not read the source: ${r.error ?? "unknown error"}`,
+            `No se pudo leer la fuente: ${r.error ?? "error desconocido"}`,
+          ),
+        );
       if (r.skipped && r.reason === "max_attempts_reached")
-        throw new Error("This source could not be read automatically. Review the official page.");
+        throw new Error(
+          tr(
+            "This source could not be read automatically. Review the official page.",
+            "Esta fuente no se pudo leer automáticamente. Revisa la página oficial.",
+          ),
+        );
     });
 
   const onDiscover = () =>
     run("__discover__", async () => {
       const funderIds = selectedFunders.size > 0 ? [...selectedFunders] : undefined;
-      setInfo("Checking official funder sources. Keep this page open.");
+      setInfo(
+        tr(
+          "Checking official funder sources. Keep this page open.",
+          "Revisando las fuentes oficiales de los financiadores. Mantén esta página abierta.",
+        ),
+      );
       const r = await discoverAll({ data: { funderIds } });
       if (r?.jobId) {
         setActiveJob({ jobId: r.jobId, queued: r.queued ?? 0 });
         setInfo(
-          `Checked ${r.queued} funder(s): ${r.totalInserted ?? 0} new opportunities, ${r.totalSeenAgain ?? 0} already tracked.`,
+          tr(
+            `Checked ${r.queued} funder(s): ${r.totalInserted ?? 0} new opportunities, ${r.totalSeenAgain ?? 0} already tracked.`,
+            `Se revisaron ${r.queued} financiador(es): ${r.totalInserted ?? 0} oportunidades nuevas, ${r.totalSeenAgain ?? 0} ya seguidas.`,
+          ),
         );
       }
     });
@@ -459,7 +544,12 @@ function GrantsPage({ orgId }: { orgId: string }) {
     setError(null);
     try {
       const started = await startStrictReview({ data: { includeTerminal: false } });
-      setInfo(`${started.queued} grants queued for strict, source-backed review.`);
+      setInfo(
+        tr(
+          `${started.queued} grants queued for strict, source-backed review.`,
+          `${started.queued} grants en cola para una revisión estricta basada en fuentes.`,
+        ),
+      );
       await refetchStrictReview();
     } catch (e) {
       fail(e);
@@ -477,8 +567,11 @@ function GrantsPage({ orgId }: { orgId: string }) {
       const result = await processStrictReview({ data: { jobId, limit: 2 } });
       setInfo(
         result.pending > 0
-          ? `${result.processed} reviewed; ${result.pending} remain in the controlled queue.`
-          : "Strict catalog review completed.",
+          ? tr(
+              `${result.processed} reviewed; ${result.pending} remain in the controlled queue.`,
+              `${result.processed} revisados; ${result.pending} quedan en la cola controlada.`,
+            )
+          : tr("Strict catalog review completed.", "Revisión estricta del catálogo completada."),
       );
       await Promise.all([refetchStrictReview(), refresh()]);
     } catch (e) {
@@ -493,7 +586,10 @@ function GrantsPage({ orgId }: { orgId: string }) {
     info && { tone: "info" as const, text: info, onClose: () => setInfo(null) },
     data.searchDegradedReason && {
       tone: "info" as const,
-      text: "Meaning-based search is temporarily unavailable; showing keyword matches.",
+      text: tr(
+        "Meaning-based search is temporarily unavailable; showing keyword matches.",
+        "La búsqueda por significado no está disponible por ahora; se muestran coincidencias por palabra clave.",
+      ),
       onClose: () => undefined,
     },
   ].filter(Boolean) as Array<{ tone: "info" | "error"; text: string; onClose: () => void }>;
@@ -509,6 +605,7 @@ function GrantsPage({ orgId }: { orgId: string }) {
         sectors={sectors}
         isAdmin={isAdmin}
         simple={isConsultant}
+        focus={focus}
         searchMode={searching ? (data.searchMode ?? null) : null}
         notices={notices}
         actions={{
@@ -552,7 +649,7 @@ function GrantsPage({ orgId }: { orgId: string }) {
           />
         }
         moreFilters={
-          <div className="space-y-3 rounded-lg border bg-card p-3 text-sm">
+          <div className="space-y-3 text-sm">
             <GrantFacetFilters counts={data.facetCounts} value={facets} onChange={setFacets} />
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2">
@@ -561,7 +658,7 @@ function GrantsPage({ orgId }: { orgId: string }) {
                   checked={includeHardBlocked}
                   onChange={(e) => setIncludeHardBlocked(e.target.checked)}
                 />
-                Include grants your rules block
+                {tr("Include grants your rules block", "Incluir grants que tus reglas bloquean")}
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -569,7 +666,7 @@ function GrantsPage({ orgId }: { orgId: string }) {
                   checked={includeDismissed}
                   onChange={(e) => setIncludeDismissed(e.target.checked)}
                 />
-                Include hidden / rejected
+                {tr("Include hidden / rejected", "Incluir ocultos / rechazados")}
               </label>
               {searchProfileId && (
                 <Button
@@ -578,7 +675,7 @@ function GrantsPage({ orgId }: { orgId: string }) {
                   disabled={reviewMutation.isPending}
                   onClick={() => reviewMutation.mutate()}
                 >
-                  Mark results reviewed
+                  {tr("Mark results reviewed", "Marcar resultados como revisados")}
                 </Button>
               )}
             </div>

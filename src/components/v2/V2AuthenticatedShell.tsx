@@ -54,6 +54,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getLlmRouteStatus, type LlmRouteStatus } from "@/lib/llm-route.functions";
 import { TenantReadinessBanner } from "@/components/org/TenantReadinessBanner";
 import { useActiveTenant } from "@/lib/tenant-context";
+import { useTr } from "@/lib/ui-lang";
 const SIDEBAR_COLLAPSED_KEY = "iial.v2.sidebar.collapsed";
 
 type NavItem = {
@@ -247,6 +248,79 @@ const LIFECYCLE = [
   { label: "Report", icon: CalendarDays },
 ];
 
+// Spanish for the menu labels and descriptions above (keyed by the English text).
+const NAV_ES: Record<string, string> = {
+  Organizations: "Organizaciones",
+  Clients: "Clientes",
+  "Profiles, readiness and matching grants": "Perfiles, preparación y grants compatibles",
+  "Every day": "Día a día",
+  Today: "Hoy",
+  "Deadlines, missing items, follow-ups": "Plazos, faltantes y seguimientos",
+  "Find grants": "Buscar grants",
+  "Search and check if we can apply": "Buscar y verificar si podemos postular",
+  "My grants": "Mis grants",
+  "What we are working on, emails to Marcelo": "En qué trabajamos, correos a Marcelo",
+  Partners: "Socios",
+  "Universities, co-ops and contacts": "Universidades, cooperativas y contactos",
+  "Fit insights": "Análisis de encaje",
+  "Why grants do not pass": "Por qué los grants no califican",
+  Funders: "Financiadores",
+  "CRA, history, patterns": "CRA, historial, patrones",
+  "Your applications": "Sus postulaciones",
+  Proposals: "Propuestas",
+  "Drafts and sections": "Borradores y secciones",
+  "Answer library": "Biblioteca de respuestas",
+  "Approved reusable language": "Textos aprobados reutilizables",
+  "Quality check": "Control de calidad",
+  "Scores and gaps": "Puntajes y brechas",
+  Submissions: "Envíos",
+  "Sent, won, waiting": "Enviados, ganados, en espera",
+  "After you win": "Después de ganar",
+  Awards: "Adjudicaciones",
+  "Outcomes and reports": "Resultados e informes",
+  Money: "Dinero",
+  "Budget vs actuals": "Presupuesto vs. real",
+  Impact: "Impacto",
+  "Measures and evidence": "Indicadores y evidencia",
+  Renewals: "Renovaciones",
+  "Next-cycle likelihood": "Probabilidad del próximo ciclo",
+  "Stay on track": "Mantenerse al día",
+  Tasks: "Tareas",
+  "Assignments and follow-up": "Asignaciones y seguimiento",
+  Deadlines: "Plazos",
+  "Reports and reminders": "Informes y recordatorios",
+  "Market view": "Vista de mercado",
+  "Recipients and programs": "Beneficiarios y programas",
+  "Set up": "Configuración",
+  "Organization profile": "Perfil de la organización",
+  "Who you are and what you apply for": "Quiénes son y a qué postulan",
+  "What we show you": "Qué le mostramos",
+  "IIAL eligibility model": "Modelo de elegibilidad IIAL",
+  "Design backlog": "Backlog de diseño",
+  "Roadmap, ideas and improvements": "Hoja de ruta, ideas y mejoras",
+  Guide: "Guía",
+  "System guide": "Guía del sistema",
+  "Privacy & governance": "Privacidad y gobernanza",
+  "Consents, data rights, compliance": "Consentimientos, derechos de datos, cumplimiento",
+  Admin: "Administración",
+  Autonomy: "Autonomía",
+  "Daemons, memory, lessons": "Procesos, memoria, lecciones",
+  Operations: "Operaciones",
+  "Platform health": "Salud de la plataforma",
+  "Admin console": "Consola de administración",
+  "Users, agents, modules": "Usuarios, agentes, módulos",
+  "Audit trail": "Registro de auditoría",
+  "Decisions and activity history": "Historial de decisiones y actividad",
+  Workflows: "Flujos de trabajo",
+  "Automation and processing rules": "Reglas de automatización y procesamiento",
+  Discover: "Descubrir",
+  Fit: "Encaje",
+  Draft: "Redactar",
+  Submit: "Enviar",
+  Award: "Adjudicar",
+  Report: "Informar",
+};
+
 const ACCENT_CLASS: Record<NavGroup["accent"], string> = {
   teal: "bg-brand-green",
   amber: "bg-amber-400",
@@ -257,6 +331,8 @@ const ACCENT_CLASS: Record<NavGroup["accent"], string> = {
 
 export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const tr = useTr();
+  const navTr = (text: string) => tr(text, NAV_ES[text] ?? text);
   const isAdmin = useIsAdmin();
   // Shell renders on every authenticated page, so this must never suspend or
   // throw: assume the safer "cloud is in play" wording until it resolves.
@@ -270,9 +346,12 @@ export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
   const isConsultant = useIsConsultant();
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) =>
-      isConsultant ? CONSULTANT_MENU.includes(item.to) : !item.adminOnly || isAdmin,
-    ),
+    label: navTr(group.label),
+    items: group.items
+      .filter((item) =>
+        isConsultant ? CONSULTANT_MENU.includes(item.to) : !item.adminOnly || isAdmin,
+      )
+      .map((item) => ({ ...item, label: navTr(item.label), description: navTr(item.description) })),
   })).filter((group) => group.items.length > 0);
   const activeItem = findActiveItem(currentPath, visibleGroups);
 
@@ -308,7 +387,7 @@ export function V2AuthenticatedShell({ children }: { children: ReactNode }) {
     <TooltipProvider delayDuration={150}>
       <div data-ui-version="v2" className="min-h-screen bg-background text-foreground">
         <aside
-          aria-label="Sidebar navigation"
+          aria-label={tr("Sidebar navigation", "Navegación lateral")}
           className={cn(
             "fixed inset-y-0 left-0 z-40 hidden border-r border-white/10 bg-sidebar text-white lg:flex lg:flex-col transition-all duration-300 ease-in-out",
             collapsed ? "w-[68px]" : "w-[280px]",
@@ -363,6 +442,7 @@ function V2DesktopNav({
   onToggleCollapse?: () => void;
 }) {
   const simple = useIsConsultant();
+  const tr = useTr();
   return (
     <>
       <div
@@ -392,10 +472,14 @@ function V2DesktopNav({
                     className="h-8 w-8 text-white/70 hover:bg-white/10 hover:text-white"
                   >
                     <PanelLeftOpen className="h-4 w-4" />
-                    <span className="sr-only">Expand sidebar</span>
+                    <span className="sr-only">
+                      {tr("Expand sidebar", "Expandir barra lateral")}
+                    </span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="right">Expand sidebar</TooltipContent>
+                <TooltipContent side="right">
+                  {tr("Expand sidebar", "Expandir barra lateral")}
+                </TooltipContent>
               </Tooltip>
             )}
             <Tooltip>
@@ -408,7 +492,7 @@ function V2DesktopNav({
                   <Command className="h-4 w-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right">Search (Cmd K)</TooltipContent>
+              <TooltipContent side="right">{tr("Search (Cmd K)", "Buscar (Cmd K)")}</TooltipContent>
             </Tooltip>
           </div>
         ) : (
@@ -420,7 +504,9 @@ function V2DesktopNav({
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-semibold tracking-normal">IIAL Grants</div>
-                  <div className="text-xs text-white/56">Opportunity operating system</div>
+                  <div className="text-xs text-white/56">
+                    {tr("Opportunity operating system", "Sistema operativo de oportunidades")}
+                  </div>
                 </div>
               </Link>
               {onToggleCollapse && (
@@ -434,10 +520,14 @@ function V2DesktopNav({
                       className="h-8 w-8 text-white/70 hover:bg-white/10 hover:text-white"
                     >
                       <PanelLeftClose className="h-4 w-4" />
-                      <span className="sr-only">Collapse sidebar</span>
+                      <span className="sr-only">
+                        {tr("Collapse sidebar", "Contraer barra lateral")}
+                      </span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="right">Collapse sidebar</TooltipContent>
+                  <TooltipContent side="right">
+                    {tr("Collapse sidebar", "Contraer barra lateral")}
+                  </TooltipContent>
                 </Tooltip>
               )}
             </div>
@@ -449,7 +539,12 @@ function V2DesktopNav({
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Command className="h-4 w-4 shrink-0 text-brand-green" />
-                <span className="truncate">Search grants, funders, proposals</span>
+                <span className="truncate">
+                  {tr(
+                    "Search grants, funders, proposals",
+                    "Buscar grants, financiadores, propuestas",
+                  )}
+                </span>
               </span>
               <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/56">
                 Cmd K
@@ -464,7 +559,7 @@ function V2DesktopNav({
           "flex-1 overflow-y-auto transition-all duration-200",
           collapsed ? "px-1.5 py-3" : "px-3 py-4",
         )}
-        aria-label="Primary"
+        aria-label={tr("Primary", "Principal")}
       >
         <div className="space-y-4">
           {groups.map((group) => (
@@ -501,7 +596,7 @@ function V2DesktopNav({
           <div className="rounded-md border border-white/10 bg-white/[0.055] p-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-white">
               <Bot className="h-4 w-4 text-brand-green" />
-              AI stack
+              {tr("AI stack", "Stack de IA")}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-white/62">
               <span className="rounded-[6px] bg-white/[0.07] px-2 py-1">Lovable AI</span>
@@ -514,8 +609,10 @@ function V2DesktopNav({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-64 text-xs">
-                  Agents call the Lovable AI Gateway — always read AI-drafted text before
-                  submitting, never take it as final.
+                  {tr(
+                    "Agents call the Lovable AI Gateway — always read AI-drafted text before submitting, never take it as final.",
+                    "Los agentes usan Lovable AI Gateway: lea siempre el texto redactado por IA antes de enviarlo; nunca lo tome como definitivo.",
+                  )}
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -530,7 +627,7 @@ function V2DesktopNav({
               </div>
             </TooltipTrigger>
             <TooltipContent side="right" className="text-xs">
-              AI stack active: Lovable AI / Cloud
+              {tr("AI stack active: Lovable AI / Cloud", "Stack de IA activo: Lovable AI / Cloud")}
             </TooltipContent>
           </Tooltip>
         )}
@@ -551,10 +648,12 @@ function V2DesktopNav({
                 onClick={onSignOut}
               >
                 <LogOut className="h-4 w-4" />
-                <span className="sr-only">Sign out</span>
+                <span className="sr-only">{tr("Sign out", "Cerrar sesión")}</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent side={collapsed ? "right" : "top"}>Sign out</TooltipContent>
+            <TooltipContent side={collapsed ? "right" : "top"}>
+              {tr("Sign out", "Cerrar sesión")}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -582,6 +681,7 @@ function V2TopBar({
   const Icon = activeItem?.icon ?? Sparkles;
 
   const simple = useIsConsultant();
+  const tr = useTr();
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-md transition-colors">
       <div className="flex h-16 items-center justify-between gap-3 px-3 sm:px-5">
@@ -608,12 +708,16 @@ function V2TopBar({
                     <PanelLeftClose className="h-4 w-4" />
                   )}
                   <span className="sr-only">
-                    {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    {collapsed
+                      ? tr("Expand sidebar", "Expandir barra lateral")
+                      : tr("Collapse sidebar", "Contraer barra lateral")}
                   </span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                {collapsed
+                  ? tr("Expand sidebar", "Expandir barra lateral")
+                  : tr("Collapse sidebar", "Contraer barra lateral")}
               </TooltipContent>
             </Tooltip>
           )}
@@ -624,10 +728,10 @@ function V2TopBar({
             <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
               IIAL Grants
               <ChevronRight className="h-3 w-3 opacity-60" />
-              <span>Workspace</span>
+              <span>{tr("Workspace", "Espacio de trabajo")}</span>
             </div>
             <div className="truncate text-sm font-semibold tracking-tight text-foreground">
-              {activeItem?.label ?? "IIAL Command Center"}
+              {activeItem?.label ?? tr("IIAL Command Center", "Centro de mando IIAL")}
             </div>
           </div>
         </div>
@@ -641,7 +745,9 @@ function V2TopBar({
             onClick={openCommandPalette}
           >
             <Search className="h-4 w-4 text-primary/70" />
-            <span className="text-xs">Search grants, funders...</span>
+            <span className="text-xs">
+              {tr("Search grants, funders...", "Buscar grants, financiadores...")}
+            </span>
             <kbd className="ml-auto rounded border border-border/80 bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
               ⌘K
             </kbd>
@@ -672,7 +778,10 @@ function V2TopBar({
                 </Badge>
               </TooltipTrigger>
               <TooltipContent className="max-w-72 text-xs">
-                {`Analysis and drafting run through ${llmRoute.cloudProviders.join(", ") || "Lovable AI"}. Eligibility verdicts stay rule-based.`}
+                {tr(
+                  `Analysis and drafting run through ${llmRoute.cloudProviders.join(", ") || "Lovable AI"}. Eligibility verdicts stay rule-based.`,
+                  `El análisis y la redacción se hacen con ${llmRoute.cloudProviders.join(", ") || "Lovable AI"}. Los veredictos de elegibilidad siguen basados en reglas.`,
+                )}
               </TooltipContent>
             </Tooltip>
           )}
@@ -691,10 +800,12 @@ function V2TopBar({
                 onClick={openCommandPalette}
               >
                 <Command className="h-4 w-4" />
-                <span className="sr-only">Open command palette</span>
+                <span className="sr-only">
+                  {tr("Open command palette", "Abrir paleta de comandos")}
+                </span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Command palette</TooltipContent>
+            <TooltipContent>{tr("Command palette", "Paleta de comandos")}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -708,7 +819,7 @@ function V2TopBar({
                 <div key={stage.label} className="flex min-w-0 items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-md border bg-card px-2 py-1 font-medium text-foreground">
                     <StageIcon className="h-3.5 w-3.5 text-primary" />
-                    {stage.label}
+                    {tr(stage.label, NAV_ES[stage.label] ?? stage.label)}
                   </span>
                   {index < LIFECYCLE.length - 1 && <ChevronRight className="h-3.5 w-3.5" />}
                 </div>
@@ -723,20 +834,23 @@ function V2TopBar({
 
 function TenantSelector() {
   const { organizations, activeOrgId, isLoading, setActiveOrgId } = useActiveTenant();
+  const tr = useTr();
   if (!isLoading && organizations.length === 0) return null;
 
   return (
     <label className="relative hidden items-center gap-2 rounded-lg border border-border/60 bg-card/70 px-2.5 py-1.5 shadow-2xs sm:flex">
       <Building2 className="h-4 w-4 shrink-0 text-primary" />
-      <span className="sr-only">Active organization</span>
+      <span className="sr-only">{tr("Active organization", "Organización activa")}</span>
       <select
-        aria-label="Active organization"
+        aria-label={tr("Active organization", "Organización activa")}
         value={activeOrgId ?? ""}
         disabled={isLoading || organizations.length === 0}
         onChange={(event) => setActiveOrgId(event.target.value)}
         className="max-w-[170px] cursor-pointer appearance-none truncate bg-transparent pr-4 text-xs font-semibold text-foreground outline-none disabled:cursor-wait"
       >
-        {!activeOrgId && <option value="">Loading workspace…</option>}
+        {!activeOrgId && (
+          <option value="">{tr("Loading workspace…", "Cargando espacio de trabajo…")}</option>
+        )}
         {organizations.map((organization) => (
           <option key={organization.id} value={organization.id}>
             {organization.name}
@@ -761,19 +875,20 @@ function V2MobileNav({
   onSignOut: () => void;
   llmRoute: LlmRouteStatus;
 }) {
+  const tr = useTr();
   return (
     <Sheet>
       <SheetTrigger asChild>
         <Button variant="outline" size="icon" className="h-9 w-9 lg:hidden">
           <Menu className="h-4 w-4" />
-          <span className="sr-only">Open navigation</span>
+          <span className="sr-only">{tr("Open navigation", "Abrir navegación")}</span>
         </Button>
       </SheetTrigger>
       <SheetContent
         side="left"
         className="w-[320px] max-w-[86vw] border-white/10 bg-sidebar p-0 text-white"
       >
-        <SheetTitle className="sr-only">Navigation</SheetTitle>
+        <SheetTitle className="sr-only">{tr("Navigation", "Navegación")}</SheetTitle>
         <V2DesktopNav
           activePath={activePath}
           groups={groups}

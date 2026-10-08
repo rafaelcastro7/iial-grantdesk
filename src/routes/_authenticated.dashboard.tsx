@@ -19,6 +19,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { ConsultantToday } from "@/components/v2/ConsultantToday";
 import { listGrantWorkspaces } from "@/lib/grant-workspace.functions";
 import { Activity, ArrowRight } from "lucide-react";
+import { pick, useTr, useUiLang, type UiLang } from "@/lib/ui-lang";
 import "@/i18n";
 import { isActiveGrantStatus } from "@/agents/pipeline-stages.shared";
 
@@ -67,6 +68,7 @@ type NextStep =
   | { kind: "grant"; eyebrow: string; title: string; body: string; cta: string; id: string };
 
 function Dashboard() {
+  const tr = useTr();
   const { activeOrgId } = useActiveTenant();
   const fetchPipeline = useServerFn(listGrantWorkspaces);
   const { data: pipelineData } = useQuery({
@@ -217,7 +219,9 @@ function Dashboard() {
           };
 
   // Greet the person, not the organization ("Welcome back, Rocio").
-  const greeting = personName ? `Welcome back, ${personName}` : "Welcome back";
+  const greeting = personName
+    ? tr(`Welcome back, ${personName}`, `Bienvenido de nuevo, ${personName}`)
+    : tr("Welcome back", "Bienvenido de nuevo");
 
   return (
     <DashboardV2
@@ -258,10 +262,14 @@ type MatchGrant = {
 const VERDICT_RANK = { eligible: 2, needs_input: 1, not_eligible: 0 } as const;
 
 /** Badge text shared by both match rows; same reading as the radar. */
-function matchLabel(evaluation: MatchGrant["evaluation"]): string {
-  if (!evaluation) return "Needs fit check";
+function matchLabel(evaluation: MatchGrant["evaluation"], lang: UiLang = "en"): string {
+  if (!evaluation) return pick(lang, "Needs fit check", "Falta revisar el encaje");
   const v = evaluationVerdict(evaluation);
-  return v === "eligible" ? "Eligible" : v === "needs_input" ? "Confirm eligibility" : "Not a fit";
+  return v === "eligible"
+    ? pick(lang, "Eligible", "Elegible")
+    : v === "needs_input"
+      ? pick(lang, "Confirm eligibility", "Confirmar elegibilidad")
+      : pick(lang, "Not a fit", "No encaja");
 }
 
 function DashboardV2({
@@ -299,6 +307,7 @@ function DashboardV2({
   topMatches: MatchGrant[];
   withDeadline: number;
 }) {
+  const tr = useTr();
   const headlineGreeting = greeting.replace(/[.!?]+$/, "");
 
   return (
@@ -311,14 +320,19 @@ function DashboardV2({
             <section className="rounded-md border bg-card shadow-sm">
               <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
                 <div>
-                  <h2 className="text-base font-semibold">New grants that fit</h2>
+                  <h2 className="text-base font-semibold">
+                    {tr("New grants that fit", "Nuevos grants que encajan")}
+                  </h2>
                   <p className="text-sm text-muted-foreground">
-                    Best fit first. Open one to start its plan.
+                    {tr(
+                      "Best fit first. Open one to start its plan.",
+                      "Los de mejor encaje primero. Abra uno para iniciar su plan.",
+                    )}
                   </p>
                 </div>
                 <Button asChild variant="outline" size="sm" className="gap-2">
                   <Link to="/grants">
-                    Find grants <ArrowRight className="h-4 w-4" />
+                    {tr("Find grants", "Buscar grants")} <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
               </div>
@@ -335,9 +349,14 @@ function DashboardV2({
                     <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md border bg-muted">
                       <Activity className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="mt-3 text-sm font-semibold">No scored grants yet</p>
+                    <p className="mt-3 text-sm font-semibold">
+                      {tr("No scored grants yet", "Aún no hay grants evaluados")}
+                    </p>
                     <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                      Open the grant radar and run fit checks to build a ranked queue.
+                      {tr(
+                        "Open the grant radar and run fit checks to build a ranked queue.",
+                        "Abra el radar de grants y revise el encaje para armar una lista priorizada.",
+                      )}
                     </p>
                   </div>
                 ) : (
@@ -398,6 +417,8 @@ function V2Metric({
 }
 
 function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
+  const tr = useTr();
+  const lang = useUiLang();
   const f = Array.isArray(grant.funder) ? grant.funder[0] : grant.funder;
   const fit = realFit(grant.evaluation);
   const eligible = grant.evaluation?.eligibility_pass ?? false;
@@ -406,12 +427,12 @@ function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
     : null;
   const deadlineLabel =
     days == null
-      ? "Rolling deadline"
+      ? tr("Rolling deadline", "Plazo abierto")
       : days < 0
-        ? "Closed"
+        ? tr("Closed", "Cerrado")
         : days === 0
-          ? "Closes today"
-          : `Closes in ${days} days`;
+          ? tr("Closes today", "Cierra hoy")
+          : tr(`Closes in ${days} days`, `Cierra en ${days} días`);
 
   return (
     <Link
@@ -424,7 +445,9 @@ function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
           {grant.title}
         </div>
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="truncate">{f?.name ?? "Unknown funder"}</span>
+          <span className="truncate">
+            {f?.name ?? tr("Unknown funder", "Financiador desconocido")}
+          </span>
           <span className="h-1 w-1 rounded-full bg-border" />
           <span
             className={
@@ -447,7 +470,7 @@ function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
               : "text-muted-foreground",
           )}
         >
-          {matchLabel(grant.evaluation)}
+          {matchLabel(grant.evaluation, lang)}
         </Badge>
       </div>
       <div className="flex items-center gap-2 md:justify-end">
@@ -456,7 +479,9 @@ function V2MatchRow({ grant, now }: { grant: MatchGrant; now: number }) {
             {fit == null ? "—" : fit}
           </div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {fit == null && grant.evaluation ? "AI review pending" : "fit score"}
+            {fit == null && grant.evaluation
+              ? tr("AI review pending", "Revisión IA pendiente")
+              : tr("fit score", "puntaje de encaje")}
           </div>
         </div>
       </div>

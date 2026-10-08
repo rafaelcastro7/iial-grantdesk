@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { previewExternalUrl } from "@/lib/external-preview.functions";
+import { useTr } from "@/lib/ui-lang";
 
 function hostnameOf(url: string): string {
   try {
@@ -125,6 +126,7 @@ export function ExternalLinkPreview({
   showIcon?: boolean;
   title?: string;
 }) {
+  const tr = useTr();
   const [open, setOpen] = useState(false);
   const fetchPreview = useServerFn(previewExternalUrl);
 
@@ -166,7 +168,7 @@ export function ExternalLinkPreview({
               {isLoading ? (
                 <Skeleton className="h-5 w-3/4" />
               ) : (
-                (data?.ok ? data.title : null) || "Preview"
+                (data?.ok ? data.title : null) || tr("Preview", "Vista previa")
               )}
             </SheetTitle>
             <SheetDescription className="text-[11px] break-all font-mono">{url}</SheetDescription>
@@ -189,7 +191,10 @@ export function ExternalLinkPreview({
               <div className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/30 p-4 text-center space-y-2">
                 <AlertTriangle className="h-5 w-5 mx-auto text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Couldn't load a preview of this page — it may require sign-in or interaction.
+                  {tr(
+                    "Couldn't load a preview of this page — it may require sign-in or interaction.",
+                    "No se pudo cargar una vista previa de esta página — puede requerir inicio de sesión o interacción.",
+                  )}
                 </p>
               </div>
             )}
@@ -199,7 +204,10 @@ export function ExternalLinkPreview({
                 <PreviewBody markdown={data.markdown} />
                 {data.truncated && (
                   <p className="mt-3 text-[11px] text-muted-foreground">
-                    Preview truncated — open the original for the full page.
+                    {tr(
+                      "Preview truncated — open the original for the full page.",
+                      "Vista previa recortada — abre el original para ver la página completa.",
+                    )}
                   </p>
                 )}
               </>
@@ -211,12 +219,13 @@ export function ExternalLinkPreview({
           <div className="flex items-center justify-between gap-2">
             {!isLoading && data?.ok && (
               <Badge variant="outline" className="text-[10px] font-normal">
-                Reader mode · {data.via.replace(/_/g, " ")}
+                {tr("Reader mode", "Modo lectura")} · {data.via.replace(/_/g, " ")}
               </Badge>
             )}
             <Button asChild variant="default" size="sm" className="ml-auto gap-1.5">
               <a href={url} target="_blank" rel="noopener noreferrer">
-                Open original site <ExternalLinkIcon className="h-3.5 w-3.5" />
+                {tr("Open original site", "Abrir sitio original")}{" "}
+                <ExternalLinkIcon className="h-3.5 w-3.5" />
               </a>
             </Button>
           </div>

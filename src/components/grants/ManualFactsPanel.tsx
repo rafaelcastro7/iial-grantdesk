@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setGrantManualField } from "@/lib/grants.functions";
+import { useTr, useUiLang, localeOf } from "@/lib/ui-lang";
 
 type FieldKey =
   | "amount_cad_min"
@@ -31,30 +32,56 @@ export type ManualFactsGrant = {
   field_search_status?: SearchStatus | null;
 };
 
-const FIELDS: Array<{ key: FieldKey; label: string; kind: Kind; searchKey: string }> = [
+const FIELDS: Array<{
+  key: FieldKey;
+  label: string;
+  labelEs: string;
+  kind: Kind;
+  searchKey: string;
+}> = [
   {
     key: "amount_cad_max",
     label: "Maximum amount (CAD)",
+    labelEs: "Monto máximo (CAD)",
     kind: "amount",
     searchKey: "amount_cad_max",
   },
   {
     key: "amount_cad_min",
     label: "Minimum amount (CAD)",
+    labelEs: "Monto mínimo (CAD)",
     kind: "amount",
     searchKey: "amount_cad_min",
   },
-  { key: "deadline", label: "Deadline", kind: "date", searchKey: "deadline" },
-  { key: "eligibility_note", label: "Who can apply", kind: "text", searchKey: "eligibility" },
-  { key: "applicant_types", label: "Applicant types", kind: "list", searchKey: "eligibility" },
-  { key: "sectors", label: "Sectors", kind: "list", searchKey: "sectors" },
+  {
+    key: "deadline",
+    label: "Deadline",
+    labelEs: "Fecha límite",
+    kind: "date",
+    searchKey: "deadline",
+  },
+  {
+    key: "eligibility_note",
+    label: "Who can apply",
+    labelEs: "Quién puede postular",
+    kind: "text",
+    searchKey: "eligibility",
+  },
+  {
+    key: "applicant_types",
+    label: "Applicant types",
+    labelEs: "Tipos de solicitante",
+    kind: "list",
+    searchKey: "eligibility",
+  },
+  { key: "sectors", label: "Sectors", labelEs: "Sectores", kind: "list", searchKey: "sectors" },
 ];
 
-function display(kind: Kind, value: unknown): string | null {
+function display(kind: Kind, value: unknown, locale = "en-CA"): string | null {
   if (value == null) return null;
   if (kind === "list") return Array.isArray(value) && value.length ? value.join(", ") : null;
   if (kind === "amount") {
-    return new Intl.NumberFormat("en-CA", {
+    return new Intl.NumberFormat(locale, {
       currency: "CAD",
       maximumFractionDigits: 0,
       style: "currency",
@@ -74,6 +101,9 @@ function day(iso?: string) {
  * completed by hand; enrichment never overwrites a hand-entered value.
  */
 export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
+  const tr = useTr();
+  const lang = useUiLang();
+  const locale = localeOf(lang);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FieldKey | null>(null);
   const [draft, setDraft] = useState("");
@@ -112,10 +142,12 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
     if (raw) {
       if (kind === "amount") {
         const n = Number(raw.replace(/[$,\s]/g, ""));
-        if (!Number.isFinite(n) || n < 0) return setError("Enter a number, e.g. 50000");
+        if (!Number.isFinite(n) || n < 0)
+          return setError(tr("Enter a number, e.g. 50000", "Ingresa un número, p. ej. 50000"));
         value = n;
       } else if (kind === "date") {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return setError("Use YYYY-MM-DD");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw))
+          return setError(tr("Use YYYY-MM-DD", "Usa AAAA-MM-DD"));
         value = raw;
       } else if (kind === "list") {
         value = raw
@@ -137,7 +169,10 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
       // API reports it missing from the schema cache.
       setError(
         /set_grant_manual_field|schema cache|Could not find the function/i.test(message)
-          ? "Editing is not available yet: the database update that enables it has not been applied. Ask an admin to apply pending migrations in Lovable."
+          ? tr(
+              "Editing is not available yet: the database update that enables it has not been applied. Ask an admin to apply pending migrations in Lovable.",
+              "La edición aún no está disponible: no se ha aplicado la actualización de la base de datos que la habilita. Pide a un administrador que aplique las migraciones pendientes en Lovable.",
+            )
           : message,
       );
     } finally {
@@ -145,7 +180,7 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
     }
   };
 
-  const missingCount = FIELDS.filter(({ key, kind }) => !display(kind, values[key])).length;
+  const missingCount = FIELDS.filter(({ key, kind }) => !display(kind, values[key], locale)).length;
 
   return (
     <section className="rounded-md border bg-background">
@@ -157,11 +192,13 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
         className="flex w-full items-center justify-between gap-3 p-4 text-left"
       >
         <div>
-          <h2 className="text-sm font-semibold">Grant facts</h2>
+          <h2 className="text-sm font-semibold">{tr("Grant facts", "Datos del grant")}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {missingCount === 0
-              ? "All key facts are filled in."
-              : `${missingCount} of ${FIELDS.length} missing — open to review or complete them.`}
+              ? tr("All key facts are filled in.", "Todos los datos clave están completos.")
+              : lang === "es"
+                ? `Faltan ${missingCount} de ${FIELDS.length} — abre para revisarlos o completarlos.`
+                : `${missingCount} of ${FIELDS.length} missing — open to review or complete them.`}
           </p>
         </div>
         <ChevronDown
@@ -171,11 +208,15 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
       {open && (
         <div id={`grant-facts-${grant.id}`} className="border-t px-4 pb-4">
           <p className="mt-3 text-xs text-muted-foreground">
-            Hand-entered values are never overwritten by the automatic search.
+            {tr(
+              "Hand-entered values are never overwritten by the automatic search.",
+              "La búsqueda automática nunca sobrescribe los valores ingresados a mano.",
+            )}
           </p>
           <ul className="mt-2 divide-y">
-            {FIELDS.map(({ key, label, kind, searchKey }) => {
-              const shown = display(kind, values[key]);
+            {FIELDS.map(({ key, label: labelEn, labelEs, kind, searchKey }) => {
+              const label = tr(labelEn, labelEs);
+              const shown = display(kind, values[key], locale);
               const byPerson = manual[key];
               const notFound = !shown && status[searchKey]?.status === "not_found";
               return (
@@ -191,15 +232,19 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
                             className="h-8 w-64 max-w-full"
                             type={kind === "date" ? "date" : "text"}
                             inputMode={kind === "amount" ? "numeric" : undefined}
-                            placeholder={kind === "list" ? "Comma-separated" : undefined}
+                            placeholder={
+                              kind === "list"
+                                ? tr("Comma-separated", "Separados por comas")
+                                : undefined
+                            }
                             value={draft}
                             onChange={(e) => setDraft(e.target.value)}
                           />
                           <Button size="sm" disabled={saving} onClick={() => submit(key, kind)}>
-                            <Check className="mr-1 h-3.5 w-3.5" /> Save
+                            <Check className="mr-1 h-3.5 w-3.5" /> {tr("Save", "Guardar")}
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
-                            <X className="mr-1 h-3.5 w-3.5" /> Cancel
+                            <X className="mr-1 h-3.5 w-3.5" /> {tr("Cancel", "Cancelar")}
                           </Button>
                           {error && <span className="text-xs text-rose-600">{error}</span>}
                         </div>
@@ -208,29 +253,39 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
                           {shown ?? (
                             <span className="text-muted-foreground">
                               {notFound
-                                ? "Not found"
+                                ? tr("Not found", "No encontrado")
                                 : grant.enriched_at
-                                  ? "Not published"
-                                  : "Not searched yet"}
+                                  ? tr("Not published", "No publicado")
+                                  : tr("Not searched yet", "Aún no buscado")}
                             </span>
                           )}
                         </div>
                       )}
                       {byPerson ? (
                         <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-sky-700 dark:text-sky-400">
-                          <UserRound className="h-3 w-3" /> Entered by a person on{" "}
+                          <UserRound className="h-3 w-3" />{" "}
+                          {tr("Entered by a person on", "Ingresado por una persona el")}{" "}
                           {day(byPerson.at)}
                         </div>
                       ) : notFound ? (
                         <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
-                          <SearchX className="h-3 w-3" /> Searched the official sources on{" "}
-                          {day(status[searchKey]?.checked_at)} and did not find it — you can add it.
+                          <SearchX className="h-3 w-3" />{" "}
+                          {tr(
+                            "Searched the official sources on",
+                            "Se buscó en las fuentes oficiales el",
+                          )}{" "}
+                          {day(status[searchKey]?.checked_at)}{" "}
+                          {tr(
+                            "and did not find it — you can add it.",
+                            "y no se encontró — puedes agregarlo.",
+                          )}
                         </div>
                       ) : null}
                     </div>
                     {editing !== key && (
                       <Button size="sm" variant="outline" onClick={() => start(key, kind)}>
-                        <PencilLine className="mr-1 h-3.5 w-3.5" /> {shown ? "Edit" : "Add"}
+                        <PencilLine className="mr-1 h-3.5 w-3.5" />{" "}
+                        {shown ? tr("Edit", "Editar") : tr("Add", "Agregar")}
                       </Button>
                     )}
                   </div>

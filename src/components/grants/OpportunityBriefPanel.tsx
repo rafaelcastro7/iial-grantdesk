@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { humanizeBriefCondition, humanizeBriefReason } from "@/lib/eligibility-explain";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import { useActiveTenant } from "@/lib/tenant-context";
+import { useTr, useUiLang, pick, localeOf } from "@/lib/ui-lang";
 
 function StatusIcon({ s }: { s: string }) {
   if (s === "pass") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />;
@@ -36,23 +37,24 @@ function StatusIcon({ s }: { s: string }) {
 }
 
 function VerdictBadge({ v }: { v: Brief["recommendation"]["verdict"] }) {
+  const tr = useTr();
   if (v === "go") {
     return (
       <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-2xs">
-        Recommended to Pursue
+        {tr("Recommended to Pursue", "Recomendado para postular")}
       </Badge>
     );
   }
   if (v === "no_go") {
     return (
       <Badge variant="destructive" className="font-semibold shadow-2xs">
-        Not Recommended
+        {tr("Not Recommended", "No recomendado")}
       </Badge>
     );
   }
   return (
     <Badge className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-2xs">
-      With conditions
+      {tr("With conditions", "Con condiciones")}
     </Badge>
   );
 }
@@ -65,6 +67,11 @@ export function OpportunityBriefPanel({
   showScreeningDetails?: boolean;
 }) {
   const { activeOrgId } = useActiveTenant();
+  const tr = useTr();
+  const lang = useUiLang();
+  const locale = localeOf(lang);
+  const p = (en: string, es: string) => pick(lang, en, es);
+  const n = (x: number) => x.toLocaleString(locale);
   const [copied, setCopied] = useState(false);
   const gen = useServerFn(generateOpportunityBrief);
   const m = useMutation({
@@ -81,28 +88,30 @@ export function OpportunityBriefPanel({
   const copyExecutiveSummary = () => {
     if (!b) return;
     const lines = [
-      `# Executive Brief: ${b.program_snapshot.program}`,
-      `Funder: ${b.program_snapshot.funder ?? "Unknown"}`,
-      `Verdict: ${b.recommendation.verdict.toUpperCase()}`,
-      `Executive Summary: ${b.executive_summary ?? humanizeBriefReason(b.recommendation.reason)}`,
+      `# ${p("Executive Brief", "Resumen ejecutivo")}: ${b.program_snapshot.program}`,
+      `${p("Funder", "Financiador")}: ${b.program_snapshot.funder ?? p("Unknown", "Desconocido")}`,
+      `${p("Verdict", "Veredicto")}: ${b.recommendation.verdict.toUpperCase()}`,
+      `${p("Executive Summary", "Resumen ejecutivo")}: ${b.executive_summary ?? humanizeBriefReason(b.recommendation.reason)}`,
       "",
-      `## Financial Scale`,
-      `- Max Award: ${b.program_snapshot.max_amount_cad ? `$${b.program_snapshot.max_amount_cad.toLocaleString()} CAD` : "TBD"}`,
-      `- Match Required: ${b.money.match_required_pct ? `${b.money.match_required_pct}% (~$${b.money.estimated_match_cad?.toLocaleString()} CAD)` : "None"}`,
-      `- Total Project: ${b.money.estimated_total_cad ? `$${b.money.estimated_total_cad.toLocaleString()} CAD` : "TBD"}`,
-      `- Timeline: ${b.program_snapshot.runway_label ?? b.program_snapshot.deadline ?? "Rolling"}`,
+      `## ${p("Financial Scale", "Escala financiera")}`,
+      `- ${p("Max Award", "Monto máximo")}: ${b.program_snapshot.max_amount_cad ? `$${n(b.program_snapshot.max_amount_cad)} CAD` : p("TBD", "Por definir")}`,
+      `- ${p("Match Required", "Contrapartida requerida")}: ${b.money.match_required_pct ? `${b.money.match_required_pct}% (~$${b.money.estimated_match_cad != null ? n(b.money.estimated_match_cad) : ""} CAD)` : p("None", "Ninguna")}`,
+      `- ${p("Total Project", "Proyecto total")}: ${b.money.estimated_total_cad ? `$${n(b.money.estimated_total_cad)} CAD` : p("TBD", "Por definir")}`,
+      `- ${p("Timeline", "Plazo")}: ${b.program_snapshot.runway_label ?? b.program_snapshot.deadline ?? p("Rolling", "Continuo")}`,
       "",
-      `## Partnership Stance`,
+      `## ${p("Partnership Stance", "Postura de alianzas")}`,
       b.partner.note,
-      b.partner.recommended_action ? `Action: ${b.partner.recommended_action}` : "",
+      b.partner.recommended_action
+        ? `${p("Action", "Acción")}: ${b.partner.recommended_action}`
+        : "",
       "",
-      `## Action Items Before Starting`,
+      `## ${p("Action Items Before Starting", "Acciones antes de empezar")}`,
       ...b.recommendation.conditions.map((c) => `- ${humanizeBriefCondition(c)}`),
       "",
-      `## Strategic Angle`,
+      `## ${p("Strategic Angle", "Enfoque estratégico")}`,
       b.strategic_angle,
       "",
-      `## Application Checklist`,
+      `## ${p("Application Checklist", "Lista de verificación de la solicitud")}`,
       ...b.application_checklist.map((item) => `- [ ] ${item}`),
     ];
     navigator.clipboard.writeText(lines.filter(Boolean).join("\n"));
@@ -117,7 +126,7 @@ export function OpportunityBriefPanel({
           <div className="flex items-center gap-2">
             <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
               <FileText className="h-4 w-4 text-primary" />
-              What you need to apply
+              {tr("What you need to apply", "Lo que necesitas para postular")}
             </CardTitle>
             {b?.program_snapshot.runway_label && (
               <Badge
@@ -135,8 +144,10 @@ export function OpportunityBriefPanel({
             )}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Executive go / no-go decision brief: co-funding requirements, team composition, and
-            proposal assets.
+            {tr(
+              "Executive go / no-go decision brief: co-funding requirements, team composition, and proposal assets.",
+              "Resumen ejecutivo para decidir si postular: requisitos de cofinanciamiento, composición del equipo y materiales de la propuesta.",
+            )}
           </p>
         </div>
 
@@ -147,17 +158,20 @@ export function OpportunityBriefPanel({
               size="sm"
               onClick={copyExecutiveSummary}
               className="h-8 gap-1.5 text-xs font-medium"
-              title="Copy brief formatted for Slack or leadership update"
+              title={tr(
+                "Copy brief formatted for Slack or leadership update",
+                "Copiar el resumen con formato para Slack o un reporte a la dirección",
+              )}
             >
               {copied ? (
                 <>
                   <Check className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>Copied!</span>
+                  <span>{tr("Copied!", "¡Copiado!")}</span>
                 </>
               ) : (
                 <>
                   <Copy className="h-3.5 w-3.5" />
-                  <span>Copy Brief</span>
+                  <span>{tr("Copy Brief", "Copiar resumen")}</span>
                 </>
               )}
             </Button>
@@ -171,7 +185,7 @@ export function OpportunityBriefPanel({
             className="h-8 gap-1.5 text-xs font-medium"
           >
             <Loader2 className={`h-3.5 w-3.5 ${m.isPending ? "animate-spin" : "hidden"}`} />
-            Refresh
+            {tr("Refresh", "Actualizar")}
           </Button>
         </div>
       </CardHeader>
@@ -181,7 +195,10 @@ export function OpportunityBriefPanel({
           <div className="flex items-center gap-2.5 py-6 text-muted-foreground text-xs">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
             <span>
-              Synthesizing executive brief, financial structure, and strategic positioning...
+              {tr(
+                "Synthesizing executive brief, financial structure, and strategic positioning...",
+                "Sintetizando el resumen ejecutivo, la estructura financiera y el posicionamiento estratégico...",
+              )}
             </span>
           </div>
         )}
@@ -223,7 +240,10 @@ export function OpportunityBriefPanel({
                 {b.recommendation.conditions.length > 0 && (
                   <div className="pt-2 border-t border-current/15">
                     <p className="text-xs font-bold uppercase tracking-wider mb-1.5 opacity-90">
-                      Action Items Before You Start Writing
+                      {tr(
+                        "Action Items Before You Start Writing",
+                        "Acciones antes de empezar a redactar",
+                      )}
                     </p>
                     <ul className="space-y-1.5 text-xs leading-relaxed opacity-95">
                       {b.recommendation.conditions.map((c, i) => (
@@ -248,7 +268,8 @@ export function OpportunityBriefPanel({
             >
               <div className="flex items-center justify-between gap-2 mb-2">
                 <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <Users className="h-3.5 w-3.5 text-primary" /> Partnership Stance
+                  <Users className="h-3.5 w-3.5 text-primary" />{" "}
+                  {tr("Partnership Stance", "Postura de alianzas")}
                 </h4>
                 <Badge
                   variant={b.partner.needed ? "outline" : "secondary"}
@@ -258,7 +279,9 @@ export function OpportunityBriefPanel({
                       : "text-muted-foreground"
                   }`}
                 >
-                  {b.partner.needed ? "Mandatory External Partner" : "Sole Lead Applicant"}
+                  {b.partner.needed
+                    ? tr("Mandatory External Partner", "Socio externo obligatorio")
+                    : tr("Sole Lead Applicant", "Solicitante principal único")}
                 </Badge>
               </div>
 
@@ -268,7 +291,8 @@ export function OpportunityBriefPanel({
                 <div className="mt-2.5 pt-2 border-t border-current/15 flex items-start gap-2 text-xs">
                   <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
                   <span className="leading-relaxed">
-                    <strong>Recommended Next Step:</strong> {b.partner.recommended_action}
+                    <strong>{tr("Recommended Next Step:", "Siguiente paso recomendado:")}</strong>{" "}
+                    {b.partner.recommended_action}
                   </span>
                 </div>
               )}
@@ -278,28 +302,33 @@ export function OpportunityBriefPanel({
             <section className="rounded-xl border bg-muted/20 p-3.5 sm:p-4">
               <div className="flex items-center justify-between mb-2.5">
                 <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <CircleDollarSign className="h-3.5 w-3.5 text-primary" /> Financial Architecture
-                  &amp; Match
+                  <CircleDollarSign className="h-3.5 w-3.5 text-primary" />{" "}
+                  {tr("Financial Architecture & Match", "Arquitectura financiera y contrapartida")}
                 </h4>
                 {b.money.in_kind_allowed && (
                   <span className="text-[10px] text-muted-foreground font-medium">
-                    In-kind eligible (~{b.money.in_kind_cap_pct ?? 50}% allowance)
+                    {tr("In-kind eligible", "Admite aportes en especie")} (~
+                    {b.money.in_kind_cap_pct ?? 50}% {tr("allowance", "permitido")})
                   </span>
                 )}
               </div>
 
               <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
                 <div className="rounded-lg border bg-background/80 p-2.5 shadow-2xs">
-                  <dt className="text-[11px] font-medium text-muted-foreground">Max Grant Award</dt>
+                  <dt className="text-[11px] font-medium text-muted-foreground">
+                    {tr("Max Grant Award", "Monto máximo del grant")}
+                  </dt>
                   <dd className="font-bold text-foreground mt-0.5 text-xs sm:text-sm">
                     {b.money.request_amount
-                      ? `$${b.money.request_amount.toLocaleString()} CAD`
-                      : "Grant amount TBD"}
+                      ? `$${n(b.money.request_amount)} CAD`
+                      : tr("Grant amount TBD", "Monto del grant por definir")}
                   </dd>
                 </div>
 
                 <div className="rounded-lg border bg-background/80 p-2.5 shadow-2xs">
-                  <dt className="text-[11px] font-medium text-muted-foreground">Match Required</dt>
+                  <dt className="text-[11px] font-medium text-muted-foreground">
+                    {tr("Match Required", "Contrapartida requerida")}
+                  </dt>
                   <dd
                     className={`font-bold mt-0.5 text-xs sm:text-sm ${
                       b.money.match_required_pct
@@ -308,27 +337,27 @@ export function OpportunityBriefPanel({
                     }`}
                   >
                     {b.money.match_required_pct !== null && b.money.match_required_pct > 0
-                      ? `${b.money.match_required_pct}% (~$${b.money.estimated_match_cad?.toLocaleString() ?? "-"} CAD)`
-                      : "None (100% grant)"}
+                      ? `${b.money.match_required_pct}% (~$${b.money.estimated_match_cad != null ? n(b.money.estimated_match_cad) : "-"} CAD)`
+                      : tr("None (100% grant)", "Ninguna (100% grant)")}
                   </dd>
                 </div>
 
                 <div className="rounded-lg border bg-background/80 p-2.5 shadow-2xs">
                   <dt className="text-[11px] font-medium text-muted-foreground">
-                    Est. Total Project
+                    {tr("Est. Total Project", "Proyecto total est.")}
                   </dt>
                   <dd className="font-bold text-foreground mt-0.5 text-xs sm:text-sm">
                     {b.money.estimated_total_cad
-                      ? `$${b.money.estimated_total_cad.toLocaleString()} CAD`
+                      ? `$${n(b.money.estimated_total_cad)} CAD`
                       : b.money.request_amount
-                        ? `$${b.money.request_amount.toLocaleString()} CAD`
-                        : "Scope-dependent"}
+                        ? `$${n(b.money.request_amount)} CAD`
+                        : tr("Scope-dependent", "Depende del alcance")}
                   </dd>
                 </div>
 
                 <div className="rounded-lg border bg-background/80 p-2.5 shadow-2xs">
                   <dt className="text-[11px] font-medium text-muted-foreground">
-                    Cash Match Status
+                    {tr("Cash Match Status", "Estado de la contrapartida en efectivo")}
                   </dt>
                   <dd
                     className={`font-bold mt-0.5 text-xs sm:text-sm flex items-center gap-1 ${
@@ -338,8 +367,11 @@ export function OpportunityBriefPanel({
                     }`}
                   >
                     {b.money.cash_match_verified
-                      ? "Verified / No cash match"
-                      : "Pending leadership sign-off"}
+                      ? tr("Verified / No cash match", "Verificada / Sin contrapartida en efectivo")
+                      : tr(
+                          "Pending leadership sign-off",
+                          "Pendiente de aprobación de la dirección",
+                        )}
                   </dd>
                 </div>
               </dl>
@@ -349,8 +381,11 @@ export function OpportunityBriefPanel({
             <section className="rounded-xl border bg-background/90 p-3.5 sm:p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <Target className="h-3.5 w-3.5 text-primary" /> Strategic Positioning &amp; Win
-                  Theme
+                  <Target className="h-3.5 w-3.5 text-primary" />{" "}
+                  {tr(
+                    "Strategic Positioning & Win Theme",
+                    "Posicionamiento estratégico y tema ganador",
+                  )}
                 </h4>
               </div>
 
@@ -361,7 +396,8 @@ export function OpportunityBriefPanel({
               {b.win_factors && b.win_factors.length > 0 && (
                 <div className="pt-2 border-t">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5 flex items-center gap-1">
-                    <Award className="h-3 w-3 text-amber-500" /> Reviewer High-Score Levers:
+                    <Award className="h-3 w-3 text-amber-500" />{" "}
+                    {tr("Reviewer High-Score Levers:", "Factores que más puntúan los evaluadores:")}
                   </span>
                   <div className="grid gap-1.5 sm:grid-cols-2">
                     {b.win_factors.map((factor, idx) => (
@@ -382,17 +418,23 @@ export function OpportunityBriefPanel({
             <section className="rounded-xl border bg-muted/20 p-3.5 sm:p-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <ListChecks className="h-3.5 w-3.5 text-primary" /> Application Checklist &amp;
-                  Deliverables
+                  <ListChecks className="h-3.5 w-3.5 text-primary" />{" "}
+                  {tr(
+                    "Application Checklist & Deliverables",
+                    "Lista de verificación y entregables",
+                  )}
                 </h4>
                 <span className="text-[11px] text-muted-foreground">
-                  {b.application_checklist.length} items required
+                  {b.application_checklist.length} {tr("items required", "elementos requeridos")}
                 </span>
               </div>
 
               {b.application_checklist.length === 0 ? (
                 <p className="text-xs italic text-muted-foreground">
-                  No specific requirements detected yet — check the funder's own guidelines page.
+                  {tr(
+                    "No specific requirements detected yet — check the funder's own guidelines page.",
+                    "Aún no se detectan requisitos específicos — revisa la página de lineamientos del financiador.",
+                  )}
                 </p>
               ) : (
                 <ul className="grid gap-2 sm:grid-cols-2">
@@ -412,10 +454,16 @@ export function OpportunityBriefPanel({
             {/* 6. RISKS, UNKNOWNS & PITFALLS */}
             <section className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-3.5 sm:p-4">
               <h4 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
-                <AlertTriangle className="h-3.5 w-3.5" /> Risks, Red Flags &amp; Audit Conditions
+                <AlertTriangle className="h-3.5 w-3.5" />{" "}
+                {tr(
+                  "Risks, Red Flags & Audit Conditions",
+                  "Riesgos, alertas y condiciones de auditoría",
+                )}
               </h4>
               {b.risks.length === 0 ? (
-                <p className="text-xs italic text-muted-foreground">No material risks detected.</p>
+                <p className="text-xs italic text-muted-foreground">
+                  {tr("No material risks detected.", "No se detectaron riesgos importantes.")}
+                </p>
               ) : (
                 <ul className="space-y-1.5 text-xs leading-relaxed">
                   {b.risks.map((x, i) => (
@@ -431,43 +479,48 @@ export function OpportunityBriefPanel({
             {/* 7. PROGRAM SNAPSHOT AT A GLANCE */}
             <section className="rounded-xl border bg-muted/15 p-3.5 sm:p-4">
               <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-primary" /> Program Snapshot at a Glance
+                <Sparkles className="h-3.5 w-3.5 text-primary" />{" "}
+                {tr("Program Snapshot at a Glance", "Resumen rápido del programa")}
               </h4>
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
                 <div>
-                  <dt className="text-muted-foreground">Funder: </dt>
+                  <dt className="text-muted-foreground">{tr("Funder:", "Financiador:")} </dt>
                   <dd className="font-semibold text-foreground">
                     {b.program_snapshot.funder ?? "-"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Program: </dt>
+                  <dt className="text-muted-foreground">{tr("Program:", "Programa:")} </dt>
                   <dd className="font-semibold text-foreground">{b.program_snapshot.program}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Max Grant: </dt>
+                  <dt className="text-muted-foreground">{tr("Max Grant:", "Grant máximo:")} </dt>
                   <dd className="font-semibold text-foreground">
                     {b.program_snapshot.max_amount_cad
-                      ? `$${b.program_snapshot.max_amount_cad.toLocaleString()} CAD`
+                      ? `$${n(b.program_snapshot.max_amount_cad)} CAD`
                       : "-"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Org Cost Share: </dt>
+                  <dt className="text-muted-foreground">
+                    {tr("Org Cost Share:", "Aporte de la organización:")}{" "}
+                  </dt>
                   <dd className="font-semibold text-foreground">
                     {b.program_snapshot.cost_share_pct_org !== null
                       ? `~${b.program_snapshot.cost_share_pct_org}%`
-                      : "None"}
+                      : tr("None", "Ninguno")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Intake Mode: </dt>
+                  <dt className="text-muted-foreground">
+                    {tr("Intake Mode:", "Modalidad de convocatoria:")}{" "}
+                  </dt>
                   <dd className="font-semibold capitalize text-foreground">
                     {b.program_snapshot.intake}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Deadline: </dt>
+                  <dt className="text-muted-foreground">{tr("Deadline:", "Fecha límite:")} </dt>
                   <dd className="font-semibold text-foreground">
                     {b.program_snapshot.deadline ?? "-"}
                   </dd>
@@ -479,7 +532,7 @@ export function OpportunityBriefPanel({
                     url={b.program_snapshot.url}
                     className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-semibold"
                   >
-                    Authoritative Grant Portal URL
+                    {tr("Authoritative Grant Portal URL", "URL oficial del portal del grant")}
                   </ExternalLinkPreview>
                 </div>
               )}
@@ -491,7 +544,8 @@ export function OpportunityBriefPanel({
                 <Separator />
                 <section className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Screening Details &amp; Rule Checks ({b.filters.length} criteria evaluated)
+                    {tr("Screening Details & Rule Checks", "Detalles de evaluación y reglas")} (
+                    {b.filters.length} {tr("criteria evaluated", "criterios evaluados")})
                   </h4>
                   <ul className="space-y-1.5 text-xs">
                     {b.filters.map((c) => (
@@ -507,7 +561,7 @@ export function OpportunityBriefPanel({
                             <span className="font-semibold text-foreground">{c.label}</span>
                             {c.hard && (
                               <span className="rounded bg-rose-500/10 px-1.5 py-0.2 text-[10px] font-bold uppercase text-rose-600 dark:text-rose-400">
-                                Hard Block
+                                {tr("Hard Block", "Bloqueo absoluto")}
                               </span>
                             )}
                           </div>

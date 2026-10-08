@@ -326,7 +326,7 @@ export function grantsDigest(
       `${i + 1}. ${g.title}${g.funder?.name ? ` (${g.funder.name})` : ""}`,
       summary ? `   ${L.what}: ${summary.slice(0, 220)}${summary.length > 220 ? "…" : ""}` : "",
       `   ${L.how}: ${who} — ${route}${lead}`,
-      `   ${L.money}: ${amountText(g)} · ${L.deadline}: ${deadlineText(g, ws)}`,
+      `   ${L.money}: ${amountText(g, lang)} · ${L.deadline}: ${deadlineText(g, ws, lang)}`,
       `   ${L.need}: ${
         missing.length
           ? missing
@@ -527,7 +527,9 @@ export function todayAgenda(
   rows: Array<{ grant: WorkspaceGrant | null; workspace: Workspace }>,
   today = new Date(),
   horizonDays = 21,
+  lang: Lang = "en",
 ): AgendaItem[] {
+  const es = lang === "es";
   const todayIso = today.toISOString().slice(0, 10);
   const limit = new Date(today.getTime() + horizonDays * 86400000).toISOString().slice(0, 10);
   const items: AgendaItem[] = [];
@@ -536,14 +538,19 @@ export function todayAgenda(
     const base = { grantId: g.id, grantTitle: g.title };
     const dl = g.deadline?.slice(0, 10);
     if (dl && dl >= todayIso && dl <= limit)
-      items.push({ ...base, kind: "deadline", date: dl, text: `Deadline: ${deadlineText(g, ws)}` });
+      items.push({
+        ...base,
+        kind: "deadline",
+        date: dl,
+        text: `${es ? "Fecha límite" : "Deadline"}: ${deadlineText(g, ws, lang)}`,
+      });
     for (const m of ws.milestones ?? [])
       if (!m.done && m.date <= limit)
         items.push({
           ...base,
           kind: "milestone",
           date: m.date,
-          text: m.date < todayIso ? `Overdue: ${m.label}` : m.label,
+          text: m.date < todayIso ? `${es ? "Atrasado" : "Overdue"}: ${m.label}` : m.label,
         });
     const missing = (ws.checklist ?? []).filter((c) => c.status === "missing");
     const critical = missing.filter((c) => c.critical);
@@ -552,7 +559,9 @@ export function todayAgenda(
         ...base,
         kind: "missing",
         date: null,
-        text: `${missing.length} document${missing.length === 1 ? "" : "s"} missing${critical.length ? ` (${critical.length} critical)` : ""}`,
+        text: es
+          ? `${missing.length === 1 ? "Falta 1 documento" : `Faltan ${missing.length} documentos`}${critical.length ? ` (${critical.length} ${critical.length === 1 ? "crítico" : "críticos"})` : ""}`
+          : `${missing.length} document${missing.length === 1 ? "" : "s"} missing${critical.length ? ` (${critical.length} critical)` : ""}`,
       });
     for (const p of ws.partners ?? [])
       if (p.name?.trim() && (p.status === "to_contact" || p.status === "contacted" || !p.status))
@@ -562,15 +571,19 @@ export function todayAgenda(
           date: null,
           text:
             p.status === "contacted"
-              ? `Follow up with ${p.name} (no answer yet)`
-              : `Contact ${p.name}`,
+              ? es
+                ? `Dar seguimiento a ${p.name} (sin respuesta aún)`
+                : `Follow up with ${p.name} (no answer yet)`
+              : es
+                ? `Contactar a ${p.name}`
+                : `Contact ${p.name}`,
         });
     if ((ws.priority === "now" || ws.priority === "prepare") && !ws.route)
       items.push({
         ...base,
         kind: "decision",
         date: null,
-        text: "Decide our role (lead, partner…)",
+        text: es ? "Decidir nuestro rol (líder, socio…)" : "Decide our role (lead, partner…)",
       });
   }
   const rank = { deadline: 0, milestone: 1, decision: 2, missing: 3, partner: 4 };

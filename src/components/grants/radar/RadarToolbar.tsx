@@ -1,4 +1,15 @@
-import { Globe, Loader2, Search, ShieldCheck, Sparkles, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import {
+  ChevronDown,
+  Globe,
+  Loader2,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Target,
+  X,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { countryName, type RadarStatusFilter, type RadarVerdictFilter } from "@/lib/grant-radar";
+import {
+  countryName,
+  type RadarFocus,
+  type RadarStatusFilter,
+  type RadarVerdictFilter,
+} from "@/lib/grant-radar";
+import { useTr, useUiLang, type UiLang } from "@/lib/ui-lang";
 
 export type RadarFilterState = {
   search: string;
@@ -33,41 +50,56 @@ export const DEFAULT_RADAR_FILTERS: RadarFilterState = {
 export const QUICK_SCOUT_PROMPTS = [
   {
     label: "🌾 Canada Agri-Food 2026",
+    labelEs: "🌾 Agroalimentario Canadá 2026",
     query: "Canada agriculture and food innovation grant calls 2026 sustainable food distribution",
   },
   {
     label: "🍫 Cacao & Bioeconomy (Peru/LATAM)",
-    query: "Convocatorias y grants de cacao, bioeconomia y agricultura sostenible en Peru o Latinoamerica 2026",
+    labelEs: "🍫 Cacao y bioeconomía (Perú/LATAM)",
+    query:
+      "Convocatorias y grants de cacao, bioeconomia y agricultura sostenible en Peru o Latinoamerica 2026",
   },
   {
     label: "🎓 Canadian Academic Consortium",
+    labelEs: "🎓 Consorcio académico canadiense",
     query: "Canadian college research partnership grants SSHRC agri-food applied research 2026",
   },
   {
     label: "🌍 GAC & International Rolling Calls",
-    query: "Global Affairs Canada international assistance unsolicited concept notes CFLI Peru 2026",
+    labelEs: "🌍 GAC y convocatorias internacionales continuas",
+    query:
+      "Global Affairs Canada international assistance unsolicited concept notes CFLI Peru 2026",
   },
 ];
 
+/** Web query suggested for a country with no grants in the catalog. */
+export function webQueryForCountry(code: string): string {
+  return `grants ${countryName(code)} agri-food 2026 2027`;
+}
+
 const MIN_AMOUNTS = [0, 25_000, 50_000, 100_000, 500_000];
 const LEAD_TIMES = [2, 4, 6, 8, 12];
-const STATUS_LABELS: Record<RadarStatusFilter, string> = {
-  active: "In progress",
-  new: "New leads",
-  pursuing: "Pursuing",
-  upcoming: "Upcoming cycles",
-  closed: "Finished",
-  all: "Everything",
+const STATUS_LABELS: Record<RadarStatusFilter, [string, string]> = {
+  active: ["In progress", "En curso"],
+  new: ["New leads", "Nuevas oportunidades"],
+  pursuing: ["Pursuing", "En postulación"],
+  upcoming: ["Upcoming cycles", "Próximos ciclos"],
+  closed: ["Finished", "Finalizados"],
+  all: ["Everything", "Todo"],
 };
-const VERDICT_LABELS: Record<RadarVerdictFilter, string> = {
-  all: "Any verdict",
-  eligible: "You can apply",
-  needs_input: "Needs a check",
-  not_eligible: "Not a fit",
+const VERDICT_FILTER_LABELS: Record<RadarVerdictFilter, [string, string]> = {
+  all: ["Any verdict", "Cualquier veredicto"],
+  eligible: ["You can apply", "Puedes postular"],
+  needs_input: ["Needs a check", "Requiere revisión"],
+  not_eligible: ["Not a fit", "No encaja"],
 };
 
-function money(n: number) {
-  return n === 0 ? "Any amount" : `From $${n >= 1000 ? `${n / 1000}K` : n}`;
+const label2 = (pair: [string, string], lang: UiLang) => (lang === "es" ? pair[1] : pair[0]);
+
+function money(n: number, lang: UiLang) {
+  if (n === 0) return lang === "es" ? "Cualquier monto" : "Any amount";
+  const v = `$${n >= 1000 ? `${n / 1000}K` : n}`;
+  return lang === "es" ? `Desde ${v}` : `From ${v}`;
 }
 
 function Pick<T extends string | number>({
@@ -117,6 +149,8 @@ export function RadarToolbar({
   onWebSearch,
   isWebSearching = false,
   totalCatalogLoaded = 0,
+  focus,
+  moreFilters,
 }: {
   value: RadarFilterState;
   onChange: (next: RadarFilterState) => void;
@@ -129,19 +163,38 @@ export function RadarToolbar({
   onWebSearch?: (q?: string) => void;
   isWebSearching?: boolean;
   totalCatalogLoaded?: number;
+  /** Countries and sectors of the grants the organization is working on. */
+  focus?: RadarFocus | null;
+  /** Extra filters (facets, toggles) shown under "More filters". */
+  moreFilters?: ReactNode;
 }) {
+  const tr = useTr();
+  const lang = useUiLang();
+  const [showMore, setShowMore] = useState(false);
   const set = <K extends keyof RadarFilterState>(k: K, v: RadarFilterState[K]) =>
     onChange({ ...value, [k]: v });
 
   const chips: Array<{ key: keyof RadarFilterState; label: string }> = [];
-  if (value.country !== "all") chips.push({ key: "country", label: countryName(value.country) });
+  if (value.country !== "all")
+    chips.push({ key: "country", label: countryName(value.country, lang) });
   if (value.sector !== "all") chips.push({ key: "sector", label: value.sector });
   if (value.verdict !== DEFAULT_RADAR_FILTERS.verdict)
-    chips.push({ key: "verdict", label: VERDICT_LABELS[value.verdict] });
+    chips.push({ key: "verdict", label: label2(VERDICT_FILTER_LABELS[value.verdict], lang) });
   if (value.status !== DEFAULT_RADAR_FILTERS.status)
-    chips.push({ key: "status", label: STATUS_LABELS[value.status] });
+    chips.push({ key: "status", label: label2(STATUS_LABELS[value.status], lang) });
   if (value.minAmount !== DEFAULT_RADAR_FILTERS.minAmount)
-    chips.push({ key: "minAmount", label: money(value.minAmount) });
+    chips.push({ key: "minAmount", label: money(value.minAmount, lang) });
+
+  // Focus sectors may not be in this page of results; still offer them.
+  const sectorOptions = [...sectors];
+  for (const s of [...(focus?.sectors ?? []), value.sector]) {
+    if (s && s !== "all" && !sectorOptions.some((o) => o.toLowerCase() === s.toLowerCase()))
+      sectorOptions.push(s);
+  }
+  const hiddenActive =
+    value.status !== DEFAULT_RADAR_FILTERS.status ||
+    value.minAmount !== DEFAULT_RADAR_FILTERS.minAmount;
+  const hasFocus = !!focus && (focus.countries.length > 0 || focus.sectors.length > 0);
 
   return (
     <div className="space-y-3 rounded-lg border bg-card p-3 shadow-sm">
@@ -159,7 +212,7 @@ export function RadarToolbar({
               }`}
             >
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              <span>Tracked Catalog</span>
+              <span>{tr("Tracked Catalog", "Catálogo seguido")}</span>
               {totalCatalogLoaded > 0 && (
                 <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] text-muted-foreground">
                   {totalCatalogLoaded}
@@ -177,7 +230,7 @@ export function RadarToolbar({
               }`}
             >
               <Globe className="h-3.5 w-3.5" />
-              <span>AI Web Scout (Live Internet)</span>
+              <span>{tr("AI Web Scout (Live Internet)", "Búsqueda web con IA (en vivo)")}</span>
               <span className="inline-flex items-center gap-0.5 rounded bg-primary-foreground/20 px-1.5 py-0.2 text-[10px]">
                 <Sparkles className="h-2.5 w-2.5" /> Google AI
               </span>
@@ -195,7 +248,9 @@ export function RadarToolbar({
               className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
             >
               <Globe className="h-3.5 w-3.5" />
-              <span>Search live web for &ldquo;{value.search}&rdquo;</span>
+              <span>
+                {tr("Search live web for", "Buscar en la web")} &ldquo;{value.search}&rdquo;
+              </span>
             </button>
           )}
         </div>
@@ -215,8 +270,11 @@ export function RadarToolbar({
             <Input
               value={webQuery}
               onChange={(e) => onWebQueryChange?.(e.target.value)}
-              placeholder="Ask anything to search the live web, e.g. 'Convocatorias de bioeconomia y cacao 2026' or 'Canada agri-food grants'..."
-              aria-label="Web search prompt"
+              placeholder={tr(
+                "Ask anything to search the live web, e.g. 'Convocatorias de bioeconomia y cacao 2026' or 'Canada agri-food grants'...",
+                "Pregunta lo que quieras para buscar en la web, p. ej. 'Convocatorias de bioeconomía y cacao 2026' o 'Canada agri-food grants'...",
+              )}
+              aria-label={tr("Web search prompt", "Consulta de búsqueda web")}
               className="h-10 pl-9 pr-28 text-sm"
               disabled={isWebSearching}
               autoFocus
@@ -230,12 +288,12 @@ export function RadarToolbar({
               {isWebSearching ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Scouting...
+                  {tr("Scouting...", "Buscando...")}
                 </>
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  Scout Web
+                  {tr("Scout Web", "Buscar en la web")}
                 </>
               )}
             </Button>
@@ -243,7 +301,9 @@ export function RadarToolbar({
 
           {/* Prompt pills for Rocío's routine requests */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Quick queries:</span>
+            <span className="text-xs text-muted-foreground">
+              {tr("Quick queries:", "Consultas rápidas:")}
+            </span>
             {QUICK_SCOUT_PROMPTS.map((p) => (
               <button
                 key={p.label}
@@ -255,7 +315,7 @@ export function RadarToolbar({
                 disabled={isWebSearching}
                 className="rounded-full border border-border/60 bg-muted/40 px-2.5 py-0.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-foreground disabled:opacity-50"
               >
-                {p.label}
+                {lang === "es" ? p.labelEs : p.label}
               </button>
             ))}
           </div>
@@ -269,60 +329,144 @@ export function RadarToolbar({
               <Input
                 value={value.search}
                 onChange={(e) => set("search", e.target.value)}
-                placeholder="Search catalog by topic, funder or keyword"
-                aria-label="Search grants"
+                placeholder={tr(
+                  "Search catalog by topic, funder or keyword",
+                  "Buscar en el catálogo por tema, financiador o palabra clave",
+                )}
+                aria-label={tr("Search grants", "Buscar grants")}
                 className="h-9 pl-9"
               />
             </div>
             <Pick
-              label="Country"
+              label={tr("Country", "País")}
               value={value.country}
               onChange={(v) => set("country", v)}
               options={[
-                { value: "all", label: "All countries" },
-                ...countries.map((c) => ({ value: c, label: countryName(c) })),
+                { value: "all", label: tr("All countries", "Todos los países") },
+                ...countries.map((c) => ({ value: c, label: countryName(c, lang) })),
               ]}
             />
             <Pick
-              label="Sector"
+              label={tr("Sector", "Sector")}
               value={value.sector}
               onChange={(v) => set("sector", v)}
               options={[
-                { value: "all", label: "Any sector" },
-                ...sectors.map((s) => ({ value: s, label: s })),
+                { value: "all", label: tr("Any sector", "Cualquier sector") },
+                ...sectorOptions.map((s) => ({ value: s, label: s })),
               ]}
             />
             <Pick
-              label="Minimum amount"
-              value={value.minAmount}
-              onChange={(v) => set("minAmount", v)}
-              options={MIN_AMOUNTS.map((n) => ({ value: n, label: money(n) }))}
-            />
-            <Pick
-              label="Verdict"
+              label={tr("Verdict", "Veredicto")}
               value={value.verdict}
               onChange={(v) => set("verdict", v)}
-              options={(Object.keys(VERDICT_LABELS) as RadarVerdictFilter[]).map((k) => ({
+              options={(Object.keys(VERDICT_FILTER_LABELS) as RadarVerdictFilter[]).map((k) => ({
                 value: k,
-                label: VERDICT_LABELS[k],
+                label: label2(VERDICT_FILTER_LABELS[k], lang),
               }))}
             />
-            <Pick
-              label="Status"
-              value={value.status}
-              onChange={(v) => set("status", v)}
-              options={(Object.keys(STATUS_LABELS) as RadarStatusFilter[]).map((k) => ({
-                value: k,
-                label: STATUS_LABELS[k],
-              }))}
-            />
-            <Pick
-              label="Preparation time"
-              value={value.leadTimeWeeks}
-              onChange={(v) => set("leadTimeWeeks", v)}
-              options={LEAD_TIMES.map((w) => ({ value: w, label: `${w} weeks to prepare` }))}
-            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMore((v) => !v)}
+              aria-expanded={showMore}
+              className="h-9 gap-1 text-xs text-muted-foreground"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              {tr("More filters", "Más filtros")}
+              {hiddenActive && !showMore && (
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
+              )}
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${showMore ? "rotate-180" : ""}`}
+              />
+            </Button>
           </div>
+
+          {hasFocus && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Target className="h-3.5 w-3.5 text-primary" />
+                {tr("Your focus:", "Tu foco:")}
+              </span>
+              {focus!.countries.map((c) => {
+                const active = value.country.toUpperCase() === c;
+                return (
+                  <button
+                    key={`c-${c}`}
+                    type="button"
+                    onClick={() => set("country", active ? "all" : c)}
+                    aria-pressed={active}
+                    title={tr(
+                      "From the grants you are working on",
+                      "Según los grants en los que estás trabajando",
+                    )}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs transition ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-primary/30 bg-primary/5 text-foreground hover:bg-primary/10"
+                    }`}
+                  >
+                    {countryName(c, lang)}
+                  </button>
+                );
+              })}
+              {focus!.sectors.map((s) => {
+                const active = value.sector.toLowerCase() === s.toLowerCase();
+                return (
+                  <button
+                    key={`s-${s}`}
+                    type="button"
+                    onClick={() => set("sector", active ? "all" : s)}
+                    aria-pressed={active}
+                    title={tr(
+                      "From the grants you are working on",
+                      "Según los grants en los que estás trabajando",
+                    )}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs transition ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-muted/40 text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {showMore && (
+            <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Pick
+                  label={tr("Status", "Estado")}
+                  value={value.status}
+                  onChange={(v) => set("status", v)}
+                  options={(Object.keys(STATUS_LABELS) as RadarStatusFilter[]).map((k) => ({
+                    value: k,
+                    label: label2(STATUS_LABELS[k], lang),
+                  }))}
+                />
+                <Pick
+                  label={tr("Minimum amount", "Monto mínimo")}
+                  value={value.minAmount}
+                  onChange={(v) => set("minAmount", v)}
+                  options={MIN_AMOUNTS.map((n) => ({ value: n, label: money(n, lang) }))}
+                />
+                <Pick
+                  label={tr("Preparation time", "Tiempo de preparación")}
+                  value={value.leadTimeWeeks}
+                  onChange={(v) => set("leadTimeWeeks", v)}
+                  options={LEAD_TIMES.map((w) => ({
+                    value: w,
+                    label: tr(`${w} weeks to prepare`, `${w} semanas para preparar`),
+                  }))}
+                />
+              </div>
+              {moreFilters}
+            </div>
+          )}
 
           {chips.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
@@ -331,6 +475,7 @@ export function RadarToolbar({
                   key={c.key}
                   type="button"
                   onClick={() => set(c.key, DEFAULT_RADAR_FILTERS[c.key] as never)}
+                  aria-label={tr(`Remove filter ${c.label}`, `Quitar filtro ${c.label}`)}
                   className="inline-flex items-center gap-1 rounded-full border bg-muted px-2.5 py-0.5 text-xs text-foreground hover:bg-accent"
                 >
                   {c.label}
@@ -344,7 +489,7 @@ export function RadarToolbar({
                 }
                 className="text-xs text-muted-foreground underline-offset-2 hover:underline"
               >
-                Clear all
+                {tr("Clear all", "Limpiar todo")}
               </button>
             </div>
           )}

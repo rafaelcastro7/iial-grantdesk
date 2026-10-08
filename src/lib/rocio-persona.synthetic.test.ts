@@ -515,6 +515,28 @@ describe("Home 'Today' (what needs Rocío)", () => {
     expect(a.some((x) => x.text.includes("Follow up with Lambton College"))).toBe(true);
     expect(a.some((x) => x.grantId === "g2")).toBe(false);
   });
+
+  it("the agenda reads in Spanish when the interface is in Spanish", async () => {
+    const { todayAgenda } = await import("@/lib/consultant-desk.shared");
+    const { emptyWorkspace } = await import("@/lib/grant-workspace.shared");
+    const today = new Date("2026-10-08T12:00:00Z");
+    const g = { id: "g1", title: "Food-Link Fund", deadline: "2026-10-20" };
+    const ws = emptyWorkspace("o", g);
+    ws.priority = "prepare";
+    ws.milestones = [{ id: "m", label: "Registro en el portal", date: "2026-10-05" }];
+    ws.partners = [
+      { id: "p", name: "Lambton College", status: "contacted" },
+      { id: "q", name: "SOCODEVI", status: "to_contact" },
+    ];
+    const a = todayAgenda([{ grant: g, workspace: ws }], today, 21, "es");
+    const texts = a.map((x) => x.text);
+    expect(texts).toContain("Atrasado: Registro en el portal");
+    expect(texts).toContain("Fecha límite: 20 de octubre de 2026");
+    expect(texts).toContain("Dar seguimiento a Lambton College (sin respuesta aún)");
+    expect(texts).toContain("Contactar a SOCODEVI");
+    expect(texts).toContain("Decidir nuestro rol (líder, socio…)");
+    expect(texts.some((t) => /^Faltan \d+ documentos/.test(t))).toBe(true);
+  });
 });
 
 describe("Find grants: what Rocío reads on each card", () => {
@@ -543,5 +565,104 @@ describe("Find grants: what Rocío reads on each card", () => {
     const item = toRadarItem(g as never, { now: Date.now(), leadTimeWeeks: 4, searching: false });
     expect(item.verdict).toBe("not_eligible");
     expect(item.reason).toMatch(/gives no reason/);
+  });
+});
+
+describe("Grant Copilot updates the plan (after Rocío clicks Apply)", () => {
+  it("keeps only valid fields from the AI and merges lists without duplicates", async () => {
+    const { sanitizePlanUpdate, applyPlanUpdate, emptyWorkspace } =
+      await import("@/lib/grant-workspace.shared");
+    const u = sanitizePlanUpdate({
+      route: "partner",
+      priority: "urgent!!", // invalid → dropped
+      lead_institution: "Lambton College",
+      add_partners: [{ name: "Lambton College", role: "Administers the funds" }, { name: "" }],
+      add_blockers: ["No audited financial statements"],
+      add_checklist: ["Letter of support from Lambton", { item: "CRA business number" }],
+      add_milestones: [
+        { label: "Call Lambton", date: "2026-10-20" },
+        { label: "x", date: "soon" },
+      ],
+      note: "We go as partner; Lambton leads.",
+      unknown_field: "ignored",
+    });
+    expect(u).not.toHaveProperty("priority");
+    expect(u).not.toHaveProperty("unknown_field");
+    expect(u.add_partners).toHaveLength(1);
+    expect(u.add_milestones).toHaveLength(1);
+    const g = { id: "g", title: "SSHRC" };
+    const ws = emptyWorkspace("o", g);
+    ws.blockers = ["No audited financial statements"];
+    const next = applyPlanUpdate(ws, u, new Date("2026-10-08T12:00:00Z"));
+    expect(next.route).toBe("partner");
+    expect(next.lead_institution).toBe("Lambton College");
+    expect(next.blockers).toEqual(["No audited financial statements"]); // no duplicate
+    expect(next.partners.map((p) => p.name)).toEqual(["Lambton College"]);
+    expect(next.checklist.filter((c) => c.item === "CRA business number")).toHaveLength(1); // already standard
+    expect(next.checklist.some((c) => c.item === "Letter of support from Lambton")).toBe(true);
+    expect(next.decision_notes).toBe("2026-10-08 (Copilot): We go as partner; Lambton leads.");
+    // Applying twice changes nothing more.
+    const again = applyPlanUpdate(next, u, new Date("2026-10-08T12:00:00Z"));
+    expect(again.partners).toHaveLength(1);
+    expect(again.checklist).toHaveLength(next.checklist.length);
+  });
+});
+
+describe("Grant Copilot corrects facts (only valid, sourced values)", () => {
+  it("drops invented or malformed values", async () => {
+    const { sanitizeGrantFacts, sanitizeProfileUpdate } =
+      await import("@/lib/copilot-actions.shared");
+    const g = sanitizeGrantFacts({
+      deadline: "2027-03-30",
+      amount_cad_max: "$540,000",
+      amount_cad_min: -5,
+      eligibility_note: "Consortia from at least two FONTAGRO member countries.",
+      applicant_types: ["academic", "academic", "nonprofit"],
+      source_url: "javascript:alert(1)",
+      title: "ignored",
+    });
+    expect(g).toEqual({
+      deadline: "2027-03-30",
+      amount_cad_max: 540000,
+      eligibility_note: "Consortia from at least two FONTAGRO member countries.",
+      applicant_types: ["academic", "nonprofit"],
+    });
+    const p = sanitizeProfileUpdate({
+      audit_readiness_level: "audited", // not a valid level → dropped
+      registration_status: "nonprofit",
+      years_operating: 4,
+      business_number: "123", // not allowed from the Copilot
+    });
+    expect(p).toEqual({ registration_status: "nonprofit", years_operating: 4 });
+  });
+});
+
+describe("Grant Copilot cannot invent organizations", () => {
+  it("keeps only names the user, the plan, the directory or the web mention", async () => {
+    const { groundPlanUpdate } = await import("@/lib/copilot-actions.shared");
+    const known = "Rocío: ¿podemos ir con Lambton College? Directorio: Universidad del Rosario";
+    const out = groundPlanUpdate(
+      {
+        lead_institution: "Universidad Nacional de Colombia", // invented
+        administrator: "Lead institution", // filler
+        add_partners: [
+          { name: "Lambton College" },
+          { name: "Universidad del Rosario" },
+          { name: "GrantDesk QA (synthetic)" }, // ourselves
+          { name: "Instituto Inventado" },
+        ],
+      },
+      known,
+      ["GrantDesk QA (synthetic)"],
+    );
+    expect(out.lead_institution).toBeUndefined();
+    expect(out.administrator).toBeUndefined();
+    expect(out.add_partners?.map((p) => p.name)).toEqual([
+      "Lambton College",
+      "Universidad del Rosario",
+    ]);
+    expect(
+      groundPlanUpdate({ lead_institution: "lambton college" }, known, []).lead_institution,
+    ).toBe("lambton college");
   });
 });

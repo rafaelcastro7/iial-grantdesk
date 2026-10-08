@@ -16,6 +16,7 @@ import {
   GrantReadinessProfileForm,
   optionalNumber,
 } from "@/components/org/GrantReadinessProfileForm";
+import { useTr } from "@/lib/ui-lang";
 import "@/i18n";
 
 const orgQueryOptions = (orgId: string) =>
@@ -86,6 +87,7 @@ export type OrgFormValues = z.infer<typeof orgSchema>;
 function OrgPage() {
   const { activeOrgId, activeOrganization, organizations, setActiveOrgId, isLoading } =
     useActiveTenant();
+  const tr = useTr();
   const query = useQuery({
     ...orgQueryOptions(activeOrgId ?? "00000000-0000-0000-0000-000000000000"),
     enabled: !!activeOrgId,
@@ -94,7 +96,7 @@ function OrgPage() {
   if (isLoading || !activeOrgId || !query.data) {
     return (
       <div className="mx-auto max-w-5xl p-8 text-sm text-muted-foreground">
-        Loading organization profile…
+        {tr("Loading organization profile…", "Cargando perfil de la organización…")}
       </div>
     );
   }
@@ -103,7 +105,7 @@ function OrgPage() {
     <OrgProfileEditor
       key={activeOrgId}
       orgId={activeOrgId}
-      organizationName={activeOrganization?.name ?? "Organization"}
+      organizationName={activeOrganization?.name ?? tr("Organization", "Organización")}
       organizations={organizations}
       onSwitchOrg={setActiveOrgId}
       data={query.data}

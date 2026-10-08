@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FormField } from "@/components/FormField";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { pick, useTr, useUiLang, type UiLang } from "@/lib/ui-lang";
+import { useMemo } from "react";
 import "@/i18n";
 
 export const Route = createFileRoute("/auth")({
@@ -22,22 +25,36 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-const authSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
+const makeAuthSchema = (lang: UiLang) =>
+  z.object({
+    email: z.string().email(pick(lang, "Invalid email address", "Correo electrónico no válido")),
+    password: z
+      .string()
+      .min(
+        8,
+        pick(
+          lang,
+          "Password must be at least 8 characters",
+          "La contraseña debe tener al menos 8 caracteres",
+        ),
+      ),
+  });
+const authSchema = makeAuthSchema("en");
 
 type AuthFormValues = z.infer<typeof authSchema>;
 
 function AuthPage() {
   const { t } = useTranslation();
+  const tr = useTr();
+  const lang = useUiLang();
+  const schema = useMemo(() => makeAuthSchema(lang), [lang]);
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const form = useForm<AuthFormValues>({
-    resolver: zodResolver(authSchema),
+    resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
   });
 
@@ -65,7 +82,13 @@ function AuthPage() {
       const { error } = await fn;
       if (error) throw error;
       const session = await waitForSession();
-      if (!session) throw new Error("Unable to establish a session after sign in.");
+      if (!session)
+        throw new Error(
+          tr(
+            "Unable to establish a session after sign in.",
+            "No se pudo establecer la sesión después de iniciar sesión.",
+          ),
+        );
       await navigate({ to: "/dashboard" });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -91,7 +114,13 @@ function AuthPage() {
       });
       if (error) throw error;
       const session = await waitForSession();
-      if (!session) throw new Error("Unable to establish a session after demo sign in.");
+      if (!session)
+        throw new Error(
+          tr(
+            "Unable to establish a session after demo sign in.",
+            "No se pudo establecer la sesión después del inicio de sesión de demostración.",
+          ),
+        );
       await navigate({ to: "/dashboard" });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -102,6 +131,9 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,111,160,0.12),_transparent_42%),linear-gradient(180deg,_rgba(15,23,42,0.02),_transparent)] px-4 py-8 text-foreground sm:px-6">
+      <div className="mx-auto mb-4 flex w-full max-w-md justify-end">
+        <LanguageToggle />
+      </div>
       <Card className="mx-auto w-full max-w-md border-border/70 bg-card/95 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.32)] backdrop-blur">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="space-y-1">
@@ -109,7 +141,10 @@ function AuthPage() {
               {mode === "signin" ? t("auth.signIn") : t("auth.signUp")}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Sign in to your workspace or try the seeded demo accounts below.
+              {tr(
+                "Sign in to your workspace or try the seeded demo accounts below.",
+                "Inicie sesión en su espacio de trabajo o pruebe las cuentas de demostración a continuación.",
+              )}
             </p>
           </div>
         </CardHeader>
@@ -145,7 +180,7 @@ function AuthPage() {
           {import.meta.env.DEV && (
             <div className="mt-6 border-t pt-6">
               <p className="mb-2 text-center text-xs uppercase tracking-wide text-muted-foreground">
-                Demo autologin
+                {tr("Demo autologin", "Acceso automático de demostración")}
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {DEMO_USERS.map((u) => (
@@ -163,7 +198,8 @@ function AuthPage() {
                 ))}
               </div>
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                Seeded accounts - password <code className="font-mono">{DEMO_PASSWORD}</code>
+                {tr("Seeded accounts - password", "Cuentas de prueba - contraseña")}{" "}
+                <code className="font-mono">{DEMO_PASSWORD}</code>
               </p>
             </div>
           )}

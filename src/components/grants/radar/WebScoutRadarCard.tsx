@@ -13,6 +13,7 @@ import {
 import type { DiscoveredWebGrant } from "@/lib/grant-web-scout.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 
 export function WebScoutRadarCard({
   grant,
@@ -29,8 +30,10 @@ export function WebScoutRadarCard({
   onImport: (grant: DiscoveredWebGrant) => Promise<void>;
   onOpenWorkspace?: (grantId: string) => void;
 }) {
+  const tr = useTr();
+  const uiLang = useUiLang();
   const [copiedBrief, setCopiedBrief] = useState(false);
-  const [briefLang, setBriefLang] = useState<"en" | "es">("en");
+  const [briefLang, setBriefLang] = useState<"en" | "es">(uiLang);
 
   const handleCopyBrief = async (lang: "en" | "es" = briefLang) => {
     const isEs = lang === "es";
@@ -95,7 +98,7 @@ Rocío`;
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                 <Globe className="h-3 w-3" />
-                Live Web
+                {tr("Live Web", "Web en vivo")}
               </span>
               <span className="font-semibold text-foreground text-sm md:text-base">
                 {grant.title}
@@ -106,7 +109,14 @@ Rocío`;
               <span
                 className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${statusTone}`}
               >
-                {grant.status}
+                {uiLang === "es"
+                  ? ({
+                      open: "abierta",
+                      upcoming: "próxima",
+                      continuous: "continua",
+                      closed: "cerrada",
+                    }[grant.status as string] ?? grant.status)
+                  : grant.status}
               </span>
             </div>
             <p className="text-xs font-medium text-primary/80">{grant.funder}</p>
@@ -125,12 +135,14 @@ Rocío`;
                 {copiedBrief ? (
                   <>
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Copied! ({briefLang.toUpperCase()})</span>
+                    <span>
+                      {tr("Copied!", "¡Copiado!")} ({briefLang.toUpperCase()})
+                    </span>
                   </>
                 ) : (
                   <>
                     <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>Brief for Marcelo</span>
+                    <span>{tr("Brief for Marcelo", "Resumen para Marcelo")}</span>
                   </>
                 )}
               </Button>
@@ -146,7 +158,7 @@ Rocío`;
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
-                  title="Copy brief in English"
+                  title={tr("Copy brief in English", "Copiar resumen en inglés")}
                 >
                   EN
                 </button>
@@ -161,7 +173,7 @@ Rocío`;
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
-                  title="Copy brief in Spanish"
+                  title={tr("Copy brief in Spanish", "Copiar resumen en español")}
                 >
                   ES
                 </button>
@@ -177,7 +189,7 @@ Rocío`;
                 onClick={() => onOpenWorkspace?.(importedId)}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                In Pipeline (Open)
+                {tr("In Pipeline (Open)", "En el pipeline (abrir)")}
               </Button>
             ) : (
               <Button
@@ -190,12 +202,12 @@ Rocío`;
                 {isImporting ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Importing...
+                    {tr("Importing...", "Importando...")}
                   </>
                 ) : (
                   <>
                     <Plus className="h-3.5 w-3.5" />
-                    Import to Radar
+                    {tr("Import to Radar", "Importar al radar")}
                   </>
                 )}
               </Button>
@@ -212,12 +224,14 @@ Rocío`;
             <DollarSign className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>{grant.amount_range}</span>
             <span className="font-normal text-amber-700 dark:text-amber-400">
-              (AI estimate, verify)
+              {tr("(AI estimate, verify)", "(estimación de IA, verificar)")}
             </span>
           </div>
           <div className="flex items-center gap-1">
             <Calendar className="h-3.5 w-3.5" />
-            <span>Deadline: {grant.deadline}</span>
+            <span>
+              {tr("Deadline:", "Fecha límite:")} {grant.deadline}
+            </span>
           </div>
           <a
             href={grant.url}
@@ -225,7 +239,7 @@ Rocío`;
             rel="noreferrer noopener"
             className="flex items-center gap-1 text-primary hover:underline ml-auto"
           >
-            <span>Official funder page</span>
+            <span>{tr("Official funder page", "Página oficial del financiador")}</span>
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
@@ -235,7 +249,9 @@ Rocío`;
           <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/90 flex items-start gap-2">
             <Sparkles className="mt-0.5 h-3.5 w-3.5 text-primary shrink-0" />
             <div>
-              <strong className="text-foreground">Why it fits {orgName}: </strong>
+              <strong className="text-foreground">
+                {tr(`Why it fits ${orgName}: `, `Por qué encaja con ${orgName}: `)}
+              </strong>
               <span>{grant.applicant_fit}</span>
             </div>
           </div>

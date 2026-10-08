@@ -2,6 +2,7 @@ import { ShieldCheck, Sparkles, Loader2 } from "lucide-react";
 import type { RadarClientProfile } from "@/lib/radar.functions";
 import type { RadarResult, RadarGrant } from "@/lib/grant-radar";
 import { Button } from "@/components/ui/button";
+import { useTr } from "@/lib/ui-lang";
 
 /**
  * Shows who every grant is being checked against, and the outcome of that
@@ -30,10 +31,14 @@ export function EligibilityCheckBar({
   isEvaluatingAll?: boolean;
   evalProgress?: { current: number; total: number; lastTitle?: string } | null;
 }) {
+  const tr = useTr();
   if (!selected) {
     return (
       <div className="rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-        Add a client profile to check every grant against eligibility rules before it is listed.
+        {tr(
+          "Add a client profile to check every grant against eligibility rules before it is listed.",
+          "Agrega un perfil de cliente para verificar cada grant contra las reglas de elegibilidad antes de listarlo.",
+        )}
       </div>
     );
   }
@@ -44,10 +49,10 @@ export function EligibilityCheckBar({
         <ShieldCheck className="h-5 w-5 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
           <p className="font-display text-sm font-semibold text-foreground">
-            Eligibility pre-check against{" "}
+            {tr("Eligibility pre-check against", "Verificación previa de elegibilidad para")}{" "}
             {profiles.length > 1 ? (
               <select
-                aria-label="Client profile"
+                aria-label={tr("Client profile", "Perfil del cliente")}
                 value={selected.clientId}
                 onChange={(e) => onSelect(e.target.value)}
                 className="rounded border border-border bg-background px-1.5 py-0.5 font-semibold text-primary"
@@ -63,19 +68,30 @@ export function EligibilityCheckBar({
             )}
           </p>
           <p className="text-xs text-muted-foreground">
-            Every grant is run through the same rules first — territory, status, deadline vs{" "}
-            {selected.leadTimeWeeks ?? 3} weeks of preparation, applicant type, scale and cost
-            share.
+            {tr(
+              `Every grant is run through the same rules first — territory, status, deadline vs ${selected.leadTimeWeeks ?? 3} weeks of preparation, applicant type, scale and cost share.`,
+              `Cada grant pasa primero por las mismas reglas: territorio, estado, fecha límite frente a ${selected.leadTimeWeeks ?? 3} semanas de preparación, tipo de postulante, escala y contrapartida.`,
+            )}
           </p>
         </div>
         <dl className="flex gap-2 text-center text-xs">
-          <Stat label="Can apply" value={counts.eligible} tone="text-eligible" />
-          <Stat label="Needs input" value={counts.needsInput} tone="text-needs-input" />
-          <Stat label="Ruled out" value={ruledOut} tone="text-ineligible" />
+          <Stat
+            label={tr("Can apply", "Puede postular")}
+            value={counts.eligible}
+            tone="text-eligible"
+          />
+          <Stat
+            label={tr("Needs input", "Falta información")}
+            value={counts.needsInput}
+            tone="text-needs-input"
+          />
+          <Stat label={tr("Ruled out", "Descartados")} value={ruledOut} tone="text-ineligible" />
         </dl>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={onToggleHide}>
-            {hideIneligible ? "Show ruled out" : "Hide ruled out"}
+            {hideIneligible
+              ? tr("Show ruled out", "Mostrar descartados")
+              : tr("Hide ruled out", "Ocultar descartados")}
           </Button>
           {onEvaluateAll && (
             <Button
@@ -84,21 +100,27 @@ export function EligibilityCheckBar({
               disabled={isEvaluatingAll}
               onClick={onEvaluateAll}
               className="gap-1.5 font-medium"
-              title="Evaluate fit for all listed grants using the Evaluator against the organization profile"
+              title={tr(
+                "Evaluate fit for all listed grants using the Evaluator against the organization profile",
+                "Evaluar el encaje de todos los grants listados con el evaluador, según el perfil de la organización",
+              )}
             >
               {isEvaluatingAll ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>
                     {evalProgress
-                      ? `Evaluating ${evalProgress.current}/${evalProgress.total}...`
-                      : "Evaluating..."}
+                      ? tr(
+                          `Evaluating ${evalProgress.current}/${evalProgress.total}...`,
+                          `Evaluando ${evalProgress.current}/${evalProgress.total}...`,
+                        )
+                      : tr("Evaluating...", "Evaluando...")}
                   </span>
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 text-amber-300" />
-                  <span>Auto-evaluate listed</span>
+                  <span>{tr("Auto-evaluate listed", "Evaluar los listados")}</span>
                 </>
               )}
             </Button>

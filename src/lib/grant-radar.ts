@@ -13,6 +13,10 @@
 import { decideEligibility } from "@/lib/eligibility";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 
+/** Interface language for the texts this module writes (default English). */
+export type RadarLang = "en" | "es";
+const pickLang = (lang: RadarLang | undefined, en: string, es: string) => (lang === "es" ? es : en);
+
 export type RadarVerdict = "eligible" | "needs_input" | "not_eligible";
 export type RadarTiming = "closed" | "too_soon" | "urgent" | "comfortable" | "open_ended";
 export type RadarNextAction = "enrich" | "evaluate" | "draft" | "open";
@@ -105,6 +109,8 @@ export type RadarOptions = {
   rules?: RadarRulesProfile | null;
   /** Pre-filter grants the rules rule out (default true). */
   hideIneligible?: boolean;
+  /** Language of the reasons written here (default English). */
+  lang?: RadarLang;
 };
 
 export type RadarGroup<T extends RadarGrant> = {
@@ -234,6 +240,7 @@ export function ruleDecision(
   g: RadarGrant,
   rules: RadarRulesProfile,
   now: number,
+  lang: RadarLang = "en",
 ): { verdict: RadarVerdict; reason: string } {
   const d = decideEligibility({
     grant: {
@@ -256,8 +263,140 @@ export function ruleDecision(
   });
   return {
     verdict: d.verdict === "ineligible" ? "not_eligible" : d.verdict,
-    reason: d.headline,
+    reason: translateRuleText(d.headline, lang),
   };
+}
+
+type RuleOut = string | ((...m: string[]) => string);
+
+// Spanish for the rules engine's sentences (src/lib/eligibility.ts). Values
+// inside them (codes, dates, amounts, applicant types) are kept as written.
+const RULE_TEXT_ES: Array<[RegExp, RuleOut]> = [
+  [/^Meets every published requirement\.$/, "Cumple todos los requisitos publicados."],
+  [
+    /^Meets the published requirements, but: ([\s\S]+)$/,
+    (_, rest) => `Cumple los requisitos publicados, pero: ${translateRuleText(rest, "es")}`,
+  ],
+  [
+    /^Meets every published requirement we can check\. ([\s\S]+)$/,
+    (_, rest) =>
+      `Cumple todos los requisitos publicados que podemos verificar. ${translateRuleText(rest, "es")}`,
+  ],
+  [
+    /^This funder is multilateral and does not restrict applicants to one country\.$/,
+    "Este financiador es multilateral y no limita a los postulantes a un solo país.",
+  ],
+  [
+    /^We do not know where this client operates, so we cannot check where it may apply\.$/,
+    "No sabemos dónde opera este cliente, así que no podemos verificar dónde puede postular.",
+  ],
+  [
+    /^Open to applicants in (.+), where this client operates\.$/,
+    (_, c) => `Abierto a postulantes en ${c}, donde opera este cliente.`,
+  ],
+  [
+    /^Based in (.+), but its own terms say foreign applicants are eligible — confirm this client qualifies before drafting\.$/,
+    (_, c) =>
+      `Con sede en ${c}, pero sus bases admiten postulantes extranjeros: confirma que este cliente califica antes de redactar.`,
+  ],
+  [
+    /^Restricted to (.+); this client operates in (.+)\.$/,
+    (_, a, b) => `Restringido a ${a}; este cliente opera en ${b}.`,
+  ],
+  [
+    /^This call is (.+), so it is no longer accepting applications\.$/,
+    (_, st) => `Esta convocatoria figura como "${st}" y ya no recibe postulaciones.`,
+  ],
+  [
+    /^No closing date published — this funder accepts applications continuously\.$/,
+    "No publica fecha de cierre: este financiador recibe postulaciones de forma continua.",
+  ],
+  [
+    /^We could not read the published closing date \((.+)\)\.$/,
+    (_, d) => `No pudimos leer la fecha de cierre publicada (${d}).`,
+  ],
+  [/^Closed on (.+)\.$/, (_, d) => `Cerró el ${d}.`],
+  [/^Closes on (.+) — (\d+) days left\.$/, (_, d, n) => `Cierra el ${d}: quedan ${n} días.`],
+  [/^Closes on (.+)\.$/, (_, d) => `Cierra el ${d}.`],
+  [
+    /^This funder does not publish a machine-readable applicant list — read their terms\.$/,
+    "Este financiador no publica una lista legible de postulantes elegibles: revisa sus bases.",
+  ],
+  [
+    /^Open to (.+)\. We do not know this client's legal form\.$/,
+    (_, t) => `Abierto a ${t}. No conocemos la forma jurídica de este cliente.`,
+  ],
+  [
+    /^Open to (.+), which is what this client is\.$/,
+    (_, t) => `Abierto a ${t}, que corresponde a este cliente.`,
+  ],
+  [
+    /^Open to (.+) only; this client is (.+)\.$/,
+    (_, a, b) => `Solo abierto a ${a}; este cliente es ${b}.`,
+  ],
+  [
+    /^No critical pre-application requirement has been extracted\.$/,
+    "No se ha extraído ningún requisito crítico previo a la postulación.",
+  ],
+  [/^Resolve before drafting: ([\s\S]+)\.$/, (_, r) => `Resolver antes de redactar: ${r}.`],
+  [
+    /^Not enough figures published to compare this award against the client's budget\.$/,
+    "No hay cifras suficientes publicadas para comparar este monto con el presupuesto del cliente.",
+  ],
+  [
+    /^The smallest award here \((.+?)\) is more than twice this client's annual budget — winnable, but a stretch\.$/,
+    (_, a) =>
+      `El monto mínimo aquí (${a}) supera el doble del presupuesto anual de este cliente: se puede ganar, pero es exigente.`,
+  ],
+  [
+    /^The smallest award here \((.+?)\) is ([\d.]+)x this client's annual budget/,
+    (_, a, r) =>
+      `El monto mínimo aquí (${a}) equivale a ${r} veces el presupuesto anual de este cliente: probablemente excede lo que puede gestionar.`,
+  ],
+  [
+    /^Award size fits an organization of this client's scale, though the most it pays \((.+?)\)/,
+    (_, a) =>
+      `El monto se ajusta a una organización de la escala de este cliente, aunque el máximo que paga (${a}) es menos del 2% del presupuesto anual.`,
+  ],
+  [
+    /^Award size fits an organization of this client's scale\.$/,
+    "El monto se ajusta a una organización de la escala de este cliente.",
+  ],
+  [
+    /^This call does not say whether the applicant must contribute anything\.$/,
+    "Esta convocatoria no indica si el postulante debe aportar algo.",
+  ],
+  [/^The funder covers the full cost\.$/, "El financiador cubre el costo total."],
+  [
+    /^The applicant is expected to carry about (\d+)% of the cost\. Confirm that before drafting\.$/,
+    (_, n) =>
+      `Se espera que el postulante cubra cerca del ${n}% del costo. Confírmalo antes de redactar.`,
+  ],
+  [
+    /^No closing date, so there is no deadline to race\.$/,
+    "Sin fecha de cierre, así que no hay plazo que apure.",
+  ],
+  [
+    /^We could not read the closing date, so we cannot say whether there is time\.$/,
+    "No pudimos leer la fecha de cierre, así que no sabemos si hay tiempo.",
+  ],
+  [/^This call has closed\.$/, "Esta convocatoria ya cerró."],
+  [
+    /^(\d+) days? left, against the (\d+) weeks this client usually needs\. Winnable only if much of it is already written\.$/,
+    (_, d, w) =>
+      `Quedan ${d} días, frente a las ${w} semanas que este cliente suele necesitar. Solo es viable si buena parte ya está escrita.`,
+  ],
+  [/^(\d+) weeks to the deadline\.$/, (_, w) => `${w} semanas hasta el cierre.`],
+];
+
+/** The rules engine's sentence in the interface language (unknown text stays as is). */
+export function translateRuleText(text: string, lang: RadarLang = "en"): string {
+  if (lang !== "es" || !text) return text;
+  for (const [re, out] of RULE_TEXT_ES) {
+    const m = text.match(re);
+    if (m) return typeof out === "string" ? out : out(...(m as unknown as string[]));
+  }
+  return text;
 }
 
 export function daysUntil(deadline: string | null | undefined, now: number): number | null {
@@ -325,9 +464,10 @@ const NEGATIVE_CUE =
 
 export function toRadarItem<T extends RadarGrant>(
   g: T,
-  opts: Pick<RadarOptions, "leadTimeWeeks" | "searching" | "rules"> & { now: number },
+  opts: Pick<RadarOptions, "leadTimeWeeks" | "searching" | "rules" | "lang"> & { now: number },
 ): RadarItem<T> {
-  const ruled = opts.rules ? ruleDecision(g, opts.rules, opts.now) : null;
+  const lang = opts.lang ?? "en";
+  const ruled = opts.rules ? ruleDecision(g, opts.rules, opts.now, lang) : null;
 
   // Authoritative completed evaluation takes precedence over preliminary rules
   let verdict: RadarVerdict;
@@ -336,21 +476,31 @@ export function toRadarItem<T extends RadarGrant>(
 
   if (g.evaluation) {
     verdict = evaluationVerdict(g.evaluation);
-    const rationale = humanizeRationale((g.evaluation as { rationale_en?: string }).rationale_en);
+    const rationale = humanizeRationale(
+      (g.evaluation as { rationale_en?: string }).rationale_en,
+      lang,
+    );
     if (verdict === "not_eligible" && ruled?.verdict === "not_eligible" && ruled.reason) {
       // The rules give the concrete, verifiable reason.
       reason = ruled.reason;
     } else if (verdict === "not_eligible" && rationale && !NEGATIVE_CUE.test(rationale)) {
       // The saved "no" stays, but its explanation argues the opposite: say so.
-      reason =
-        "The review said no, but its explanation gives no reason. Open the grant and re-check fit.";
+      reason = pickLang(
+        lang,
+        "The review said no, but its explanation gives no reason. Open the grant and re-check fit.",
+        "La revisión dijo que no, pero su explicación no da un motivo. Abre el grant y vuelve a verificar el encaje.",
+      );
     } else {
       reason = rationale ?? ruled?.reason ?? null;
     }
     isRuled = true;
   } else if (g.hardBlocked) {
     verdict = "not_eligible";
-    reason = "Excluded by institutional eligibility rules.";
+    reason = pickLang(
+      lang,
+      "Excluded by institutional eligibility rules.",
+      "Excluido por las reglas institucionales de elegibilidad.",
+    );
     isRuled = true;
   } else if (ruled) {
     // A preliminary rules pass is not a confirmed fit: the full evaluation can
@@ -358,7 +508,11 @@ export function toRadarItem<T extends RadarGrant>(
     // contradicted by the grant detail. Only an evaluation confirms eligibility.
     if (ruled.verdict === "eligible") {
       verdict = "needs_input";
-      reason = "Passes the preliminary check — the eligibility check runs automatically.";
+      reason = pickLang(
+        lang,
+        "Passes the preliminary check — the eligibility check runs automatically.",
+        "Pasa la verificación preliminar: la verificación de elegibilidad se ejecuta automáticamente.",
+      );
     } else {
       verdict = ruled.verdict;
       reason = ruled.reason;
@@ -472,6 +626,7 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
       leadTimeWeeks: opts.leadTimeWeeks,
       searching: opts.searching,
       rules: opts.rules,
+      lang: opts.lang,
     });
     if (
       !opts.searching &&
@@ -558,13 +713,158 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
   };
 }
 
-export function countryName(code: string): string {
-  if (code === "INTL") return "International";
+export function countryName(code: string, lang: RadarLang = "en"): string {
+  const c = (code ?? "").toUpperCase();
+  if (c === "INTL" || c === "INT") return pickLang(lang, "International", "Internacional");
+  if (c === "LATAM" || c === "LAC")
+    return pickLang(lang, "Latin America & Caribbean", "América Latina y el Caribe");
   try {
-    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+    return new Intl.DisplayNames([lang], { type: "region" }).of(c) ?? code;
   } catch {
     return code;
   }
+}
+
+/**
+ * Countries always offered in the country filter, even with no grant in the
+ * catalog yet (choosing one shows the empty state, which offers the web search).
+ */
+export const RADAR_BASE_COUNTRIES = [
+  "CA",
+  "US",
+  "MX",
+  "PE",
+  "CO",
+  "CR",
+  "EC",
+  "BO",
+  "CL",
+  "AR",
+  "BR",
+  "GT",
+  "HN",
+  "LATAM",
+  "INTL",
+] as const;
+
+const canonicalCountry = (c: string) => {
+  const u = c.trim().toUpperCase();
+  return u === "INT" ? "INTL" : u === "LAC" ? "LATAM" : u;
+};
+
+/** The fixed list followed by any other country present in the catalog. */
+export function radarCountryOptions(catalog: string[], selected?: string | null): string[] {
+  const out: string[] = [...RADAR_BASE_COUNTRIES];
+  const seen = new Set<string>(out);
+  const extra = [...(catalog ?? []), ...(selected && selected !== "all" ? [selected] : [])];
+  for (const raw of extra) {
+    if (!raw || raw === "all") continue;
+    const canon = canonicalCountry(raw);
+    if (seen.has(canon)) continue;
+    seen.add(canon);
+    out.push(raw.trim().toUpperCase());
+  }
+  return out;
+}
+
+const COUNTRY_ALIASES: Record<string, string> = {
+  canada: "CA",
+  canadá: "CA",
+  "united states": "US",
+  usa: "US",
+  "estados unidos": "US",
+  eeuu: "US",
+  mexico: "MX",
+  méxico: "MX",
+  peru: "PE",
+  perú: "PE",
+  colombia: "CO",
+  "costa rica": "CR",
+  ecuador: "EC",
+  bolivia: "BO",
+  chile: "CL",
+  argentina: "AR",
+  brazil: "BR",
+  brasil: "BR",
+  guatemala: "GT",
+  honduras: "HN",
+  "latin america": "LATAM",
+  "latin america & caribbean": "LATAM",
+  latinoamérica: "LATAM",
+  latinoamerica: "LATAM",
+  "américa latina": "LATAM",
+  "america latina": "LATAM",
+  latam: "LATAM",
+  lac: "LATAM",
+  international: "INTL",
+  internacional: "INTL",
+  multilateral: "INTL",
+  intl: "INTL",
+  int: "INTL",
+};
+
+/** Code for a free-text country ("Perú", "PE", "Peru (Cusco)"), or null. */
+export function countryCodeOf(text: string | null | undefined): string | null {
+  const raw = (text ?? "").trim();
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  if (COUNTRY_ALIASES[lower]) return COUNTRY_ALIASES[lower];
+  if (/^[A-Za-z]{2}$/.test(raw)) return raw.toUpperCase();
+  const head = lower.split(/[(,/-]/)[0].trim();
+  if (COUNTRY_ALIASES[head]) return COUNTRY_ALIASES[head];
+  for (const [name, code] of Object.entries(COUNTRY_ALIASES)) {
+    if (name.length > 3 && lower.includes(name)) return code;
+  }
+  return null;
+}
+
+export type RadarFocus = {
+  /** Country codes, most frequent first (grant countries and partner countries). */
+  countries: string[];
+  /** Sector values, most frequent first. */
+  sectors: string[];
+};
+
+type FocusRow = {
+  workspace?: {
+    priority?: string | null;
+    partners?: Array<{ country?: string | null }> | null;
+  } | null;
+  grant?: { country?: string | null; sectors?: string[] | null } | null;
+};
+
+/**
+ * What the organization cares about, read from the grants it is working on
+ * (pipeline): their countries, their sectors and the partners' countries.
+ * Deterministic; discarded grants are ignored.
+ */
+export function focusFromWorkspaces(rows: FocusRow[], limit = 6): RadarFocus {
+  const countries = new Map<string, number>();
+  const sectors = new Map<string, { label: string; n: number }>();
+  const bump = (code: string | null) => {
+    if (code) countries.set(code, (countries.get(code) ?? 0) + 1);
+  };
+  for (const r of rows ?? []) {
+    if (r.workspace?.priority === "discard") continue;
+    bump(countryCodeOf(r.grant?.country));
+    for (const p of r.workspace?.partners ?? []) bump(countryCodeOf(p?.country));
+    for (const s of r.grant?.sectors ?? []) {
+      const key = (s ?? "").trim().toLowerCase();
+      if (!key) continue;
+      const cur = sectors.get(key);
+      sectors.set(key, { label: cur?.label ?? s.trim(), n: (cur?.n ?? 0) + 1 });
+    }
+  }
+  return {
+    countries: [...countries.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, limit)
+      .map(([c]) => c),
+    sectors: [...sectors.entries()]
+      .sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]))
+      .slice(0, limit)
+      .map(([, v]) => v.label),
+  };
 }
 
 /**
@@ -581,8 +881,12 @@ export function grantCurrency(g: {
   return (g.country ?? "").toUpperCase() === "US" ? "USD" : "CAD";
 }
 
-export function formatMoney(value: number | null, currency: "CAD" | "USD" = "CAD"): string {
-  if (value == null) return "Amount not published";
+export function formatMoney(
+  value: number | null,
+  currency: "CAD" | "USD" = "CAD",
+  lang: RadarLang = "en",
+): string {
+  if (value == null) return pickLang(lang, "Amount not published", "Monto no publicado");
   const sign = currency === "USD" ? "US$" : "$";
   if (value >= 1_000_000)
     return `${sign}${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
@@ -590,8 +894,25 @@ export function formatMoney(value: number | null, currency: "CAD" | "USD" = "CAD
   return `${sign}${value}`;
 }
 
-export function timingLabel(item: Pick<RadarItem<RadarGrant>, "timing" | "daysLeft">): string {
+export function timingLabel(
+  item: Pick<RadarItem<RadarGrant>, "timing" | "daysLeft">,
+  lang: RadarLang = "en",
+): string {
   const d = item.daysLeft;
+  if (lang === "es") {
+    switch (item.timing) {
+      case "closed":
+        return "Cerrado";
+      case "open_ended":
+        return "Sin fecha límite fija";
+      case "too_soon":
+        return d === 0
+          ? "Cierra hoy · no alcanza el tiempo"
+          : `Cierra en ${d} días · no alcanza el tiempo`;
+      default:
+        return d === 1 ? "Cierra mañana" : `Cierra en ${d} días`;
+    }
+  }
   switch (item.timing) {
     case "closed":
       return "Closed";
@@ -609,6 +930,27 @@ export const VERDICT_LABELS: Record<RadarVerdict, string> = {
   needs_input: "Needs a check",
   not_eligible: "Not a fit",
 };
+
+export const VERDICT_LABELS_ES: Record<RadarVerdict, string> = {
+  eligible: "Puedes postular",
+  needs_input: "Requiere revisión",
+  not_eligible: "No encaja",
+};
+
+export function verdictLabel(v: RadarVerdict, lang: RadarLang = "en"): string {
+  return lang === "es" ? VERDICT_LABELS_ES[v] : VERDICT_LABELS[v];
+}
+
+export const NEXT_ACTION_LABELS_ES: Record<RadarNextAction, string> = {
+  enrich: "Leer la fuente",
+  evaluate: "Verificar elegibilidad",
+  draft: "Iniciar el borrador",
+  open: "Abrir",
+};
+
+export function nextActionLabel(a: RadarNextAction, lang: RadarLang = "en"): string {
+  return lang === "es" ? NEXT_ACTION_LABELS_ES[a] : NEXT_ACTION_LABELS[a];
+}
 
 export const NEXT_ACTION_LABELS: Record<RadarNextAction, string> = {
   enrich: "Read the source",
@@ -696,3 +1038,8 @@ export const FUNDING_KIND_LABEL: Record<FundingKind, string> = {
   loan: "Loan",
   tax_credit: "Tax credit",
 };
+
+export function fundingKindLabel(k: FundingKind, lang: RadarLang = "en"): string {
+  if (lang !== "es") return FUNDING_KIND_LABEL[k];
+  return { grant: "Grant", loan: "Préstamo", tax_credit: "Crédito fiscal" }[k];
+}

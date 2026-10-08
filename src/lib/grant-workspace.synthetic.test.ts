@@ -113,3 +113,61 @@ describe("application workspace (synthetic)", () => {
     expect(csv.split("\r\n")).toHaveLength(2);
   });
 });
+
+describe("application workspace in Spanish (synthetic)", () => {
+  it("the memo to Marcelo can be written in Spanish with Spanish headings, amount and date", async () => {
+    const { amountText, deadlineText } = await import("@/lib/grant-workspace.shared");
+    const ws = emptyWorkspace("org", grant);
+    ws.priority = "prepare";
+    ws.route = "partner";
+    ws.blockers = ["No tenemos estados financieros auditados"];
+    ws.checklist[0].status = "have";
+    const { subject, body } = decisionMemo(grant, ws, {
+      applicantNames: ["IIAL"],
+      eligibility: [],
+      lang: "es",
+    });
+    expect(subject).toContain("Decisión");
+    expect(body.startsWith("Hola Marcelo")).toBe(true);
+    for (const h of [
+      "Qué es",
+      "Monto y fechas",
+      "Quién aplica y cómo",
+      "Qué tenemos",
+      "Qué nos falta",
+      "Riesgos / bloqueos",
+      "Qué gana IIAL",
+      "Recomendación",
+    ])
+      expect(body).toContain(h);
+    expect(body).toContain("4 de noviembre de 2026");
+    expect(body).toContain("Socio (otra organización administra)");
+    expect(body).not.toContain("Hi Marcelo");
+    expect(amountText({ ...grant, amount_cad_min: null }, "es")).toBe("hasta $50,000");
+    expect(amountText({ ...grant, amount_cad_max: null }, "es")).toBe("desde $10,000");
+    expect(amountText({ ...grant, amount_cad_min: null, amount_cad_max: null }, "es")).toBe(
+      "no publicado",
+    );
+    expect(
+      deadlineText(
+        { ...grant, deadline: null },
+        { deadline_time: null, deadline_timezone: null, call_status: null },
+        "es",
+      ),
+    ).toBe("sin fecha fija");
+    // English stays the default.
+    expect(decisionMemo(grant, ws, { applicantNames: [], eligibility: [] }).body).toMatch(
+      /^Hi Marcelo/,
+    );
+  });
+
+  it("standard documents and milestones can be generated in Spanish", () => {
+    const items = defaultChecklist(grant, "es").map((c) => c.item);
+    expect(items).toContain("Constancia de constitución");
+    const ms = defaultMilestones(grant.deadline, new Date("2026-09-01T12:00:00Z"), "es");
+    expect(ms[0].label).toBe("Decisión de aplicar o no");
+    expect(ms[0].id).toBe(
+      defaultMilestones(grant.deadline, new Date("2026-09-01T12:00:00Z"))[0].id,
+    );
+  });
+});

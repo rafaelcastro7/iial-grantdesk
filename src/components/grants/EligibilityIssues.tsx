@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { describeCheck } from "@/lib/eligibility-explain";
+import { useTr } from "@/lib/ui-lang";
 
 type Check = { id?: string; label: string; status?: string; detail?: string; hard?: boolean };
 
@@ -10,6 +11,7 @@ type Check = { id?: string; label: string; status?: string; detail?: string; har
  * tell a profile setting they can fix from a grant they should not pursue.
  */
 export function EligibilityIssues({ checks }: { checks: Check[] }) {
+  const tr = useTr();
   const issues = checks.filter((check) => check.status === "fail" || check.status === "warn");
   if (issues.length === 0) return null;
 
@@ -27,13 +29,15 @@ export function EligibilityIssues({ checks }: { checks: Check[] }) {
               <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                 {info.grantSays && (
                   <>
-                    <dt className="text-muted-foreground">Grant asks for</dt>
+                    <dt className="text-muted-foreground">
+                      {tr("Grant asks for", "El grant pide")}
+                    </dt>
                     <dd className="text-foreground">{info.grantSays}</dd>
                   </>
                 )}
                 {info.profileSays && (
                   <>
-                    <dt className="text-muted-foreground">Your profile</dt>
+                    <dt className="text-muted-foreground">{tr("Your profile", "Tu perfil")}</dt>
                     <dd className="text-foreground">{info.profileSays}</dd>
                   </>
                 )}
@@ -45,7 +49,7 @@ export function EligibilityIssues({ checks }: { checks: Check[] }) {
                 to="/org"
                 className="mt-1.5 inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
               >
-                Review my profile <ArrowRight className="h-3 w-3" />
+                {tr("Review my profile", "Revisar mi perfil")} <ArrowRight className="h-3 w-3" />
               </Link>
             )}
           </li>

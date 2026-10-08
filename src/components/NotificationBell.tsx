@@ -13,18 +13,21 @@ import {
 } from "@/lib/notifications.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { pick, useTr, useUiLang, type UiLang } from "@/lib/ui-lang";
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, lang: UiLang = "en"): string {
   const ms = Date.now() - new Date(iso).getTime();
   const days = Math.floor(ms / 86_400_000);
-  if (days >= 1) return `${days}d ago`;
+  if (days >= 1) return pick(lang, `${days}d ago`, `hace ${days} d`);
   const hours = Math.floor(ms / 3_600_000);
-  if (hours >= 1) return `${hours}h ago`;
+  if (hours >= 1) return pick(lang, `${hours}h ago`, `hace ${hours} h`);
   const mins = Math.max(1, Math.floor(ms / 60_000));
-  return `${mins}m ago`;
+  return pick(lang, `${mins}m ago`, `hace ${mins} min`);
 }
 
 export function NotificationBell() {
+  const tr = useTr();
+  const lang = useUiLang();
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const fetchFn = useServerFn(listNotifications);
@@ -66,7 +69,7 @@ export function NotificationBell() {
         size="sm"
         className="relative"
         onClick={() => onOpenChange(!open)}
-        aria-label="Notifications"
+        aria-label={tr("Notifications", "Notificaciones")}
       >
         <Bell className="h-4 w-4" />
         {unread > 0 && (
@@ -85,21 +88,21 @@ export function NotificationBell() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-1rem)] max-w-80 rounded-md border bg-card shadow-lg sm:w-80">
             <div className="flex items-center justify-between border-b px-3 py-2">
-              <span className="text-sm font-medium">Notifications</span>
+              <span className="text-sm font-medium">{tr("Notifications", "Notificaciones")}</span>
               {unread > 0 && (
                 <button
                   type="button"
                   onClick={onMarkAll}
                   className="text-xs text-muted-foreground hover:underline"
                 >
-                  Mark all read
+                  {tr("Mark all read", "Marcar todo como leído")}
                 </button>
               )}
             </div>
             <ul className="max-h-80 overflow-y-auto divide-y">
               {uniqueNotifications.length === 0 && (
                 <li className="px-3 py-6 text-center text-xs text-muted-foreground">
-                  No notifications yet.
+                  {tr("No notifications yet.", "Aún no hay notificaciones.")}
                 </li>
               )}
               {uniqueNotifications.map((n, index) => (
@@ -120,7 +123,7 @@ export function NotificationBell() {
                     </div>
                     <p className="mt-0.5 text-muted-foreground">{n.body_en}</p>
                     <p className="mt-1 text-[10px] text-muted-foreground/70">
-                      {timeAgo(n.created_at)}
+                      {timeAgo(n.created_at, lang)}
                     </p>
                   </Link>
                 </li>

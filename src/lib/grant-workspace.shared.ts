@@ -137,7 +137,18 @@ const slug = (s: string) =>
     .slice(0, 48) || "item";
 
 /** Documents almost every Canadian call asks for, plus the grant's own requirements. */
-export function defaultChecklist(grant: WorkspaceGrant): ChecklistItem[] {
+const STD_DOCS_ES: Record<string, string> = {
+  "Proof of incorporation": "Constancia de constitución",
+  "CRA business number": "Número de empresa de la CRA (BN)",
+  "Financial statements (last 2 years)": "Estados financieros (últimos 2 años)",
+  "Funder portal registration": "Registro en el portal del financiador",
+  "Letters of support from partners": "Cartas de apoyo de los socios",
+  "Project budget (funder template)": "Presupuesto del proyecto (plantilla del financiador)",
+  "Concept note / project description": "Nota conceptual / descripción del proyecto",
+  "CVs of key personnel": "CV del personal clave",
+};
+
+export function defaultChecklist(grant: WorkspaceGrant, lang: "en" | "es" = "en"): ChecklistItem[] {
   const fromGrant = (grant.requirements ?? [])
     .map((r) => (r.requirement ?? "").trim())
     .filter(Boolean)
@@ -156,7 +167,11 @@ export function defaultChecklist(grant: WorkspaceGrant): ChecklistItem[] {
     "Project budget (funder template)",
     "Concept note / project description",
     "CVs of key personnel",
-  ].map((item) => ({ id: `std-${slug(item)}`, item, status: "missing" as const }));
+  ].map((item) => ({
+    id: `std-${slug(item)}`,
+    item: lang === "es" ? (STD_DOCS_ES[item] ?? item) : item,
+    status: "missing" as const,
+  }));
   const seen = new Set<string>();
   return [...fromGrant, ...standard].filter((c) => {
     const k = c.item.toLowerCase();
@@ -176,22 +191,35 @@ const addDays = (iso: string, days: number) => {
 export function defaultMilestones(
   deadline: string | null | undefined,
   today = new Date(),
+  lang: "en" | "es" = "en",
 ): Milestone[] {
   if (!deadline || !/^\d{4}-\d{2}-\d{2}/.test(deadline)) return [];
   const d = deadline.slice(0, 10);
-  const plan: Array<[string, number]> = [
-    ["Go / no-go decision", -35],
-    ["Register in the funder portal (allow 10+ business days)", -30],
-    ["Confirm partners and request letters of support", -25],
-    ["Concept note / first full draft", -18],
-    ["Budget and documents complete", -10],
-    ["Internal review and sign-off", -5],
-    ["Submit (aim 2 days early)", -2],
+  const plan: Array<[string, number, string]> = [
+    ["Go / no-go decision", -35, "Decisión de aplicar o no"],
+    [
+      "Register in the funder portal (allow 10+ business days)",
+      -30,
+      "Registrarse en el portal del financiador (prever 10+ días hábiles)",
+    ],
+    [
+      "Confirm partners and request letters of support",
+      -25,
+      "Confirmar socios y pedir cartas de apoyo",
+    ],
+    ["Concept note / first full draft", -18, "Nota conceptual / primer borrador completo"],
+    ["Budget and documents complete", -10, "Presupuesto y documentos completos"],
+    ["Internal review and sign-off", -5, "Revisión interna y aprobación"],
+    ["Submit (aim 2 days early)", -2, "Enviar (idealmente 2 días antes)"],
   ];
   const todayIso = today.toISOString().slice(0, 10);
-  return plan.map(([label, offset]) => {
+  return plan.map(([label, offset, labelEs]) => {
     const date = addDays(d, offset);
-    return { id: slug(label), label, date: date < todayIso ? todayIso : date };
+    return {
+      id: slug(label),
+      label: lang === "es" ? labelEs : label,
+      date: date < todayIso ? todayIso : date,
+    };
   });
 }
 
@@ -231,22 +259,30 @@ export type ApplicantEligibility = {
 const money = (v: number | null | undefined, currency: string) =>
   v == null ? null : `${currency === "USD" ? "US$" : "$"}${Math.round(v).toLocaleString("en-CA")}`;
 
-export function amountText(grant: WorkspaceGrant): string {
+export function amountText(grant: WorkspaceGrant, lang: "en" | "es" = "en"): string {
   const cur = (grant.currency ?? (grant.country === "US" ? "USD" : "CAD")).toUpperCase();
   const min = money(grant.amount_cad_min, cur);
   const max = money(grant.amount_cad_max, cur);
   if (min && max) return min === max ? max : `${min} – ${max}`;
-  if (max) return `up to ${max}`;
-  if (min) return `from ${min}`;
-  return "not published";
+  if (max) return lang === "es" ? `hasta ${max}` : `up to ${max}`;
+  if (min) return lang === "es" ? `desde ${min}` : `from ${min}`;
+  return lang === "es" ? "no publicado" : "not published";
 }
 
 export function deadlineText(
   grant: WorkspaceGrant,
   ws: Pick<Workspace, "deadline_time" | "deadline_timezone" | "call_status">,
+  lang: "en" | "es" = "en",
 ): string {
   if (!grant.deadline) {
-    return ws.call_status ? CALL_STATUS_LABEL[ws.call_status] : "no fixed deadline";
+    if (ws.call_status) return callStatusLabel(ws.call_status, lang);
+    return lang === "es" ? "sin fecha fija" : "no fixed deadline";
+  }
+  if (lang === "es") {
+    const [y, m, d] = grant.deadline.slice(0, 10).split("-").map(Number);
+    const esDate = `${d} de ${ES_MONTHS[m - 1] ?? ""} de ${y}`;
+    const t = [ws.deadline_time, ws.deadline_timezone].filter(Boolean).join(" ");
+    return t ? `${esDate}, ${t}` : esDate;
   }
   const date = new Date(`${grant.deadline.slice(0, 10)}T12:00:00Z`).toLocaleDateString("en-CA", {
     day: "numeric",
@@ -257,6 +293,21 @@ export function deadlineText(
   const time = [ws.deadline_time, ws.deadline_timezone].filter(Boolean).join(" ");
   return time ? `${date}, ${time}` : date;
 }
+
+const ES_MONTHS = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
 
 /**
  * Decision memo for the decision maker, in plain (B1) English: what it is,
@@ -272,8 +323,10 @@ export function decisionMemo(
     recipient?: string;
     sender?: string;
     orgName?: string;
+    lang?: "en" | "es";
   },
 ): { subject: string; body: string } {
+  if (opts.lang === "es") return decisionMemoEs(grant, ws, opts);
   const recipient = opts.recipient ?? "Marcelo";
   const sender = opts.sender ?? "Rocío";
   const funder = grant.funder?.name ? ` (${grant.funder.name})` : "";
@@ -361,6 +414,115 @@ export function decisionMemo(
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return { subject: `Grant decision: ${grant.title}`, body };
+}
+
+function decisionMemoEs(
+  grant: WorkspaceGrant,
+  ws: Workspace,
+  opts: {
+    applicantNames: string[];
+    eligibility: ApplicantEligibility[];
+    recipient?: string;
+    sender?: string;
+    orgName?: string;
+  },
+): { subject: string; body: string } {
+  const recipient = opts.recipient ?? "Marcelo";
+  const sender = opts.sender ?? "Rocío";
+  const org = opts.orgName?.trim() || "IIAL";
+  const funder = grant.funder?.name ? ` (${grant.funder.name})` : "";
+  const applicants = opts.applicantNames.length
+    ? opts.applicantNames.join(" y ")
+    : "aún no decidido";
+  const route = ws.route ? routeLabel(ws.route, "es") : "aún no decidido";
+  const ready = ws.checklist.filter((c) => c.status === "have").map((c) => c.item);
+  const missing = ws.checklist.filter((c) => c.status === "missing" || c.status === "in_progress");
+  const partners = ws.partners.filter((p) => p.name.trim());
+  const nextMilestone = ws.milestones.find((m) => !m.done);
+  const partnerStatus: Record<string, string> = {
+    to_contact: "por contactar",
+    contacted: "contactado",
+    interested: "interesado",
+    confirmed: "confirmado",
+    declined: "declinó",
+  };
+  const recommendation: Record<Priority, string> = {
+    now: "Recomiendo que apliquemos ya.",
+    prepare:
+      "Recomiendo que preparemos la postulación y decidamos cuando resolvamos los puntos pendientes.",
+    monitor:
+      "Recomiendo que por ahora solo monitoreemos esta convocatoria y no invirtamos tiempo todavía.",
+    discard: "Recomiendo que no apliquemos.",
+  };
+  const lines: string[] = [
+    `Hola ${recipient}:`,
+    "",
+    `Le comparto un breve resumen de "${grant.title}"${funder}, para que decidamos si aplicamos.`,
+    "",
+    "Qué es",
+    grant.summary?.trim()
+      ? `- ${grant.summary.trim().replace(/\s+/g, " ").slice(0, 400)}`
+      : "- (ver la página oficial)",
+    grant.url ? `- Página oficial: ${grant.url}` : "",
+    "",
+    "Monto y fechas",
+    `- Monto: ${amountText(grant, "es")}${ws.instrument ? ` (${instrumentLabel(ws.instrument, "es").toLowerCase()})` : ""}`,
+    ws.match_pct != null
+      ? `- Debemos aportar el ${ws.match_pct}% de los costos${ws.match_in_kind_ok ? " (se acepta aporte en especie)" : ws.match_in_kind_ok === false ? " (solo en efectivo)" : ""}`
+      : "",
+    `- Fecha límite: ${deadlineText(grant, ws, "es")}`,
+    nextMilestone ? `- Próximo paso: ${nextMilestone.label}, antes del ${nextMilestone.date}` : "",
+    "",
+    "Quién aplica y cómo",
+    `- Aplicante: ${applicants}`,
+    `- Nuestro rol: ${route}`,
+    ws.lead_institution ? `- Institución líder: ${ws.lead_institution}` : "",
+    ws.administrator ? `- Quién administra los fondos: ${ws.administrator}` : "",
+    ...opts.eligibility.map(
+      (e) =>
+        `- ${e.orgName}: ${e.verdict === "eligible" ? "elegible" : e.verdict === "needs_input" ? "por confirmar" : "no elegible"}${e.reasons[0] ? ` — ${e.reasons[0]}` : ""}`,
+    ),
+    "",
+    ws.project_title || ws.wcis_angle ? "Idea de proyecto" : "",
+    ws.project_title ? `- ${ws.project_title}` : "",
+    ws.wcis_angle ? `- Cómo usamos el WCIS: ${ws.wcis_angle}` : "",
+    "",
+    partners.length ? "Socios" : "",
+    ...partners.map(
+      (p) =>
+        `- ${p.name}${p.country ? ` (${p.country})` : ""}${p.role ? `: ${p.role}` : ""}${p.status ? ` — ${partnerStatus[p.status] ?? p.status}` : ""}`,
+    ),
+    "",
+    "Qué tenemos",
+    ready.length ? ready.map((r) => `- ${r}`).join("\n") : "- Nada confirmado todavía",
+    "",
+    "Qué nos falta",
+    missing.length
+      ? missing
+          .map(
+            (c) =>
+              `- ${c.item}${c.status === "in_progress" ? " (en curso)" : ""}${c.due ? `, antes del ${c.due}` : ""}`,
+          )
+          .join("\n")
+      : "- Nada, estamos listos",
+    ...(ws.blockers.length ? ["", "Riesgos / bloqueos", ...ws.blockers.map((b) => `- ${b}`)] : []),
+    "",
+    `Qué gana ${org}`,
+    ...valueForUs(ws.route, org, "es").map((v) => `- ${v}`),
+    "",
+    "Recomendación",
+    recommendation[ws.priority],
+    ws.decision_notes?.trim() ? ws.decision_notes.trim() : "",
+    "",
+    "Quedo atenta a sus comentarios.",
+    "",
+    sender,
+  ];
+  const body = lines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { subject: `Decisión sobre el grant: ${grant.title}`, body };
 }
 
 // ---------------------------------------------------------------------------
@@ -608,3 +770,154 @@ export const instrumentLabel = (i: Instrument, lang: L = "en") =>
   lang === "es" ? ES_INSTRUMENT[i] : INSTRUMENT_LABEL[i];
 export const checkStatusLabel = (c: CheckStatus, lang: L = "en") =>
   lang === "es" ? ES_CHECK[c] : CHECK_STATUS_LABEL[c];
+
+// ---------------------------------------------------------------------------
+// Plan updates proposed by the Grant Copilot and applied by the user.
+export type PlanUpdate = {
+  priority?: Priority | null;
+  route?: Route | null;
+  lead_institution?: string | null;
+  administrator?: string | null;
+  call_status?: CallStatus | null;
+  instrument?: Instrument | null;
+  match_pct?: number | null;
+  match_in_kind_ok?: boolean | null;
+  project_title?: string | null;
+  wcis_angle?: string | null;
+  add_blockers?: string[];
+  add_partners?: Array<{ name: string; country?: string | null; role?: string | null }>;
+  add_checklist?: Array<{ item: string; critical?: boolean }>;
+  add_milestones?: Array<{ label: string; date: string }>;
+  note?: string | null;
+};
+
+const ENUMS = {
+  priority: PRIORITIES as readonly string[],
+  route: ROUTES as readonly string[],
+  call_status: CALL_STATUSES as readonly string[],
+  instrument: INSTRUMENTS as readonly string[],
+};
+
+/** Values that are placeholders, not facts ("[Name]", "(example)", "e.g.", "TBD"). */
+export const PLACEHOLDER =
+  /\[[^\]]*\]|\((?:e\.?g\.?|example|ejemplo)[^)]*\)|\b(?:e\.g\.|TBD|por definir|placeholder)\b|<[^>]+>/i;
+
+/** Keeps only valid, non-empty fields of an update proposed by the AI. */
+export function sanitizePlanUpdate(raw: unknown): PlanUpdate {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const str = (v: unknown, max = 300) =>
+    typeof v === "string" && v.trim() && !PLACEHOLDER.test(v) ? v.trim().slice(0, max) : undefined;
+  const out: PlanUpdate = {};
+  for (const k of ["priority", "route", "call_status", "instrument"] as const) {
+    const v = str(r[k], 40);
+    if (v && ENUMS[k].includes(v)) (out as Record<string, unknown>)[k] = v;
+  }
+  for (const k of ["lead_institution", "administrator", "project_title"] as const) {
+    const v = str(r[k], 200);
+    if (v) out[k] = v;
+  }
+  const angle = str(r.wcis_angle, 800);
+  if (angle) out.wcis_angle = angle;
+  const note = str(r.note, 600);
+  if (note) out.note = note;
+  if (typeof r.match_pct === "number" && r.match_pct >= 0 && r.match_pct <= 100)
+    out.match_pct = r.match_pct;
+  if (typeof r.match_in_kind_ok === "boolean") out.match_in_kind_ok = r.match_in_kind_ok;
+  const arr = (v: unknown) => (Array.isArray(v) ? v.slice(0, 10) : []);
+  const blockers = arr(r.add_blockers)
+    .map((b) => str(b, 200))
+    .filter(Boolean) as string[];
+  if (blockers.length) out.add_blockers = blockers;
+  const partners = arr(r.add_partners)
+    .map((p) => p as Record<string, unknown>)
+    .filter((p) => str(p?.name, 120))
+    .map((p) => ({
+      name: str(p.name, 120)!,
+      country: str(p.country, 60) ?? null,
+      role: str(p.role, 160) ?? null,
+    }));
+  if (partners.length) out.add_partners = partners;
+  const checklist = arr(r.add_checklist)
+    .map((c) => (typeof c === "string" ? { item: c } : (c as Record<string, unknown>)))
+    .filter((c) => str(c?.item, 200))
+    .map((c) => ({ item: str(c.item, 200)!, critical: c.critical === true }));
+  if (checklist.length) out.add_checklist = checklist;
+  const milestones = arr(r.add_milestones)
+    .map((m) => m as Record<string, unknown>)
+    .filter((m) => str(m?.label, 160) && /^\d{4}-\d{2}-\d{2}$/.test(String(m?.date ?? "")))
+    .map((m) => ({ label: str(m.label, 160)!, date: String(m.date) }));
+  if (milestones.length) out.add_milestones = milestones;
+  return out;
+}
+
+export function isEmptyPlanUpdate(u: PlanUpdate): boolean {
+  return Object.keys(u).length === 0;
+}
+
+/** Applies an update to a plan: fields replace, lists are added without duplicates. */
+export function applyPlanUpdate(ws: Workspace, u: PlanUpdate, today = new Date()): Workspace {
+  const next: Workspace = { ...ws };
+  for (const k of [
+    "priority",
+    "route",
+    "lead_institution",
+    "administrator",
+    "call_status",
+    "instrument",
+    "match_pct",
+    "match_in_kind_ok",
+    "project_title",
+    "wcis_angle",
+  ] as const) {
+    if (u[k] !== undefined && u[k] !== null) (next as Record<string, unknown>)[k] = u[k];
+  }
+  const low = (s: string) => s.trim().toLowerCase();
+  if (u.add_blockers?.length) {
+    const have = new Set(ws.blockers.map(low));
+    next.blockers = [...ws.blockers, ...u.add_blockers.filter((b) => !have.has(low(b)))];
+  }
+  if (u.add_partners?.length) {
+    const have = new Set(ws.partners.map((p) => low(p.name)));
+    next.partners = [
+      ...ws.partners,
+      ...u.add_partners
+        .filter((p) => !have.has(low(p.name)))
+        .map((p) => ({
+          id: newId("partner"),
+          name: p.name,
+          country: p.country ?? null,
+          role: p.role ?? null,
+          status: "to_contact" as const,
+        })),
+    ];
+  }
+  if (u.add_checklist?.length) {
+    const have = new Set(ws.checklist.map((c) => low(c.item)));
+    next.checklist = [
+      ...ws.checklist,
+      ...u.add_checklist
+        .filter((c) => !have.has(low(c.item)))
+        .map((c) => ({
+          id: newId("item"),
+          item: c.item,
+          status: "missing" as const,
+          critical: !!c.critical,
+        })),
+    ];
+  }
+  if (u.add_milestones?.length) {
+    const have = new Set(ws.milestones.map((m) => `${low(m.label)}|${m.date}`));
+    next.milestones = [
+      ...ws.milestones,
+      ...u.add_milestones
+        .filter((m) => !have.has(`${low(m.label)}|${m.date}`))
+        .map((m) => ({ id: newId("ms"), label: m.label, date: m.date })),
+    ].sort((a, b) => a.date.localeCompare(b.date));
+  }
+  if (u.note) {
+    const stamp = today.toISOString().slice(0, 10);
+    const line = `${stamp} (Copilot): ${u.note}`;
+    next.decision_notes = ws.decision_notes ? `${ws.decision_notes}\n${line}` : line;
+  }
+  return next;
+}

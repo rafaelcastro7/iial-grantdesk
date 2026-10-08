@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import {
-  FUNDING_KIND_LABEL,
+  fundingKindLabel,
   draftGate,
   evaluationVerdict,
   fundingKindOf,
@@ -52,6 +52,7 @@ import {
   realFit,
 } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
+import { localeOf, pick, useTr, useUiLang, type UiLang } from "@/lib/ui-lang";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 
 type Requirement = {
@@ -151,6 +152,19 @@ type Props = {
 
 const DAY_MS = 86_400_000;
 
+const STATUS_LABEL_ES: Record<string, string> = {
+  discovered: "Descubierto",
+  enriched: "Detalles obtenidos",
+  scored: "Encaje evaluado",
+  shortlisted: "Preseleccionado",
+  in_proposal: "En propuesta",
+  submitted: "Enviado",
+  won: "Otorgado",
+  lost: "No otorgado",
+  expired: "Cerrado / vencido",
+  archived: "Archivado",
+};
+
 const STATUS_LABEL: Record<string, string> = {
   discovered: "Discovered",
   enriched: "Details Fetched",
@@ -183,6 +197,8 @@ export function V2GrantDetail({
   onShortlist,
 }: Props) {
   const { activeOrganization, activeOrgName, activeOrgId } = useActiveTenant();
+  const tr = useTr();
+  const lang = useUiLang();
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string | undefined>(undefined);
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
@@ -193,7 +209,7 @@ export function V2GrantDetail({
     "plan" | "roadmap" | "funder_facts" | "technical_audit"
   >("plan");
 
-  const funderName = grant.funder?.name ?? "Funding Agency";
+  const funderName = grant.funder?.name ?? tr("Funding Agency", "Agencia financiadora");
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
   const ruleSnapshot = evaluation?.rule_snapshot as {
     checks?: Parameters<typeof EligibilityIssues>[0]["checks"];
@@ -212,13 +228,14 @@ export function V2GrantDetail({
       })
     : null;
 
-  const deadline = getDeadlineState(grant.deadline);
+  const deadline = getDeadlineState(grant.deadline, lang, grant.deadline_kind);
   const currency = grantCurrency(grant);
   const amount = amountLabel(
     grant.amount_cad_min,
     grant.amount_cad_max,
     grant.status !== "discovered",
     currency,
+    lang,
   );
   const quality = getQualityState({
     grant,
@@ -233,26 +250,30 @@ export function V2GrantDetail({
     qualityPct: quality.pct,
     status: grant.status,
     enrichAttempts: grant.enrich_attempts,
+    lang,
   });
 
   // Synthesize complete strategic grant roadmap (Consortium routes, financial hurdles, WCIS revenue)
   const roadmap = useMemo(() => {
-    return synthesizeGrantRoadmap({
-      id: grant.id,
-      title: grant.title,
-      funderName: grant.funder?.name,
-      summary: grant.summary,
-      amountCadMax: grant.amount_cad_max,
-      applicantTypes: grant.applicant_types,
-      sectors: grant.sectors,
-      deadline: grant.deadline,
-      deadlineKind: grant.deadline_kind,
-      jurisdiction: grant.funder?.jurisdiction,
-      requirements: grant.requirements,
-      eligibilityNote: grant.eligibility_note,
-      orgName: activeOrgName || "IIAL",
-    });
-  }, [grant, activeOrgName]);
+    return synthesizeGrantRoadmap(
+      {
+        id: grant.id,
+        title: grant.title,
+        funderName: grant.funder?.name,
+        summary: grant.summary,
+        amountCadMax: grant.amount_cad_max,
+        applicantTypes: grant.applicant_types,
+        sectors: grant.sectors,
+        deadline: grant.deadline,
+        deadlineKind: grant.deadline_kind,
+        jurisdiction: grant.funder?.jurisdiction,
+        requirements: grant.requirements,
+        eligibilityNote: grant.eligibility_note,
+        orgName: activeOrgName || "IIAL",
+      },
+      lang,
+    );
+  }, [grant, activeOrgName, lang]);
 
   const [selectedRouteId, setSelectedRouteId] = useState<RouteId>(roadmap.recommendedRouteId);
 
@@ -271,18 +292,36 @@ export function V2GrantDetail({
   const evaluateBlockedReason = canEvaluate
     ? null
     : verdict.enrichmentFailed
-      ? "Unable to read official webpage automatically. Open the link to review manually."
-      : "Fetch details first to provide text for evaluation.";
+      ? tr(
+          "Unable to read official webpage automatically. Open the link to review manually.",
+          "No se pudo leer la página oficial automáticamente. Abra el enlace para revisarla manualmente.",
+        )
+      : tr(
+          "Fetch details first to provide text for evaluation.",
+          "Primero obtenga los detalles para tener texto que evaluar.",
+        );
   const canDraft = draftGate(evaluation) === "ok";
   const draftBlockedReason = canDraft
     ? null
     : evalVerdict === "not_eligible"
-      ? "Direct application does not meet profile criteria. Consider applying via a consortium (Route B or C)."
+      ? tr(
+          "Direct application does not meet profile criteria. Consider applying via a consortium (Route B or C).",
+          "La postulación directa no cumple los criterios del perfil. Considere postular mediante un consorcio (Ruta B o C).",
+        )
       : evalVerdict === "needs_input"
-        ? "Verify pending call requirements before drafting."
+        ? tr(
+            "Verify pending call requirements before drafting.",
+            "Verifique los requisitos pendientes de la convocatoria antes de redactar.",
+          )
         : evaluation
-          ? "Drafting is enabled upon validating route feasibility."
-          : "Run 'Check Fit' to unlock proposal drafting.";
+          ? tr(
+              "Drafting is enabled upon validating route feasibility.",
+              "La redacción se habilita al validar la viabilidad de la ruta.",
+            )
+          : tr(
+              "Run 'Check Fit' to unlock proposal drafting.",
+              "Ejecute 'Revisar encaje' para habilitar la redacción de la propuesta.",
+            );
 
   const actionDisabled = busy != null;
   const kind = fundingKindOf(grant);
@@ -293,7 +332,7 @@ export function V2GrantDetail({
 
   const eligibleGroups = eligibilityRows
     .filter(([, value]) => value === true)
-    .map(([key]) => ELIGIBILITY_LABEL[key] ?? humanizeKey(key));
+    .map(([key]) => eligibilityLabel(key, lang) ?? humanizeKey(key));
   const eligibilityDetails = eligibilityRows.filter(
     ([, value]) => typeof value !== "boolean" && value != null && value !== "",
   );
@@ -317,7 +356,7 @@ export function V2GrantDetail({
             to="/grants"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Find grants
+            <ArrowLeft className="h-3.5 w-3.5" /> {tr("Find grants", "Buscar grants")}
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             {grant.url && (
@@ -329,14 +368,14 @@ export function V2GrantDetail({
                   className: "h-8 gap-1.5 text-xs",
                 })}
               >
-                <span>Official page</span>
+                <span>{tr("Official page", "Página oficial")}</span>
                 <ExternalLink className="h-3 w-3" />
               </ExternalLinkPreview>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-                  More <ChevronDown className="h-3.5 w-3.5" />
+                  {tr("More", "Más")} <ChevronDown className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -345,20 +384,31 @@ export function V2GrantDetail({
                   onSelect={() => onEvaluate()}
                 >
                   <SearchCheck className="mr-2 h-4 w-4" />
-                  {evaluation ? "Re-check fit" : "Check fit"}
+                  {evaluation
+                    ? tr("Re-check fit", "Volver a revisar encaje")
+                    : tr("Check fit", "Revisar encaje")}
                 </DropdownMenuItem>
                 {canFetch && (
                   <DropdownMenuItem disabled={actionDisabled} onSelect={() => onFetchDetails()}>
-                    <RefreshCw className="mr-2 h-4 w-4" /> Fetch details from the official page
+                    <RefreshCw className="mr-2 h-4 w-4" />{" "}
+                    {tr(
+                      "Fetch details from the official page",
+                      "Obtener detalles de la página oficial",
+                    )}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onSelect={() => handleOpenCopilotWithPrompt()}>
-                  <Bot className="mr-2 h-4 w-4" /> Ask the Copilot (uses AI credits)
+                  <Bot className="mr-2 h-4 w-4" />{" "}
+                  {tr(
+                    "Ask the Copilot (uses AI credits)",
+                    "Preguntar al Copilot (usa créditos de IA)",
+                  )}
                 </DropdownMenuItem>
                 {existingProposalId ? (
                   <DropdownMenuItem asChild>
                     <Link to="/proposals/$id" params={{ id: existingProposalId }}>
-                      <FileText className="mr-2 h-4 w-4" /> Open proposal draft
+                      <FileText className="mr-2 h-4 w-4" />{" "}
+                      {tr("Open proposal draft", "Abrir borrador de propuesta")}
                     </Link>
                   </DropdownMenuItem>
                 ) : (
@@ -366,16 +416,19 @@ export function V2GrantDetail({
                     disabled={actionDisabled || !canDraft}
                     onSelect={() => onDraft()}
                   >
-                    <Send className="mr-2 h-4 w-4" /> Draft a proposal (AI)
+                    <Send className="mr-2 h-4 w-4" />{" "}
+                    {tr("Draft a proposal (AI)", "Redactar una propuesta (IA)")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem disabled={busy === "share"} onSelect={() => onShare()}>
                   <Link2 className="mr-2 h-4 w-4" />
-                  {shareUrl ? "Link copied" : "Copy a share link"}
+                  {shareUrl
+                    ? tr("Link copied", "Enlace copiado")
+                    : tr("Copy a share link", "Copiar un enlace para compartir")}
                 </DropdownMenuItem>
                 {isAdmin && grant.status === "scored" && (
                   <DropdownMenuItem disabled={busy === "shortlist"} onSelect={() => onShortlist()}>
-                    Shortlist
+                    {tr("Shortlist", "Preseleccionar")}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -392,7 +445,7 @@ export function V2GrantDetail({
             {cleanTitle(grant.title)}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {[funderName, grant.funder?.jurisdiction, FUNDING_KIND_LABEL[kind]]
+            {[funderName, grant.funder?.jurisdiction, fundingKindLabel(kind, lang)]
               .filter(Boolean)
               .join(" · ")}
           </p>
@@ -400,11 +453,15 @@ export function V2GrantDetail({
 
         <dl className="grid gap-2 text-sm sm:grid-cols-3">
           <div className="rounded-lg border bg-background/70 px-3 py-2">
-            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">Amount</dt>
+            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+              {tr("Amount", "Monto")}
+            </dt>
             <dd className="font-semibold">{amount}</dd>
           </div>
           <div className="rounded-lg border bg-background/70 px-3 py-2">
-            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">Deadline</dt>
+            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+              {tr("Deadline", "Fecha límite")}
+            </dt>
             <dd
               className={cn(
                 "font-semibold",
@@ -413,12 +470,15 @@ export function V2GrantDetail({
                   "text-amber-600 dark:text-amber-400",
               )}
             >
-              {isRolling ? "Continuous intake" : deadline.label}
+              {isRolling ? tr("Continuous intake", "Recepción continua") : deadline.label}
             </dd>
           </div>
           <div className="rounded-lg border bg-background/70 px-3 py-2">
             <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
-              Can {activeOrgName || "we"} apply?
+              {tr(
+                `Can ${activeOrgName || "we"} apply?`,
+                activeOrgName ? `¿Puede ${activeOrgName} postular?` : "¿Podemos postular?",
+              )}
             </dt>
             <dd
               className={cn(
@@ -433,12 +493,12 @@ export function V2GrantDetail({
               )}
             >
               {evalVerdict === "eligible"
-                ? `Yes${fitScore != null ? ` · fit ${fitScore}/100` : ""}`
+                ? `${tr("Yes", "Sí")}${fitScore != null ? ` · ${tr("fit", "encaje")} ${fitScore}/100` : ""}`
                 : evalVerdict === "needs_input"
-                  ? "Maybe — check the points below"
+                  ? tr("Maybe — check the points below", "Tal vez — revise los puntos de abajo")
                   : evalVerdict === "not_eligible"
-                    ? "Not directly — only as a partner"
-                    : "Not checked yet"}
+                    ? tr("Not directly — only as a partner", "No directamente — solo como socio")
+                    : tr("Not checked yet", "Aún no revisado")}
             </dd>
           </div>
         </dl>
@@ -452,7 +512,7 @@ export function V2GrantDetail({
       {busy === "enrich" && (
         <div className="flex items-center gap-2.5 rounded-md border border-teal-500/40 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-900 dark:text-teal-200">
           <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
-          Reading the official page (20–60 s)…
+          {tr("Reading the official page (20–60 s)…", "Leyendo la página oficial (20–60 s)…")}
         </div>
       )}
 
@@ -461,7 +521,10 @@ export function V2GrantDetail({
         <GrantApplicationWorkspace grantId={grant.id} orgId={activeOrgId} />
       ) : (
         <p className="rounded-lg border p-4 text-sm text-muted-foreground">
-          Choose the organization you are working for to open its plan.
+          {tr(
+            "Choose the organization you are working for to open its plan.",
+            "Elija la organización para la que trabaja para abrir su plan.",
+          )}
         </p>
       )}
 
@@ -471,9 +534,12 @@ export function V2GrantDetail({
         onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}
       >
         <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold">
-          More about this grant
+          {tr("More about this grant", "Más sobre este grant")}
           <span className="ml-2 font-normal text-muted-foreground">
-            fit analysis, suggested routes, funder facts, technical audit
+            {tr(
+              "fit analysis, suggested routes, funder facts, technical audit",
+              "análisis de encaje, rutas sugeridas, datos del financiador, auditoría técnica",
+            )}
           </span>
         </summary>
         {moreOpen && (
@@ -510,20 +576,41 @@ export function V2GrantDetail({
                 {/* OFFICIAL SUMMARY & SCOPE */}
                 <Panel
                   icon={FileText}
-                  title="Program Scope &amp; Official Description"
-                  description="Summary extracted from official funder documentation."
+                  title={tr(
+                    "Program Scope & Official Description",
+                    "Alcance del programa y descripción oficial",
+                  )}
+                  description={tr(
+                    "Summary extracted from official funder documentation.",
+                    "Resumen extraído de la documentación oficial del financiador.",
+                  )}
                 >
                   <div className="space-y-4">
                     <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
                       {grant.summary?.trim() ||
-                        "No detailed description extracted yet. Click 'Fetch details' or visit the official page."}
+                        tr(
+                          "No detailed description extracted yet. Click 'Fetch details' or visit the official page.",
+                          "Aún no se extrajo una descripción detallada. Haga clic en 'Obtener detalles' o visite la página oficial.",
+                        )}
                     </p>
 
                     <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FactRow label="Who can apply" values={applicantTypes} />
-                      <FactRow label="Eligible uses of funds" values={fundingUses} />
-                      <FactRow label="Target populations" values={populations} />
-                      <FactRow label="Eligible sectors" values={sectors} />
+                      <FactRow
+                        label={tr("Who can apply", "Quién puede postular")}
+                        values={applicantTypes}
+                      />
+                      <FactRow
+                        label={tr("Eligible uses of funds", "Usos elegibles de los fondos")}
+                        values={fundingUses}
+                      />
+                      <FactRow
+                        label={tr("Target populations", "Poblaciones objetivo")}
+                        values={populations}
+                      />
+                      <FactRow
+                        label={tr("Eligible sectors", "Sectores elegibles")}
+                        values={sectors}
+                      />
                     </div>
                   </div>
                 </Panel>
@@ -531,16 +618,28 @@ export function V2GrantDetail({
                 {/* FUNDER ELIGIBILITY RULES */}
                 <Panel
                   icon={ShieldCheck}
-                  title="Eligibility Rules Declared by Funder"
-                  description="Explicit conditions stated in call guidelines."
+                  title={tr(
+                    "Eligibility Rules Declared by Funder",
+                    "Reglas de elegibilidad declaradas por el financiador",
+                  )}
+                  description={tr(
+                    "Explicit conditions stated in call guidelines.",
+                    "Condiciones explícitas indicadas en las bases de la convocatoria.",
+                  )}
                 >
                   {eligibleGroups.length === 0 &&
                   eligibilityDetails.length === 0 &&
                   !grant.eligibility_note ? (
                     <EmptyState
                       icon={ShieldAlert}
-                      title="No textual eligibility rules extracted"
-                      body="Verify on the funder's official website before investing drafting time."
+                      title={tr(
+                        "No textual eligibility rules extracted",
+                        "No se extrajeron reglas de elegibilidad textuales",
+                      )}
+                      body={tr(
+                        "Verify on the funder's official website before investing drafting time.",
+                        "Verifique en el sitio oficial del financiador antes de invertir tiempo en la redacción.",
+                      )}
                     />
                   ) : (
                     <div className="space-y-4 text-sm">
@@ -552,7 +651,7 @@ export function V2GrantDetail({
                       {eligibleGroups.length > 0 && (
                         <div>
                           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
-                            Explicitly Eligible Groups
+                            {tr("Explicitly Eligible Groups", "Grupos explícitamente elegibles")}
                           </span>
                           <div className="flex flex-wrap gap-1.5">
                             {eligibleGroups.map((label) => (
@@ -572,7 +671,7 @@ export function V2GrantDetail({
                           {eligibilityDetails.map(([key, value]) => (
                             <div key={key} className="rounded-lg border bg-background/70 p-3">
                               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
-                                {ELIGIBILITY_LABEL[key] ?? humanizeKey(key)}
+                                {eligibilityLabel(key, lang) ?? humanizeKey(key)}
                               </span>
                               <div className="mt-1 text-xs">
                                 {typeof value === "object" ? JSON.stringify(value) : String(value)}
@@ -588,15 +687,27 @@ export function V2GrantDetail({
                 {/* SOURCES & PROVENANCE */}
                 <Panel
                   icon={Link2}
-                  title="Official Sources &amp; Provenance"
-                  description="Verified web pages and observation timestamps."
+                  title={tr("Official Sources & Provenance", "Fuentes oficiales y procedencia")}
+                  description={tr(
+                    "Verified web pages and observation timestamps.",
+                    "Páginas web verificadas y fechas de observación.",
+                  )}
                 >
                   <div className="space-y-2.5 text-sm">
                     {grant.url && (
-                      <SourceLink href={grant.url} label="Official Call Guidelines Page" />
+                      <SourceLink
+                        href={grant.url}
+                        label={tr(
+                          "Official Call Guidelines Page",
+                          "Página oficial de bases de la convocatoria",
+                        )}
+                      />
                     )}
                     {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
-                      <SourceLink href={grant.funder.source_url} label="Main Funder Portal" />
+                      <SourceLink
+                        href={grant.funder.source_url}
+                        label={tr("Main Funder Portal", "Portal principal del financiador")}
+                      />
                     )}
                     {otherSources.map((url) => (
                       <SourceLink
@@ -606,8 +717,14 @@ export function V2GrantDetail({
                       />
                     ))}
                     <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
-                      <span>Discovered: {formatDateTime(grant.discovered_at)}</span>
-                      <span>Last verified: {formatDateTime(grant.last_seen_at)}</span>
+                      <span>
+                        {tr("Discovered", "Descubierto")}:{" "}
+                        {formatDateTime(grant.discovered_at, lang)}
+                      </span>
+                      <span>
+                        {tr("Last verified", "Última verificación")}:{" "}
+                        {formatDateTime(grant.last_seen_at, lang)}
+                      </span>
                     </div>
                   </div>
                 </Panel>
@@ -654,11 +771,11 @@ export function V2GrantDetail({
             {/* AI FIT & DECISION RATIONALE */}
             <Panel
               icon={ClipboardCheck}
-              title="Fit Verdict &amp; Decisions"
+              title={tr("Fit Verdict & Decisions", "Veredicto de encaje y decisiones")}
               description={
                 evaluation
-                  ? `Evaluated on ${formatDateTime(evaluation.created_at)}`
-                  : "Fit not evaluated yet."
+                  ? `${tr("Evaluated on", "Evaluado el")} ${formatDateTime(evaluation.created_at, lang)}`
+                  : tr("Fit not evaluated yet.", "Encaje aún no evaluado.")
               }
             >
               <div className="space-y-3">
@@ -668,7 +785,9 @@ export function V2GrantDetail({
 
                 {evaluation?.rationale_en && (
                   <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed text-foreground">
-                    <span className="font-semibold block mb-1">Evaluation Engine Rationale:</span>
+                    <span className="font-semibold block mb-1">
+                      {tr("Evaluation Engine Rationale:", "Fundamento del motor de evaluación:")}
+                    </span>
                     {humanizeRationale(evaluation.rationale_en)}
                   </div>
                 )}
@@ -712,14 +831,32 @@ const ELIGIBILITY_LABEL: Record<string, string> = {
   registered_charity: "CRA Registered Charity",
 };
 
+const ELIGIBILITY_LABEL_ES: Record<string, string> = {
+  non_profit: "Entidad sin fines de lucro",
+  for_profit: "Empresa con fines de lucro",
+  academic: "Institución académica / universitaria",
+  individual: "Persona / trabajador independiente",
+  indigenous: "Comunidad / organización indígena",
+  canadian_entity: "Entidad legal registrada en Canadá",
+  ontario_based: "Con sede en Ontario",
+  registered_charity: "Organización benéfica registrada en la CRA",
+};
+
+function eligibilityLabel(key: string, lang: UiLang): string | undefined {
+  return (lang === "es" ? ELIGIBILITY_LABEL_ES : ELIGIBILITY_LABEL)[key];
+}
+
 function FactRow({ label, values }: { label: string; values: string[] }) {
+  const tr = useTr();
   return (
     <div className="space-y-1">
       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
         {label}
       </span>
       {values.length === 0 ? (
-        <span className="text-xs text-muted-foreground italic">Not specified</span>
+        <span className="text-xs text-muted-foreground italic">
+          {tr("Not specified", "No especificado")}
+        </span>
       ) : (
         <div className="flex flex-wrap gap-1">
           {values.map((v) => (
@@ -799,22 +936,50 @@ function EmptyState({
   );
 }
 
-function getDeadlineState(deadline: string | null) {
+function getDeadlineState(deadline: string | null, lang: UiLang = "en", kind?: string | null) {
+  const t = (en: string, es: string) => pick(lang, en, es);
+  // A closed call with no published date is closed, not an "open window".
+  if (!deadline && kind === "closed") {
+    return {
+      label: t("Closed — next cycle", "Cerrada — próximo ciclo"),
+      detail: t("No date for the next call yet", "Aún no hay fecha para la próxima convocatoria"),
+      days: null as number | null,
+    };
+  }
+  if (!deadline && kind !== "rolling") {
+    return {
+      label: t("Not published", "No publicada"),
+      detail: t("The funder has not published a date", "El financiador no ha publicado una fecha"),
+      days: null as number | null,
+    };
+  }
   if (!deadline) {
     return {
-      label: "Open Window",
-      detail: "Continuous intake or unspecified date",
+      label: t("Open Window", "Ventanilla abierta"),
+      detail: t(
+        "Continuous intake or unspecified date",
+        "Recepción continua o fecha no especificada",
+      ),
       days: null as number | null,
     };
   }
   const date = new Date(deadline);
   if (Number.isNaN(date.getTime())) {
-    return { label: "Non-standard date", detail: deadline, days: null as number | null };
+    return {
+      label: t("Non-standard date", "Fecha no estándar"),
+      detail: deadline,
+      days: null as number | null,
+    };
   }
   const days = Math.ceil((date.getTime() - Date.now()) / DAY_MS);
-  if (days < 0) return { label: "Closed", detail: formatDate(deadline), days };
-  if (days === 0) return { label: "Closes today", detail: formatDate(deadline), days };
-  return { label: `${days} days remaining`, detail: formatDate(deadline), days };
+  if (days < 0) return { label: t("Closed", "Cerrado"), detail: formatDate(deadline, lang), days };
+  if (days === 0)
+    return { label: t("Closes today", "Cierra hoy"), detail: formatDate(deadline, lang), days };
+  return {
+    label: t(`${days} days remaining`, `Quedan ${days} días`),
+    detail: formatDate(deadline, lang),
+    days,
+  };
 }
 
 function getQualityState({
@@ -848,7 +1013,9 @@ function getVerdict({
   evalVerdict,
   qualityPct,
   status,
+  lang = "en",
 }: {
+  lang?: UiLang;
   deadlineDays: number | null;
   enrichAttempts?: number | null;
   evaluation: Evaluation;
@@ -856,76 +1023,106 @@ function getVerdict({
   qualityPct: number;
   status: string;
 }) {
+  const t = (en: string, es: string) => pick(lang, en, es);
   const enrichmentFailed = status === "discovered" && (enrichAttempts ?? 0) >= MAX_ENRICH_ATTEMPTS;
   if (status === "won") {
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
-      label: "Awarded Grant",
-      detail: "Grant won. Retain for reporting and historical archive.",
+      label: t("Awarded Grant", "Grant otorgado"),
+      detail: t(
+        "Grant won. Retain for reporting and historical archive.",
+        "Grant ganado. Conservar para informes y archivo histórico.",
+      ),
     };
   }
   if (status === "submitted" || status === "in_proposal") {
     return {
       dot: "bg-teal-500",
       enrichmentFailed,
-      label: status === "submitted" ? "Under Review by Funder" : "Proposal in Drafting",
-      detail: STATUS_LABEL[status] || status,
+      label:
+        status === "submitted"
+          ? t("Under Review by Funder", "En revisión por el financiador")
+          : t("Proposal in Drafting", "Propuesta en redacción"),
+      detail: (lang === "es" ? STATUS_LABEL_ES : STATUS_LABEL)[status] || status,
     };
   }
   if (isTerminalGrantStatus(status) || (deadlineDays != null && deadlineDays < 0)) {
     return {
       dot: "bg-rose-500",
       enrichmentFailed,
-      label: "Closed / Expired",
-      detail: "Call deadline has passed. Monitor for future intake cycles.",
+      label: t("Closed / Expired", "Cerrado / vencido"),
+      detail: t(
+        "Call deadline has passed. Monitor for future intake cycles.",
+        "La fecha límite ya pasó. Esté atento a futuras convocatorias.",
+      ),
     };
   }
   if (enrichmentFailed) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Verify Source Manually",
-      detail: "Automatic ingestion did not extract sufficient structured data.",
+      label: t("Verify Source Manually", "Verificar la fuente manualmente"),
+      detail: t(
+        "Automatic ingestion did not extract sufficient structured data.",
+        "La captura automática no extrajo suficientes datos estructurados.",
+      ),
     };
   }
   if (!evaluation) {
     return {
       dot: "bg-teal-500",
       enrichmentFailed,
-      label: "Ready for Fit Evaluation",
-      detail: "Record has sufficient detail. Run evaluation to assess institutional fit.",
+      label: t("Ready for Fit Evaluation", "Listo para evaluar el encaje"),
+      detail: t(
+        "Record has sufficient detail. Run evaluation to assess institutional fit.",
+        "El registro tiene suficiente detalle. Ejecute la evaluación para medir el encaje institucional.",
+      ),
     };
   }
   if (evalVerdict === "eligible" && (realFit(evaluation) ?? 0) >= 70) {
     return {
       dot: "bg-emerald-500",
       enrichmentFailed,
-      label: "High Priority (Strong Fit)",
-      detail: "High thematic alignment with no fiduciary blocks detected.",
+      label: t("High Priority (Strong Fit)", "Prioridad alta (encaje fuerte)"),
+      detail: t(
+        "High thematic alignment with no fiduciary blocks detected.",
+        "Alta alineación temática sin bloqueos fiduciarios detectados.",
+      ),
     };
   }
   if (evalVerdict === "eligible" && (realFit(evaluation) ?? 0) >= 45) {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Conditionally Viable",
-      detail: "Viable when articulated with the right consortium partner.",
+      label: t("Conditionally Viable", "Viable con condiciones"),
+      detail: t(
+        "Viable when articulated with the right consortium partner.",
+        "Viable si se articula con el socio de consorcio adecuado.",
+      ),
     };
   }
   if (evalVerdict === "needs_input") {
     return {
       dot: "bg-amber-500",
       enrichmentFailed,
-      label: "Confirm Consortium Requirements",
-      detail: "Review audit conditions or partner representation before drafting.",
+      label: t("Confirm Consortium Requirements", "Confirmar requisitos del consorcio"),
+      detail: t(
+        "Review audit conditions or partner representation before drafting.",
+        "Revise las condiciones de auditoría o la representación de socios antes de redactar.",
+      ),
     };
   }
   return {
     dot: "bg-rose-500",
     enrichmentFailed,
-    label: evaluation.eligibility_pass ? "Low Priority" : "Direct Block (Consortium Required)",
-    detail: "Not viable for direct application. Review consortium matrix to unlock.",
+    label: evaluation.eligibility_pass
+      ? t("Low Priority", "Prioridad baja")
+      : t("Direct Block (Consortium Required)", "Bloqueo directo (se requiere consorcio)"),
+    detail: t(
+      "Not viable for direct application. Review consortium matrix to unlock.",
+      "No es viable para postulación directa. Revise la matriz de consorcio para habilitarla.",
+    ),
   };
 }
 
@@ -934,25 +1131,31 @@ function amountLabel(
   max: number | null,
   everEnriched: boolean,
   currency: "CAD" | "USD",
+  lang: UiLang = "en",
 ): string {
+  const t = (en: string, es: string) => pick(lang, en, es);
   const f = (v: number) => formatMoney(v, currency);
   if (min != null && max != null) return min === max ? f(max) : `${f(min)} – ${f(max)}`;
-  if (max != null) return `Up to ${f(max)}`;
-  if (min != null) return `From ${f(min)}`;
-  return everEnriched ? "Not published" : "To be verified";
+  if (max != null) return `${t("Up to", "Hasta")} ${f(max)}`;
+  if (min != null) return `${t("From", "Desde")} ${f(min)}`;
+  return everEnriched ? t("Not published", "No publicado") : t("To be verified", "Por verificar");
 }
 
-function formatDate(value: string) {
+function formatDate(value: string, lang: UiLang = "en") {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-CA", { day: "numeric", month: "short", year: "numeric" });
+  return date.toLocaleDateString(localeOf(lang), {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "Not recorded";
+function formatDateTime(value: string | null | undefined, lang: UiLang = "en") {
+  if (!value) return pick(lang, "Not recorded", "No registrado");
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("en-CA", {
+  return date.toLocaleString(localeOf(lang), {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",

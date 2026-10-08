@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getAgentTrace } from "@/lib/traces.functions";
+import { useTr, useUiLang, type UiLang } from "@/lib/ui-lang";
 import {
   Sheet,
   SheetContent,
@@ -145,7 +146,127 @@ const STEP_INFO: Record<string, { title: string; desc: string }> = {
   done: { title: "Done", desc: "Agent run finished successfully." },
 };
 
-function stepInfo(step: string) {
+const STEP_INFO_ES: Record<string, { title: string; desc: string }> = {
+  init: {
+    title: "Inicializar",
+    desc: "Inicia la ejecución del agente, asigna un id de traza y prepara el contexto para este grant.",
+  },
+  load: {
+    title: "Cargar grant + organización",
+    desc: "Obtiene el registro del grant y el perfil de tu organización desde la base de datos.",
+  },
+  gate: {
+    title: "Filtro de elegibilidad",
+    desc: "Reglas estrictas que deciden si el grant puede continuar (estado, indicadores de elegibilidad, archivado).",
+  },
+  inventory: {
+    title: "Inventario de campos",
+    desc: "Revisa qué campos (monto, fecha límite, sectores, elegibilidad) ya se conocen antes de extraer la página.",
+  },
+  scrape: {
+    title: "Extracción web",
+    desc: "Descarga la página del programa (Firecrawl → fetch de respaldo) y extrae Markdown limpio.",
+  },
+  extractors: {
+    title: "Pasada determinista",
+    desc: "Ejecuta extractores con regex + chrono + reglas — sin costo de LLM y totalmente trazables.",
+  },
+  regex_amount: {
+    title: "Regex · monto",
+    desc: "Interpreta cifras y rangos en dólares del texto de la página con patrones estrictos.",
+  },
+  chrono_deadline: {
+    title: "Chrono · fecha límite",
+    desc: "Detecta fechas límite de postulación mediante análisis de fechas en lenguaje natural.",
+  },
+  rule_eligibility: {
+    title: "Reglas · elegibilidad",
+    desc: "Compara etiquetas de elegibilidad (sin fines de lucro, con fines de lucro, indígena, sector…) con una lista curada.",
+  },
+  rule_sectors: {
+    title: "Reglas · sectores",
+    desc: "Etiqueta los sectores del programa (clima, ciudades inteligentes, investigación aplicada…) con reglas de palabras clave.",
+  },
+  llm_gap: {
+    title: "Análisis de vacíos con LLM",
+    desc: "Lista los campos que siguen faltando tras la pasada determinista — solo esos se envían al LLM.",
+  },
+  llm_providers: {
+    title: "Revisión de proveedores",
+    desc: "Lista los modelos locales disponibles y la extracción JSON de Firecrawl.",
+  },
+  llm_cascade: {
+    title: "Cascada de LLM gratuitos",
+    desc: "Llama a los modelos locales en orden (principal → respaldo).",
+  },
+  llm_validate: {
+    title: "Validar salida del LLM",
+    desc: "Verificación de esquema por campo + verificación de citas: el LLM debe citar texto exacto de la página.",
+  },
+  translate: {
+    title: "Traducir (FR→EN)",
+    desc: "Traduce al inglés cualquier valor en francés antes de guardarlo para que el catálogo sea monolingüe.",
+  },
+  translate_sectors: {
+    title: "Traducir sectores",
+    desc: "Traduce las etiquetas de sector en francés a sus nombres canónicos en inglés.",
+  },
+  translate_eligibility: {
+    title: "Traducir elegibilidad",
+    desc: "Traduce al inglés los valores de elegibilidad en francés.",
+  },
+  schema: {
+    title: "Validación de esquema",
+    desc: "Verificación Zod final de que el registro del grant coincide con el esquema de la base de datos.",
+  },
+  rules_load: {
+    title: "Cargar reglas de ajuste",
+    desc: "Carga tus reglas de evaluación personalizadas (F1–F6 del SOP de IIAL) para esta evaluación.",
+  },
+  rules_summary: {
+    title: "Resumen de reglas",
+    desc: "Aplica cada regla y registra aprobado / fallido / omitido con el motivo.",
+  },
+  llm_call: {
+    title: "Veredicto del LLM",
+    desc: "Pide al LLM un puntaje de ajuste de 0–100 y una justificación escrita, basada en el texto del grant.",
+  },
+  parse: {
+    title: "Interpretar veredicto",
+    desc: "Valida la salida JSON del LLM contra el esquema del veredicto.",
+  },
+  combine: {
+    title: "Combinar puntajes",
+    desc: "Combina el puntaje por reglas y el del LLM según tus ponderaciones para obtener el ajuste final.",
+  },
+  rationale: {
+    title: "Justificación",
+    desc: "La explicación escrita del LLM para el veredicto, en inglés.",
+  },
+  persist: {
+    title: "Guardar evaluación",
+    desc: "Inserta o actualiza la fila de evaluación (puntaje, elegibilidad, justificación, modelo) en grant_evaluations.",
+  },
+  commit: {
+    title: "Confirmar",
+    desc: "Actualiza el estado del grant (puntuado / archivado) y escribe el puntaje de ajuste final.",
+  },
+  skip: {
+    title: "Omitir",
+    desc: "Este paso se omitió — el mensaje explica por qué (ya procesado, máximo de intentos, etc.).",
+  },
+  done: { title: "Listo", desc: "La ejecución del agente terminó correctamente." },
+};
+
+function stepInfo(step: string, lang: UiLang = "en") {
+  if (lang === "es") {
+    return (
+      STEP_INFO_ES[step] ?? {
+        title: step,
+        desc: "Paso del proceso — consulta el mensaje y los detalles abajo.",
+      }
+    );
+  }
   return (
     STEP_INFO[step] ?? {
       title: step,
@@ -181,6 +302,8 @@ export function AgentTracePanel({
   focusStep?: string | null;
   onFocusStep?: (step: string | null) => void;
 }) {
+  const tr = useTr();
+  const lang = useUiLang();
   const fetchTrace = useServerFn(getAgentTrace);
   const { data } = useQuery({
     queryKey: ["agent-trace", runId],
@@ -246,7 +369,7 @@ export function AgentTracePanel({
   }, [steps]);
   const elapsedMs =
     steps.length > 1 ? new Date(steps[steps.length - 1].created_at).getTime() - t0Ms : 0;
-  const currentInfo = lastStep ? stepInfo(lastStep) : null;
+  const currentInfo = lastStep ? stepInfo(lastStep, lang) : null;
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -259,21 +382,25 @@ export function AgentTracePanel({
               ) : (
                 <Flag className="h-4 w-4 text-emerald-500" />
               )}
-              {fr ? "Chaîne de raisonnement —" : "Chain of thought —"}{" "}
+              {fr
+                ? "Chaîne de raisonnement —"
+                : tr("Chain of thought —", "Cadena de razonamiento —")}{" "}
               <span className="font-mono text-sm">{agentLabel}</span>
             </SheetTitle>
             <SheetDescription className="text-xs">
               {runId ? (
-                <span className="font-mono">run {runId.slice(0, 12)}…</span>
+                <span className="font-mono">
+                  {tr("run", "ejecución")} {runId.slice(0, 12)}…
+                </span>
               ) : fr ? (
                 "Aucune exécution sélectionnée"
               ) : (
-                "No run selected"
+                tr("No run selected", "Ninguna ejecución seleccionada")
               )}
               {steps.length > 0 && (
                 <>
                   <span className="ml-2">
-                    · {steps.length} {fr ? "étapes" : "steps"}
+                    · {steps.length} {fr ? "étapes" : tr("steps", "pasos")}
                   </span>
                   <span className="ml-2 text-emerald-600">✓ {counts.ok}</span>
                   {counts.warn > 0 && <span className="ml-1 text-amber-600">⚠ {counts.warn}</span>}
@@ -290,7 +417,7 @@ export function AgentTracePanel({
               <div className="mt-2 rounded-md border bg-muted/30 p-2 text-xs">
                 <div className="flex items-center gap-1.5 font-medium">
                   <Loader2 className="h-3 w-3 animate-spin text-sky-500" />
-                  {fr ? "Étape actuelle:" : "Current step:"} {currentInfo.title}
+                  {fr ? "Étape actuelle:" : tr("Current step:", "Paso actual:")} {currentInfo.title}
                 </div>
                 <p className="mt-0.5 text-muted-foreground leading-relaxed">{currentInfo.desc}</p>
               </div>
@@ -302,13 +429,18 @@ export function AgentTracePanel({
               <p className="text-xs text-muted-foreground italic py-8 text-center">
                 {fr
                   ? "Lancez Enrich ou Évaluer pour voir le raisonnement en direct."
-                  : "Trigger Enrich or Evaluate to see live reasoning."}
+                  : tr(
+                      "Trigger Enrich or Evaluate to see live reasoning.",
+                      "Ejecuta Enrich o Evaluate para ver el razonamiento en vivo.",
+                    )}
               </p>
             )}
             {runId && steps.length === 0 && (
               <p className="text-xs text-muted-foreground italic py-8 text-center flex items-center justify-center gap-2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {fr ? "En attente du premier événement…" : "Waiting for first event…"}
+                {fr
+                  ? "En attente du premier événement…"
+                  : tr("Waiting for first event…", "Esperando el primer evento…")}
               </p>
             )}
             {steps.map((s, i) => {
@@ -321,7 +453,7 @@ export function AgentTracePanel({
                   /* ignore */
                 }
               }
-              const info = stepInfo(s.step);
+              const info = stepInfo(s.step, lang);
               // Match by step id (precise) or step name (first occurrence).
               const isFocused = !!focusStep && (focusStep === s.id || focusStep === s.step);
               const copyDeepLink = async (e: React.MouseEvent) => {
@@ -390,7 +522,7 @@ export function AgentTracePanel({
                               aria-label={
                                 fr
                                   ? "Copier le lien vers cette étape"
-                                  : "Copy deep-link to this step"
+                                  : tr("Copy deep-link to this step", "Copiar enlace a este paso")
                               }
                             >
                               {copied === s.id ? (
@@ -404,10 +536,10 @@ export function AgentTracePanel({
                             {copied === s.id
                               ? fr
                                 ? "Lien copié"
-                                : "Link copied"
+                                : tr("Link copied", "Enlace copiado")
                               : fr
                                 ? "Copier le lien vers cette étape"
-                                : "Copy deep-link to this step"}
+                                : tr("Copy deep-link to this step", "Copiar enlace a este paso")}
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -415,7 +547,7 @@ export function AgentTracePanel({
                       {payloadObj && Object.keys(payloadObj).length > 0 && (
                         <details className="mt-1.5" open={isFocused}>
                           <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">
-                            {fr ? "Détails" : "Details"}
+                            {fr ? "Détails" : tr("Details", "Detalles")}
                           </summary>
                           <pre className="mt-1 text-[10px] bg-muted/40 p-1.5 rounded font-mono overflow-x-auto whitespace-pre-wrap break-words">
                             {JSON.stringify(payloadObj, null, 2)}

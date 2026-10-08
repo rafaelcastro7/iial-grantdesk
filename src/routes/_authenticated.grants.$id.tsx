@@ -16,6 +16,7 @@ import { createShareLink } from "@/lib/share-report.functions";
 import { useIsAdmin } from "@/lib/use-platform";
 import "@/i18n";
 import { useActiveTenant } from "@/lib/tenant-context";
+import { getUiLang, pick, useTr } from "@/lib/ui-lang";
 
 const detailQuery = (id: string, orgId: string) =>
   queryOptions({
@@ -51,24 +52,39 @@ export const Route = createFileRoute("/_authenticated/grants/$id")({
     step: typeof raw.step === "string" ? raw.step : undefined,
   }),
   errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,
-  notFoundComponent: () => (
-    <div className="mx-auto max-w-lg space-y-3 p-8 text-center">
-      <h1 className="text-xl font-semibold">This grant is no longer available</h1>
-      <p className="text-sm text-muted-foreground">
-        It may have been removed when the catalog was reset. Search again from Grant Radar.
-      </p>
-      <Link to="/grants" className="text-primary underline">
-        Back to Grant Radar
-      </Link>
-    </div>
-  ),
+  notFoundComponent: () => <GrantNotFound />,
   component: TenantGrantDetailPage,
 });
 
+function GrantNotFound() {
+  const tr = useTr();
+  return (
+    <div className="mx-auto max-w-lg space-y-3 p-8 text-center">
+      <h1 className="text-xl font-semibold">
+        {tr("This grant is no longer available", "Este grant ya no está disponible")}
+      </h1>
+      <p className="text-sm text-muted-foreground">
+        {tr(
+          "It may have been removed when the catalog was reset. Search again from Grant Radar.",
+          "Es posible que se haya eliminado al reiniciar el catálogo. Vuelva a buscar desde Grant Radar.",
+        )}
+      </p>
+      <Link to="/grants" className="text-primary underline">
+        {tr("Back to Grant Radar", "Volver a Grant Radar")}
+      </Link>
+    </div>
+  );
+}
+
 function TenantGrantDetailPage() {
   const { activeOrgId, isLoading } = useActiveTenant();
+  const tr = useTr();
   if (isLoading || !activeOrgId) {
-    return <div className="p-8 text-sm text-muted-foreground">Loading grant workspace…</div>;
+    return (
+      <div className="p-8 text-sm text-muted-foreground">
+        {tr("Loading grant workspace…", "Cargando el espacio de trabajo del grant…")}
+      </div>
+    );
   }
   return <GrantDetailPage key={activeOrgId} orgId={activeOrgId} />;
 }
@@ -313,39 +329,73 @@ function GrantDetailPage({ orgId }: { orgId: string }) {
 function toUserFacingActionError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
   const lower = raw.toLowerCase();
+  const t = (en: string, es: string) => pick(getUiLang(), en, es);
 
   if (lower.includes("ollama") || lower.includes("model") || lower.includes("llm")) {
-    return "The AI provider chain could not complete this step. Open the reasoning trace or Admin > Agents to review the failed provider attempts, then retry.";
+    return t(
+      "The AI provider chain could not complete this step. Open the reasoning trace or Admin > Agents to review the failed provider attempts, then retry.",
+      "La cadena de proveedores de IA no pudo completar este paso. Abra la traza de razonamiento o Admin > Agents para revisar los intentos fallidos y vuelva a intentarlo.",
+    );
   }
   if (raw.includes("grant_not_enriched_yet")) {
-    return "Fetch details first. The evaluator needs the enriched grant facts before it can validate fit rules.";
+    return t(
+      "Fetch details first. The evaluator needs the enriched grant facts before it can validate fit rules.",
+      "Primero obtenga los detalles. El evaluador necesita los datos completos del grant para validar las reglas de encaje.",
+    );
   }
   if (raw.includes("plan_unusable") || raw.includes("strategist_")) {
-    return "The AI could not produce a usable plan for this grant, so no proposal was created and nothing generic was saved. Try Draft proposal again.";
+    return t(
+      "The AI could not produce a usable plan for this grant, so no proposal was created and nothing generic was saved. Try Draft proposal again.",
+      "La IA no pudo generar un plan utilizable para este grant, así que no se creó ninguna propuesta ni se guardó nada genérico. Intente redactar la propuesta de nuevo.",
+    );
   }
   if (raw.includes("not_eligible")) {
-    return "Drafting is only available for grants your fit check found eligible.";
+    return t(
+      "Drafting is only available for grants your fit check found eligible.",
+      "La redacción solo está disponible para grants que la revisión de encaje consideró elegibles.",
+    );
   }
   if (raw.includes("not_evaluated")) {
-    return "Check fit first: drafting unlocks once this grant is assessed as eligible.";
+    return t(
+      "Check fit first: drafting unlocks once this grant is assessed as eligible.",
+      "Revise el encaje primero: la redacción se habilita cuando este grant se evalúa como elegible.",
+    );
   }
   if (raw.includes("org_profile_missing")) {
-    return "Complete the organization profile before evaluating grants. Fit rules depend on your sectors, jurisdictions, budget, and applicant profile.";
+    return t(
+      "Complete the organization profile before evaluating grants. Fit rules depend on your sectors, jurisdictions, budget, and applicant profile.",
+      "Complete el perfil de la organización antes de evaluar grants. Las reglas de encaje dependen de sus sectores, jurisdicciones, presupuesto y perfil de solicitante.",
+    );
   }
   if (raw.includes("grant_in_terminal_state")) {
-    return "This grant is already in a terminal state, so the system will not spend a new AI evaluation on it.";
+    return t(
+      "This grant is already in a terminal state, so the system will not spend a new AI evaluation on it.",
+      "Este grant ya está en un estado final, así que el sistema no gastará una nueva evaluación de IA en él.",
+    );
   }
   if (raw.includes("evaluator_schema_validation")) {
-    return "The evaluator responded in an unexpected format. The run was logged for audit; retry once, and check the agent trace if it repeats.";
+    return t(
+      "The evaluator responded in an unexpected format. The run was logged for audit; retry once, and check the agent trace if it repeats.",
+      "El evaluador respondió en un formato inesperado. La ejecución quedó registrada para auditoría; reintente una vez y revise la traza del agente si se repite.",
+    );
   }
   if (raw.includes("agent_disabled")) {
-    return "This agent is disabled in Admin > Agents. Enable it before running this action.";
+    return t(
+      "This agent is disabled in Admin > Agents. Enable it before running this action.",
+      "Este agente está desactivado en Admin > Agents. Actívelo antes de ejecutar esta acción.",
+    );
   }
   if (raw.includes("module_disabled")) {
-    return "This workspace module is disabled in Admin > Modules. Enable it before continuing.";
+    return t(
+      "This workspace module is disabled in Admin > Modules. Enable it before continuing.",
+      "Este módulo está desactivado en Admin > Modules. Actívelo antes de continuar.",
+    );
   }
   if (raw.includes("template_not_found")) {
-    return "No proposal template is available. Ask an administrator to restore the default proposal template.";
+    return t(
+      "No proposal template is available. Ask an administrator to restore the default proposal template.",
+      "No hay plantilla de propuesta disponible. Pida a un administrador que restaure la plantilla predeterminada.",
+    );
   }
 
   return raw;

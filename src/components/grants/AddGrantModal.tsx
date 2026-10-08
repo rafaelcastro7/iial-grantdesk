@@ -15,8 +15,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useTr } from "@/lib/ui-lang";
 
 export function AddGrantModal({ triggerBtn }: { triggerBtn?: React.ReactNode }) {
+  const tr = useTr();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,7 +47,11 @@ export function AddGrantModal({ triggerBtn }: { triggerBtn?: React.ReactNode }) 
         search: res.isNew ? { analyze: "1" } : {},
       });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to add grant by URL.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : tr("Failed to add grant by URL.", "No se pudo agregar el grant por URL."),
+      );
     } finally {
       setLoading(false);
     }
@@ -57,7 +63,7 @@ export function AddGrantModal({ triggerBtn }: { triggerBtn?: React.ReactNode }) 
         {triggerBtn || (
           <Button size="sm" className="gap-1.5 shadow-sm">
             <Plus className="h-4 w-4" />
-            <span>Add grant by URL</span>
+            <span>{tr("Add grant by URL", "Agregar grant por URL")}</span>
           </Button>
         )}
       </DialogTrigger>
@@ -66,18 +72,20 @@ export function AddGrantModal({ triggerBtn }: { triggerBtn?: React.ReactNode }) 
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
               <Sparkles className="h-5 w-5 text-primary" />
-              Analyze External Grant
+              {tr("Analyze External Grant", "Analizar grant externo")}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Paste the URL of any grant or funding program call. GrantDesk will fetch, extract
-              eligibility requirements, and evaluate fit for your organization.
+              {tr(
+                "Paste the URL of any grant or funding program call. GrantDesk will fetch, extract eligibility requirements, and evaluate fit for your organization.",
+                "Pega la URL de cualquier grant o convocatoria de financiamiento. GrantDesk la descargará, extraerá los requisitos de elegibilidad y evaluará el encaje con tu organización.",
+              )}
             </DialogDescription>
           </DialogHeader>
 
           <div className="my-4 space-y-3">
             <div className="space-y-1.5">
               <label htmlFor="grant-url-input" className="text-xs font-medium text-foreground">
-                Grant Page URL
+                {tr("Grant Page URL", "URL de la página del grant")}
               </label>
               <div className="relative flex items-center">
                 <Link2 className="absolute left-3 h-4 w-4 text-muted-foreground" />
@@ -109,18 +117,18 @@ export function AddGrantModal({ triggerBtn }: { triggerBtn?: React.ReactNode }) 
               onClick={() => setOpen(false)}
               disabled={loading}
             >
-              Cancel
+              {tr("Cancel", "Cancelar")}
             </Button>
             <Button type="submit" disabled={loading || !url.trim()}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing...
+                  {tr("Analyzing...", "Analizando...")}
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-1.5 h-4 w-4" />
-                  Add &amp; Analyze
+                  {tr("Add & Analyze", "Agregar y analizar")}
                 </>
               )}
             </Button>

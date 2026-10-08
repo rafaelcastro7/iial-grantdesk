@@ -11,6 +11,7 @@ import { todayAgenda, type AgendaItem } from "@/lib/consultant-desk.shared";
 import { listGrantWorkspaces } from "@/lib/grant-workspace.functions";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 
 const ICON: Record<AgendaItem["kind"], ComponentType<{ className?: string }>> = {
   deadline: CalendarClock,
@@ -21,6 +22,8 @@ const ICON: Record<AgendaItem["kind"], ComponentType<{ className?: string }>> = 
 };
 
 export function ConsultantToday({ greeting }: { greeting: string }) {
+  const tr = useTr();
+  const lang = useUiLang();
   const { activeOrgId, activeOrgName } = useActiveTenant();
   const fetchRows = useServerFn(listGrantWorkspaces);
   const { data, isLoading } = useQuery({
@@ -28,7 +31,7 @@ export function ConsultantToday({ greeting }: { greeting: string }) {
     queryFn: () => fetchRows({ data: { orgId: activeOrgId as string } }),
     enabled: !!activeOrgId,
   });
-  const agenda = data ? todayAgenda(data.rows) : [];
+  const agenda = data ? todayAgenda(data.rows, undefined, undefined, lang) : [];
   const today = new Date().toISOString().slice(0, 10);
   const working = data?.rows.filter((r) => r.workspace.priority !== "discard").length ?? 0;
 
@@ -39,19 +42,25 @@ export function ConsultantToday({ greeting }: { greeting: string }) {
           <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">{greeting}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {activeOrgName ? `${activeOrgName} · ` : ""}
-            {working} grant{working === 1 ? "" : "s"} in the pipeline. This is what needs you in the
-            next 3 weeks.
+            {tr(
+              `${working} grant${working === 1 ? "" : "s"} in the pipeline. This is what needs you in the next 3 weeks.`,
+              `${working} grant${working === 1 ? "" : "s"} en el pipeline. Esto es lo que requiere su atención en las próximas 3 semanas.`,
+            )}
           </p>
           <div className="mt-4">
-            {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+            {isLoading && (
+              <p className="text-sm text-muted-foreground">{tr("Loading…", "Cargando…")}</p>
+            )}
             {data && agenda.length === 0 && (
               <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                Nothing pending. Find new opportunities in the Grant radar and save an Application
-                plan to track them here.
+                {tr(
+                  "Nothing pending. Find new opportunities in the Grant radar and save an Application plan to track them here.",
+                  "Nada pendiente. Encuentre nuevas oportunidades en el Radar de grants y guarde un Plan de postulación para darles seguimiento aquí.",
+                )}
               </p>
             )}
             {agenda.length > 0 && (
-              <ul className="divide-y rounded-md border" aria-label="Today">
+              <ul className="divide-y rounded-md border" aria-label={tr("Today", "Hoy")}>
                 {agenda.slice(0, 10).map((a, i) => {
                   const Icon = ICON[a.kind];
                   const overdue = a.date != null && a.date < today;
@@ -91,28 +100,32 @@ export function ConsultantToday({ greeting }: { greeting: string }) {
                 to="/pipeline"
                 className="mt-2 inline-block text-xs text-primary hover:underline"
               >
-                {agenda.length - 10} more in the Pipeline
+                {tr(
+                  `${agenda.length - 10} more in the Pipeline`,
+                  `${agenda.length - 10} más en el Pipeline`,
+                )}
               </Link>
             )}
           </div>
         </div>
         <aside className="space-y-2 border-t bg-muted/35 p-5 lg:border-l lg:border-t-0">
           <div className="text-[11px] font-semibold uppercase text-muted-foreground">
-            Quick actions
+            {tr("Quick actions", "Acciones rápidas")}
           </div>
           <Button asChild className="w-full justify-start gap-2">
             <Link to="/grants">
-              <Radar className="h-4 w-4" /> Find grants
+              <Radar className="h-4 w-4" /> {tr("Find grants", "Buscar grants")}
             </Link>
           </Button>
           <Button asChild variant="outline" className="w-full justify-start gap-2">
             <Link to="/pipeline">
-              <Mail className="h-4 w-4" /> Email Marcelo about our grants
+              <Mail className="h-4 w-4" />{" "}
+              {tr("Email Marcelo about our grants", "Escribir a Marcelo sobre nuestros grants")}
             </Link>
           </Button>
           <Button asChild variant="outline" className="w-full justify-start gap-2">
             <Link to="/partners">
-              <Users className="h-4 w-4" /> Partners and contacts
+              <Users className="h-4 w-4" /> {tr("Partners and contacts", "Socios y contactos")}
             </Link>
           </Button>
         </aside>
