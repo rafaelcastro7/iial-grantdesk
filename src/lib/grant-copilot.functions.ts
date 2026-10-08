@@ -36,45 +36,6 @@ export type CopilotAction =
       profile?: import("@/lib/copilot-actions.shared").ProfileUpdate;
     };
 
-/** Live Google search (Gemini grounding, free tier) about this call. */
-async function searchWebAboutGrant(
-  apiKey: string,
-  question: string,
-): Promise<{ text: string; sources: Array<{ title: string; url: string }> } | null> {
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: question }] }],
-          tools: [{ googleSearch: {} }],
-        }),
-      },
-    );
-    if (!res.ok) return null;
-    const j = (await res.json()) as {
-      candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-        groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string; title?: string } }> };
-      }>;
-    };
-    const c = j.candidates?.[0];
-    const text = (c?.content?.parts ?? [])
-      .map((x) => x.text ?? "")
-      .join("")
-      .trim();
-    const sources = (c?.groundingMetadata?.groundingChunks ?? [])
-      .map((g) => ({ title: g.web?.title ?? "", url: g.web?.uri ?? "" }))
-      .filter((x) => x.url)
-      .slice(0, 6);
-    return text ? { text: text.slice(0, 4000), sources } : null;
-  } catch {
-    return null;
-  }
-}
-
 export type CopilotMessage = {
   id: string;
   role: "user" | "assistant";
@@ -252,7 +213,7 @@ export const askGrantCopilot = createServerFn({ method: "POST" })
 
     // 4d. Live web search about the call (free tier), when it can add facts.
     const env = (await import("@/lib/env.server")).serverEnv();
-    const googleKey = env.GOOGLE_AI_STUDIO_KEY;
+    const canSearch = Boolean(env.GOOGLE_AI_STUDIO_KEY || env.GROQ_API_KEY);
     const factsMissing =
       !grant.deadline ||
       !grant.amount_cad_max ||
@@ -263,17 +224,18 @@ export const askGrantCopilot = createServerFn({ method: "POST" })
         data.message,
       );
     const web =
-      googleKey && (factsMissing || wantsWeb || history.length === 0)
-        ? await searchWebAboutGrant(
-            googleKey,
+      canSearch && (factsMissing || wantsWeb || history.length === 0)
+        ? await (
+            await import("@/lib/web-grounding.server")
+          ).searchWebGrounded(
             `Find the official, current information for the funding call "${grant.title}" by ${(grant.funder as { name?: string } | null)?.name ?? "the funder"}${grant.url ? ` (official page: ${grant.url})` : ""}. Report: is it open, upcoming or closed and the next cycle; exact deadline(s) with time zone; amount per project; who can apply (applicant types and countries); key requirements (registration, financial statements, match / cost-share, consortium rules); how to apply. Also answer: ${data.message.slice(0, 500)}. Only state facts found on official or reliable pages; say "not published" otherwise.`,
           )
         : null;
     const webText = web
       ? `${web.text}\nSources:\n${web.sources.map((x) => `- ${x.title}: ${x.url}`).join("\n")}`
-      : googleKey
-        ? "No web search for this message."
-        : "Web search unavailable (no Google key configured).";
+      : canSearch
+        ? "No web search for this message (or no search provider could answer)."
+        : "Web search unavailable (no search provider configured).";
 
     // 5. Record user message in DB
     await supabase.from("grant_copilot_messages").insert({

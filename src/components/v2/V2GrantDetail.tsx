@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { GrantDossier } from "@/components/grants/GrantDossier";
 import { CallFactsCard, type CallFacts } from "@/components/grants/CallFactsCard";
 import { cleanTitle } from "@/lib/html-text";
 import {
@@ -518,6 +519,8 @@ export function V2GrantDetail({
       )}
 
       {/* ----------------- MAIN WIDESCREEN WORKSPACE (8 COLS MAIN + 4 COLS RAIL) ----------------- */}
+      {activeOrgId && <GrantDossier grantId={grant.id} orgId={activeOrgId} />}
+
       <CallFactsCard
         facts={grant as unknown as CallFacts}
         onFetchDetails={() => onFetchDetails()}
@@ -531,6 +534,9 @@ export function V2GrantDetail({
         }
       />
 
+      <h2 className="pt-2 font-display text-lg font-semibold">
+        {tr("Our working plan", "Nuestro plan de trabajo")}
+      </h2>
       {activeOrgId ? (
         <GrantApplicationWorkspace grantId={grant.id} orgId={activeOrgId} />
       ) : (
@@ -542,274 +548,278 @@ export function V2GrantDetail({
         </p>
       )}
 
-      {/* Folded and lazy: nothing inside loads (or calls AI) until opened. */}
-      <details
-        className="group rounded-xl border bg-card shadow-sm"
-        onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}
-      >
-        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold">
-          {tr("More about this grant", "Más sobre este grant")}
-          <span className="ml-2 font-normal text-muted-foreground">
-            {tr(
-              "fit analysis, suggested routes, funder facts, technical audit",
-              "análisis de encaje, rutas sugeridas, datos del financiador, auditoría técnica",
-            )}
-          </span>
-        </summary>
-        {moreOpen && (
-          <div className="space-y-5 border-t p-4 sm:p-5">
-            {
-              <>
-                {/* 1. APPLICATION ROUTES & CONSORTIUM MATRIX */}
-                <GrantConsortiumMatrix
-                  routes={roadmap.routes}
-                  recommendedRouteId={roadmap.recommendedRouteId}
-                  selectedRouteId={selectedRouteId}
-                  onSelectRoute={(id) => setSelectedRouteId(id)}
-                  orgName={activeOrgName}
-                />
+      {/* Folded and lazy: nothing inside loads (or calls AI) until opened. Admins only. */}
+      {isAdmin && (
+        <details
+          className="group rounded-xl border bg-card shadow-sm"
+          onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}
+        >
+          <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold">
+            {tr("More about this grant", "Más sobre este grant")}
+            <span className="ml-2 font-normal text-muted-foreground">
+              {tr(
+                "fit analysis, suggested routes, funder facts, technical audit",
+                "análisis de encaje, rutas sugeridas, datos del financiador, auditoría técnica",
+              )}
+            </span>
+          </summary>
+          {moreOpen && (
+            <div className="space-y-5 border-t p-4 sm:p-5">
+              {
+                <>
+                  {/* 1. APPLICATION ROUTES & CONSORTIUM MATRIX */}
+                  <GrantConsortiumMatrix
+                    routes={roadmap.routes}
+                    recommendedRouteId={roadmap.recommendedRouteId}
+                    selectedRouteId={selectedRouteId}
+                    onSelectRoute={(id) => setSelectedRouteId(id)}
+                    orgName={activeOrgName}
+                  />
 
-                {/* 2. FINANCIAL CONDITIONS & CRITICAL HURDLES */}
-                <GrantFinancialHurdles financial={roadmap.financial} orgName={activeOrgName} />
+                  {/* 2. FINANCIAL CONDITIONS & CRITICAL HURDLES */}
+                  <GrantFinancialHurdles financial={roadmap.financial} orgName={activeOrgName} />
 
-                {/* 3. STRATEGIC RETURN & DOWNSTREAM REVENUE MODEL */}
-                <GrantStrategicRevenue
-                  strategicReturn={roadmap.strategicReturn}
-                  orgName={activeOrgName}
-                />
+                  {/* 3. STRATEGIC RETURN & DOWNSTREAM REVENUE MODEL */}
+                  <GrantStrategicRevenue
+                    strategicReturn={roadmap.strategicReturn}
+                    orgName={activeOrgName}
+                  />
 
-                {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
-                <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
+                  {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
+                  <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
 
-                {/* Emails live in the Application plan (one composer, real partners). */}
-              </>
-            }
+                  {/* Emails live in the Application plan (one composer, real partners). */}
+                </>
+              }
 
-            {
-              <>
-                {/* OFFICIAL SUMMARY & SCOPE */}
-                <Panel
-                  icon={FileText}
-                  title={tr(
-                    "Program Scope & Official Description",
-                    "Alcance del programa y descripción oficial",
-                  )}
-                  description={tr(
-                    "Summary extracted from official funder documentation.",
-                    "Resumen extraído de la documentación oficial del financiador.",
-                  )}
-                >
-                  <div className="space-y-4">
-                    <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
-                      {grant.summary?.trim() ||
-                        tr(
-                          "No detailed description extracted yet. Click 'Fetch details' or visit the official page.",
-                          "Aún no se extrajo una descripción detallada. Haga clic en 'Obtener detalles' o visite la página oficial.",
-                        )}
-                    </p>
+              {
+                <>
+                  {/* OFFICIAL SUMMARY & SCOPE */}
+                  <Panel
+                    icon={FileText}
+                    title={tr(
+                      "Program Scope & Official Description",
+                      "Alcance del programa y descripción oficial",
+                    )}
+                    description={tr(
+                      "Summary extracted from official funder documentation.",
+                      "Resumen extraído de la documentación oficial del financiador.",
+                    )}
+                  >
+                    <div className="space-y-4">
+                      <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                        {grant.summary?.trim() ||
+                          tr(
+                            "No detailed description extracted yet. Click 'Fetch details' or visit the official page.",
+                            "Aún no se extrajo una descripción detallada. Haga clic en 'Obtener detalles' o visite la página oficial.",
+                          )}
+                      </p>
 
-                    <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FactRow
-                        label={tr("Who can apply", "Quién puede postular")}
-                        values={applicantTypes}
-                      />
-                      <FactRow
-                        label={tr("Eligible uses of funds", "Usos elegibles de los fondos")}
-                        values={fundingUses}
-                      />
-                      <FactRow
-                        label={tr("Target populations", "Poblaciones objetivo")}
-                        values={populations}
-                      />
-                      <FactRow
-                        label={tr("Eligible sectors", "Sectores elegibles")}
-                        values={sectors}
-                      />
+                      <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FactRow
+                          label={tr("Who can apply", "Quién puede postular")}
+                          values={applicantTypes}
+                        />
+                        <FactRow
+                          label={tr("Eligible uses of funds", "Usos elegibles de los fondos")}
+                          values={fundingUses}
+                        />
+                        <FactRow
+                          label={tr("Target populations", "Poblaciones objetivo")}
+                          values={populations}
+                        />
+                        <FactRow
+                          label={tr("Eligible sectors", "Sectores elegibles")}
+                          values={sectors}
+                        />
+                      </div>
                     </div>
-                  </div>
-                </Panel>
+                  </Panel>
 
-                {/* FUNDER ELIGIBILITY RULES */}
-                <Panel
-                  icon={ShieldCheck}
-                  title={tr(
-                    "Eligibility Rules Declared by Funder",
-                    "Reglas de elegibilidad declaradas por el financiador",
-                  )}
-                  description={tr(
-                    "Explicit conditions stated in call guidelines.",
-                    "Condiciones explícitas indicadas en las bases de la convocatoria.",
-                  )}
-                >
-                  {eligibleGroups.length === 0 &&
-                  eligibilityDetails.length === 0 &&
-                  !grant.eligibility_note ? (
-                    <EmptyState
-                      icon={ShieldAlert}
-                      title={tr(
-                        "No textual eligibility rules extracted",
-                        "No se extrajeron reglas de elegibilidad textuales",
-                      )}
-                      body={tr(
-                        "Verify on the funder's official website before investing drafting time.",
-                        "Verifique en el sitio oficial del financiador antes de invertir tiempo en la redacción.",
-                      )}
-                    />
-                  ) : (
-                    <div className="space-y-4 text-sm">
-                      {grant.eligibility_note && (
-                        <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
-                          {grant.eligibility_note}
-                        </p>
-                      )}
-                      {eligibleGroups.length > 0 && (
-                        <div>
-                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
-                            {tr("Explicitly Eligible Groups", "Grupos explícitamente elegibles")}
-                          </span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {eligibleGroups.map((label) => (
-                              <Badge
-                                key={label}
-                                variant="secondary"
-                                className="rounded-md text-xs py-1 px-2.5"
-                              >
-                                {label}
-                              </Badge>
+                  {/* FUNDER ELIGIBILITY RULES */}
+                  <Panel
+                    icon={ShieldCheck}
+                    title={tr(
+                      "Eligibility Rules Declared by Funder",
+                      "Reglas de elegibilidad declaradas por el financiador",
+                    )}
+                    description={tr(
+                      "Explicit conditions stated in call guidelines.",
+                      "Condiciones explícitas indicadas en las bases de la convocatoria.",
+                    )}
+                  >
+                    {eligibleGroups.length === 0 &&
+                    eligibilityDetails.length === 0 &&
+                    !grant.eligibility_note ? (
+                      <EmptyState
+                        icon={ShieldAlert}
+                        title={tr(
+                          "No textual eligibility rules extracted",
+                          "No se extrajeron reglas de elegibilidad textuales",
+                        )}
+                        body={tr(
+                          "Verify on the funder's official website before investing drafting time.",
+                          "Verifique en el sitio oficial del financiador antes de invertir tiempo en la redacción.",
+                        )}
+                      />
+                    ) : (
+                      <div className="space-y-4 text-sm">
+                        {grant.eligibility_note && (
+                          <p className="rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
+                            {grant.eligibility_note}
+                          </p>
+                        )}
+                        {eligibleGroups.length > 0 && (
+                          <div>
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
+                              {tr("Explicitly Eligible Groups", "Grupos explícitamente elegibles")}
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {eligibleGroups.map((label) => (
+                                <Badge
+                                  key={label}
+                                  variant="secondary"
+                                  className="rounded-md text-xs py-1 px-2.5"
+                                >
+                                  {label}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {eligibilityDetails.length > 0 && (
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {eligibilityDetails.map(([key, value]) => (
+                              <div key={key} className="rounded-lg border bg-background/70 p-3">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                                  {eligibilityLabel(key, lang) ?? humanizeKey(key)}
+                                </span>
+                                <div className="mt-1 text-xs">
+                                  {typeof value === "object"
+                                    ? JSON.stringify(value)
+                                    : String(value)}
+                                </div>
+                              </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-                      {eligibilityDetails.length > 0 && (
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {eligibilityDetails.map(([key, value]) => (
-                            <div key={key} className="rounded-lg border bg-background/70 p-3">
-                              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
-                                {eligibilityLabel(key, lang) ?? humanizeKey(key)}
-                              </span>
-                              <div className="mt-1 text-xs">
-                                {typeof value === "object" ? JSON.stringify(value) : String(value)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Panel>
-
-                {/* SOURCES & PROVENANCE */}
-                <Panel
-                  icon={Link2}
-                  title={tr("Official Sources & Provenance", "Fuentes oficiales y procedencia")}
-                  description={tr(
-                    "Verified web pages and observation timestamps.",
-                    "Páginas web verificadas y fechas de observación.",
-                  )}
-                >
-                  <div className="space-y-2.5 text-sm">
-                    {grant.url && (
-                      <SourceLink
-                        href={grant.url}
-                        label={tr(
-                          "Official Call Guidelines Page",
-                          "Página oficial de bases de la convocatoria",
                         )}
-                      />
+                      </div>
                     )}
-                    {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
-                      <SourceLink
-                        href={grant.funder.source_url}
-                        label={tr("Main Funder Portal", "Portal principal del financiador")}
-                      />
+                  </Panel>
+
+                  {/* SOURCES & PROVENANCE */}
+                  <Panel
+                    icon={Link2}
+                    title={tr("Official Sources & Provenance", "Fuentes oficiales y procedencia")}
+                    description={tr(
+                      "Verified web pages and observation timestamps.",
+                      "Páginas web verificadas y fechas de observación.",
                     )}
-                    {otherSources.map((url) => (
-                      <SourceLink
-                        key={url}
-                        href={url}
-                        label={url.replace(/^https?:\/\/(www\.)?/, "")}
-                      />
-                    ))}
-                    <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
-                      <span>
-                        {tr("Discovered", "Descubierto")}:{" "}
-                        {formatDateTime(grant.discovered_at, lang)}
-                      </span>
-                      <span>
-                        {tr("Last verified", "Última verificación")}:{" "}
-                        {formatDateTime(grant.last_seen_at, lang)}
-                      </span>
+                  >
+                    <div className="space-y-2.5 text-sm">
+                      {grant.url && (
+                        <SourceLink
+                          href={grant.url}
+                          label={tr(
+                            "Official Call Guidelines Page",
+                            "Página oficial de bases de la convocatoria",
+                          )}
+                        />
+                      )}
+                      {grant.funder?.source_url && grant.funder.source_url !== grant.url && (
+                        <SourceLink
+                          href={grant.funder.source_url}
+                          label={tr("Main Funder Portal", "Portal principal del financiador")}
+                        />
+                      )}
+                      {otherSources.map((url) => (
+                        <SourceLink
+                          key={url}
+                          href={url}
+                          label={url.replace(/^https?:\/\/(www\.)?/, "")}
+                        />
+                      ))}
+                      <div className="pt-2 text-xs text-muted-foreground border-t flex flex-wrap gap-4">
+                        <span>
+                          {tr("Discovered", "Descubierto")}:{" "}
+                          {formatDateTime(grant.discovered_at, lang)}
+                        </span>
+                        <span>
+                          {tr("Last verified", "Última verificación")}:{" "}
+                          {formatDateTime(grant.last_seen_at, lang)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </Panel>
-              </>
-            }
-
-            {
-              <>
-                {/* SUBSANACIÓN MANUAL DE HECHOS */}
-                <ManualFactsPanel grant={grant} />
-
-                {/* DESGLOSE DE PUNTUACIÓN Y AUDITORÍA DE REGLAS */}
-                <FitEvaluation
-                  status={grant.status}
-                  discoveredAt={grant.discovered_at}
-                  enrichedAt={grant.enriched_at}
-                  scoredAt={grant.scored_at}
-                  evaluation={
-                    evaluation
-                      ? {
-                          fit_score: evaluation.fit_score,
-                          eligibility_pass: evaluation.eligibility_pass,
-                          rule_verdict:
-                            (evaluation.rule_snapshot as { verdict?: string } | null | undefined)
-                              ?.verdict ?? null,
-                          rationale_en: evaluation.rationale_en,
-                          rationale_fr: evaluation.rationale_fr ?? "",
-                          created_at: evaluation.created_at,
-                          axis_breakdown:
-                            (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
-                        }
-                      : null
-                  }
-                />
-
-                {/* TRAZA DE EVENTOS */}
-                <FetchTrailPanel
-                  grantId={grant.id}
-                  onRetry={onFetchDetails}
-                  retrying={busy === "enrich"}
-                />
-              </>
-            }
-            {/* AI FIT & DECISION RATIONALE */}
-            <Panel
-              icon={ClipboardCheck}
-              title={tr("Fit Verdict & Decisions", "Veredicto de encaje y decisiones")}
-              description={
-                evaluation
-                  ? `${tr("Evaluated on", "Evaluado el")} ${formatDateTime(evaluation.created_at, lang)}`
-                  : tr("Fit not evaluated yet.", "Encaje aún no evaluado.")
+                  </Panel>
+                </>
               }
-            >
-              <div className="space-y-3">
-                <p className="text-xs leading-relaxed text-muted-foreground">{verdict.detail}</p>
 
-                {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
+              {
+                <>
+                  {/* SUBSANACIÓN MANUAL DE HECHOS */}
+                  <ManualFactsPanel grant={grant} />
 
-                {evaluation?.rationale_en && (
-                  <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed text-foreground">
-                    <span className="font-semibold block mb-1">
-                      {tr("Evaluation Engine Rationale:", "Fundamento del motor de evaluación:")}
-                    </span>
-                    {humanizeRationale(evaluation.rationale_en)}
-                  </div>
-                )}
-              </div>
-            </Panel>
-          </div>
-        )}
-      </details>
+                  {/* DESGLOSE DE PUNTUACIÓN Y AUDITORÍA DE REGLAS */}
+                  <FitEvaluation
+                    status={grant.status}
+                    discoveredAt={grant.discovered_at}
+                    enrichedAt={grant.enriched_at}
+                    scoredAt={grant.scored_at}
+                    evaluation={
+                      evaluation
+                        ? {
+                            fit_score: evaluation.fit_score,
+                            eligibility_pass: evaluation.eligibility_pass,
+                            rule_verdict:
+                              (evaluation.rule_snapshot as { verdict?: string } | null | undefined)
+                                ?.verdict ?? null,
+                            rationale_en: evaluation.rationale_en,
+                            rationale_fr: evaluation.rationale_fr ?? "",
+                            created_at: evaluation.created_at,
+                            axis_breakdown:
+                              (evaluation.axis_breakdown as AxisScore[] | null | undefined) ?? null,
+                          }
+                        : null
+                    }
+                  />
+
+                  {/* TRAZA DE EVENTOS */}
+                  <FetchTrailPanel
+                    grantId={grant.id}
+                    onRetry={onFetchDetails}
+                    retrying={busy === "enrich"}
+                  />
+                </>
+              }
+              {/* AI FIT & DECISION RATIONALE */}
+              <Panel
+                icon={ClipboardCheck}
+                title={tr("Fit Verdict & Decisions", "Veredicto de encaje y decisiones")}
+                description={
+                  evaluation
+                    ? `${tr("Evaluated on", "Evaluado el")} ${formatDateTime(evaluation.created_at, lang)}`
+                    : tr("Fit not evaluated yet.", "Encaje aún no evaluado.")
+                }
+              >
+                <div className="space-y-3">
+                  <p className="text-xs leading-relaxed text-muted-foreground">{verdict.detail}</p>
+
+                  {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
+
+                  {evaluation?.rationale_en && (
+                    <div className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed text-foreground">
+                      <span className="font-semibold block mb-1">
+                        {tr("Evaluation Engine Rationale:", "Fundamento del motor de evaluación:")}
+                      </span>
+                      {humanizeRationale(evaluation.rationale_en)}
+                    </div>
+                  )}
+                </div>
+              </Panel>
+            </div>
+          )}
+        </details>
+      )}
 
       {/* ----------------- MODALS & SLIDE-OVER SHEETS ----------------- */}
       <GrantCopilotSheet

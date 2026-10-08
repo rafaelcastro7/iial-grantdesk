@@ -38,7 +38,7 @@ export async function searchWebForGrantsImpl(
   },
 ): Promise<WebScoutResult> {
   const env = serverEnv();
-  const apiKey = env.GOOGLE_AI_STUDIO_KEY || env.GEMINI_API_KEY;
+  const apiKey = env.GOOGLE_AI_STUDIO_KEY || env.GEMINI_API_KEY || env.GROQ_API_KEY;
 
   if (!apiKey) {
     return {
@@ -48,7 +48,7 @@ export async function searchWebForGrantsImpl(
       searchedAt: new Date().toISOString(),
       grants: [],
       error:
-        "GOOGLE_AI_STUDIO_KEY or GEMINI_API_KEY is not configured in environment secrets. Please configure it in Lovable Project Settings to enable live Google Search.",
+        "No web search provider is configured (GEMINI_API_KEY / GOOGLE_AI_STUDIO_KEY or GROQ_API_KEY in the project secrets).",
     };
   }
 
@@ -90,35 +90,15 @@ Return valid JSON in this exact structure:
 Return ONLY valid JSON.`;
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          tools: [{ googleSearch: {} }],
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Google Search API responded with HTTP ${response.status}: ${errText.slice(0, 200)}`);
+    // Google first, then Groq's built-in browser search: never tied to one API.
+    const { searchWebGrounded } = await import("@/lib/web-grounding.server");
+    const found = await searchWebGrounded(prompt);
+    if (!found) {
+      throw new Error(
+        "No web search provider could answer right now (quota or network). Try again in a few minutes.",
+      );
     }
-
-    const data = (await response.json()) as {
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{ text?: string }>;
-        };
-      }>;
-    };
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) {
-      throw new Error("Empty response returned from Google Search Scout.");
-    }
+    const text = found.text.replace(/^[\s\S]*?(\{[\s\S]*\})[\s\S]*$/, "$1");
 
     const cleaned = text
       .replace(/^```(?:json)?\s*/i, "")
@@ -157,10 +137,7 @@ Return ONLY valid JSON.`;
       .filter((u): u is string => Boolean(u && u.startsWith("http")));
 
     const { data: existingGrants } = urlsToCheck.length
-      ? await supabase
-          .from("grants")
-          .select("id, url, title")
-          .in("url", urlsToCheck)
+      ? await supabase.from("grants").select("id, url, title").in("url", urlsToCheck)
       : { data: [] };
 
     const existingByUrl = new Map<string, string>();

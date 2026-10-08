@@ -43,7 +43,7 @@ async function assertMember(db: Db, userId: string, orgId: string) {
  * Eligibility of each organization the user works for (e.g. IIAL and Nahua
  * Canada), from that organization's own profile and rules. Deterministic: 0 tokens.
  */
-async function eligibilityByOrg(
+export async function eligibilityByOrg(
   db: Db,
   grant: Record<string, unknown>,
   orgs: Array<{ id: string; name: string }>,
