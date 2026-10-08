@@ -196,8 +196,18 @@ function openAiCompatible(url: string, model: string): ExternalProvider["call"] 
 }
 
 const EXTERNAL_PROVIDERS: (ExternalProvider & {
-  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY";
+  envKey: "CEREBRAS_API_KEY" | "GROQ_API_KEY" | "GOOGLE_AI_STUDIO_KEY";
 })[] = [
+  // Google AI Studio free tier first (OpenAI-compatible endpoint).
+  {
+    name: "gemini-flash",
+    model: "gemini-2.5-flash",
+    envKey: "GOOGLE_AI_STUDIO_KEY",
+    call: openAiCompatible(
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "gemini-2.5-flash",
+    ),
+  },
   {
     name: "groq-gpt-20b",
     model: "openai/gpt-oss-20b",
