@@ -1945,6 +1945,60 @@ export type Database = {
           },
         ]
       }
+      grant_dossiers: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string | null
+          grant_id: string
+          id: string
+          lang: string
+          model: string | null
+          org_id: string
+          sources: Json
+          updated_at: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          grant_id: string
+          id?: string
+          lang?: string
+          model?: string | null
+          org_id: string
+          sources?: Json
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          grant_id?: string
+          id?: string
+          lang?: string
+          model?: string | null
+          org_id?: string
+          sources?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_dossiers_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_dossiers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grant_embeddings: {
         Row: {
           content_hash: string
