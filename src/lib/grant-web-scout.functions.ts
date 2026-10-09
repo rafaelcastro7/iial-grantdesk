@@ -12,6 +12,7 @@ export const searchWebGrants = createServerFn({ method: "POST" })
       .object({
         query: z.string().trim().min(3).max(1000),
         orgId: z.string().uuid().optional(),
+        lang: z.enum(["en", "es"]).optional(),
       })
       .parse(i),
   )
@@ -37,5 +38,6 @@ export const searchWebGrants = createServerFn({ method: "POST" })
       query: data.query,
       orgName,
       orgType,
+      lang: data.lang,
     });
   });

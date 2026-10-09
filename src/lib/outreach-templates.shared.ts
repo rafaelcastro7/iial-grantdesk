@@ -183,7 +183,12 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
   ]
     .filter(Boolean)
     .join("\n");
-  const deadline = dateText(grant, ws, lang);
+  const closed = (daysLeft(grant) ?? 0) < 0;
+  const deadline = closed
+    ? lang === "en"
+      ? `${dateText(grant, ws, lang)} (this year's call has closed; we are preparing for the next one)`
+      : `${dateText(grant, ws, lang)} (la convocatoria de este año ya cerró; preparamos la próxima)`
+    : dateText(grant, ws, lang);
   const idea = ws.project_title?.trim();
   const wcis = ws.wcis_angle?.trim();
   const ourRole = ws.route ? ROLE_TEXT[lang][ws.route] : null;
@@ -391,14 +396,20 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
     case "deadline_reminder":
       subject =
         lang === "en"
-          ? `Letter of support: ${grant.title} (deadline ${deadline})`
-          : `Carta de apoyo: ${grant.title} (plazo ${deadline})`;
+          ? closed
+            ? `Letter of support for the next call: ${grant.title}`
+            : `Letter of support: ${grant.title} (deadline ${deadline})`
+          : closed
+            ? `Carta de apoyo para la próxima convocatoria: ${grant.title}`
+            : `Carta de apoyo: ${grant.title} (plazo ${deadline})`;
       lines =
         lang === "en"
           ? [
               hi,
               "",
-              `A quick reminder about ${program}: the deadline is ${deadline}, so time is now short.`,
+              closed
+                ? `A quick note about ${program}: this year's call closed on ${dateText(grant, ws, lang)}, and we would like to prepare the next one together, well ahead of time.`
+                : `A quick reminder about ${program}: the deadline is ${deadline}, so time is now short.`,
               "To complete the application we would need your letter of support (signed, on letterhead) describing your role in the project.",
               ms ? `It would help a lot to have it by ${ms.date}.` : "",
               "I am happy to send you a short draft to adapt if that is easier.",
@@ -408,7 +419,9 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
           : [
               hi,
               "",
-              `Un breve recordatorio sobre ${program}: la fecha límite es ${deadline}, por lo que el tiempo es ajustado.`,
+              closed
+                ? `Un breve comentario sobre ${program}: la convocatoria de este año cerró el ${dateText(grant, ws, lang)}, y nos gustaría preparar juntos la próxima con tiempo.`
+                : `Un breve recordatorio sobre ${program}: la fecha límite es ${deadline}, por lo que el tiempo es ajustado.`,
               "Para completar la aplicación necesitaríamos su carta de apoyo (firmada, en papel membretado) describiendo su rol en el proyecto.",
               ms ? `Nos ayudaría mucho tenerla antes del ${ms.date}.` : "",
               "Con gusto le envío un borrador breve para adaptar, si le resulta más fácil.",

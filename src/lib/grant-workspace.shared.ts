@@ -411,6 +411,7 @@ export function defaultMilestones(
     ["Submit (aim 2 days early)", -2, "Enviar (idealmente 2 días antes)"],
   ];
   const todayIso = today.toISOString().slice(0, 10);
+  if (d < todayIso) return [];
   return plan.map(([label, offset, labelEs]) => {
     const date = addDays(d, offset);
     return {
@@ -516,6 +517,47 @@ const ES_MONTHS = [
  * who applies and how, WCIS fit, money, deadline, what we have and what is
  * missing, and a recommendation. Internal: it may mention blockers.
  */
+/** What the memo takes from the grant dossier. */
+export type MemoDossier = {
+  verdict: string;
+  fit?: string;
+  traps?: string[];
+  route?: string;
+  questions?: string[];
+};
+
+/** Whole sentences up to about `max` characters. */
+function firstSentences(text: string, max: number): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("; "));
+  return end > max / 3 ? cut.slice(0, end + 1) : `${cut.slice(0, cut.lastIndexOf(" "))}…`;
+}
+
+function dossierLines(d: MemoDossier | null | undefined, lang: "en" | "es"): string[] {
+  if (!d?.verdict) return [];
+  const es = lang === "es";
+  return [
+    es ? "En una frase" : "In one line",
+    `- ${d.fit ? `${d.fit}. ` : ""}${firstSentences(d.verdict, 600)}`,
+    ...(d.route ? [`- ${es ? "Ruta recomendada" : "Recommended route"}: ${d.route}`] : []),
+    ...(d.traps?.length
+      ? [
+          es ? "- Lo que el folleto no dice:" : "- What the brochure does not say:",
+          ...d.traps.slice(0, 5).map((t) => `  · ${t}`),
+        ]
+      : []),
+    ...(d.questions?.length
+      ? [
+          es ? "- Por confirmar con el financiador:" : "- To confirm with the funder:",
+          ...d.questions.slice(0, 3).map((q) => `  · ${q}`),
+        ]
+      : []),
+    "",
+  ];
+}
+
 export function decisionMemo(
   grant: WorkspaceGrant,
   ws: Workspace,
@@ -526,6 +568,8 @@ export function decisionMemo(
     sender?: string;
     orgName?: string;
     lang?: "en" | "es";
+    /** The dossier's conclusion, when there is one: it leads the memo. */
+    dossier?: MemoDossier | null;
   },
 ): { subject: string; body: string } {
   if (opts.lang === "es") return decisionMemoEs(grant, ws, opts);
@@ -552,6 +596,7 @@ export function decisionMemo(
     "",
     `Here is a short summary of "${grant.title}"${funder}, so we can decide if we apply.`,
     "",
+    ...dossierLines(opts.dossier, "en"),
     "What it is",
     grant.summary?.trim()
       ? `- ${grant.summary.trim().replace(/\s+/g, " ").slice(0, 400)}`
@@ -627,6 +672,7 @@ function decisionMemoEs(
     recipient?: string;
     sender?: string;
     orgName?: string;
+    dossier?: MemoDossier | null;
   },
 ): { subject: string; body: string } {
   const recipient = opts.recipient ?? "Marcelo";
@@ -661,6 +707,7 @@ function decisionMemoEs(
     "",
     `Le comparto un breve resumen de "${grant.title}"${funder}, para que decidamos si aplicamos.`,
     "",
+    ...dossierLines(opts.dossier, "es"),
     "Qué es",
     grant.summary?.trim()
       ? `- ${grant.summary.trim().replace(/\s+/g, " ").slice(0, 400)}`

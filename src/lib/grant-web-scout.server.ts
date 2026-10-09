@@ -12,6 +12,10 @@ export type DiscoveredWebGrant = {
   deadline: string;
   status: "open" | "upcoming" | "continuous" | "closed";
   applicant_fit: string;
+  /** Who can apply: our organizations and in which role (e.g. "IIAL (líder) · Nahua (socio)"). */
+  applicant?: string;
+  /** grant | contribution | repayable | loan | cost_share | prize | other */
+  instrument?: string;
   alreadyInCatalog: boolean;
   existingGrantId?: string | null;
 };
@@ -35,6 +39,7 @@ export async function searchWebForGrantsImpl(
     query: string;
     orgName?: string;
     orgType?: string;
+    lang?: "en" | "es";
   },
 ): Promise<WebScoutResult> {
   const env = serverEnv();
@@ -53,59 +58,63 @@ export async function searchWebForGrantsImpl(
   }
 
   const clientName = opts.orgName || "IIAL";
-  const prompt = `You are an expert grant discovery scout. Search Google in real-time to find REAL, CURRENT, OR UPCOMING (2026/2027) grant funding opportunities and RFP calls matching this query:
+  const es = opts.lang === "es";
+  const prompt = `You are a senior grant scout. Search the web now for REAL funding calls that are OPEN, UPCOMING or CONTINUOUS (2026-2027) for this request:
 "${opts.query}"
 
-Context on the searching organization:
-- Organization: ${clientName} (${opts.orgType || "Canadian non-profit applied research institute / commercial partner Nahua"})
-- Focus: agricultural innovation, cacao value chain, bioeconomy, sustainability, food systems, community development in Canada and Latin America (Peru, Colombia, Mexico).
+Who is searching (the team can act through either organization):
+- ${clientName} (${opts.orgType || "Canadian non-profit, applied research and professional training, WCIS supply-chain integrity standard"}).
+- Nahua Canada (Canadian for-profit start-up, about one month old, agri-food / cacao).
+- Focus: agri-food, cacao and coffee value chains, traceability, sustainability, applied research and training, Canada and Latin America (Peru, Colombia, Mexico, Central America).
 
-For each grant you find from authoritative sources, extract:
-- title: official name of the grant, fund, or call
-- funder: organization or government agency funding it
-- country: ISO 2-letter code (e.g. CA, US, PE, CO, MX) or 'INT' for multilateral/global
-- url: real official web URL of the call or funder official page
-- summary: 1-2 sentence description of the funding scope
-- amount_range: estimated funding amount and currency (e.g. '$50,000 - $250,000 CAD', 'Up to $1,000,000 USD')
-- deadline: specific date (YYYY-MM-DD), 'Rolling / Continuous', or 'Upcoming Cycle (2026/2027)'
-- status: 'open' | 'upcoming' | 'continuous' | 'closed'
-- applicant_fit: why ${clientName} or its consortium partners (e.g. Lambton College, SOCODEVI, APP CACAO, Nahua) can participate
+Rules:
+- Return 6 to 10 opportunities when they exist, most relevant first; fewer only if no more exist.
+- Only money for projects or organizations (grants, contributions, cost-shared funding, loans for projects). EXCLUDE prizes, awards, contests, scholarships for individuals and events; if you include one, set "instrument": "prize".
+- Never invent: if the amount or the deadline is not published, write "not published" / "no publicado".
+- The url must be the call's own official page when possible (not a news article or a generic list).
+- Write title in its official language; write summary, applicant_fit, applicant, amount_range and deadline in ${es ? "SPANISH" : "ENGLISH"}.
 
-Return valid JSON in this exact structure:
-{
-  "grants": [
-    {
-      "title": "...",
-      "funder": "...",
-      "country": "...",
-      "url": "...",
-      "summary": "...",
-      "amount_range": "...",
-      "deadline": "...",
-      "status": "open",
-      "applicant_fit": "..."
-    }
-  ]
-}
-Return ONLY valid JSON.`;
+For each opportunity:
+- title, funder, country (ISO-2 code, or "INT" for multilateral/global, "LATAM" for regional Latin America)
+- url
+- summary: one sentence, what it funds
+- amount_range: amount and currency per project, and the type ("Subvención hasta 50.000 CAD", "Préstamo hasta 1,5 M USD")
+- instrument: grant | contribution | repayable | loan | cost_share | prize | other
+- deadline: "YYYY-MM-DD HH:mm TZ" if published, otherwise "continua"/"rolling" or "próximo ciclo 2027"/"next cycle 2027"
+- status: open | upcoming | continuous | closed
+- applicant: which of our organizations can take part and how, e.g. "IIAL: líder" / "IIAL: socio de un college" / "Nahua: líder" / "Ninguna: solo productores"
+- applicant_fit: one sentence, why it fits (or what blocks it)
+
+Return ONLY this JSON:
+{ "grants": [ { "title": "", "funder": "", "country": "", "url": "", "summary": "", "amount_range": "", "instrument": "", "deadline": "", "status": "open", "applicant": "", "applicant_fit": "" } ] }`;
 
   try {
     // Google first, then Groq's built-in browser search: never tied to one API.
     const { searchWebGrounded } = await import("@/lib/web-grounding.server");
-    const found = await searchWebGrounded(prompt, { maxChars: 60000 });
-    if (!found) {
+    // Two searches in parallel (the request as written, and one aimed at
+    // official calls in the other language), merged without duplicates.
+    const variant = es
+      ? prompt.replace(
+          `"${opts.query}"`,
+          `"${opts.query}" — official calls for proposals 2026 2027 (English sources)`,
+        )
+      : prompt.replace(
+          `"${opts.query}"`,
+          `"${opts.query}" — convocatorias oficiales 2026 2027 (fuentes en español)`,
+        );
+    const answers = await Promise.all([
+      searchWebGrounded(prompt, { maxChars: 60000 }),
+      searchWebGrounded(variant, { maxChars: 60000 }),
+    ]);
+    if (!answers.some(Boolean)) {
       throw new Error(
-        "No web search provider could answer right now (quota or network). Try again in a few minutes.",
+        es
+          ? "Ningún buscador de internet pudo responder ahora (límite diario gratuito o red). Intente en unos minutos; los grants del sistema siguen disponibles abajo."
+          : "No internet search provider could answer right now (free daily limit or network). Try again in a few minutes; the grants in the system are still below.",
       );
     }
-    const text = found.text.replace(/^[\s\S]*?(\{[\s\S]*\})[\s\S]*$/, "$1");
 
-    const cleaned = text
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/i, "")
-      .trim();
-
-    let rawGrants: Array<{
+    type RawGrant = {
       title?: string;
       funder?: string;
       country?: string;
@@ -115,20 +124,41 @@ Return ONLY valid JSON.`;
       deadline?: string;
       status?: string;
       applicant_fit?: string;
-    }> = [];
-
-    try {
-      const parsed = JSON.parse(cleaned) as { grants?: typeof rawGrants };
-      rawGrants = parsed.grants || [];
-    } catch {
-      // Fallback regex extraction if model included outer prose
-      const match = cleaned.match(/\{[\s\S]*"grants"[\s\S]*\}/);
-      if (match) {
-        const parsed = JSON.parse(match[0]) as { grants?: typeof rawGrants };
-        rawGrants = parsed.grants || [];
-      } else {
-        throw new Error("Could not parse structured grant list from Google Search results.");
+      applicant?: string;
+      instrument?: string;
+    };
+    const parseList = (raw: string): RawGrant[] => {
+      const cleaned = raw
+        .replace(/^[\s\S]*?(\{[\s\S]*\})[\s\S]*$/, "$1")
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      try {
+        return (JSON.parse(cleaned) as { grants?: RawGrant[] }).grants ?? [];
+      } catch {
+        const match = cleaned.match(/\{[\s\S]*"grants"[\s\S]*\}/);
+        try {
+          return match ? ((JSON.parse(match[0]) as { grants?: RawGrant[] }).grants ?? []) : [];
+        } catch {
+          return [];
+        }
       }
+    };
+    const seen = new Set<string>();
+    const rawGrants: RawGrant[] = answers
+      .flatMap((a) => (a ? parseList(a.text) : []))
+      .filter((g) => {
+        const k = (g.url ?? g.title ?? "").trim().toLowerCase().replace(/\/+$/, "");
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    if (!rawGrants.length && answers.some(Boolean)) {
+      throw new Error(
+        es
+          ? "La búsqueda respondió, pero no en un formato legible. Intente de nuevo."
+          : "The search answered, but not in a readable format. Try again.",
+      );
     }
 
     // Check catalog presence in bulk to mark already imported items
@@ -147,6 +177,7 @@ Return ONLY valid JSON.`;
 
     const grants: DiscoveredWebGrant[] = rawGrants
       .filter((g) => Boolean(g.title && g.url))
+      .filter((g) => !/^prize$/i.test((g.instrument ?? "").trim()))
       .map((g) => {
         const url = g.url!.trim();
         const existingId = existingByUrl.get(url.toLowerCase()) ?? null;
@@ -170,10 +201,15 @@ Return ONLY valid JSON.`;
           deadline: (g.deadline || "Rolling").trim(),
           status: validStatus,
           applicant_fit: (g.applicant_fit || "").trim(),
+          applicant: (g.applicant || "").trim() || undefined,
+          instrument: (g.instrument || "").trim().toLowerCase() || undefined,
           alreadyInCatalog: Boolean(existingId),
           existingGrantId: existingId,
         };
       });
+
+    const rank = { open: 0, upcoming: 1, continuous: 2, closed: 3 } as const;
+    grants.sort((a, b) => rank[a.status] - rank[b.status]);
 
     return {
       ok: true,

@@ -186,8 +186,20 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         (e) => ws.applicant_org_ids.length === 0 || ws.applicant_org_ids.includes(e.orgId),
       ),
       lang: uiLang,
+      dossier: (() => {
+        const d = dossierData?.saved?.dossier as Dossier | undefined;
+        if (!d?.verdict) return null;
+        const rec = d.routes?.options?.find((o) => o.recommended) ?? null;
+        return {
+          verdict: d.verdict,
+          fit: d.fit ? fitLabel(d.fit, uiLang) : undefined,
+          traps: (d.traps ?? []).map((t) => t.title),
+          route: rec?.name,
+          questions: d.questions_to_confirm,
+        };
+      })(),
     });
-  }, [data, ws, currentOrgName, uiLang]);
+  }, [data, ws, currentOrgName, uiLang, dossierData?.saved]);
 
   const glossary = useMemo(
     () =>

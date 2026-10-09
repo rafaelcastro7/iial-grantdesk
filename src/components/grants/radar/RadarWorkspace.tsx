@@ -97,6 +97,7 @@ export function RadarWorkspace({
         data: {
           query: text,
           orgId: activeOrgId ?? undefined,
+          lang,
         },
       });
 
@@ -520,6 +521,62 @@ export function RadarWorkspace({
                     </span>
                     <span>{tr(`Targeted for ${orgName}`, `Para ${orgName}`)}</span>
                   </div>
+
+                  {/* The overview Rocío asked ChatGPT for: one row per opportunity. */}
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full min-w-[820px] text-left text-sm">
+                      <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2">{tr("Opportunity", "Oportunidad")}</th>
+                          <th className="px-3 py-2">{tr("Status", "Estado")}</th>
+                          <th className="px-3 py-2">{tr("Deadline", "Cierre")}</th>
+                          <th className="px-3 py-2">{tr("Who applies", "Quién aplica")}</th>
+                          <th className="px-3 py-2">{tr("Amount and type", "Monto y tipo")}</th>
+                          <th className="px-3 py-2">{tr("Link", "Enlace")}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {webResults.map((g) => (
+                          <tr key={g.url} className="align-top">
+                            <td className="px-3 py-2">
+                              <div className="font-medium">{g.title}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {g.funder} · {g.country}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {g.status === "open"
+                                ? tr("Open", "Abierta")
+                                : g.status === "upcoming"
+                                  ? tr("Upcoming", "Por abrir")
+                                  : g.status === "continuous"
+                                    ? tr("Continuous", "Continua")
+                                    : tr("Closed", "Cerrada")}
+                            </td>
+                            <td className="px-3 py-2">{g.deadline}</td>
+                            <td className="px-3 py-2">{g.applicant || "—"}</td>
+                            <td className="px-3 py-2">{g.amount_range}</td>
+                            <td className="px-3 py-2">
+                              <a
+                                href={g.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary hover:underline"
+                              >
+                                {tr("Official page", "Página oficial")}
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {tr(
+                      "Found by AI on the internet: verify amounts and dates on the official page. Import one to analyze it and prepare its dossier.",
+                      "Encontrado con IA en internet: verifique montos y fechas en la página oficial. Importe uno para analizarlo y preparar su dossier.",
+                    )}
+                  </p>
 
                   <div className="space-y-3">
                     {webResults.map((grant) => (

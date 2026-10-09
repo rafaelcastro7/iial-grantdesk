@@ -794,3 +794,50 @@ describe("Review fixes: plan never loses applied changes", () => {
     expect(ws.milestones[0].label).toBe("Decisión de aplicar o no");
   });
 });
+
+describe("Replay fixes: closed calls and the memo", () => {
+  const closedGrant = {
+    id: "s",
+    title: "SSHRC SARI",
+    deadline: "2026-08-04",
+    funder: { name: "SSHRC" },
+  };
+
+  it("a passed deadline never says 'time is short' and has no countdown", async () => {
+    const { composeOutreach } = await import("@/lib/outreach-templates.shared");
+    const { emptyWorkspace, defaultMilestones } = await import("@/lib/grant-workspace.shared");
+    const e = composeOutreach({
+      template: "deadline_reminder",
+      lang: "es",
+      grant: closedGrant,
+      workspace: emptyWorkspace("o", closedGrant),
+      orgName: "IIAL",
+      senderName: "Rocío Cruz",
+    });
+    expect(e.body).not.toMatch(/tiempo es ajustado/);
+    expect(e.body).toMatch(/cerró/);
+    expect(e.subject).toMatch(/próxima convocatoria/);
+    expect(defaultMilestones("2026-08-04", new Date("2026-10-08T12:00:00Z"))).toEqual([]);
+  });
+
+  it("the memo leads with the dossier's conclusion", async () => {
+    const { decisionMemo, emptyWorkspace } = await import("@/lib/grant-workspace.shared");
+    const m = decisionMemo(closedGrant, emptyWorkspace("o", closedGrant), {
+      applicantNames: [],
+      eligibility: [],
+      lang: "es",
+      dossier: {
+        verdict:
+          "La convocatoria 2026 cerró; para la próxima, ir como co-solicitante con una universidad.",
+        fit: "Sí, para el próximo ciclo",
+        traps: ["Contrapartida del 50% de organizaciones"],
+        route: "Ruta A: co-solicitante con universidad",
+      },
+    });
+    expect(m.body).toMatch(
+      /En una frase\n- Sí, para el próximo ciclo\. La convocatoria 2026 cerró/,
+    );
+    expect(m.body).toContain("Ruta recomendada: Ruta A");
+    expect(m.body).toContain("· Contrapartida del 50%");
+  });
+});
