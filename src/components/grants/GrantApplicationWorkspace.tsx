@@ -128,6 +128,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [saving, setSaving] = useState(false);
   const [newBlocker, setNewBlocker] = useState("");
   const [newItem, setNewItem] = useState("");
+  const [showPartners, setShowPartners] = useState(false);
 
   // The server copy last seen, to tell what changed on the server meanwhile.
   const serverRef = useRef<Workspace | null>(null);
@@ -174,7 +175,9 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   };
 
   const currentOrgName = useMemo(() => {
-    return data?.orgs.find((o) => o.id === orgId)?.name ?? "IIAL";
+    return (
+      data?.orgs.find((o) => o.id === orgId)?.name ?? tr("our organization", "nuestra organización")
+    );
   }, [data?.orgs, orgId]);
 
   const memo = useMemo(() => {
@@ -298,11 +301,17 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const setPartners = (list: Partner[]) => update({ partners: list });
   const missing = ws.checklist.filter((c) => c.status === "missing").length;
   const ready = ws.checklist.filter((c) => c.status === "have").length;
+  // Partners matter when someone else leads or the call is open to consortia.
+  const partnersShown =
+    showPartners ||
+    ws.partners.length > 0 ||
+    (!!ws.route && ws.route !== "lead") ||
+    dossierFit?.fit === "partner_only";
 
   const writeSection = (
     <Section
       icon={<Mail className="h-4 w-4" />}
-      title={tr("5. Write", "5. Redactar")}
+      title={tr("Write", "Redactar")}
       hint={tr(
         "Emails never include the internal blockers; the memo does.",
         "Los correos nunca incluyen los bloqueos internos; el memo sí.",
@@ -616,40 +625,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         </Button>
       </div>
 
-      <Section
-        icon={<Users className="h-4 w-4" />}
-        title={tr("1. Can we apply?", "1. ¿Podemos aplicar?")}
-        hint={tr(
-          "Rules checked against each organization's profile (no AI); the dossier verdict, when there is one, comes from the call itself.",
-          "Reglas verificadas con el perfil de cada organización (sin IA); el veredicto del dossier, cuando existe, sale de la convocatoria misma.",
-        )}
-      >
-        {dossierFit && (
-          <div
-            className={cn(
-              "mb-3 rounded-lg border p-3 text-sm",
-              fitTone(dossierFit.fit) === "good"
-                ? "border-emerald-500/40 bg-emerald-500/5"
-                : fitTone(dossierFit.fit) === "warn"
-                  ? "border-amber-500/40 bg-amber-500/5"
-                  : "border-rose-500/40 bg-rose-500/5",
-            )}
-          >
-            <span className="font-semibold">
-              {tr("Dossier (official page and web)", "Dossier (página oficial y web)")}:{" "}
-              {fitLabel(dossierFit.fit, uiLang)}
-            </span>
-            {dossierFit.reason && (
-              <span className="block text-muted-foreground">{dossierFit.reason}</span>
-            )}
-            <span className="block pt-1 text-xs text-muted-foreground">
-              {tr(
-                "The checks below use only your profile's rules; when they disagree, the dossier read the call itself.",
-                "Las verificaciones de abajo usan solo las reglas de su perfil; si no coinciden, el dossier leyó la convocatoria misma.",
-              )}
-            </span>
-          </div>
-        )}
+      <Section icon={<Users className="h-4 w-4" />} title={tr("Who applies", "Quién postula")}>
         <div className="grid gap-3 sm:grid-cols-2">
           {data.eligibility.map((e) => {
             const chosen = ws.applicant_org_ids.includes(e.orgId);
@@ -779,7 +755,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
 
       <Section
         icon={<ClipboardList className="h-4 w-4" />}
-        title={tr("2. Our decision", "2. Nuestra decisión")}
+        title={tr("Our decision", "Nuestra decisión")}
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label={tr("Priority", "Prioridad")}>
@@ -825,13 +801,18 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
               ))}
             </select>
           </Field>
-          <Field label={tr("Lead institution", "Institución líder")}>
-            <Input
-              value={ws.lead_institution ?? ""}
-              placeholder={tr("An eligible institution that applies", "Una institución elegible que postula")}
-              onChange={(e) => update({ lead_institution: e.target.value || null })}
-            />
-          </Field>
+          {(ws.route !== "lead" || !!ws.lead_institution) && (
+            <Field label={tr("Lead institution", "Institución líder")}>
+              <Input
+                value={ws.lead_institution ?? ""}
+                placeholder={tr(
+                  "An eligible institution that applies",
+                  "Una institución elegible que postula",
+                )}
+                onChange={(e) => update({ lead_institution: e.target.value || null })}
+              />
+            </Field>
+          )}
         </div>
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-medium text-primary">
@@ -990,171 +971,186 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         </div>
       </Section>
 
-      <Section icon={<Users className="h-4 w-4" />} title={tr("3. Partners", "3. Socios")}>
-        {ws.partners.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            {tr("No partners yet.", "Aún no hay socios.")}
-          </p>
-        )}
-        <div className="space-y-2">
-          {ws.partners.map((p, idx) => (
-            <div
-              key={p.id}
-              className="grid gap-2 rounded-lg border p-2 sm:grid-cols-[1.4fr_0.8fr_1.4fr_1fr_1fr_auto]"
-            >
-              <Input
-                value={p.name}
-                placeholder={tr("Organization", "Organización")}
-                list="partner-directory-names"
-                onChange={(e) => {
-                  const known = directoryByName.get(e.target.value.trim().toLowerCase());
-                  setPartners(
-                    ws.partners.map((x, i) =>
-                      i === idx
-                        ? {
-                            ...x,
-                            name: e.target.value,
-                            ...(known
-                              ? {
-                                  country: x.country || known.country,
-                                  type: x.type || known.type,
-                                  contact:
-                                    x.contact ||
-                                    [known.contact_name, known.email].filter(Boolean).join(" · ") ||
-                                    null,
-                                }
-                              : {}),
-                          }
-                        : x,
-                    ),
-                  );
-                }}
-              />
-              <Input
-                value={p.country ?? ""}
-                placeholder={tr("Country", "País")}
-                onChange={(e) =>
-                  setPartners(
-                    ws.partners.map((x, i) => (i === idx ? { ...x, country: e.target.value } : x)),
-                  )
-                }
-              />
-              <Input
-                value={p.role ?? ""}
-                placeholder={tr(
-                  "Role (e.g. administers the grant)",
-                  "Rol (p. ej. administra el grant)",
-                )}
-                onChange={(e) =>
-                  setPartners(
-                    ws.partners.map((x, i) => (i === idx ? { ...x, role: e.target.value } : x)),
-                  )
-                }
-              />
-              <Input
-                value={p.contact ?? ""}
-                placeholder={tr("Contact", "Contacto")}
-                onChange={(e) =>
-                  setPartners(
-                    ws.partners.map((x, i) => (i === idx ? { ...x, contact: e.target.value } : x)),
-                  )
-                }
-              />
-              <select
-                className={selectClass}
-                value={p.status ?? "to_contact"}
-                onChange={(e) =>
-                  setPartners(
-                    ws.partners.map((x, i) =>
-                      i === idx ? { ...x, status: e.target.value as Partner["status"] } : x,
-                    ),
-                  )
-                }
+      {!partnersShown ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={() => setShowPartners(true)}
+        >
+          <Users className="h-4 w-4" /> {tr("Add partners", "Agregar socios")}
+        </Button>
+      ) : (
+        <Section icon={<Users className="h-4 w-4" />} title={tr("Partners", "Socios")}>
+          <div className="space-y-2">
+            {ws.partners.map((p, idx) => (
+              <div
+                key={p.id}
+                className="grid gap-2 rounded-lg border p-2 sm:grid-cols-[1.4fr_0.8fr_1.4fr_1fr_1fr_auto]"
               >
-                {PARTNER_STATUS.map(([v, en, es]) => (
-                  <option key={v} value={v}>
-                    {tr(en, es)}
-                  </option>
-                ))}
-              </select>
+                <Input
+                  value={p.name}
+                  placeholder={tr("Organization", "Organización")}
+                  list="partner-directory-names"
+                  onChange={(e) => {
+                    const known = directoryByName.get(e.target.value.trim().toLowerCase());
+                    setPartners(
+                      ws.partners.map((x, i) =>
+                        i === idx
+                          ? {
+                              ...x,
+                              name: e.target.value,
+                              ...(known
+                                ? {
+                                    country: x.country || known.country,
+                                    type: x.type || known.type,
+                                    contact:
+                                      x.contact ||
+                                      [known.contact_name, known.email]
+                                        .filter(Boolean)
+                                        .join(" · ") ||
+                                      null,
+                                  }
+                                : {}),
+                            }
+                          : x,
+                      ),
+                    );
+                  }}
+                />
+                <Input
+                  value={p.country ?? ""}
+                  placeholder={tr("Country", "País")}
+                  onChange={(e) =>
+                    setPartners(
+                      ws.partners.map((x, i) =>
+                        i === idx ? { ...x, country: e.target.value } : x,
+                      ),
+                    )
+                  }
+                />
+                <Input
+                  value={p.role ?? ""}
+                  placeholder={tr(
+                    "Role (e.g. administers the grant)",
+                    "Rol (p. ej. administra el grant)",
+                  )}
+                  onChange={(e) =>
+                    setPartners(
+                      ws.partners.map((x, i) => (i === idx ? { ...x, role: e.target.value } : x)),
+                    )
+                  }
+                />
+                <Input
+                  value={p.contact ?? ""}
+                  placeholder={tr("Contact", "Contacto")}
+                  onChange={(e) =>
+                    setPartners(
+                      ws.partners.map((x, i) =>
+                        i === idx ? { ...x, contact: e.target.value } : x,
+                      ),
+                    )
+                  }
+                />
+                <select
+                  className={selectClass}
+                  value={p.status ?? "to_contact"}
+                  onChange={(e) =>
+                    setPartners(
+                      ws.partners.map((x, i) =>
+                        i === idx ? { ...x, status: e.target.value as Partner["status"] } : x,
+                      ),
+                    )
+                  }
+                >
+                  {PARTNER_STATUS.map(([v, en, es]) => (
+                    <option key={v} value={v}>
+                      {tr(en, es)}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={tr("Remove partner", "Quitar socio")}
+                  onClick={() => setPartners(ws.partners.filter((_, i) => i !== idx))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2 gap-1.5"
+            onClick={() =>
+              setPartners([
+                ...ws.partners,
+                { id: newId("partner"), name: "", status: "to_contact" },
+              ])
+            }
+          >
+            <Plus className="h-4 w-4" /> {tr("Add partner", "Agregar socio")}
+          </Button>
+          <datalist id="partner-directory-names">
+            {(directory?.partners ?? []).map((d) => (
+              <option key={d.id} value={d.name} />
+            ))}
+          </datalist>
+          {directory?.available &&
+            ws.partners.some(
+              (p) => p.name.trim() && !directoryByName.has(p.name.trim().toLowerCase()),
+            ) && (
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
-                aria-label={tr("Remove partner", "Quitar socio")}
-                onClick={() => setPartners(ws.partners.filter((_, i) => i !== idx))}
+                size="sm"
+                className="mt-1 text-xs"
+                onClick={async () => {
+                  const fresh = ws.partners.filter(
+                    (p) => p.name.trim() && !directoryByName.has(p.name.trim().toLowerCase()),
+                  );
+                  for (const p of fresh) {
+                    await saveToDirectory({
+                      data: {
+                        org_id: orgId,
+                        name: p.name.trim(),
+                        country: p.country ?? null,
+                        type: p.type ?? null,
+                        contact_name: p.contact ?? null,
+                        contact_title: null,
+                        email: null,
+                        phone: null,
+                        website: null,
+                        languages: [],
+                        notes: null,
+                      },
+                    }).catch(() => undefined);
+                  }
+                  await qc.invalidateQueries({ queryKey: ["partner-directory", orgId] });
+                  toast.success(
+                    tr(
+                      `${fresh.length} partner(s) added to the directory`,
+                      `${fresh.length} socio(s) agregado(s) al directorio`,
+                    ),
+                  );
+                }}
               >
-                <Trash2 className="h-4 w-4" />
+                {tr(
+                  "Save new partners to the directory",
+                  "Guardar los socios nuevos en el directorio",
+                )}
               </Button>
-            </div>
-          ))}
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-2 gap-1.5"
-          onClick={() =>
-            setPartners([...ws.partners, { id: newId("partner"), name: "", status: "to_contact" }])
-          }
-        >
-          <Plus className="h-4 w-4" /> {tr("Add partner", "Agregar socio")}
-        </Button>
-        <datalist id="partner-directory-names">
-          {(directory?.partners ?? []).map((d) => (
-            <option key={d.id} value={d.name} />
-          ))}
-        </datalist>
-        {directory?.available &&
-          ws.partners.some(
-            (p) => p.name.trim() && !directoryByName.has(p.name.trim().toLowerCase()),
-          ) && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="mt-1 text-xs"
-              onClick={async () => {
-                const fresh = ws.partners.filter(
-                  (p) => p.name.trim() && !directoryByName.has(p.name.trim().toLowerCase()),
-                );
-                for (const p of fresh) {
-                  await saveToDirectory({
-                    data: {
-                      org_id: orgId,
-                      name: p.name.trim(),
-                      country: p.country ?? null,
-                      type: p.type ?? null,
-                      contact_name: p.contact ?? null,
-                      contact_title: null,
-                      email: null,
-                      phone: null,
-                      website: null,
-                      languages: [],
-                      notes: null,
-                    },
-                  }).catch(() => undefined);
-                }
-                await qc.invalidateQueries({ queryKey: ["partner-directory", orgId] });
-                toast.success(
-                  tr(
-                    `${fresh.length} partner(s) added to the directory`,
-                    `${fresh.length} socio(s) agregado(s) al directorio`,
-                  ),
-                );
-              }}
-            >
-              {tr(
-                "Save new partners to the directory",
-                "Guardar los socios nuevos en el directorio",
-              )}
-            </Button>
-          )}
-      </Section>
+            )}
+        </Section>
+      )}
 
       <Section
         icon={<CheckCircle2 className="h-4 w-4" />}
-        title={tr("4. Documents and dates", "4. Documentos y fechas")}
+        title={tr("Documents and dates", "Documentos y fechas")}
         hint={tr(`${ready} ready · ${missing} missing`, `${ready} listos · ${missing} faltan`)}
       >
         <div className="divide-y rounded-lg border">

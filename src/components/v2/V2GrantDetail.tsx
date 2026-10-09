@@ -29,7 +29,7 @@ import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/Man
 import { GrantCopilotSheet } from "@/components/grants/GrantCopilotSheet";
 import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
 import { useActiveTenant } from "@/lib/tenant-context";
-import { GrantApplicationWorkspace } from "@/components/grants/GrantApplicationWorkspace";
+import { GrantPlanPanel } from "@/components/grants/GrantPlanPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -442,19 +442,7 @@ export function V2GrantDetail({
         />
       )}
 
-      <h2 className="pt-2 font-display text-lg font-semibold">
-        {tr("Our working plan", "Nuestro plan de trabajo")}
-      </h2>
-      {activeOrgId ? (
-        <GrantApplicationWorkspace grantId={grant.id} orgId={activeOrgId} />
-      ) : (
-        <p className="rounded-lg border p-4 text-sm text-muted-foreground">
-          {tr(
-            "Choose the organization you are working for to open its plan.",
-            "Elija la organización para la que trabaja para abrir su plan.",
-          )}
-        </p>
-      )}
+      {activeOrgId && <GrantPlanPanel grantId={grant.id} orgId={activeOrgId} />}
 
       {/* Everything secondary, folded. Closed content is unmounted, so the
           technical panels load nothing until opened. */}
