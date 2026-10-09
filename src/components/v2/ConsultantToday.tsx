@@ -43,7 +43,10 @@ export function ConsultantToday({ greeting }: { greeting: string }) {
       const key = "grants.radar.filters.v1";
       const prev = JSON.parse(window.sessionStorage.getItem(key) ?? "{}");
       window.sessionStorage.setItem(key, JSON.stringify({ ...prev, search: text }));
-      if (!/^https?:\/\//i.test(text)) window.sessionStorage.setItem("grants.autoWeb", text);
+      window.sessionStorage.setItem(
+        /^https?:\/\//i.test(text) ? "grants.autoLink" : "grants.autoWeb",
+        text,
+      );
     } catch {
       /* storage unavailable: Find grants still opens */
     }

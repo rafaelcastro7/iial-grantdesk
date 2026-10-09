@@ -18,10 +18,24 @@ import {
   Scale,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { dossierToPlan, type Dossier } from "@/lib/grant-dossier.shared";
+import {
+  dossierToPlan,
+  fitLabel,
+  fitTone,
+  type Dossier,
+  type DossierFit,
+} from "@/lib/grant-dossier.shared";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ROUTES, routeLabel, type Route } from "@/lib/grant-workspace.shared";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   generateGrantDossier,
   getGrantDossier,
@@ -53,16 +67,30 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
   });
   const autoStarted = useRef(false);
   useEffect(() => {
+    const onceKey = `dossier-auto:${grantId}:${orgId}`;
+    let triedBefore = false;
+    try {
+      triedBefore = window.sessionStorage.getItem(onceKey) === "1";
+    } catch {
+      /* storage unavailable */
+    }
     if (
       autoStarted.current ||
       isLoading ||
       saved ||
       busy ||
       !wsData?.saved ||
-      data?.available === false
+      data?.available !== true ||
+      data.otherLang ||
+      triedBefore
     )
       return;
     autoStarted.current = true;
+    try {
+      window.sessionStorage.setItem(onceKey, "1");
+    } catch {
+      /* storage unavailable */
+    }
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, saved, wsData?.saved, data?.available]);
@@ -74,10 +102,12 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
       setLocal(res.saved);
       if (!res.persisted)
         toast.info(
-          tr(
-            "Dossier ready. It will be saved once the database update 20261008110000_grant_dossiers.sql is applied.",
-            "Dossier listo. Se guardará cuando se aplique la actualización 20261008110000_grant_dossiers.sql.",
-          ),
+          res.persistError
+            ? `${tr("Dossier ready, but it could not be saved", "Dossier listo, pero no se pudo guardar")}: ${res.persistError}`
+            : tr(
+                "Dossier ready. It will be saved once the database update 20261008110000_grant_dossiers.sql is applied.",
+                "Dossier listo. Se guardará cuando se aplique la actualización 20261008110000_grant_dossiers.sql.",
+              ),
         );
       await qc.invalidateQueries({ queryKey: ["grant-dossier", grantId, orgId, lang] });
     } catch (e) {
@@ -119,20 +149,62 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
     month: "short",
     year: "numeric",
   });
+  const fit = (d as { fit?: DossierFit }).fit;
+  const tone = fit ? fitTone(fit) : "muted";
+  const recommended = d.routes.options.find((o) => o.recommended) ?? null;
+  const recIndex = recommended ? d.routes.options.indexOf(recommended) : -1;
+  const nextStep = d.timeline[0]?.step ?? d.questions_to_confirm?.[0] ?? null;
+  const critical = d.documents.filter((x) => x.critical).length;
 
   return (
-    <div className="space-y-4" aria-label={tr("Grant dossier", "Dossier del grant")}>
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <Sparkles className="h-4 w-4 text-primary" />
-            {tr("Verdict", "Veredicto")}
-          </h2>
+    <section
+      key={saved.updated_at}
+      className="space-y-3"
+      aria-label={tr("Grant dossier", "Dossier del grant")}
+    >
+      {/* 1. The decision, first: do we apply, why, how, what next. */}
+      <section
+        className={cn(
+          "rounded-xl border-2 bg-card p-5 shadow-sm",
+          tone === "good"
+            ? "border-emerald-500/50"
+            : tone === "warn"
+              ? "border-amber-500/50"
+              : tone === "bad"
+                ? "border-rose-500/50"
+                : "border-border",
+        )}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {tr("Do we apply?", "¿Aplicamos?")}
+            </div>
+            <h2
+              className={cn(
+                "mt-0.5 text-xl font-bold sm:text-2xl",
+                tone === "good"
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : tone === "warn"
+                    ? "text-amber-700 dark:text-amber-400"
+                    : tone === "bad"
+                      ? "text-rose-700 dark:text-rose-400"
+                      : "",
+              )}
+            >
+              {fit ? fitLabel(fit, lang) : tr("Verdict", "Veredicto")}
+            </h2>
+            {(d as { fit_reason?: string }).fit_reason && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {(d as { fit_reason?: string }).fit_reason}
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {tr(`Prepared ${when}`, `Preparado el ${when}`)}
             <Button
               size="sm"
-              variant="ghost"
+              variant="outline"
               className="h-7 gap-1 px-2 text-xs"
               onClick={run}
               disabled={busy}
@@ -142,66 +214,183 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
             </Button>
           </div>
         </div>
-        <p className="mt-2 whitespace-pre-line text-sm leading-relaxed">{d.verdict}</p>
-        {(d.questions_to_confirm ?? []).length > 0 && (
-          <div className="mt-3 rounded-lg bg-muted/40 p-3 text-sm">
-            <div className="text-xs font-semibold uppercase text-muted-foreground">
-              {tr("To confirm with the funder", "Por confirmar con el financiador")}
-            </div>
-            <ul className="mt-1 list-disc pl-5">
-              {d.questions_to_confirm!.map((q) => (
-                <li key={q}>{q}</li>
-              ))}
-            </ul>
+
+        <dl className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+          <div className="rounded-lg bg-muted/40 p-3">
+            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+              {tr("Strategy", "Estrategia")}
+            </dt>
+            <dd className="mt-0.5 font-medium">
+              {recommended?.name ?? tr("To define", "Por definir")}
+            </dd>
+            {recIndex >= 0 && (
+              <dd className="mt-2">
+                <ApplyButton
+                  grantId={grantId}
+                  orgId={orgId}
+                  dossier={d}
+                  part="route"
+                  optionIndex={recIndex}
+                  label={tr("Use in the plan", "Usar en el plan")}
+                />
+              </dd>
+            )}
           </div>
-        )}
+          <div className="rounded-lg bg-muted/40 p-3">
+            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+              {tr("What we need", "Lo que necesitamos")}
+            </dt>
+            <dd className="mt-0.5 font-medium">
+              {tr(`${d.documents.length} documents`, `${d.documents.length} documentos`)}
+              {critical > 0 && (
+                <span className="text-destructive">
+                  {" "}
+                  · {tr(`${critical} critical`, `${critical} críticos`)}
+                </span>
+              )}
+            </dd>
+            {d.money_note && (
+              <dd className="mt-1 text-xs text-muted-foreground line-clamp-3">{d.money_note}</dd>
+            )}
+          </div>
+          <div className="rounded-lg bg-muted/40 p-3">
+            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+              {tr("Next step", "Próximo paso")}
+            </dt>
+            <dd className="mt-0.5 font-medium">{nextStep ?? "—"}</dd>
+          </div>
+        </dl>
+
+        <details className="mt-3 text-sm">
+          <summary className="cursor-pointer text-xs font-medium text-primary">
+            {tr("Read the full verdict", "Leer el veredicto completo")}
+          </summary>
+          <p className="mt-2 whitespace-pre-line leading-relaxed">{d.verdict}</p>
+        </details>
       </section>
 
-      {d.traps.length > 0 && (
-        <Block
-          icon={<AlertTriangle className="h-4 w-4 text-amber-600" />}
-          title={tr("What the brochure does not say", "Lo que el folleto no dice")}
-          action={
+      {/* 2. Everything else, one tab at a time. */}
+      <Tabs defaultValue="needs" className="rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+          <TabsTrigger value="needs" className="gap-1.5">
+            <FileText className="h-3.5 w-3.5" /> {tr("What we need", "Lo que necesitamos")}
+            <Count n={d.documents.length} />
+          </TabsTrigger>
+          <TabsTrigger value="strategy" className="gap-1.5">
+            <Scale className="h-3.5 w-3.5" /> {tr("Strategy", "Estrategia")}
+            <Count n={d.routes.options.length} />
+          </TabsTrigger>
+          <TabsTrigger value="risks" className="gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" /> {tr("Risks", "Riesgos")}
+            <Count n={d.traps.length + (d.questions_to_confirm?.length ?? 0)} />
+          </TabsTrigger>
+          <TabsTrigger value="messages" className="gap-1.5">
+            <Mail className="h-3.5 w-3.5" /> {tr("Messages", "Mensajes")}
+            <Count n={d.messages.length} />
+          </TabsTrigger>
+          <TabsTrigger value="sources" className="gap-1.5">
+            <ExternalLink className="h-3.5 w-3.5" /> {tr("Sources", "Fuentes")}
+            <Count n={saved.sources.length} />
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="needs" className="space-y-4 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">
+              {tr("Official documents", "Documentos oficiales")}
+            </h3>
             <ApplyButton
               grantId={grantId}
               orgId={orgId}
               dossier={d}
-              part="traps"
-              label={tr("Add as internal blockers", "Agregar como bloqueos internos")}
+              part="documents"
+              label={tr("Add to the plan", "Agregar al plan")}
             />
-          }
-        >
-          <ol className="space-y-2.5">
-            {d.traps.map((t, i) => (
-              <li key={i} className="text-sm">
-                <div className="font-semibold">
-                  {i + 1}. {t.title}
-                </div>
-                <p className="text-muted-foreground">{t.detail}</p>
-                {t.source_url && (
-                  <a
-                    href={t.source_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    {tr("Source", "Fuente")} <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-              </li>
+          </div>
+          <Accordion type="multiple" className="rounded-lg border">
+            {d.documents.map((doc, i) => (
+              <AccordionItem key={i} value={`doc-${i}`} className="px-3">
+                <AccordionTrigger className="py-2.5 text-left font-sans text-sm font-medium hover:no-underline">
+                  <span>
+                    {doc.item}
+                    {doc.critical && (
+                      <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
+                        {tr("critical", "crítico")}
+                      </span>
+                    )}
+                    {doc.only_for && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {tr("only for", "solo para")}{" "}
+                        {(ROUTES as readonly string[]).includes(doc.only_for)
+                          ? routeLabel(doc.only_for as Route, lang)
+                          : doc.only_for}
+                      </span>
+                    )}
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {(doc.details ?? []).length > 0 ? (
+                    <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                      {doc.details!.map((x, xi) => (
+                        <li key={`${xi}-${x}`}>{x}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {tr("No more detail published.", "No hay más detalle publicado.")}
+                    </p>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </ol>
-        </Block>
-      )}
+          </Accordion>
 
-      {d.routes.options.length > 0 && (
-        <Block
-          icon={<Scale className="h-4 w-4 text-primary" />}
-          title={tr(
-            "Which route unlocks the money fastest",
-            "Qué ruta desbloquea el dinero más rápido",
+          {(d.timeline.length > 0 || d.money_note) && (
+            <div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                  <CalendarClock className="h-4 w-4 text-primary" />
+                  {tr("Money and timeline", "Dinero y cronograma")}
+                </h3>
+                {d.timeline.some((t) => t.date) && (
+                  <ApplyButton
+                    grantId={grantId}
+                    orgId={orgId}
+                    dossier={d}
+                    part="timeline"
+                    label={tr("Add the dates to the plan", "Agregar las fechas al plan")}
+                  />
+                )}
+              </div>
+              <ol className="space-y-1.5 text-sm">
+                {d.timeline.map((t, i) => (
+                  <li
+                    key={i}
+                    className="flex flex-wrap items-baseline gap-x-3 border-l-2 border-primary/30 pl-3"
+                  >
+                    <span className="font-medium">{t.step}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {[t.date, t.when].filter(Boolean).join(" · ")}
+                    </span>
+                    {t.money &&
+                      !/^(n\/?a|none|ninguno|—|-|0|no aplica|sin costos?( directos?)?)$/i.test(
+                        t.money.trim(),
+                      ) && (
+                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                          {t.money}
+                        </span>
+                      )}
+                  </li>
+                ))}
+              </ol>
+              {d.money_note && (
+                <p className="mt-3 rounded-lg bg-muted/40 p-3 text-sm">{d.money_note}</p>
+              )}
+            </div>
           )}
-        >
+        </TabsContent>
+
+        <TabsContent value="strategy" className="pt-2">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
@@ -221,8 +410,10 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
               </thead>
               <tbody className="divide-y">
                 {d.routes.criteria.map((c, ci) => (
-                  <tr key={c} className="align-top">
-                    <td className="py-2 pr-3 font-medium">{c}</td>
+                  <tr key={`${ci}-${c}`} className="align-top">
+                    <th scope="row" className="py-2 pr-3 text-left font-medium">
+                      {c}
+                    </th>
                     {d.routes.options.map((o, oi) => (
                       <td key={oi} className={cn("py-2 pr-3", o.recommended && "bg-primary/5")}>
                         {o.values[ci]}
@@ -248,169 +439,109 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
               </tbody>
             </table>
           </div>
-        </Block>
-      )}
+        </TabsContent>
 
-      {d.documents.length > 0 && (
-        <Block
-          icon={<FileText className="h-4 w-4 text-primary" />}
-          title={tr("Official documents", "Documentos oficiales")}
-          action={
-            <ApplyButton
-              grantId={grantId}
-              orgId={orgId}
-              dossier={d}
-              part="documents"
-              label={tr("Add to the plan's documents", "Agregar a los documentos del plan")}
-            />
-          }
-        >
-          <ol className="space-y-2 text-sm">
-            {d.documents.map((doc, i) => (
-              <li key={i}>
-                <span className="font-medium">
-                  {i + 1}. {doc.item}
-                </span>
-                {doc.critical && (
-                  <span className="ml-1 text-xs font-semibold text-destructive">
-                    {tr("(critical)", "(crítico)")}
-                  </span>
-                )}
-                {doc.only_for && (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    — {tr("only for", "solo para")} {doc.only_for}
-                  </span>
-                )}
-                {(doc.details ?? []).length > 0 && (
-                  <ul className="mt-0.5 list-disc pl-6 text-muted-foreground">
-                    {doc.details!.map((x) => (
-                      <li key={x}>{x}</li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ol>
-        </Block>
-      )}
-
-      {(d.timeline.length > 0 || d.money_note) && (
-        <Block
-          icon={<CalendarClock className="h-4 w-4 text-primary" />}
-          title={tr("Money and timeline", "Dinero y cronograma")}
-          action={
-            d.timeline.some((t) => t.date) ? (
-              <ApplyButton
-                grantId={grantId}
-                orgId={orgId}
-                dossier={d}
-                part="timeline"
-                label={tr("Add the dates to the plan", "Agregar las fechas al plan")}
-              />
-            ) : undefined
-          }
-        >
-          <ol className="relative space-y-2 border-l pl-4 text-sm">
-            {d.timeline.map((t, i) => (
-              <li key={i}>
-                <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border bg-background" />
-                <div className="font-medium">{t.step}</div>
-                <div className="text-xs text-muted-foreground">
-                  {[t.date, t.when].filter(Boolean).join(" · ")}
-                  {t.money &&
-                    !/^(n\/?a|none|ninguno|—|-|0|no aplica|sin costos?( directos?)?)$/i.test(
-                      t.money.trim(),
-                    ) && (
-                      <span className="ml-2 font-semibold text-emerald-700 dark:text-emerald-400">
-                        {t.money}
-                      </span>
-                    )}
-                </div>
-              </li>
-            ))}
-          </ol>
-          {d.money_note && (
-            <p className="mt-3 rounded-lg bg-muted/40 p-3 text-sm">{d.money_note}</p>
+        <TabsContent value="risks" className="space-y-4 pt-2">
+          {d.traps.length > 0 && (
+            <div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">
+                  {tr("What the brochure does not say", "Lo que el folleto no dice")}
+                </h3>
+                <ApplyButton
+                  grantId={grantId}
+                  orgId={orgId}
+                  dossier={d}
+                  part="traps"
+                  label={tr("Add as internal blockers", "Agregar como bloqueos internos")}
+                />
+              </div>
+              <Accordion type="multiple" className="rounded-lg border">
+                {d.traps.map((t, i) => (
+                  <AccordionItem key={i} value={`trap-${i}`} className="px-3">
+                    <AccordionTrigger className="py-2.5 text-left font-sans text-sm font-medium hover:no-underline">
+                      {i + 1}. {t.title}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <p className="text-sm text-muted-foreground">{t.detail}</p>
+                      {t.source_url && (
+                        <a
+                          href={t.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          {tr("Source", "Fuente")} <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
           )}
-        </Block>
-      )}
+          {(d.questions_to_confirm ?? []).length > 0 && (
+            <div className="rounded-lg bg-muted/40 p-3 text-sm">
+              <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                {tr("To confirm with the funder", "Por confirmar con el financiador")}
+              </h3>
+              <ul className="mt-1 list-disc pl-5">
+                {d.questions_to_confirm!.map((q, qi) => (
+                  <li key={`${qi}-${q}`}>{q}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </TabsContent>
 
-      {d.messages.length > 0 && (
-        <Block
-          icon={<Mail className="h-4 w-4 text-primary" />}
-          title={tr("Messages ready to send", "Mensajes listos para enviar")}
-        >
+        <TabsContent value="messages" className="pt-2">
           <div className="grid gap-3 lg:grid-cols-2">
             {d.messages.map((m, i) => (
               <MessageCard key={i} message={m} />
             ))}
           </div>
-        </Block>
-      )}
+        </TabsContent>
 
-      {saved.sources.length > 0 && (
-        <section className="rounded-xl border bg-card p-4 text-xs text-muted-foreground">
-          <details>
-            <summary className="cursor-pointer font-semibold">
-              {tr(`Sources (${saved.sources.length})`, `Fuentes (${saved.sources.length})`)}
-            </summary>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5">
-              {saved.sources.map((s) => (
-                <li key={s.url}>
-                  <a
-                    href={s.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {s.title ||
-                      (() => {
-                        try {
-                          return new URL(s.url).hostname;
-                        } catch {
-                          return s.url;
-                        }
-                      })()}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </details>
-          <span className="block pt-1">
+        <TabsContent value="sources" className="pt-2 text-sm">
+          <ul className="list-disc space-y-0.5 pl-5">
+            {saved.sources.map((src) => (
+              <li key={src.url}>
+                <a
+                  href={src.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {src.title ||
+                    (() => {
+                      try {
+                        return new URL(src.url).hostname;
+                      } catch {
+                        return src.url;
+                      }
+                    })()}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-muted-foreground">
             {tr(
               "Prepared by AI from these sources; verify amounts and dates on the official page before sending.",
               "Preparado con IA a partir de estas fuentes; verifique montos y fechas en la página oficial antes de enviar.",
             )}
-          </span>
-        </section>
-      )}
-    </div>
+          </p>
+        </TabsContent>
+      </Tabs>
+    </section>
   );
 }
 
-function Block({
-  icon,
-  title,
-  action,
-  children,
-}: {
-  icon: ReactNode;
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border bg-card p-5 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          {icon}
-          {title}
-        </h3>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
+function Count({ n }: { n: number }) {
+  return n > 0 ? (
+    <span className="rounded-full bg-muted px-1.5 text-[10px] font-semibold text-muted-foreground">
+      {n}
+    </span>
+  ) : null;
 }
 
 function ApplyButton({

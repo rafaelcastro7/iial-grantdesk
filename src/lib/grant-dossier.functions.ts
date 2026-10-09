@@ -48,17 +48,24 @@ export const getGrantDossier = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const db = context.supabase as unknown as Db;
-    const { data: row, error } = await db
+    const { data: rows, error } = await db
       .from("grant_dossiers")
-      .select("content, sources, model, updated_at")
+      .select("lang, content, sources, model, updated_at")
       .eq("org_id", data.orgId)
-      .eq("grant_id", data.grantId)
-      .eq("lang", data.lang)
-      .maybeSingle();
+      .eq("grant_id", data.grantId);
     if (error) {
-      if (missingTable(error.message)) return { saved: null, available: false };
+      if (missingTable(error.message)) return { saved: null, available: false, otherLang: false };
       throw new Error(error.message);
     }
+    const all = (rows ?? []) as Array<{
+      lang: string;
+      content: unknown;
+      sources: unknown;
+      model: string | null;
+      updated_at: string;
+    }>;
+    const row = all.find((r) => r.lang === data.lang) ?? null;
+    const otherLang = all.some((r) => r.lang !== data.lang);
     return {
       saved: row
         ? ({
@@ -69,6 +76,7 @@ export const getGrantDossier = createServerFn({ method: "GET" })
           } as SavedDossier)
         : null,
       available: true,
+      otherLang,
     };
   });
 

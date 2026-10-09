@@ -86,9 +86,14 @@ export function RadarWorkspace({
   const addGrantFn = useServerFn(addGrantByUrl);
   const orgName = activeOrgName || "IIAL";
 
+  // In-flight guard as a ref: timers and effects never see a stale "not searching".
+  const webInFlight = useRef(false);
+  const autoWebFor = useRef("");
   const handleExecuteWebSearch = async (queryText?: string) => {
     const text = (queryText ?? webQuery).trim();
-    if (!text || isWebSearching) return;
+    if (!text || webInFlight.current) return;
+    webInFlight.current = true;
+    autoWebFor.current = text;
 
     setIsWebSearching(true);
     setWebError(null);
@@ -124,6 +129,7 @@ export function RadarWorkspace({
     } catch (err: unknown) {
       setWebError(err instanceof Error ? err.message : String(err));
     } finally {
+      webInFlight.current = false;
       setIsWebSearching(false);
     }
   };
@@ -163,13 +169,17 @@ export function RadarWorkspace({
   // A search started on Today arrives here and runs on the internet at once.
   useEffect(() => {
     let q: string | null = null;
+    let link: string | null = null;
     try {
       q = window.sessionStorage.getItem("grants.autoWeb");
+      link = window.sessionStorage.getItem("grants.autoLink");
       window.sessionStorage.removeItem("grants.autoWeb");
+      window.sessionStorage.removeItem("grants.autoLink");
     } catch {
       /* storage unavailable */
     }
-    if (q) {
+    if (link) void handleSubmitSearch(link);
+    else if (q) {
       setWebQuery(q);
       void handleExecuteWebSearch(q);
     }
@@ -177,13 +187,12 @@ export function RadarWorkspace({
   }, []);
 
   // A search with nothing in the catalog goes to the web by itself (once per text).
-  const autoWebFor = useRef("");
   useEffect(() => {
     const q = filters.search.trim();
     if (q.length < 4 || /^https?:/i.test(q) || radar.items.length > 0 || isWebSearching) return;
     if (autoWebFor.current === q) return;
     const t = setTimeout(() => {
-      autoWebFor.current = q;
+      if (autoWebFor.current === q || webInFlight.current) return;
       setWebQuery(q);
       void handleExecuteWebSearch(q);
     }, 1200);
@@ -226,7 +235,7 @@ export function RadarWorkspace({
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               {sourceMode === "web"
                 ? tr(
-                    `Live web exploration powered by Google AI Search · Targeting ${orgName}`,
+                    `Searching the internet with AI · for ${orgName}`,
                     `Exploración web en vivo con Google AI Search · Para ${orgName}`,
                   )
                 : simple
@@ -395,6 +404,7 @@ export function RadarWorkspace({
           {radar.items.length === 0 ? (
             <EmptyState
               hasAny={totalLoaded > 0}
+              hasWebResults={webResults.length > 0}
               isAdmin={isAdmin}
               searchQuery={
                 filters.search ||
@@ -623,6 +633,7 @@ function Stat({ label, value, tone }: { label: string; value: ReactNode; tone: s
 
 function EmptyState({
   hasAny,
+  hasWebResults,
   isAdmin,
   searchQuery,
   countryLabel,
@@ -631,6 +642,7 @@ function EmptyState({
   onSearchWeb,
 }: {
   hasAny: boolean;
+  hasWebResults?: boolean;
   isAdmin: boolean;
   searchQuery?: string;
   /** The chosen country, when the empty result is for one country. */
@@ -663,15 +675,20 @@ function EmptyState({
               "Search the live web for calls in this country, then import the ones that fit.",
               "Busca convocatorias de este país en la web y luego importa las que encajen.",
             )
-          : searchQuery || hasAny
+          : hasWebResults
             ? tr(
                 "The internet results are above. You can also loosen the filters.",
                 "Los resultados de internet están arriba. También puede ampliar los filtros.",
               )
-            : tr(
-                "Tracked opportunities will appear here once ingested or imported.",
-                "Las oportunidades seguidas aparecerán aquí cuando se ingresen o importen.",
-              )}
+            : searchQuery || hasAny
+              ? tr(
+                  "Try other words or loosen the filters, or search the internet.",
+                  "Pruebe con otras palabras o amplíe los filtros, o busque en internet.",
+                )
+              : tr(
+                  "Tracked opportunities will appear here once ingested or imported.",
+                  "Las oportunidades seguidas aparecerán aquí cuando se ingresen o importen.",
+                )}
       </p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {searchQuery && onSearchWeb && (

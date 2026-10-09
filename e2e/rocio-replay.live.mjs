@@ -82,11 +82,11 @@ try {
   grantUrl = page.url();
   const prep = page.getByRole("button", { name: "Preparar el dossier" });
   await prep
-    .or(page.getByRole("heading", { name: "Veredicto" }))
+    .or(page.getByText("¿Aplicamos?", { exact: true }))
     .first()
     .waitFor({ timeout: 120000 });
   if (await prep.isVisible()) await prep.click();
-  await page.getByRole("heading", { name: "Veredicto" }).waitFor({ timeout: 300000 });
+  await page.getByText("¿Aplicamos?", { exact: true }).waitFor({ timeout: 300000 });
   await page.waitForTimeout(2000);
   const t = await main();
   record(ask, Date.now() - t0, t.slice(0, t.indexOf("Nuestro plan de trabajo")));
@@ -101,6 +101,7 @@ ask =
   "Mensaje a Marcelo: de qué trata, si aplica WCIS, requisitos, plazos, monto y qué nos falta para decidir";
 try {
   const t0 = Date.now();
+  await page.getByRole("tab", { name: /Mensajes/ }).click();
   const t = await main();
   const i = t.indexOf("Para: Marcelo");
   const wa = i >= 0 ? t.slice(i, i + 1200) : "(no hay mensaje a Marcelo en el dossier)";

@@ -21,7 +21,7 @@ const btn = p.getByRole("button", { name: /Preparar el dossier|Actualizar/ }).fi
 await btn.waitFor({ timeout: 60000 });
 const t0 = Date.now();
 await btn.click();
-await p.getByRole("heading", { name: "Veredicto" }).or(p.getByText(/No se pudo preparar/)).first().waitFor({ timeout: 300000 });
+await p.getByText("¿Aplicamos?", { exact: true }).or(p.getByText(/No se pudo preparar/)).first().waitFor({ timeout: 300000 });
 await p.waitForTimeout(1500);
 const txt = await p.locator("main").innerText();
 console.log(`(${Math.round((Date.now() - t0) / 1000)} s)\n` + txt.slice(0, 9000));

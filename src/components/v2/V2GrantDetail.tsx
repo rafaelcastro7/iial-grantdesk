@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getGrantDossier } from "@/lib/grant-dossier.functions";
-import { fitLabel, fitTone, type DossierFit } from "@/lib/grant-dossier.shared";
+import { type DossierFit } from "@/lib/grant-dossier.shared";
 import { GrantDossier } from "@/components/grants/GrantDossier";
 import { CallFactsCard, type CallFacts } from "@/components/grants/CallFactsCard";
 import { cleanTitle } from "@/lib/html-text";
@@ -222,9 +222,21 @@ export function V2GrantDetail({
   const savedFit =
     (dossierData?.saved?.dossier as { fit?: DossierFit; fit_reason?: string } | undefined) ?? null;
   const dossierFit = savedFit?.fit ? { fit: savedFit.fit, reason: savedFit.fit_reason } : null;
-  const [activeTab, setActiveTab] = useState<
-    "plan" | "roadmap" | "funder_facts" | "technical_audit"
-  >("plan");
+
+  const callFacts = (
+    <CallFactsCard
+      facts={grant as unknown as CallFacts}
+      onFetchDetails={() => onFetchDetails()}
+      fetching={busy === "enrich"}
+      onAskCopilot={() =>
+        handleOpenCopilotWithPrompt(
+          lang === "es"
+            ? "Verifica en la web la información oficial de esta convocatoria (qué financia, quién puede aplicar, monto, fechas, requisitos y la página oficial del programa) y propón correcciones para lo que falte o esté mal."
+            : "Check this call's official information on the web (what it funds, who can apply, amount, dates, requirements and the program's own official page) and propose corrections for anything missing or wrong.",
+        )
+      }
+    />
+  );
 
   const funderName = grant.funder?.name ?? tr("Funding Agency", "Agencia financiadora");
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
@@ -468,7 +480,7 @@ export function V2GrantDetail({
           </p>
         </div>
 
-        <dl className="grid gap-2 text-sm sm:grid-cols-3">
+        <dl className={cn("grid gap-2 text-sm", dossierFit ? "sm:grid-cols-2" : "sm:grid-cols-3")}>
           <div className="rounded-lg border bg-background/70 px-3 py-2">
             <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
               {tr("Amount", "Monto")}
@@ -490,36 +502,14 @@ export function V2GrantDetail({
               {isRolling ? tr("Continuous intake", "Recepción continua") : deadline.label}
             </dd>
           </div>
-          <div className="rounded-lg border bg-background/70 px-3 py-2">
-            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
-              {tr(
-                `Can ${activeOrgName || "we"} apply?`,
-                activeOrgName ? `¿Puede ${activeOrgName} postular?` : "¿Podemos postular?",
-              )}
-            </dt>
-            {dossierFit ? (
-              <dd
-                className={cn(
-                  "font-semibold",
-                  fitTone(dossierFit.fit) === "good"
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : fitTone(dossierFit.fit) === "warn"
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-rose-600 dark:text-rose-400",
+          {!dossierFit && (
+            <div className="rounded-lg border bg-background/70 px-3 py-2">
+              <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+                {tr(
+                  `Can ${activeOrgName || "we"} apply?`,
+                  activeOrgName ? `¿Puede ${activeOrgName} postular?` : "¿Podemos postular?",
                 )}
-                title={tr(
-                  "From the grant dossier (official page and web)",
-                  "Según el dossier del grant (página oficial y web)",
-                )}
-              >
-                {fitLabel(dossierFit.fit, lang)}
-                {dossierFit.reason && (
-                  <span className="block text-xs font-normal text-muted-foreground">
-                    {dossierFit.reason}
-                  </span>
-                )}
-              </dd>
-            ) : (
+              </dt>
               <dd
                 className={cn(
                   "font-semibold",
@@ -540,8 +530,8 @@ export function V2GrantDetail({
                       ? tr("No — see the reasons below", "No — vea los motivos abajo")
                       : tr("Not checked yet", "Aún no revisado")}
               </dd>
-            )}
-          </div>
+            </div>
+          )}
         </dl>
       </header>
 
@@ -577,34 +567,10 @@ export function V2GrantDetail({
               )}
             </span>
           </summary>
-          <div className="border-t p-1">
-            <CallFactsCard
-              facts={grant as unknown as CallFacts}
-              onFetchDetails={() => onFetchDetails()}
-              fetching={busy === "enrich"}
-              onAskCopilot={() =>
-                handleOpenCopilotWithPrompt(
-                  lang === "es"
-                    ? "Verifica en la web la información oficial de esta convocatoria (qué financia, quién puede aplicar, monto, fechas, requisitos y la página oficial del programa) y propón correcciones para lo que falte o esté mal."
-                    : "Check this call's official information on the web (what it funds, who can apply, amount, dates, requirements and the program's own official page) and propose corrections for anything missing or wrong.",
-                )
-              }
-            />
-          </div>
+          <div className="border-t p-1">{callFacts}</div>
         </details>
       ) : (
-        <CallFactsCard
-          facts={grant as unknown as CallFacts}
-          onFetchDetails={() => onFetchDetails()}
-          fetching={busy === "enrich"}
-          onAskCopilot={() =>
-            handleOpenCopilotWithPrompt(
-              lang === "es"
-                ? "Verifica en la web la información oficial de esta convocatoria (qué financia, quién puede aplicar, monto, fechas, requisitos y la página oficial del programa) y propón correcciones para lo que falte o esté mal."
-                : "Check this call's official information on the web (what it funds, who can apply, amount, dates, requirements and the program's own official page) and propose corrections for anything missing or wrong.",
-            )
-          }
-        />
+        callFacts
       )}
 
       <h2 className="pt-2 font-display text-lg font-semibold">

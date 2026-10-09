@@ -213,7 +213,9 @@ export const askGrantCopilot = createServerFn({ method: "POST" })
 
     // 4d. Live web search about the call (free tier), when it can add facts.
     const env = (await import("@/lib/env.server")).serverEnv();
-    const canSearch = Boolean(env.GOOGLE_AI_STUDIO_KEY || env.GROQ_API_KEY);
+    // Free providers search when facts are missing; the paid floor only when asked.
+    const freeSearch = Boolean(env.GOOGLE_AI_STUDIO_KEY || env.GROQ_API_KEY);
+    const canSearch = freeSearch || Boolean(env.LOVABLE_API_KEY);
     const factsMissing =
       !grant.deadline ||
       !grant.amount_cad_max ||
@@ -224,7 +226,7 @@ export const askGrantCopilot = createServerFn({ method: "POST" })
         data.message,
       );
     const web =
-      canSearch && (factsMissing || wantsWeb || history.length === 0)
+      (freeSearch && (factsMissing || wantsWeb || history.length === 0)) || (canSearch && wantsWeb)
         ? await (
             await import("@/lib/web-grounding.server")
           ).searchWebGrounded(

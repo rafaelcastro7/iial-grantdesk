@@ -1,7 +1,7 @@
 // Live web search for the AI, with automatic fallback between providers so
 // it never depends on one API: Google (Gemini grounding) → Groq built-in
-// browser search (gpt-oss models) → nothing. A provider that hits its quota
-// or rate limit is skipped for a while. Server only; all free tiers.
+// browser search (gpt-oss models) → Lovable AI web search (paid floor) → nothing. A provider that hits its quota
+// or rate limit is skipped for a while. Server only; free tiers first, Lovable AI (paid) only as the last resort.
 import { serverEnv } from "@/lib/env.server";
 
 export type WebResult = {
@@ -107,6 +107,68 @@ async function viaGroq(
 }
 
 /**
+ * Lovable AI gateway (paid, last resort) with its web-search tool. If the
+ * gateway does not offer web search, the request fails and is logged; the
+ * caller then works without web results rather than with invented ones.
+ */
+async function viaLovable(
+  apiKey: string,
+  question: string,
+  maxChars: number,
+): Promise<WebResult | null> {
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "X-Lovable-AIG-SDK": "fetch",
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-6-astra",
+      input: [{ role: "user", content: question }],
+      tools: [{ type: "web_search" }],
+      store: false,
+    }),
+  });
+  if (!res.ok) {
+    console.warn(
+      `[web-search] lovable: HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 200)}`,
+    );
+    if (res.status === 429 || res.status === 402) cool("lovable", 30 * 60_000);
+    // A gateway without web search will keep failing the same way: stop trying for a while.
+    if (res.status === 400 || res.status === 404 || res.status === 422)
+      cool("lovable", 6 * 60 * 60_000);
+    return null;
+  }
+  const j = (await res.json()) as {
+    output_text?: string;
+    output?: Array<{
+      type?: string;
+      content?: Array<{
+        type?: string;
+        text?: string;
+        annotations?: Array<{ type?: string; url?: string; title?: string }>;
+      }>;
+    }>;
+  };
+  const parts = (j.output ?? []).flatMap((o) => o.content ?? []);
+  const text = (j.output_text ?? parts.map((c) => c.text ?? "").join("")).trim();
+  // Only an answer that actually cites web pages counts as a web search.
+  const sources = parts
+    .flatMap((c) => c.annotations ?? [])
+    .filter((a) => a.url && /^https?:\/\//.test(a.url))
+    .map((a) => ({ title: a.title ?? "", url: a.url! }))
+    .filter((x, i, a) => a.findIndex((y) => y.url === x.url) === i)
+    .slice(0, 8);
+  if (!text || sources.length === 0) {
+    console.warn("[web-search] lovable: answered without web sources; ignored (paused 6 h)");
+    cool("lovable", 6 * 60 * 60_000);
+    return null;
+  }
+  return { text: text.slice(0, maxChars), sources, provider: "lovable-web-search" };
+}
+
+/**
  * Searches the web and answers `question` from what it finds, trying each
  * configured provider in turn. Returns null only if none can answer.
  */
@@ -122,6 +184,9 @@ export async function searchWebGrounded(
   if (env.GROQ_API_KEY)
     for (const model of ["openai/gpt-oss-20b", "openai/gpt-oss-120b"])
       attempts.push([`groq:${model}`, () => viaGroq(env.GROQ_API_KEY!, model, question, maxChars)]);
+  // Paid floor: Lovable AI, only when the free providers could not answer.
+  if (env.LOVABLE_API_KEY)
+    attempts.push(["lovable", () => viaLovable(env.LOVABLE_API_KEY!, question, maxChars)]);
   for (const [name, run] of attempts) {
     if (cooling(name)) continue;
     try {
@@ -140,5 +205,5 @@ export async function searchWebGrounded(
 /** Whether any web-search provider is configured. */
 export function hasWebSearch(): boolean {
   const env = serverEnv();
-  return Boolean(env.GOOGLE_AI_STUDIO_KEY || env.GROQ_API_KEY);
+  return Boolean(env.GOOGLE_AI_STUDIO_KEY || env.GROQ_API_KEY || env.LOVABLE_API_KEY);
 }

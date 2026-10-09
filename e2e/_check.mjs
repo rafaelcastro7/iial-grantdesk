@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+import fs from "node:fs";
+const env = Object.fromEntries([".env",".env.local"].flatMap(f=>fs.readFileSync(f,"utf8").split(/\r?\n/)).filter(l=>l.includes("=")).map(l=>[l.slice(0,l.indexOf("=")).trim(), l.slice(l.indexOf("=")+1).trim()]));
+const b = await chromium.launch(); const p = await b.newPage({viewport:{width:1440,height:1000}});
+const errs=[]; p.on("pageerror", e=>errs.push(e.message)); p.on("console", m=>{ if(m.type()==="error") errs.push(m.text().slice(0,200)); });
+await p.goto("http://localhost:5199/auth",{waitUntil:"networkidle"}); await p.evaluate(()=>localStorage.setItem("iial.lang","es"));
+await p.fill('input[type="email"]',env.SYNTH_USER_EMAIL); await p.fill('input[type="password"]',env.SYNTH_USER_PASSWORD);
+await p.click('button[type="submit"]'); await p.waitForURL(u=>!u.pathname.startsWith("/auth"));
+await p.goto("http://localhost:5199/grants/"+process.argv[3],{waitUntil:"domcontentloaded"});
+await p.waitForTimeout(25000);
+await p.screenshot({path: process.argv[2], fullPage:false});
+console.log("errors:", errs.slice(0,5));
+await b.close();

@@ -22,7 +22,7 @@ export type DiscoveredWebGrant = {
 
 export type WebScoutResult = {
   ok: boolean;
-  provider: "gemini_google_search" | "lovable_gateway";
+  provider: string;
   query: string;
   searchedAt: string;
   grants: DiscoveredWebGrant[];
@@ -40,10 +40,13 @@ export async function searchWebForGrantsImpl(
     orgName?: string;
     orgType?: string;
     lang?: "en" | "es";
+    /** The organizations the user works for, with what they are. */
+    orgs?: Array<{ name: string; type: string; focus: string }>;
   },
 ): Promise<WebScoutResult> {
   const env = serverEnv();
-  const apiKey = env.GOOGLE_AI_STUDIO_KEY || env.GEMINI_API_KEY || env.GROQ_API_KEY;
+  const apiKey =
+    env.GOOGLE_AI_STUDIO_KEY || env.GEMINI_API_KEY || env.GROQ_API_KEY || env.LOVABLE_API_KEY;
 
   if (!apiKey) {
     return {
@@ -62,10 +65,13 @@ export async function searchWebForGrantsImpl(
   const prompt = `You are a senior grant scout. Search the web now for REAL funding calls that are OPEN, UPCOMING or CONTINUOUS (2026-2027) for this request:
 "${opts.query}"
 
-Who is searching (the team can act through either organization):
-- ${clientName} (${opts.orgType || "Canadian non-profit, applied research and professional training, WCIS supply-chain integrity standard"}).
-- Nahua Canada (Canadian for-profit start-up, about one month old, agri-food / cacao).
-- Focus: agri-food, cacao and coffee value chains, traceability, sustainability, applied research and training, Canada and Latin America (Peru, Colombia, Mexico, Central America).
+Who is searching (the team can act through any of these organizations):
+${(opts.orgs?.length
+  ? opts.orgs
+  : [{ name: clientName, type: opts.orgType ?? "organization", focus: "" }]
+)
+  .map((o) => `- ${o.name} (${o.type}${o.focus ? `; ${o.focus}` : ""})`)
+  .join("\n")}
 
 Rules:
 - Return 6 to 10 opportunities when they exist, most relevant first; fewer only if no more exist.
@@ -82,7 +88,7 @@ For each opportunity:
 - instrument: grant | contribution | repayable | loan | cost_share | prize | other
 - deadline: "YYYY-MM-DD HH:mm TZ" if published, otherwise "continua"/"rolling" or "próximo ciclo 2027"/"next cycle 2027"
 - status: open | upcoming | continuous | closed
-- applicant: which of our organizations can take part and how, e.g. "IIAL: líder" / "IIAL: socio de un college" / "Nahua: líder" / "Ninguna: solo productores"
+- applicant: which of our organizations can take part and how, e.g. "<Organization>: lead" / "<Organization>: partner of a college" / "None: producers only" (use our organizations' names)
 - applicant_fit: one sentence, why it fits (or what blocks it)
 
 Return ONLY this JSON:
@@ -102,10 +108,12 @@ Return ONLY this JSON:
           `"${opts.query}"`,
           `"${opts.query}" — convocatorias oficiales 2026 2027 (fuentes en español)`,
         );
-    const answers = await Promise.all([
-      searchWebGrounded(prompt, { maxChars: 60000 }),
-      searchWebGrounded(variant, { maxChars: 60000 }),
-    ]);
+    // The second (other-language) search only when the first finds few results.
+    const first = await searchWebGrounded(prompt, { maxChars: 60000 });
+    const firstCount = first ? (first.text.match(/"title"\s*:/g) ?? []).length : 0;
+    const second = firstCount < 5 ? await searchWebGrounded(variant, { maxChars: 60000 }) : null;
+    const answers = [first, second];
+    const providerUsed = (first ?? second)?.provider ?? "none";
     if (!answers.some(Boolean)) {
       throw new Error(
         es
@@ -213,7 +221,7 @@ Return ONLY this JSON:
 
     return {
       ok: true,
-      provider: "gemini_google_search",
+      provider: providerUsed,
       query: opts.query,
       searchedAt: new Date().toISOString(),
       grants,
