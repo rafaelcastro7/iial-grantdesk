@@ -3320,6 +3320,7 @@ export type Database = {
           consortium_roles: string[] | null
           cost_share_max_pct: number | null
           created_at: string
+          decision_maker_name: string | null
           employee_count: number | null
           focus_areas: string | null
           funding_max_cad: number | null
@@ -3334,6 +3335,7 @@ export type Database = {
           operating_regions: string[]
           org_id: string | null
           org_name: string
+          outreach_credentials: string | null
           partner_network: string[] | null
           past_funders: string[] | null
           populations_served: string[]
@@ -3358,6 +3360,7 @@ export type Database = {
           consortium_roles?: string[] | null
           cost_share_max_pct?: number | null
           created_at?: string
+          decision_maker_name?: string | null
           employee_count?: number | null
           focus_areas?: string | null
           funding_max_cad?: number | null
@@ -3372,6 +3375,7 @@ export type Database = {
           operating_regions?: string[]
           org_id?: string | null
           org_name: string
+          outreach_credentials?: string | null
           partner_network?: string[] | null
           past_funders?: string[] | null
           populations_served?: string[]
@@ -3396,6 +3400,7 @@ export type Database = {
           consortium_roles?: string[] | null
           cost_share_max_pct?: number | null
           created_at?: string
+          decision_maker_name?: string | null
           employee_count?: number | null
           focus_areas?: string | null
           funding_max_cad?: number | null
@@ -3410,6 +3415,7 @@ export type Database = {
           operating_regions?: string[]
           org_id?: string | null
           org_name?: string
+          outreach_credentials?: string | null
           partner_network?: string[] | null
           past_funders?: string[] | null
           populations_served?: string[]
