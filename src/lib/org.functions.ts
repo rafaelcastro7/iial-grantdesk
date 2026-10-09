@@ -30,6 +30,8 @@ const OrgInput = z
     legal_name: z.string().max(240).nullable(),
     business_number: z.string().max(80).nullable(),
     website: z.string().max(500).nullable(),
+    decision_maker_name: z.string().max(120).nullable().optional(),
+    outreach_credentials: z.string().max(1200).nullable().optional(),
     mission: z.string().max(4000).nullable(),
     applicant_types: z.array(z.string().min(1).max(80)).max(30),
     activities: z.array(z.string().min(1).max(120)).max(30),

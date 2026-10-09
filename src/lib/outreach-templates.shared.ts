@@ -30,8 +30,8 @@ export type Lang = "en" | "es";
 export const TEMPLATE_LABEL: Record<TemplateId, { en: string; es: string; audience: string }> = {
   partner_intro: { en: "Partner invitation", es: "Invitación a socio", audience: "Partner" },
   academic_partnership: {
-    en: "Academic partnership (applied research & WCIS)",
-    es: "Alianza académica (investigación aplicada y WCIS)",
+    en: "Academic partnership (applied research)",
+    es: "Alianza académica (investigación aplicada)",
     audience: "Partner",
   },
   meeting_invite: {
@@ -90,27 +90,36 @@ export type ComposeInput = {
   meetingWhen?: string;
   /** Links shared in the WhatsApp introduction (presentation, website). */
   links?: string[];
-  /** When true, includes Dr. Juan Marcelo Gómez's doctoral research reference and paper link. */
-  includeAcademicCredentials?: boolean;
-  /** Documents attached to the email, e.g. ["IIAL presentation", "WCIS document"]. */
+  /** A sentence about the organization (from its profile's mission), for introductions. */
+  about?: string;
+  /** Credentials to cite (from the profile), when the user chooses to include them. */
+  credentials?: string;
+  /** Documents attached to the email, e.g. ["our presentation", "the project summary"]. */
   attachments?: string[];
 };
 
-const isIial = (orgName: string) => /\bIIAL\b|Innovation and Advanced Learning/i.test(orgName);
-
 /**
- * Formal self-introduction: who is writing and what the organization is. For
- * IIAL it names the certifications it already offers (not "to be developed").
+ * Formal self-introduction: who is writing and, when the profile has it, what
+ * the organization does (its mission). Nothing about any organization is
+ * written in code.
  */
-export function senderIntro(senderName: string, orgName: string, lang: Lang): string {
-  if (isIial(orgName)) {
-    return lang === "en"
-      ? `My name is ${senderName} and I work with the Institute of Innovation and Advanced Learning (IIAL), a Canadian not-for-profit organization based in Ontario. IIAL works on applied innovation, sustainability, applied research and stronger value chains, and offers the professional certifications CSIP, CSCIP and CARP, which we are always open to adapting together with partners.`
-      : `Mi nombre es ${senderName} y colaboro con el Institute of Innovation and Advanced Learning (IIAL), una organización canadiense sin fines de lucro con sede en Ontario. IIAL trabaja en innovación aplicada, sostenibilidad, investigación aplicada y fortalecimiento de cadenas de valor, y ofrece las certificaciones profesionales CSIP, CSCIP y CARP, que siempre estamos abiertos a adaptar junto con nuestros aliados.`;
-  }
-  return lang === "en"
-    ? `My name is ${senderName} and I am writing on behalf of ${orgName}.`
-    : `Mi nombre es ${senderName} y le escribo en nombre de ${orgName}.`;
+export function senderIntro(
+  senderName: string,
+  orgName: string,
+  lang: Lang,
+  about?: string,
+): string {
+  const who = senderName.trim();
+  const mission = about?.trim().replace(/\s+/g, " ");
+  const first =
+    lang === "en"
+      ? who
+        ? `My name is ${who} and I am writing on behalf of ${orgName}.`
+        : `I am writing on behalf of ${orgName}.`
+      : who
+        ? `Mi nombre es ${who} y le escribo en nombre de ${orgName}.`
+        : `Le escribo en nombre de ${orgName}.`;
+  return mission ? `${first} ${mission}` : first;
 }
 
 function attachmentsLine(list: string[] | undefined, lang: Lang): string {
@@ -203,6 +212,7 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
         subject: "",
         body: whatsappIntro({
           lang,
+          about: input.about,
           recipientName: input.recipientName,
           senderName,
           orgName,
@@ -251,10 +261,12 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
         lang === "en"
           ? `Academic collaboration & applied research: ${grant.title}`
           : `Colaboración académica e investigación aplicada: ${grant.title}`;
-      const academicAngleEn =
-        "The initiative builds on the doctoral research of Dr. Juan Marcelo Gómez at Henley Business School (University of Reading, UK) on sustainable value chains, producer livelihoods, traceability, and market governance (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf).";
-      const academicAngleEs =
-        "La iniciativa se respalda en la investigación doctoral del Dr. Juan Marcelo Gómez en Henley Business School (Universidad de Reading, Reino Unido), enfocada en sostenibilidad en negocios internacionales, medios de vida de los productores, trazabilidad y gobernanza en cadenas de valor del cacao fino (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf).";
+      const academicAngleEn = input.credentials?.trim()
+        ? `For reference: ${input.credentials.trim()}`
+        : "";
+      const academicAngleEs = input.credentials?.trim()
+        ? `Como referencia: ${input.credentials.trim()}`
+        : "";
       lines =
         lang === "en"
           ? [
@@ -263,8 +275,8 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               `I am writing on behalf of ${orgName}. Following up on our recent conversation, we would like to explore structured collaboration on ${program}, funded by ${funder}.`,
               idea ? `Our project concept is "${idea}".` : "",
               wcis
-                ? `Rather than conventional student exercises, ${orgName} anchors collaboration in the Whole-Chain International Standard (WCIS) and applied executive microcredentials (CSIP, CSCIP, CARP) to transfer measurable impact to agrifood value chains: ${wcis}`
-                : `${orgName} brings established applied learning programs (CSIP, CSCIP, CARP) and the Whole-Chain International Standard (WCIS) to translate research into field impact with producers and cooperatives.`,
+                ? `${orgName} proposes to structure the collaboration around: ${wcis}`
+                : (input.about?.trim() ?? ""),
               academicAngleEn,
               partnerRole
                 ? `We envision your institution as ${partnerRole}, focusing on scientific rigor and impact transfer, while leaving operational work packages open to co-design together.`
@@ -281,8 +293,8 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
               `Le escribo en nombre de ${orgName}. Dando seguimiento a nuestro contacto previo, quisiéramos explorar una colaboración estructurada en torno a ${program}, financiado por ${funder}.`,
               idea ? `El concepto de proyecto que proponemos es "${idea}".` : "",
               wcis
-                ? `Más allá de proyectos capstone convencionales, ${orgName} estructura la colaboración con el Whole-Chain International Standard (WCIS) y sus programas profesionales aplicados (CSIP, CSCIP, CARP) para generar impacto verificable en cadenas agroalimentarias: ${wcis}`
-                : `${orgName} aporta programas profesionales aplicados (CSIP, CSCIP, CARP) y el estándar Whole-Chain International Standard (WCIS) para vincular investigación con productores y cooperativas en territorio.`,
+                ? `${orgName} propone estructurar la colaboración en torno a: ${wcis}`
+                : (input.about?.trim() ?? ""),
               academicAngleEs,
               partnerRole
                 ? `Visualizamos a su institución como ${partnerRole}, aportando solidez científica y transferencia de conocimiento, manteniendo los roles abiertos a co-diseño conjunto.`
@@ -302,23 +314,19 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
         lang === "en"
           ? `Collaboration opportunity: ${grant.title}`
           : `Oportunidad de colaboración: ${grant.title}`;
-      const credEn = input.includeAcademicCredentials
-        ? "The initiative builds on the doctoral research of Dr. Juan Marcelo Gómez at Henley Business School (University of Reading, UK) on sustainability in the fine cacao and chocolate value chain (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf)."
-        : "";
-      const credEs = input.includeAcademicCredentials
-        ? "El proyecto se apoya en la investigación doctoral del Dr. Juan Marcelo Gómez en Henley Business School (Universidad de Reading, Reino Unido) sobre sostenibilidad en la cadena de valor del cacao fino y chocolate (https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf)."
+      const credEn = input.credentials?.trim() ? `For reference: ${input.credentials.trim()}` : "";
+      const credEs = input.credentials?.trim()
+        ? `Como referencia: ${input.credentials.trim()}`
         : "";
       lines =
         lang === "en"
           ? [
               hi,
               "",
-              senderIntro(senderName, orgName, "en"),
+              senderIntro(senderName, orgName, "en", input.about),
               `We are preparing an application to ${program}, funded by ${funder}, and we would like to explore whether your organization would be interested in joining us.`,
               idea ? `The project we have in mind is "${idea}".` : "",
-              wcis
-                ? `${orgName} would contribute the Whole-Chain International Standard (WCIS) as the applied framework: ${wcis}`
-                : "",
+              wcis ? `${orgName} would contribute: ${wcis}` : "",
               credEn,
               partnerRole
                 ? `We see your organization as ${partnerRole}, and we are open to shaping the roles together.`
@@ -336,12 +344,10 @@ export function composeOutreach(input: ComposeInput): { subject: string; body: s
           : [
               hi,
               "",
-              senderIntro(senderName, orgName, "es"),
+              senderIntro(senderName, orgName, "es", input.about),
               `Estamos preparando una aplicación a ${program}, financiado por ${funder}, y nos gustaría explorar si su organización tendría interés en participar con nosotros.`,
               idea ? `El proyecto que proponemos es "${idea}".` : "",
-              wcis
-                ? `${orgName} aportaría el Whole-Chain International Standard (WCIS) como marco aplicado: ${wcis}`
-                : "",
+              wcis ? `${orgName} aportaría: ${wcis}` : "",
               credEs,
               partnerRole
                 ? `Vemos a su organización como ${partnerRole}, y estamos abiertos a definir los roles juntos.`

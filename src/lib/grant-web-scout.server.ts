@@ -12,7 +12,7 @@ export type DiscoveredWebGrant = {
   deadline: string;
   status: "open" | "upcoming" | "continuous" | "closed";
   applicant_fit: string;
-  /** Who can apply: our organizations and in which role (e.g. "IIAL (líder) · Nahua (socio)"). */
+  /** Who can apply: our organizations and in which role (e.g. "<organization A> (lead) · <organization B> (partner)"). */
   applicant?: string;
   /** grant | contribution | repayable | loan | cost_share | prize | other */
   instrument?: string;
@@ -60,7 +60,7 @@ export async function searchWebForGrantsImpl(
     };
   }
 
-  const clientName = opts.orgName || "IIAL";
+  const clientName = opts.orgName || "the organization";
   const es = opts.lang === "es";
   const prompt = `You are a senior grant scout. Search the web now for REAL funding calls that are OPEN, UPCOMING or CONTINUOUS (2026-2027) for this request:
 "${opts.query}"

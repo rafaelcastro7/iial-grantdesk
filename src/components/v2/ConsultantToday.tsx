@@ -1,6 +1,7 @@
 // "Today" for the consultant: deadlines, overdue steps, missing documents,
 // partners waiting and pending decisions, built from the application plans.
 // Replaces the generic hero on Home. Deterministic, no AI.
+import { decisionMakerLabel, useTeamSettings } from "@/lib/team-settings";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -56,6 +57,7 @@ export function ConsultantToday({ greeting }: { greeting: string }) {
   };
   const lang = useUiLang();
   const { activeOrgId, activeOrgName } = useActiveTenant();
+  const { settings: team } = useTeamSettings(activeOrgId);
   const fetchRows = useServerFn(listGrantWorkspaces);
   const { data, isLoading } = useQuery({
     queryKey: ["grant-pipeline", activeOrgId],
@@ -172,8 +174,8 @@ export function ConsultantToday({ greeting }: { greeting: string }) {
           </Button>
           <Button asChild variant="outline" className="w-full justify-start gap-2">
             <Link to="/pipeline">
-              <Mail className="h-4 w-4" />{" "}
-              {tr("Email Marcelo about our grants", "Escribir a Marcelo sobre nuestros grants")}
+              <Mail className="h-4 w-4" /> {tr("Write to", "Escribir a")}{" "}
+              {decisionMakerLabel(team, lang)} {tr("about our grants", "sobre nuestros grants")}
             </Link>
           </Button>
           <Button asChild variant="outline" className="w-full justify-start gap-2">

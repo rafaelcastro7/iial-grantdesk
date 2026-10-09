@@ -40,8 +40,7 @@ async function assertMember(db: Db, userId: string, orgId: string) {
 }
 
 /**
- * Eligibility of each organization the user works for (e.g. IIAL and Nahua
- * Canada), from that organization's own profile and rules. Deterministic: 0 tokens.
+ * Eligibility of each organization the user works for, from that organization's own profile and rules. Deterministic: 0 tokens.
  */
 export async function eligibilityByOrg(
   db: Db,

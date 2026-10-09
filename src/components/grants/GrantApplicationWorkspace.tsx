@@ -1,6 +1,7 @@
 // The consultant's working sheet for one grant: who applies and how, the
-// decision, consortium, documents checklist, milestones and WCIS project idea,
+// decision, consortium, documents checklist, milestones and project idea,
 // saved per organization, plus the decision memo built from it.
+import { decisionMakerLabel, useTeamSettings } from "@/lib/team-settings";
 import { dossierToPlan, type Dossier } from "@/lib/grant-dossier.shared";
 import { getGrantDossier } from "@/lib/grant-dossier.functions";
 import { fitLabel, fitTone, type DossierFit } from "@/lib/grant-dossier.shared";
@@ -20,7 +21,6 @@ import {
   Sparkles,
   Trash2,
   Users,
-  Workflow,
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -35,7 +35,6 @@ import {
   explainTerms,
   PRESET_COUNTRIES,
 } from "@/lib/consultant-desk.shared";
-import { synthesizeGrantRoadmap } from "@/lib/grant-roadmap";
 import { listPartners, savePartner } from "@/lib/partner-directory.functions";
 import {
   TEMPLATE_IDS,
@@ -50,7 +49,6 @@ import {
   INSTRUMENTS,
   PRIORITIES,
   ROUTES,
-  adoptConsortiumRoute,
   callStatusLabel,
   checkStatusLabel,
   instrumentLabel,
@@ -113,10 +111,12 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   const [langOverride, setLang] = useState<Lang | null>(null);
   const lang: Lang = langOverride ?? uiLang;
   const [partnerIdx, setPartnerIdx] = useState(0);
-  const [senderName, setSenderName] = useState("Rocío Cruz");
+  const { settings: team, setSender: setSenderName } = useTeamSettings(orgId);
+  const senderName = team.sender;
   const [meetingWhen, setMeetingWhen] = useState("");
   const [writeMode, setWriteMode] = useState<"outreach" | "memo">("outreach");
-  const [links, setLinks] = useState("https://iial.ca");
+  const [linksEdit, setLinks] = useState<string | null>(null);
+  const links = linksEdit ?? team.links;
   const [attachmentsEdit, setAttachments] = useState<string | null>(null);
   const [includeAcademicCredentials, setIncludeAcademicCredentials] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
@@ -181,6 +181,8 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
     if (!data || !ws) return null;
     const names = data.orgs.filter((o) => ws.applicant_org_ids.includes(o.id)).map((o) => o.name);
     return decisionMemo(data.grant, ws, {
+      recipient: team.decisionMaker,
+      sender: team.sender,
       applicantNames: names,
       orgName: names[0] ?? currentOrgName,
       eligibility: data.eligibility.filter(
@@ -200,7 +202,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         };
       })(),
     });
-  }, [data, ws, currentOrgName, uiLang, dossierData?.saved]);
+  }, [data, ws, currentOrgName, uiLang, dossierData?.saved, team.decisionMaker, team.sender]);
 
   const glossary = useMemo(
     () =>
@@ -225,27 +227,6 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       uiLang,
     );
   }, [countryQuery, data?.grant, uiLang]);
-
-  const roadmap = useMemo(() => {
-    if (!data?.grant) return null;
-    return synthesizeGrantRoadmap(
-      {
-        id: data.grant.id,
-        title: data.grant.title,
-        funderName: data.grant.funder?.name,
-        summary: data.grant.summary,
-        amountCadMax: data.grant.amount_cad_max,
-        deadline: data.grant.deadline,
-        deadlineKind: data.grant.deadline_kind,
-        requirements: data.grant.requirements?.map((r) => ({
-          requirement: r.requirement ?? "",
-          isCritical: r.isCritical,
-        })),
-        orgName: currentOrgName,
-      },
-      uiLang,
-    );
-  }, [data?.grant, currentOrgName, uiLang]);
 
   if (isLoading || !ws) {
     return (
@@ -331,7 +312,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         {(
           [
             ["outreach", tr("Partners and funders", "Socios y financiadores")],
-            ["memo", tr("Memo to Marcelo", "Memo para Marcelo")],
+            ["memo", `${tr("Memo to", "Memo para")} ${decisionMakerLabel(team, uiLang)}`],
           ] as const
         ).map(([k, label]) => (
           <button
@@ -374,7 +355,8 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 .split(",")
                 .map((x) => x.trim())
                 .filter(Boolean),
-              includeAcademicCredentials,
+              credentials: includeAcademicCredentials ? team.credentials : undefined,
+              about: team.about,
             });
             const isWhatsApp = template === "whatsapp_intro";
             const toPartner = TEMPLATE_LABEL[template].audience === "Partner";
@@ -424,7 +406,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                     onChange={(e) => setSenderName(e.target.value)}
                   />
                 </div>
-                {toPartner && (
+                {toPartner && team.credentials && (
                   <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -433,10 +415,11 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                       className="rounded border-border"
                     />
                     <span>
-                      {tr(
-                        "Include Dr. Juan Marcelo Gómez doctoral thesis citation (Henley Business School / Univ. of Reading)",
-                        "Incluir la cita de la tesis doctoral del Dr. Juan Marcelo Gómez (Henley Business School / Univ. of Reading)",
-                      )}
+                      {tr("Include our credentials", "Incluir nuestras credenciales")}:{" "}
+                      <span className="italic">
+                        {team.credentials.slice(0, 90)}
+                        {team.credentials.length > 90 ? "…" : ""}
+                      </span>
                     </span>
                   </label>
                 )}
@@ -454,8 +437,8 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                   <Input
                     value={attachmentsEdit ?? defaultAttachments(lang)}
                     placeholder={tr(
-                      "Attachments, separated by commas (leave empty for none)",
-                      "Adjuntos, separados por comas (déjelo vacío si no hay)",
+                      "Attachments, separated by commas, e.g. our presentation, the project summary (empty = none)",
+                      "Adjuntos, separados por comas, p. ej. nuestra presentación, el resumen del proyecto (vacío = ninguno)",
                     )}
                     onChange={(e) => setAttachments(e.target.value)}
                   />
@@ -798,110 +781,6 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
         icon={<ClipboardList className="h-4 w-4" />}
         title={tr("2. Our decision", "2. Nuestra decisión")}
       >
-        {roadmap && !dossierData?.saved && (
-          <div className="mb-4 space-y-2 rounded-lg border bg-muted/20 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-1.5">
-              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
-                <Workflow className="h-3.5 w-3.5 text-primary" />
-                {tr("Strategic suggested routes", "Rutas estratégicas sugeridas")}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {tr("Recommended:", "Recomendada:")}{" "}
-                <strong className="text-primary">
-                  {roadmap.routes
-                    .find((r) => r.id === roadmap.recommendedRouteId)
-                    ?.title.split(":")[1]
-                    ?.trim() ?? tr("Academic", "Académica")}
-                </strong>
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-              {roadmap.routes.map((r) => {
-                const isAdopted =
-                  (r.id === "direct" && ws.route === "lead") ||
-                  (r.id === "academic" &&
-                    (ws.lead_institution?.toLowerCase().includes("lambton") ||
-                      ws.partners.some((p) => p.name.toLowerCase().includes("lambton")))) ||
-                  (r.id === "territorial" &&
-                    (ws.lead_institution?.toLowerCase().includes("socodevi") ||
-                      ws.lead_institution?.toLowerCase().includes("app cacao") ||
-                      ws.partners.some((p) => p.name.toLowerCase().includes("socodevi")))) ||
-                  (r.id === "commercial" &&
-                    (ws.lead_institution?.toLowerCase().includes("nahua") ||
-                      ws.partners.some((p) => p.name.toLowerCase().includes("nahua"))));
-
-                return (
-                  <div
-                    key={r.id}
-                    className={cn(
-                      "flex flex-col justify-between rounded-lg border p-2.5 text-xs transition-all",
-                      isAdopted
-                        ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30"
-                        : "border-border/70 bg-card hover:border-primary/40",
-                    )}
-                  >
-                    <div>
-                      <div className="mb-1 flex items-center justify-between gap-1">
-                        <span className="font-semibold text-foreground line-clamp-1">
-                          {r.title.split(":")[0]}
-                        </span>
-                        <Badge
-                          variant={
-                            r.viability === "high"
-                              ? "secondary"
-                              : r.viability === "conditional"
-                                ? "outline"
-                                : "destructive"
-                          }
-                          className="px-1.5 py-0 text-[10px] font-normal"
-                        >
-                          {r.viability === "high"
-                            ? tr("Viable", "Viable")
-                            : r.viability === "conditional"
-                              ? tr("Conditional", "Condicional")
-                              : tr("Blocked", "Bloqueada")}
-                        </Badge>
-                      </div>
-                      <p className="mb-1 font-medium leading-tight text-foreground line-clamp-1">
-                        {r.title.split(":")[1]?.trim()}
-                      </p>
-                      <p className="mb-1.5 text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
-                        {r.tacticalValue}
-                      </p>
-                      <div className="text-[10px] text-muted-foreground">
-                        <strong>{tr("Lead:", "Líder:")}</strong>{" "}
-                        {r.leadEntity.split("(")[0]?.trim()}
-                      </div>
-                    </div>
-                    <div className="mt-2.5 border-t border-border/40 pt-2">
-                      {isAdopted ? (
-                        <span className="flex items-center justify-center gap-1 py-0.5 text-[11px] font-semibold text-primary">
-                          <CheckCircle2 className="h-3 w-3" /> {tr("Active route", "Ruta activa")}
-                        </span>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-6 w-full px-2 text-[11px]"
-                          onClick={() => {
-                            const next = adoptConsortiumRoute(ws, r, currentOrgName);
-                            setWs(next);
-                            setDirty(true);
-                            toast.success(`${tr("Adopted", "Ruta adoptada:")} ${r.title}`);
-                          }}
-                        >
-                          {tr("Adopt route", "Adoptar ruta")}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label={tr("Priority", "Prioridad")}>
             <select
@@ -949,7 +828,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
           <Field label={tr("Lead institution", "Institución líder")}>
             <Input
               value={ws.lead_institution ?? ""}
-              placeholder={tr("e.g. Lambton College", "p. ej. Lambton College")}
+              placeholder={tr("An eligible institution that applies", "Una institución elegible que postula")}
               onChange={(e) => update({ lead_institution: e.target.value || null })}
             />
           </Field>
@@ -1096,13 +975,13 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
                 onChange={(e) => update({ project_title: e.target.value || null })}
               />
             </Field>
-            <Field label={tr("How we use WCIS", "Cómo usamos el WCIS")}>
+            <Field label={tr("How we apply our methods", "Cómo aplicamos nuestros métodos")}>
               <Textarea
                 rows={3}
                 value={ws.wcis_angle ?? ""}
                 placeholder={tr(
-                  "WCIS as the applied framework for traceability, integrity and market readiness…",
-                  "El WCIS como marco aplicado de trazabilidad, integridad y preparación para el mercado…",
+                  "Which of our standards, methods or services this project uses, and how…",
+                  "Qué estándares, métodos o servicios nuestros usa este proyecto y cómo…",
                 )}
                 onChange={(e) => update({ wcis_angle: e.target.value || null })}
               />
@@ -1498,10 +1377,8 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
   );
 }
 
-function defaultAttachments(lang: Lang): string {
-  return lang === "es"
-    ? "la presentación general de IIAL, el documento WCIS"
-    : "IIAL's general presentation, the WCIS document";
+function defaultAttachments(_lang: Lang): string {
+  return "";
 }
 
 function Section({

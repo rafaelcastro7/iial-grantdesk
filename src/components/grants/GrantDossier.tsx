@@ -1,6 +1,7 @@
 // The grant dossier on screen: verdict, what the brochure does not say, the
 // routes compared, the official documents, money and timeline, and the
 // messages ready to send. Each part can be carried into the plan.
+import { decisionMakerLabel, useTeamSettings } from "@/lib/team-settings";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -53,6 +54,7 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
   const generate = useServerFn(generateGrantDossier);
   const [local, setLocal] = useState<SavedDossier | null>(null);
   const [busy, setBusy] = useState(false);
+  const { settings: team } = useTeamSettings(orgId);
   // Kept outside the keyed dossier view, so an Update does not reset the tab.
   const [tab, setTab] = useState("needs");
   // What was already added to the plan from this dossier (shared by all its buttons).
@@ -107,7 +109,9 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
   const run = async () => {
     setBusy(true);
     try {
-      const res = await generate({ data: { grantId, orgId, lang } });
+      const res = await generate({
+        data: { grantId, orgId, lang, decisionMaker: team.decisionMaker },
+      });
       setLocal(res.saved);
       if (!res.persisted)
         toast.info(
@@ -139,8 +143,8 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
           {tr(
-            "The full analysis in one place: verdict, what the brochure does not say, routes compared, official documents, money and timeline, and the emails and message to Marcelo ready to send. Prepared from the official page, a Google search and your organizations' profiles.",
-            "El análisis completo en un solo lugar: veredicto, lo que el folleto no dice, rutas comparadas, documentos oficiales, dinero y cronograma, y los correos y el mensaje a Marcelo listos para enviar. Se prepara con la página oficial, una búsqueda en Google y los perfiles de sus organizaciones.",
+            "The full analysis in one place: verdict, what the brochure does not say, routes compared, official documents, money and timeline, and the messages ready to send. Prepared from the official page, an internet search and your organization's profile.",
+            "El análisis completo en un solo lugar: veredicto, lo que el folleto no dice, rutas comparadas, documentos oficiales, dinero y cronograma, y los mensajes listos para enviar. Se prepara con la página oficial, una búsqueda en internet y el perfil de su organización.",
           )}
         </p>
         <Button className="mt-3 gap-2" onClick={run} disabled={busy}>

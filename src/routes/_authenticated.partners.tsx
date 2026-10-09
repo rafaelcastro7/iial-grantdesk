@@ -1,5 +1,6 @@
 // Partner directory: the universities, colleges, cooperatives, chambers and
 // companies the team works with, reused across application plans.
+import { decisionMakerLabel, useTeamSettings } from "@/lib/team-settings";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -19,6 +20,7 @@ import {
   type DirectoryPartner,
 } from "@/lib/partner-directory.functions";
 import { partnerBrief } from "@/lib/consultant-desk.shared";
+import { getOrgProfile } from "@/lib/org.functions";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { useTr, useUiLang } from "@/lib/ui-lang";
 
@@ -56,13 +58,16 @@ const emptyDraft = (): Draft => ({
 
 function PartnersPage() {
   const { activeOrgId, activeOrgName } = useActiveTenant();
+  const { settings: team } = useTeamSettings(activeOrgId);
   const fetchList = useServerFn(listPartners);
   const save = useServerFn(savePartner);
   const remove = useServerFn(deletePartner);
   const seed = useServerFn(seedDefaultPartners);
+  const fetchProfile = useServerFn(getOrgProfile);
   const qc = useQueryClient();
   const tr = useTr();
   const lang = useUiLang();
+  const forWhom = decisionMakerLabel(team, lang);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [filter, setFilter] = useState("");
   const [isSeeding, setIsSeeding] = useState(false);
@@ -71,6 +76,27 @@ function PartnersPage() {
     queryFn: () => fetchList({ data: { orgId: activeOrgId as string } }),
     enabled: !!activeOrgId,
   });
+
+  // Partners named in the active organization's profile (Organization → partner network).
+  const { data: profileData } = useQuery({
+    queryKey: ["org-profile", activeOrgId],
+    queryFn: () => fetchProfile({ data: { orgId: activeOrgId as string } }),
+    enabled: !!activeOrgId,
+    staleTime: 5 * 60_000,
+  });
+  const profileNetwork = useMemo(() => {
+    const raw = (profileData?.profile as { partner_network?: unknown } | null)?.partner_network;
+    if (!Array.isArray(raw)) return [] as string[];
+    const seen = new Set<string>();
+    return raw.filter((n): n is string => {
+      if (typeof n !== "string" || !n.trim()) return false;
+      const key = n.trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [profileData]);
+  const networkCount = profileNetwork.length;
 
   const partners = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -91,12 +117,12 @@ function PartnersPage() {
       toast.success(
         res.addedCount > 0
           ? tr(
-              `Added ${res.addedCount} recommended partner(s) to directory.`,
-              `Se agregaron ${res.addedCount} socio(s) recomendado(s) al directorio.`,
+              `Added ${res.addedCount} partner(s) from the organization profile to the directory.`,
+              `Se agregaron ${res.addedCount} socio(s) del perfil de la organización al directorio.`,
             )
           : tr(
-              "Recommended partners already present in directory.",
-              "Los socios recomendados ya están en el directorio.",
+              "The partners listed in the organization profile are already in the directory.",
+              "Los socios del perfil de la organización ya están en el directorio.",
             ),
       );
       await qc.invalidateQueries({ queryKey: ["partner-directory", activeOrgId] });
@@ -156,22 +182,27 @@ function PartnersPage() {
           onChange={(e) => setFilter(e.target.value)}
         />
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            onClick={onSeedRecommended}
-            disabled={!activeOrgId || isSeeding}
-            title={tr(
-              "Import Rocío's recommended network: Lambton College, UT Selva, U. del Rosario, Agrobosque, APP CACAO, SOCODEVI, UT Tulum",
-              "Importar la red recomendada por Rocío: Lambton College, UT Selva, U. del Rosario, Agrobosque, APP CACAO, SOCODEVI, UT Tulum",
-            )}
-          >
-            <Sparkles className="h-4 w-4 text-primary" />
-            {isSeeding
-              ? tr("Importing…", "Importando…")
-              : tr("Import recommended network (7)", "Importar red recomendada (7)")}
-          </Button>
+          {networkCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={onSeedRecommended}
+              disabled={!activeOrgId || isSeeding}
+              title={`${tr(
+                "Partners listed in the organization profile:",
+                "Socios listados en el perfil de la organización:",
+              )} ${profileNetwork.join(", ")}`}
+            >
+              <Sparkles className="h-4 w-4 text-primary" />
+              {isSeeding
+                ? tr("Importing…", "Importando…")
+                : tr(
+                    `Import the partners listed in our organization profile (${networkCount})`,
+                    `Importar los socios del perfil de nuestra organización (${networkCount})`,
+                  )}
+            </Button>
+          )}
           <Button
             size="sm"
             className="gap-1.5"
@@ -305,22 +336,31 @@ function PartnersPage() {
             </h3>
             <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground leading-relaxed">
               {tr(
-                "Consortium grants (e.g. Canadian colleges, LAC territorial cooperatives, IDRC, GAC) require verified partners. Start with Rocío’s 7 recommended institutions or add your own.",
-                "Los grants en consorcio (ej. colleges canadienses, cooperativas territoriales de ALC, IDRC, GAC) requieren socios verificados. Empieza con las 7 instituciones recomendadas por Rocío o agrega las tuyas.",
+                networkCount > 0
+                  ? "Consortium grants (e.g. with universities, colleges, cooperatives or public agencies) require verified partners. Import the partners listed in your organization profile or add your own."
+                  : "Consortium grants (e.g. with universities, colleges, cooperatives or public agencies) require verified partners. Add your own, or list them in your organization profile to import them here.",
+                networkCount > 0
+                  ? "Los grants en consorcio (ej. con universidades, colleges, cooperativas o agencias públicas) requieren socios verificados. Importa los socios listados en el perfil de tu organización o agrega los tuyos."
+                  : "Los grants en consorcio (ej. con universidades, colleges, cooperativas o agencias públicas) requieren socios verificados. Agrega los tuyos, o lístalos en el perfil de tu organización para importarlos aquí.",
               )}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Button
-                size="sm"
-                onClick={onSeedRecommended}
-                disabled={!activeOrgId || isSeeding}
-                className="gap-1.5 shadow-sm"
-              >
-                <Sparkles className="h-4 w-4" />
-                {isSeeding
-                  ? tr("Importing…", "Importando…")
-                  : tr("Import recommended network (7)", "Importar red recomendada (7)")}
-              </Button>
+              {networkCount > 0 && (
+                <Button
+                  size="sm"
+                  onClick={onSeedRecommended}
+                  disabled={!activeOrgId || isSeeding}
+                  className="gap-1.5 shadow-sm"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {isSeeding
+                    ? tr("Importing…", "Importando…")
+                    : tr(
+                        `Import the partners listed in our organization profile (${networkCount})`,
+                        `Importar los socios del perfil de nuestra organización (${networkCount})`,
+                      )}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -363,16 +403,13 @@ function PartnersPage() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    aria-label={tr("Copy brief for Marcelo", "Copiar resumen para Marcelo")}
-                    title={tr(
-                      "Copy a short brief for Marcelo",
-                      "Copiar un resumen breve para Marcelo",
-                    )}
+                    aria-label={`${tr("Copy brief for", "Copiar resumen para")} ${forWhom}`}
+                    title={`${tr("Copy a short brief for", "Copiar un resumen breve para")} ${forWhom}`}
                     onClick={async () => {
                       const b = partnerBrief(
                         p,
                         used.map((u) => u.title),
-                        { lang },
+                        { lang, recipient: team.decisionMaker, sender: team.sender },
                       );
                       try {
                         await navigator.clipboard.writeText(

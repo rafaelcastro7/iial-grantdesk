@@ -263,6 +263,26 @@ export const askGrantCopilot = createServerFn({ method: "POST" })
           .join("\n")
       : "No structured requirements extracted yet.";
 
+    // Organization-specific knowledge comes from the active tenant's profile,
+    // never from code: empty fields keep the wording generic.
+    const listOf = (v: unknown): string[] =>
+      Array.isArray(v) ? v.map((x) => String(x ?? "").trim()).filter(Boolean) : [];
+    const op = (orgProfile ?? {}) as Record<string, unknown>;
+    const orgName = String(op.org_name || op.legal_name || "").trim() || "the organization";
+    const standards = listOf(op.strategic_standards);
+    const partners = listOf(op.partner_network);
+    const capabilities = [...listOf(op.activities), ...listOf(op.capabilities)];
+    const consortiumRoles = listOf(op.consortium_roles);
+    const sectors = listOf(op.sectors);
+    const mission = String(op.mission ?? "").trim();
+    const standardsText = standards.length
+      ? standards.join(", ")
+      : "the organization's own methods or standards";
+    const partnersText = partners.length ? partners.join(", ") : "its usual partners";
+    const capabilitiesText = capabilities.length
+      ? capabilities.join(", ")
+      : "its stated capabilities";
+
     const systemPrompt = `You are GrantDesk Copilot, an elite strategic funding advisor for GrantDesk.
 You provide deep, actionable intelligence on public grants, consortium structuring, and funding pathways for organizations in the Americas.
 
@@ -274,7 +294,12 @@ Active Organization Tenant: "${orgProfile?.org_name || orgProfile?.legal_name ||
 - Years Operating: ${orgProfile?.years_operating ?? "Unknown"} (Employees: ${orgProfile?.employee_count ?? "Unknown"})
 - Annual Budget (CAD): ${orgProfile?.annual_budget_cad ? `$${orgProfile.annual_budget_cad.toLocaleString()} CAD` : "Startup / Early-stage"}
 - Max Cost Share Cap: ${orgProfile?.cost_share_max_pct != null ? `${orgProfile.cost_share_max_pct}%` : "Flexible / In-kind"}
-- Activities & Capabilities: ${[...(orgProfile?.activities || []), ...(orgProfile?.capabilities || [])].join(", ") || "Applied research, capacity building, supply chain integrity, WCIS"}
+- Mission: ${mission || "Not listed"}
+- Sectors: ${sectors.join(", ") || "Not listed"}
+- Activities & Capabilities: ${capabilities.join(", ") || "Not listed"}
+- Own Standards / Methods / Certifications: ${standards.join(", ") || "Not listed"}
+- Usual Partners (partner network): ${partners.join(", ") || "Not listed"}
+- Consortium Roles it can take: ${consortiumRoles.join(", ") || "Not listed"}
 - Business / CRA Number: ${orgProfile?.business_number || "Not listed"}
 
 OPPORTUNITY BEING ANALYZED:
@@ -306,13 +331,14 @@ CURRENT EVALUATION FOR THIS TENANT:
 STRATEGIC KNOWLEDGE RULES:
 1. CONSORTIUM & MULTI-PARTY ROUTES:
    - When the active tenant cannot lead directly (e.g. lacks 3 years audited financials, or the call requires an accredited university, indigenous council, or local cooperative), DO NOT simply say "Ineligible". Propose an APPLICATION ROUTE:
-     * Lead Applicant: Institution with official eligibility (e.g., Lambton College or local partner).
-     * Governance & Territorial Partner: e.g., SOCODEVI or regional NGO with local roots.
-     * Technical / Innovation Partner: IIAL providing applied research, digital traceability, WCIS framework, and training.
-     * Pilot / Industry Partner: Nahua Canada or local producers.
+     * Lead Applicant: an institution with official eligibility for this call${partners.length ? ` (consider ${partnersText} if eligible)` : ""}.
+     * Governance & Territorial Partner: an organization with local roots in the target region.
+     * Technical / Innovation Partner: ${orgName} contributing ${capabilitiesText}${standards.length ? ` and ${standardsText}` : ""}.
+     * Pilot / Industry Partner: producers, companies or communities that test the results.
+   - Only name a specific institution if it appears in the profile's partner network, the plan, the partner directory, the user's messages or the web results.
 2. STRATEGIC ROI & REVENUE BEYOND THE GRANT:
    - Grants cover OPEX (staff salaries, research hours, coordinator fees) without burning equity.
-   - Grants validate strategic assets like the WCIS (Whole Chain Integrity Standard), generate proof-of-concept, and unlock post-grant revenue (professional certifications CSIP/CSCIP/CARP, B2B maturity diagnostics, university co-branded cohorts).
+   - Grants validate the organization's strategic assets (${standardsText}), generate proof-of-concept, and can unlock post-grant revenue (services, training or certifications the organization already offers; never invent offerings).
 3. MATCHING FUNDS & AUDIT LEVEL:
    - Distinguish cash matching from in-kind (hours/services) matching.
    - Note if signed internal financials are acceptable (like Global Affairs Canada) vs external multi-year audits.
@@ -324,13 +350,13 @@ STRATEGIC KNOWLEDGE RULES:
 
 RESPONSE FORMAT:
 Answer directly in markdown, in at most 250 words (no long tables), then the actions block.
-WCIS is the "Whole-Chain International Standard" (no version numbers). Never use placeholders such as [Name], "(example)", "e.g." or invented names, codes or versions; only name a lead institution or partner that the user, the plan, the partner directory or the web results mention: if a value is unknown, leave the field out. The call status in a plan_update must match the system's call status unless the official page or web search says otherwise (then say so and correct it with a facts_update).
+Name the organization's standards exactly as listed in its profile (no invented version numbers or years). Never use placeholders such as [Name], "(example)", "e.g." or invented names, codes or versions; only name a lead institution or partner that the user, the plan, the partner directory or the web results mention: if a value is unknown, leave the field out. The call status in a plan_update must match the system's call status unless the official page or web search says otherwise (then say so and correct it with a facts_update).
 If the response naturally includes a formal outreach email for a potential partner, or a product/system improvement suggestion that should be added to the backlog, include an optional JSON block at the very end wrapped in:
 \`\`\`actions
 [
   {
     "type": "outreach_draft",
-    "target_partner": "SOCODEVI / University Name",
+    "target_partner": "partner name from the data",
     "subject": "Proposed Collaboration...",
     "body": "..."
   },
@@ -346,14 +372,14 @@ If the response naturally includes a formal outreach email for a potential partn
     "update": {
       "priority": "now | prepare | monitor | discard",
       "route": "lead | co_lead | partner | beneficiary",
-      "lead_institution": "e.g. Lambton College",
+      "lead_institution": "eligible lead institution named in the data",
       "administrator": "who manages the funds",
       "call_status": "open | upcoming | rolling | closed_next_cycle | invite_only",
       "instrument": "grant | contribution | repayable_contribution | loan | cost_share | tax_credit | other",
       "match_pct": 0,
       "match_in_kind_ok": true,
       "project_title": "...",
-      "wcis_angle": "how WCIS is used",
+      "wcis_angle": "how we apply ${standards.length ? standardsText : "our methods"} in this project",
       "add_blockers": ["internal weakness or risk"],
       "add_partners": [{ "name": "...", "country": "...", "role": "..." }],
       "add_checklist": [{ "item": "document or requirement", "critical": true }],
@@ -482,7 +508,12 @@ Only output actions when genuinely relevant. Output a "plan_update" whenever the
               const update = groundPlanUpdate(
                 sanitizePlanUpdate((a as { update?: unknown }).update),
                 knownText,
-                [orgProfile?.org_name ?? "", orgProfile?.legal_name ?? "", "GrantDesk", "IIAL"],
+                [
+                  orgProfile?.org_name ?? "",
+                  orgProfile?.legal_name ?? "",
+                  "GrantDesk",
+                  ...partners,
+                ],
               );
               return isEmptyPlanUpdate(update) ? [] : [{ ...a, update }];
             });
@@ -500,11 +531,23 @@ Only output actions when genuinely relevant. Output a "plan_update" whenever the
       replyText = `Sorry, an error occurred while consulting the strategic copilot assistant (${err instanceof Error ? err.message : String(err)}). Please try again.`;
     }
 
-    // WCIS has no version number: "WCIS-2025" and similar are invented.
-    const fixWcis = (t: string) => t.replace(/WCIS[\s\u2010-\u2015-]*20\d\d/g, "WCIS");
-    replyText = fixWcis(replyText);
-    if (extractedActions)
-      extractedActions = JSON.parse(fixWcis(JSON.stringify(extractedActions))) as CopilotAction[];
+    // The profile's standards carry no version year: "<standard>-2025" and similar are invented.
+    const escapeRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const stripInventedYears = (t: string) =>
+      standards
+        .filter((st) => !/20\d\d/.test(st))
+        .reduce(
+          (acc, st) =>
+            acc.replace(new RegExp(`${escapeRe(st)}[\\s\\u2010-\\u2015-]*20\\d\\d`, "g"), st),
+          t,
+        );
+    if (standards.length) {
+      replyText = stripInventedYears(replyText);
+      if (extractedActions)
+        extractedActions = JSON.parse(
+          stripInventedYears(JSON.stringify(extractedActions)),
+        ) as CopilotAction[];
+    }
 
     // 7. Record assistant reply in DB
     await supabase.from("grant_copilot_messages").insert({

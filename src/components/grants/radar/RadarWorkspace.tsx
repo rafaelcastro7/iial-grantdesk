@@ -84,7 +84,7 @@ export function RadarWorkspace({
 
   const searchWebFn = useServerFn(searchWebGrants);
   const addGrantFn = useServerFn(addGrantByUrl);
-  const orgName = activeOrgName || "IIAL";
+  const orgName = activeOrgName || tr("your organization", "tu organización");
 
   // In-flight guard as a ref: timers and effects never see a stale "not searching".
   const webInFlight = useRef(false);
@@ -552,7 +552,7 @@ export function RadarWorkspace({
                     <span>{tr(`Targeted for ${orgName}`, `Para ${orgName}`)}</span>
                   </div>
 
-                  {/* The overview Rocío asked ChatGPT for: one row per opportunity. */}
+                  {/* Overview table: one row per opportunity. */}
                   <div className="overflow-x-auto rounded-lg border">
                     <table className="w-full min-w-[820px] text-left text-sm">
                       <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">

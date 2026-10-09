@@ -1,5 +1,5 @@
-// Grant dossier: the consultant's full analysis of one call, the way Rocío
-// prepares it — verdict, what the brochure does not say, the routes compared,
+// Grant dossier: the consultant's full analysis of one call, the way a senior
+// grant consultant prepares it — verdict, what the brochure does not say, the routes compared,
 // the official document set, money and timeline, and ready-to-send messages.
 // Produced by the AI (free tier + Google search) and validated here; parts of
 // it can be carried into the application plan with one click.
@@ -56,11 +56,24 @@ export type Dossier = {
 const s = (v: unknown, max = 2000) =>
   typeof v === "string" && v.trim() ? v.trim().slice(0, max) : "";
 const arr = (v: unknown, max = 20) => (Array.isArray(v) ? v.slice(0, max) : []);
-const noVersion = (t: string) => t.replace(/WCIS[\s‐-―-]*20\d\d/g, "WCIS");
-const clean = (t: string) => noVersion(t);
+const escapeRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * The organization's own standards (from its profile) carry no version year:
+ * "<standard>-2025" and similar are invented by the AI, so the year is dropped.
+ */
+const versionStripper = (standards: string[] = []) => {
+  const names = standards.map((x) => String(x ?? "").trim()).filter((x) => x && !/20\d\d/.test(x));
+  return (t: string) =>
+    names.reduce(
+      (acc, st) =>
+        acc.replace(new RegExp(`${escapeRe(st)}[\\s\\u2010-\\u2015-]*20\\d\\d`, "g"), st),
+      t,
+    );
+};
 
 /** Keeps a well-formed dossier from whatever the AI returned. */
-export function sanitizeDossier(raw: unknown): Dossier | null {
+export function sanitizeDossier(raw: unknown, opts: { standards?: string[] } = {}): Dossier | null {
+  const clean = versionStripper(opts.standards);
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const verdict = clean(s(r.verdict, 1500));
   if (!verdict) return null;

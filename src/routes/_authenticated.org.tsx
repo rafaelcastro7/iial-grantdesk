@@ -60,6 +60,8 @@ const orgSchema = z.object({
   legal_name: z.string().optional().default(""),
   business_number: z.string().optional().default(""),
   website: z.string().optional().default(""),
+  decision_maker_name: z.string().optional().default(""),
+  outreach_credentials: z.string().optional().default(""),
   mission: z.string().optional().default(""),
   applicant_types: z.string().optional().default(""),
   activities: z.string().optional().default(""),
@@ -142,6 +144,8 @@ function OrgProfileEditor({
       legal_name: string | null;
       business_number: string | null;
       website: string | null;
+      decision_maker_name?: string | null;
+      outreach_credentials?: string | null;
       mission: string | null;
       applicant_types: string[];
       activities: string[];
@@ -192,6 +196,8 @@ function OrgProfileEditor({
       legal_name: p?.legal_name ?? "",
       business_number: p?.business_number ?? "",
       website: p?.website ?? "",
+      decision_maker_name: p?.decision_maker_name ?? "",
+      outreach_credentials: p?.outreach_credentials ?? "",
       mission: p?.mission ?? "",
       applicant_types: (p?.applicant_types ?? []).join(", "),
       activities: (p?.activities ?? []).join(", "),
@@ -228,6 +234,8 @@ function OrgProfileEditor({
       legal_name: values.legal_name || null,
       business_number: values.business_number || null,
       website: values.website || null,
+      decision_maker_name: values.decision_maker_name?.trim() || null,
+      outreach_credentials: values.outreach_credentials?.trim() || null,
       mission: values.mission || null,
       applicant_types: parseCSV(values.applicant_types),
       activities: parseCSV(values.activities),

@@ -69,7 +69,7 @@ describe("outreach emails (synthetic)", () => {
     expect(body).toContain("Estimado/a Rector:");
     expect(body).toContain("Global Affairs Canada");
     expect(body).toContain("Mexican higher-education partner");
-    expect(body).toContain("WCIS");
+    expect(body).toContain("IIAL aportaría:");
     expect(body).toContain("$40,000 – $250,000");
     expect(body).toContain("12:00 p.m. ET");
   });

@@ -54,8 +54,8 @@ export const DiscoveredGrant = z
     }, z.array(z.string()).default([])),
 
     // ISO 639-1. Not limited to en/fr — a Spanish or German source must not
-    // fail extraction just because its language isn't one of IIAL's two
-    // original bilingual (EN/FR) target languages.
+    // fail extraction just because its language isn't one of the original
+    // bilingual (EN/FR) target languages.
     language: z
       .string()
       .trim()
@@ -255,7 +255,7 @@ Rules:
 - Do NOT translate to French. FR is handled on-demand by a different agent.`,
   },
   evaluator: {
-    version: "1.4.0",
+    version: "1.5.0",
     system: `You are a grant-fit evaluator for Canadian organizations.
 Given (a) a grant and (b) an organization profile, return a fit score in [0,1]
 plus a bilingual rationale.
@@ -268,7 +268,8 @@ Rules:
   applicant: co-applicant, partner of an eligible university or college (e.g.
   the college applies and administers the funds), partner of an eligible local
   institution in another country of the Americas (consortium), technical
-  partner (e.g. applying its WCIS standard, training, certifications), or
+  partner (e.g. applying its own standards or methods, training,
+  certifications listed in its profile), or
   beneficiary / host.
 - Set eligibility_pass=true only if it can apply as lead or co-applicant.
 - Set eligibility_pass=false if it can only take part as a partner, and then
@@ -281,8 +282,8 @@ Rules:
 - rationale_en is read by a grant consultant deciding whether to pursue the
   call. Write 2-4 plain sentences, as a short explanatory paragraph:
   1. Open with the verdict and the main reason, naming the program and the
-     organization (e.g. "IIAL is not eligible because the Dairy Innovation
-     Program is designed for dairy processors...").
+     organization (e.g. "<Organization> is not eligible because the <Program>
+     is designed for dairy processors...").
   2. Contrast what the grant is for / who it accepts with what the
      organization actually is and does, citing concrete facts from both.
   3. Add any other decisive requirement met or missed (applicant type,

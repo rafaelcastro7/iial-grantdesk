@@ -22,7 +22,7 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { MAX_ENRICH_ATTEMPTS, isTerminalGrantStatus } from "@/agents/pipeline-stages.shared";
 import { FetchTrailPanel } from "@/components/grants/FetchTrailPanel";
 import { DismissGrantControl } from "@/components/grants/DismissGrantControl";
@@ -30,13 +30,8 @@ import { EligibilityIssues } from "@/components/grants/EligibilityIssues";
 import { FitEvaluation } from "@/components/grants/FitEvaluation";
 import type { AxisScore } from "@/agents/fit-rules.shared";
 import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
-import { OpportunityBriefPanel } from "@/components/grants/OpportunityBriefPanel";
 import { GrantCopilotSheet } from "@/components/grants/GrantCopilotSheet";
 import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
-import { GrantConsortiumMatrix } from "@/components/grants/GrantConsortiumMatrix";
-import { GrantFinancialHurdles } from "@/components/grants/GrantFinancialHurdles";
-import { GrantStrategicRevenue } from "@/components/grants/GrantStrategicRevenue";
-import { synthesizeGrantRoadmap, type RouteId } from "@/lib/grant-roadmap";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { GrantApplicationWorkspace } from "@/components/grants/GrantApplicationWorkspace";
 import { Badge } from "@/components/ui/badge";
@@ -209,7 +204,7 @@ export function V2GrantDetail({
   const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string | undefined>(undefined);
   const [backlogModalOpen, setBacklogModalOpen] = useState(false);
   // The application plan (saved decisions) comes first: it is where the
-  // consultant works; the roadmap and funder facts support it.
+  // consultant works; the funder facts support it.
   const [moreOpen, setMoreOpen] = useState(false);
   // The dossier (official page + web) gives the authoritative "can we apply?".
   const fetchDossier = useServerFn(getGrantDossier);
@@ -282,39 +277,6 @@ export function V2GrantDetail({
     lang,
   });
 
-  // Synthesize complete strategic grant roadmap (Consortium routes, financial hurdles, WCIS revenue)
-  const roadmap = useMemo(() => {
-    return synthesizeGrantRoadmap(
-      {
-        id: grant.id,
-        title: grant.title,
-        funderName: grant.funder?.name,
-        summary: grant.summary,
-        amountCadMax: grant.amount_cad_max,
-        applicantTypes: grant.applicant_types,
-        sectors: grant.sectors,
-        deadline: grant.deadline,
-        deadlineKind: grant.deadline_kind,
-        jurisdiction: grant.funder?.jurisdiction,
-        requirements: grant.requirements,
-        eligibilityNote: grant.eligibility_note,
-        orgName: activeOrgName || "IIAL",
-      },
-      lang,
-    );
-  }, [grant, activeOrgName, lang]);
-
-  const [selectedRouteId, setSelectedRouteId] = useState<RouteId>(roadmap.recommendedRouteId);
-
-  // Sync selectedRouteId if roadmap changes
-  useEffect(() => {
-    setSelectedRouteId(roadmap.recommendedRouteId);
-  }, [roadmap.recommendedRouteId]);
-
-  const selectedRoute = useMemo(() => {
-    return roadmap.routes.find((r) => r.id === selectedRouteId) || roadmap.routes[0];
-  }, [roadmap.routes, selectedRouteId]);
-
   const canFetch = grant.status === "discovered" && !verdict.enrichmentFailed;
   const hasEvaluableContent = (grant.summary ?? "").trim().length > 0;
   const canEvaluate = grant.status !== "discovered" || !!evaluation || hasEvaluableContent;
@@ -369,7 +331,7 @@ export function V2GrantDetail({
     .filter((url) => url !== grant.url && url !== grant.funder?.source_url)
     .slice(0, 6);
 
-  const isRolling = roadmap.financial.disbursementTimeline.intakeMode === "rolling";
+  const isRolling = grant.deadline_kind === "rolling";
 
   const handleOpenCopilotWithPrompt = (prompt?: string) => {
     setCopilotInitialPrompt(prompt);
@@ -597,40 +559,13 @@ export function V2GrantDetail({
             {tr("More about this grant", "Más sobre este grant")}
             <span className="ml-2 font-normal text-muted-foreground">
               {tr(
-                "fit analysis, suggested routes, funder facts, technical audit",
-                "análisis de encaje, rutas sugeridas, datos del financiador, auditoría técnica",
+                "fit analysis, funder facts, technical audit",
+                "análisis de encaje, datos del financiador, auditoría técnica",
               )}
             </span>
           </summary>
           {moreOpen && (
             <div className="space-y-5 border-t p-4 sm:p-5">
-              {
-                <>
-                  {/* 1. APPLICATION ROUTES & CONSORTIUM MATRIX */}
-                  <GrantConsortiumMatrix
-                    routes={roadmap.routes}
-                    recommendedRouteId={roadmap.recommendedRouteId}
-                    selectedRouteId={selectedRouteId}
-                    onSelectRoute={(id) => setSelectedRouteId(id)}
-                    orgName={activeOrgName}
-                  />
-
-                  {/* 2. FINANCIAL CONDITIONS & CRITICAL HURDLES */}
-                  <GrantFinancialHurdles financial={roadmap.financial} orgName={activeOrgName} />
-
-                  {/* 3. STRATEGIC RETURN & DOWNSTREAM REVENUE MODEL */}
-                  <GrantStrategicRevenue
-                    strategicReturn={roadmap.strategicReturn}
-                    orgName={activeOrgName}
-                  />
-
-                  {/* 4. EXECUTIVE BRIEF GO/NO-GO OPPORTUNITY DECISION */}
-                  <OpportunityBriefPanel grantId={grant.id} showScreeningDetails={false} />
-
-                  {/* Emails live in the Application plan (one composer, real partners). */}
-                </>
-              }
-
               {
                 <>
                   {/* OFFICIAL SUMMARY & SCOPE */}

@@ -103,7 +103,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         to: "/pipeline",
         label: "My grants",
-        description: "What we are working on, emails to Marcelo",
+        description: "What we are working on, emails and the decision memo",
         icon: ListChecks,
       },
       {
@@ -259,7 +259,8 @@ const NAV_ES: Record<string, string> = {
   "Find grants": "Buscar grants",
   "Search and check if we can apply": "Buscar y verificar si podemos postular",
   "My grants": "Mis grants",
-  "What we are working on, emails to Marcelo": "En qué trabajamos, correos a Marcelo",
+  "What we are working on, emails and the decision memo":
+    "En qué trabajamos, correos y el memo de decisión",
   Partners: "Socios",
   "Universities, co-ops and contacts": "Universidades, cooperativas y contactos",
   "Fit insights": "Análisis de encaje",

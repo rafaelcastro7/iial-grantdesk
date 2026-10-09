@@ -44,7 +44,7 @@ const rulesQO = (orgId: string) =>
   });
 
 export const Route = createFileRoute("/_authenticated/fit-rules")({
-  head: () => ({ meta: [{ title: "Screening Rules — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Screening Rules — GrantDesk" }] }),
   component: TenantFitRulesPage,
 });
 
@@ -73,8 +73,8 @@ const PRESETS = {
     { value: "individual_only", label: "Individuals-only" },
     { value: "for_profit_only", label: "For-profit-only" },
   ],
-  iialCapabilities: [
-    { value: "supply chain", label: "Supply Chain (WCIS)" },
+  capabilityOptions: [
+    { value: "supply chain", label: "Supply Chain" },
     { value: "traceability", label: "Traceability" },
     { value: "micro-credential", label: "Micro-credentials" },
     { value: "applied research", label: "Applied Research" },
@@ -110,7 +110,7 @@ const STRICTNESS: Record<
   },
   balanced: {
     label: "Balanced",
-    tagline: "IIAL default — the SOP recommendation.",
+    tagline: "Default — the recommended starting point.",
     patch: { ...DEFAULT_RULES },
   },
   strict: {
@@ -347,9 +347,7 @@ function FitRulesPage({ orgId }: { orgId: string }) {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 The 6 filters
               </h2>
-              <span className="text-[11px] text-muted-foreground">
-                From IIAL Grant Finding SOP v2
-              </span>
+              <span className="text-[11px] text-muted-foreground">From the grant-finding SOP</span>
             </div>
 
             {/* F1 Legal */}
@@ -358,7 +356,7 @@ function FitRulesPage({ orgId }: { orgId: string }) {
               code="F1"
               title="Legal eligibility"
               tone="auto"
-              summary="Skip grants restricted to applicant types or jurisdictions IIAL can't apply to."
+              summary="Skip grants restricted to applicant types or jurisdictions your organization can't apply to."
               hardEnabled={r.hard_fail_on_applicant_type || r.hard_fail_on_jurisdiction}
               defaultOpen
             >
@@ -416,7 +414,7 @@ function FitRulesPage({ orgId }: { orgId: string }) {
               code="F2"
               title="Role triage"
               tone="hybrid"
-              summary="The system detects whether IIAL applies as Lead or Partner and surfaces it in the brief."
+              summary="The system detects whether your organization applies as Lead or Partner and surfaces it in the brief."
               hardEnabled={false}
             >
               <p className="text-xs text-muted-foreground leading-relaxed">
@@ -433,7 +431,7 @@ function FitRulesPage({ orgId }: { orgId: string }) {
               code="F3"
               title="Money math"
               tone="auto"
-              summary="Filter by award size and the cash-match IIAL would have to carry."
+              summary="Filter by award size and the cash-match your organization would have to carry."
               hardEnabled={r.hard_fail_on_amount}
             >
               <div className="grid sm:grid-cols-2 gap-3">
@@ -470,7 +468,7 @@ function FitRulesPage({ orgId }: { orgId: string }) {
               <Separator />
 
               <Field
-                label="Max cost-share IIAL can carry"
+                label="Max cost-share we can carry"
                 hint="If the grant covers 60% and we cover 40%, that stays within a 50% cap."
               >
                 <div className="flex items-center gap-2 max-w-[200px]">
@@ -515,7 +513,7 @@ function FitRulesPage({ orgId }: { orgId: string }) {
                 <PresetChips
                   value={r.iial_capabilities}
                   onChange={(v) => set("iial_capabilities", v)}
-                  presets={PRESETS.iialCapabilities}
+                  presets={PRESETS.capabilityOptions}
                   placeholder="supply chain"
                 />
               </Field>
@@ -561,7 +559,7 @@ function FitRulesPage({ orgId }: { orgId: string }) {
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field
                   label="Min weeks — as Lead"
-                  hint="More lead time when IIAL drives the submission."
+                  hint="More lead time when your organization drives the submission."
                 >
                   <Input
                     type="number"

@@ -30,7 +30,8 @@ import {
 import { useActiveTenant } from "@/lib/tenant-context";
 import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
 import { useTr, useUiLang } from "@/lib/ui-lang";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getOrgProfile } from "@/lib/org.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { applyCopilotFacts, applyCopilotPlanUpdate } from "@/lib/grant-workspace.functions";
@@ -54,19 +55,32 @@ type Props = {
   initialPrompt?: string;
 };
 
-const QUICK_PROMPTS = [
-  "Can IIAL participate in a consortium if not eligible as the lead applicant?",
-  "What strategic assets and downstream revenue does this grant unlock for IIAL?",
-  "Draft an institutional outreach email for Lambton College or a territorial partner",
-  "Does this call accept in-kind matching or signed internal financial statements?",
-];
+type PromptContext = { org: string; standard?: string; partner?: string };
 
-const QUICK_PROMPTS_ES = [
-  "¿Puede IIAL participar en un consorcio si no es elegible como solicitante principal?",
-  "¿Qué activos estratégicos e ingresos posteriores habilita este grant para IIAL?",
-  "Redacta un correo institucional de acercamiento para Lambton College o un socio territorial",
-  "¿Esta convocatoria acepta contrapartida en especie o estados financieros internos firmados?",
-];
+/** Quick prompts built from the active organization's data (generic when a field is empty). */
+function buildQuickPrompts(lang: string, { org, standard, partner }: PromptContext): string[] {
+  if (lang === "es")
+    return [
+      `¿Puede ${org} participar en un consorcio si no es elegible como solicitante principal?`,
+      `¿Qué activos estratégicos e ingresos posteriores habilita este grant para ${org}?`,
+      partner
+        ? `Redacta un correo institucional de acercamiento para ${partner} u otro socio territorial`
+        : "Redacta un correo institucional de acercamiento para un posible socio líder o territorial",
+      standard
+        ? `¿Cómo encaja ${standard} en esta convocatoria?`
+        : "¿Esta convocatoria acepta contrapartida en especie o estados financieros internos firmados?",
+    ];
+  return [
+    `Can ${org} participate in a consortium if not eligible as the lead applicant?`,
+    `What strategic assets and downstream revenue does this grant unlock for ${org}?`,
+    partner
+      ? `Draft an institutional outreach email for ${partner} or another territorial partner`
+      : "Draft an institutional outreach email for a potential lead or territorial partner",
+    standard
+      ? `How does ${standard} fit this call?`
+      : "Does this call accept in-kind matching or signed internal financial statements?",
+  ];
+}
 
 export function GrantCopilotSheet({
   grantId,
@@ -78,7 +92,30 @@ export function GrantCopilotSheet({
   const { activeOrgId, activeOrgName } = useActiveTenant();
   const tr = useTr();
   const lang = useUiLang();
-  const quickPrompts = lang === "es" ? QUICK_PROMPTS_ES : QUICK_PROMPTS;
+  const fetchProfile = useServerFn(getOrgProfile);
+  const { data: profileData } = useQuery({
+    queryKey: ["org-profile", activeOrgId],
+    queryFn: () => fetchProfile({ data: { orgId: activeOrgId as string } }),
+    enabled: !!activeOrgId,
+    staleTime: 5 * 60_000,
+  });
+  const profile = (profileData?.profile ?? null) as {
+    org_name?: string | null;
+    strategic_standards?: string[] | null;
+    partner_network?: string[] | null;
+  } | null;
+  const firstOf = (v?: string[] | null) =>
+    (v ?? []).map((x) => String(x ?? "").trim()).find(Boolean) || undefined;
+  const orgLabel =
+    (activeOrgName || profile?.org_name || "").trim() ||
+    tr("our organization", "nuestra organización");
+  const firstStandard = firstOf(profile?.strategic_standards);
+  const firstPartner = firstOf(profile?.partner_network);
+  const quickPrompts = buildQuickPrompts(lang, {
+    org: orgLabel,
+    standard: firstStandard,
+    partner: firstPartner,
+  });
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState(initialPrompt ?? "");
   const [loading, setLoading] = useState(false);
@@ -257,8 +294,8 @@ export function GrantCopilotSheet({
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     {tr(
-                      "Ask me about eligibility, consortium routes (technical partner vs lead applicant), required matching funds, financial audit thresholds, or WCIS standard alignment.",
-                      "Pregúntame sobre elegibilidad, rutas de consorcio (socio técnico vs solicitante principal), contrapartida requerida, umbrales de auditoría financiera o alineación con el estándar WCIS.",
+                      `Ask me about eligibility, consortium routes (technical partner vs lead applicant), required matching funds, financial audit thresholds, or how ${firstStandard ?? "your methods"} fit${firstStandard ? "s" : ""} the call.`,
+                      `Pregúntame sobre elegibilidad, rutas de consorcio (socio técnico vs solicitante principal), contrapartida requerida, umbrales de auditoría financiera o cómo encaja${firstStandard ? ` ${firstStandard}` : "n sus métodos"} en la convocatoria.`,
                     )}
                   </p>
                 </div>
@@ -488,8 +525,8 @@ export function GrantCopilotSheet({
                   }
                 }}
                 placeholder={tr(
-                  "Ask about routes, partners, WCIS, requirements...",
-                  "Pregunta sobre rutas, socios, WCIS, requisitos...",
+                  `Ask about routes, partners, ${firstStandard ?? "methods"}, requirements...`,
+                  `Pregunta sobre rutas, socios, ${firstStandard ?? "métodos"}, requisitos...`,
                 )}
                 rows={2}
                 disabled={loading}
@@ -565,7 +602,9 @@ function PlanUpdateCard({
   if (update.project_title)
     lines.push(`${tr("Working title", "Título de trabajo")}: ${update.project_title}`);
   if (update.wcis_angle)
-    lines.push(`${tr("How we use WCIS", "Cómo usamos WCIS")}: ${update.wcis_angle}`);
+    lines.push(
+      `${tr("How we apply our methods", "Cómo aplicamos nuestros métodos")}: ${update.wcis_angle}`,
+    );
   for (const b of update.add_blockers ?? []) lines.push(`+ ${tr("Blocker", "Bloqueo")}: ${b}`);
   for (const pt of update.add_partners ?? [])
     lines.push(

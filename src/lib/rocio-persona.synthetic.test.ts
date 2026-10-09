@@ -10,16 +10,19 @@ import {
   STANDARD_COMPLIANCE_PACKAGE,
   whatsappIntro,
 } from "@/lib/consultant-desk.shared";
-import {
-  adoptConsortiumRoute,
-  emptyWorkspace,
-  decisionMemo,
-  type WorkspaceGrant,
-} from "@/lib/grant-workspace.shared";
-import { synthesizeGrantRoadmap } from "@/lib/grant-roadmap";
+import { emptyWorkspace, decisionMemo, type WorkspaceGrant } from "@/lib/grant-workspace.shared";
 import { buildRadar } from "@/lib/grant-radar";
 import { composeOutreach } from "@/lib/outreach-templates.shared";
-import { DEFAULT_PARTNERS } from "@/lib/partner-directory.functions";
+
+/** What IIAL's organization profile provides (data, not code). */
+const IIAL_PROFILE = {
+  recipient: "Marcelo",
+  sender: "Rocío",
+  about:
+    "IIAL es una organización canadiense sin fines de lucro que trabaja en innovación aplicada y fortalecimiento de cadenas de valor con el estándar WCIS, y ofrece las certificaciones CSIP, CSCIP y CARP.",
+  credentials:
+    "Dr. Juan Marcelo Gómez — investigación doctoral en Henley Business School (Universidad de Reading) sobre la cadena de valor del cacao fino y chocolate: https://centaur.reading.ac.uk/115792/8/Gomez%2Band%2BMcKenzie%2B036.pdf",
+};
 
 const sshrc: WorkspaceGrant = {
   id: "g-sshrc",
@@ -67,6 +70,7 @@ describe("Rocío's requests", () => {
     ws.blockers = ["No audited financial statements"];
     ws.partners = [{ id: "p1", name: "Universidad Tecnológica de Tulum", role: "Mexican partner" }];
     const m = decisionMemo(sshrc, ws, {
+      recipient: IIAL_PROFILE.recipient,
       applicantNames: ["IIAL"],
       eligibility: [],
       orgName: "IIAL",
@@ -98,7 +102,7 @@ describe("Rocío's requests", () => {
         { grant: gac, workspace: b, applicantNames: ["IIAL"] },
         { grant: sshrc, workspace: a, applicantNames: ["IIAL"] },
       ],
-      { orgName: "IIAL" },
+      { orgName: "IIAL", recipient: IIAL_PROFILE.recipient },
     );
     expect(d.subject).toBe("Summary of 2 grants to decide");
     expect(d.body.indexOf("Sustainable Agriculture")).toBeLessThan(
@@ -109,6 +113,7 @@ describe("Rocío's requests", () => {
     expect(d.body).toContain("What we need");
     const es = grantsDigest([{ grant: gac, workspace: b, applicantNames: ["IIAL"] }], {
       lang: "es",
+      recipient: IIAL_PROFILE.recipient,
     });
     expect(es.body).toContain("Hola Marcelo");
   });
@@ -156,6 +161,7 @@ describe("Rocío's requests", () => {
       orgName: "IIAL",
       recipientName: "Juan Pablo",
       links: ["https://iial.ca"],
+      about: IIAL_PROFILE.about,
     });
     expect(t).toContain("Hola Juan Pablo");
     expect(t).toContain("WCIS");
@@ -173,6 +179,7 @@ describe("Rocío's requests", () => {
         notes: "Cacao and coffee cooperative: collection, processing and export.",
       },
       ["Common Fund for Commodities — 29th call"],
+      { recipient: IIAL_PROFILE.recipient },
     );
     expect(b.body).toContain("Hi Marcelo");
     expect(b.body).toContain("https://www.agrobosque.com.pe/");
@@ -231,61 +238,12 @@ describe("Rocío's requests", () => {
     const ws = plan(sshrc);
     ws.route = "partner";
     const m = decisionMemo(sshrc, ws, {
+      recipient: IIAL_PROFILE.recipient,
       applicantNames: ["IIAL"],
       eligibility: [],
       orgName: "IIAL",
     });
     expect(m.body).toMatch(/lead institution pays IIAL for services/);
-  });
-
-  it("'Ruta B: LAMBTON COLLEGE aplica y IIAL aporta el WCIS' → adopt Route B from synthesized roadmap into plan", () => {
-    const ws = plan(sshrc);
-    const roadmap = synthesizeGrantRoadmap({
-      id: sshrc.id,
-      title: sshrc.title,
-      funderName: sshrc.funder?.name,
-      summary: sshrc.summary,
-      amountCadMax: sshrc.amount_cad_max,
-      deadline: sshrc.deadline,
-      orgName: "IIAL",
-    });
-    const academicRoute = roadmap.routes.find((r) => r.id === "academic")!;
-    expect(academicRoute).toBeDefined();
-    expect(academicRoute.viability).toBe("high");
-
-    const adopted = adoptConsortiumRoute(ws, academicRoute, "IIAL");
-    expect(adopted.route).toBe("partner");
-    expect(adopted.lead_institution).toBe("Lambton College");
-    expect(adopted.administrator).toBe("Lambton College / Research Office");
-    expect(adopted.partners.some((p) => p.name === "Lambton College")).toBe(true);
-
-    const memo = decisionMemo(sshrc, adopted, {
-      applicantNames: ["IIAL"],
-      eligibility: [],
-      orgName: "IIAL",
-    });
-    expect(memo.body).toContain("Lead institution: Lambton College");
-    expect(memo.body).toContain("Our role: Partner (another organization administers)");
-    expect(memo.body).toContain(
-      "Lambton College (Canada): Academic lead applicant and grant administrator",
-    );
-  });
-
-  it("'SOCODEVI / APP CACAO como partner en proyectos de impacto territorial' → adopt Route C into plan", () => {
-    const ws = plan(sshrc);
-    const roadmap = synthesizeGrantRoadmap({
-      id: sshrc.id,
-      title: sshrc.title,
-      funderName: sshrc.funder?.name,
-      orgName: "IIAL",
-    });
-    const territorial = roadmap.routes.find((r) => r.id === "territorial")!;
-    const adopted = adoptConsortiumRoute(ws, territorial, "IIAL");
-    expect(adopted.route).toBe("partner");
-    expect(adopted.lead_institution).toBe("SOCODEVI / APP CACAO");
-    expect(adopted.administrator).toBe("SOCODEVI");
-    expect(adopted.partners.some((p) => p.name === "SOCODEVI")).toBe(true);
-    expect(adopted.partners.some((p) => p.name === "APP CACAO")).toBe(true);
   });
 
   it("'¿Qué convocatorias abren en los próximos ciclos (FONTAGRO 2027, BID, Food-Link)?' → radar 'upcoming' filter", () => {
@@ -331,7 +289,7 @@ describe("Rocío's requests", () => {
       orgName: "IIAL",
       senderName: "Rocío Cruz",
       recipientName: "Sr. Horacio Albores Ortiz",
-      includeAcademicCredentials: true,
+      credentials: IIAL_PROFILE.credentials,
     });
     expect(e.body).toContain("Dr. Juan Marcelo Gómez");
     expect(e.body).toContain("Henley Business School");
@@ -350,12 +308,24 @@ describe("Rocío's requests", () => {
       orgName: "IIAL",
       senderName: "Rocío Cruz",
       recipientName: "Universidad del Rosario",
+      about: IIAL_PROFILE.about,
+      credentials: IIAL_PROFILE.credentials,
     });
     expect(e.subject).toContain("Colaboración académica e investigación aplicada");
-    expect(e.body).toContain("Whole-Chain International Standard (WCIS)");
-    expect(e.body).toContain("CSIP, CSCIP, CARP");
+    expect(e.body).toContain("WCIS"); // from the profile's mission
+    expect(e.body).toContain("CSIP, CSCIP y CARP");
     expect(e.body).toContain("Dr. Juan Marcelo Gómez");
     expect(e.body).toContain("Henley Business School");
+    // Without profile data the email names nothing it was not given.
+    const plain = composeOutreach({
+      template: "academic_partnership",
+      lang: "es",
+      grant: sshrc,
+      workspace: ws,
+      orgName: "Otra Org",
+      senderName: "Ana",
+    });
+    expect(plain.body).not.toMatch(/WCIS|CSIP|Gómez|Henley/);
   });
 
   it("'Paso 2: Presentación de paquete de nota conceptual, atestación, CRA y EEFF comparativos' → Step 2 submission", () => {
@@ -372,24 +342,6 @@ describe("Rocío's requests", () => {
     expect(e.body).toContain("Organization Attestation form");
     expect(e.body).toContain("CRA business documentation");
     expect(e.body).toContain("financial statements for the past two completed fiscal years");
-  });
-
-  it("'Directorio de socios: precargar la red de 7 aliados de Rocío' → DEFAULT_PARTNERS has verified profiles", () => {
-    const names = DEFAULT_PARTNERS.map((p) => p.name);
-    expect(names).toEqual(
-      expect.arrayContaining([
-        "Lambton College",
-        "Universidad Tecnológica de la Selva",
-        "Universidad del Rosario",
-        "Cooperativa Agrobosque",
-        "APP CACAO",
-        "SOCODEVI",
-        "Universidad Tecnológica de Tulum",
-      ]),
-    );
-    const agrobosque = DEFAULT_PARTNERS.find((p) => p.name === "Cooperativa Agrobosque")!;
-    expect(agrobosque.website).toBe("https://www.agrobosque.com.pe/");
-    expect(agrobosque.country).toBe("Peru");
   });
 
   it("'Dentro de esto está Madagascar? / Quién es el país beneficiario?' → checkCountryEligibility", () => {
@@ -444,19 +396,6 @@ describe("Audit fixes (country check, seeded facts)", () => {
     expect(ex.verdict).toBe("not_mentioned");
     expect(ex.detail).toMatch(/EXCLUDED/);
   });
-
-  it("seeded partners carry no invented figures or placeholder contacts", async () => {
-    const { DEFAULT_PARTNERS } = await import("@/lib/partner-directory.functions");
-    const all = JSON.stringify(DEFAULT_PARTNERS);
-    expect(all).not.toMatch(/30,000|25\+ cooperatives/);
-    expect(
-      DEFAULT_PARTNERS.every(
-        (p) =>
-          !p.contact_name ||
-          !/Office|Dirección|Gerencia|Rectoría|Coordinación/.test(p.contact_name),
-      ),
-    ).toBe(true);
-  });
 });
 
 describe("Rocío's corrections to ChatGPT's emails", () => {
@@ -474,9 +413,10 @@ describe("Rocío's corrections to ChatGPT's emails", () => {
       senderName: "Rocío Cruz",
       recipientName: "Sr. Horacio Albores Ortiz",
       attachments: ["la presentación general de IIAL", "el documento WCIS"],
+      about: IIAL_PROFILE.about,
     });
     expect(e.body).toContain(
-      "Mi nombre es Rocío Cruz y colaboro con el Institute of Innovation and Advanced Learning (IIAL)",
+      "Mi nombre es Rocío Cruz y le escribo en nombre de IIAL. IIAL es una organización",
     );
     expect(e.body).toContain("CSIP, CSCIP y CARP");
     expect(e.body).not.toMatch(/desarrollo conjunto/i);

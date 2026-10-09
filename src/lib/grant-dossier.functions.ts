@@ -84,7 +84,12 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z
-      .object({ grantId: z.string().uuid(), orgId: z.string().uuid(), lang: z.enum(["en", "es"]) })
+      .object({
+        grantId: z.string().uuid(),
+        orgId: z.string().uuid(),
+        lang: z.enum(["en", "es"]),
+        decisionMaker: z.string().max(120).optional(),
+      })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -178,8 +183,26 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
     )?.data?.user;
     const sender = String(user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? "").trim();
 
+    // The organization's own standards / methods come from its profile, never from code.
+    const standards: string[] = Array.from(
+      new Set<string>(
+        (profiles as Array<Record<string, unknown>>).flatMap((p): string[] =>
+          Array.isArray(p.strategic_standards)
+            ? (p.strategic_standards as unknown[])
+                .map((x) => String(x ?? "").trim())
+                .filter(Boolean)
+            : [],
+        ),
+      ),
+    );
+    const methodsLabel = standards.length
+      ? standards.join(", ")
+      : es
+        ? "nuestros métodos"
+        : "our methods";
+
     const system = `You are a senior grant consultant preparing a decision dossier for the team below. Be concrete, practical and honest, like a consultant who has run this program before. Write everything in ${es ? "Spanish (natural, professional, Latin American)" : "English"}.
-Use ONLY facts from the official page text, the web research, the grant record and the organization profiles below. If something is not published, say so; never invent amounts, dates, contacts, form names or organizations. WCIS is the "Whole-Chain International Standard" (no version numbers). No placeholders like [Name] except for the recipient's personal name in emails when unknown.
+Use ONLY facts from the official page text, the web research, the grant record and the organization profiles below. If something is not published, say so; never invent amounts, dates, contacts, form names, organizations, standards or people. ${standards.length ? `Our own standards / methods are: ${standards.join(", ")} (name them exactly as written, never add version numbers or years).` : 'Refer to our own approach generically as "our methods"; do not name standards or certifications that are not in the sources.'} No placeholders like [Name] except for the recipient's personal name in emails when unknown.
 Return ONLY a JSON object with this shape:
 {
   "fit": "lead (we can apply as lead or co-applicant) | partner_only (only as partner of an eligible lead) | not_eligible (no role possible) | next_cycle (eligible but the current call is closed or too close) | unclear (official text does not settle it)",
@@ -187,7 +210,7 @@ Return ONLY a JSON object with this shape:
   "verdict": "3-5 sentences: what it really is, whether and how each of our organizations can take part, and the recommendation",
   "traps": [{ "title": "short name of a hidden condition", "detail": "what the brochure does not say and what it means for us", "source_url": "https://..." }],
   "routes": {
-    "criteria": ["7 short criterion names, written in the output language: who applies, lead or partner required, our cash contribution, in-kind accepted, approval time, risk or friction, WCIS angle"],
+    "criteria": ["7 short criterion names, written in the output language: who applies, lead or partner required, our cash contribution, in-kind accepted, approval time, risk or friction, how we apply our methods (${methodsLabel})"],
     "options": [{ "name": "Route A: ...", "recommended": false, "values": ["one value per criterion"], "route": "lead | co_lead | partner | beneficiary", "lead": "organization that must lead, only if named in the sources or the partner list" }]
   },
   "documents": [{ "item": "official document or form name", "details": ["what goes in it / who signs"], "critical": true, "only_for": "route name if it only applies to one route" }],
@@ -196,7 +219,7 @@ Return ONLY a JSON object with this shape:
   "messages": [
     { "channel": "email", "to": "funder advisor / program officer", "subject": "...", "body": "ready-to-send email" },
     { "channel": "email", "to": "the academic or local partner", "subject": "...", "body": "..." },
-    { "channel": "whatsapp", "to": "Marcelo", "body": "short decision message in plain words, ending with the question to approve the next step" }
+    { "channel": "whatsapp", "to": "${data.decisionMaker?.trim() || "the decision maker"}", "body": "short decision message in plain words, ending with the question to approve the next step" }
   ],
   "questions_to_confirm": ["what we must confirm with the funder before investing time"]
 }
@@ -260,6 +283,7 @@ ${web ? `${web.text}\nSources:\n${web.sources.map((x) => `- ${x.title}: ${x.url}
     console.info(`[dossier] AI answered via ${result.provider ?? "?"} after ${Date.now() - t1} ms`);
     const dossier = sanitizeDossier(
       JSON.parse(result.text.replace(/^```(?:json)?\s*|\s*```$/g, "")),
+      { standards },
     );
     if (!dossier) throw new Error("dossier_invalid");
     const sources = [

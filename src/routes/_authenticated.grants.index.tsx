@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useSuspenseQuery, useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -164,7 +164,12 @@ function GrantsPage({ orgId }: { orgId: string }) {
   useEffect(() => ss.set(FACETS_KEY, JSON.stringify(facets)), [facets]);
   useEffect(() => ss.set("grants.searchProfileId", searchProfileId ?? ""), [searchProfileId]);
   useEffect(() => {
-    const timer = window.setTimeout(() => setServerSearch(filters.search.trim()), 250);
+    // A transition keeps the current list on screen while the new search
+    // loads (the suspense query would otherwise replace the page with a skeleton).
+    const timer = window.setTimeout(
+      () => startTransition(() => setServerSearch(filters.search.trim())),
+      150,
+    );
     return () => window.clearTimeout(timer);
   }, [filters.search]);
 

@@ -135,99 +135,7 @@ export const deletePartner = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const DEFAULT_PARTNERS: Array<Omit<DirectoryPartner, "id" | "org_id" | "updated_at">> = [
-  {
-    name: "Lambton College",
-    country: "Canada",
-    type: "College",
-    contact_name: null,
-    contact_title: null,
-    email: null,
-    phone: null,
-    website: "https://www.lambtoncollege.ca/",
-    languages: ["en"],
-    notes:
-      "Canadian college eligible to administer federal research funds; route where Lambton applies and IIAL joins as partner (e.g. SSHRC).",
-  },
-  {
-    name: "Universidad Tecnológica de la Selva",
-    country: "Mexico",
-    type: "University",
-    contact_name: "Horacio Albores Ortiz",
-    contact_title: null,
-    email: null,
-    phone: null,
-    website: "https://utselva.edu.mx/",
-    languages: ["es"],
-    notes:
-      "Chiapas, Mexico. Contacted about a Canada–Mexico academic collaboration for a grant application.",
-  },
-  {
-    name: "Universidad del Rosario",
-    country: "Colombia",
-    type: "University",
-    contact_name: null,
-    contact_title: null,
-    email: null,
-    phone: null,
-    website: "https://urosario.edu.co/",
-    languages: ["es"],
-    notes:
-      "Bogotá, Colombia. Met with the team; possible academic partner for a project benefiting Colombian agri-food associations and small businesses.",
-  },
-  {
-    name: "Cooperativa Agrobosque",
-    country: "Peru",
-    type: "Cooperative / producers",
-    contact_name: null,
-    contact_title: null,
-    email: null,
-    phone: null,
-    website: "https://www.agrobosque.com.pe/",
-    languages: ["es"],
-    notes:
-      "Peru. Cacao cooperative; met with the team. Possible beneficiary (cooperatives usually cannot co-fund in cash).",
-  },
-  {
-    name: "APP CACAO",
-    country: "Peru",
-    type: "Cooperative / producers",
-    contact_name: null,
-    contact_title: null,
-    email: null,
-    phone: null,
-    website: "https://appcacao.org/",
-    languages: ["es"],
-    notes:
-      "Peru. Association of cacao producers; possible beneficiary of a grant led by IIAL. Verify its size on its website before quoting figures.",
-  },
-  {
-    name: "SOCODEVI",
-    country: "Canada",
-    type: "NGO / foundation",
-    contact_name: null,
-    contact_title: null,
-    email: null,
-    phone: null,
-    website: "https://socodevi.org/",
-    languages: ["en", "es", "fr"],
-    notes:
-      "Canadian cooperative development organization working in Peru and Latin America; possible partner for governance of cooperative projects.",
-  },
-  {
-    name: "Universidad Tecnológica de Tulum",
-    country: "Mexico",
-    type: "University",
-    contact_name: null,
-    contact_title: null,
-    email: null,
-    phone: null,
-    website: null,
-    languages: ["es"],
-    notes: "Quintana Roo, Mexico. Contacted by IIAL as a possible academic partner.",
-  },
-];
-
+/** Imports the names in the active organization profile's partner network. */
 export const seedDefaultPartners = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ orgId: z.string().uuid() }).parse(i))
@@ -246,13 +154,41 @@ export const seedDefaultPartners = createServerFn({ method: "POST" })
     const existingNames = new Set(
       (existing ?? []).map((p: { name: string }) => p.name.trim().toLowerCase()),
     );
-    const toInsert = DEFAULT_PARTNERS.filter(
-      (p) => !existingNames.has(p.name.trim().toLowerCase()),
-    ).map((p) => ({
-      ...p,
-      org_id: data.orgId,
-      created_by: context.userId,
-    }));
+
+    // The source is the active organization's own profile (partner_network),
+    // never a list written in code.
+    const { data: profile, error: profileErr } = await db
+      .from("org_profiles")
+      .select("partner_network")
+      .eq("org_id", data.orgId)
+      .maybeSingle();
+    if (profileErr) throw new Error(profileErr.message);
+    const network: string[] = Array.isArray(profile?.partner_network)
+      ? (profile.partner_network as unknown[]).filter((n): n is string => typeof n === "string")
+      : [];
+
+    const seen = new Set<string>();
+    const toInsert: Array<Record<string, unknown>> = [];
+    for (const raw of network) {
+      const name = raw.trim().slice(0, 200);
+      const key = name.toLowerCase();
+      if (!name || existingNames.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      toInsert.push({
+        name,
+        country: null,
+        type: null,
+        contact_name: null,
+        contact_title: null,
+        email: null,
+        phone: null,
+        website: null,
+        languages: [],
+        notes: null,
+        org_id: data.orgId,
+        created_by: context.userId,
+      });
+    }
 
     if (toInsert.length > 0) {
       const { error: insertErr } = await db.from("partner_directory").insert(toInsert);

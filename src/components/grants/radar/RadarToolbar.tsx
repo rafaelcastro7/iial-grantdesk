@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ChevronDown,
   Globe,
@@ -26,6 +26,10 @@ import {
   type RadarVerdictFilter,
 } from "@/lib/grant-radar";
 import { useTr, useUiLang, type UiLang } from "@/lib/ui-lang";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getOrgProfile } from "@/lib/org.functions";
+import { useActiveTenant } from "@/lib/tenant-context";
 
 export type RadarFilterState = {
   search: string;
@@ -47,34 +51,83 @@ export const DEFAULT_RADAR_FILTERS: RadarFilterState = {
   verdict: "all",
 };
 
-export const QUICK_SCOUT_PROMPTS = [
-  {
-    label: "🌾 Canada Agri-Food 2026",
-    labelEs: "🌾 Agroalimentario Canadá 2026",
-    query: "Canada agriculture and food innovation grant calls 2026 sustainable food distribution",
-  },
-  {
-    label: "🍫 Cacao & Bioeconomy (Peru/LATAM)",
-    labelEs: "🍫 Cacao y bioeconomía (Perú/LATAM)",
-    query:
-      "Convocatorias y grants de cacao, bioeconomia y agricultura sostenible en Peru o Latinoamerica 2026",
-  },
-  {
-    label: "🎓 Canadian Academic Consortium",
-    labelEs: "🎓 Consorcio académico canadiense",
-    query: "Canadian college research partnership grants SSHRC agri-food applied research 2026",
-  },
-  {
-    label: "🌍 GAC & International Rolling Calls",
-    labelEs: "🌍 GAC y convocatorias internacionales continuas",
-    query:
-      "Global Affairs Canada international assistance unsolicited concept notes CFLI Peru 2026",
-  },
-];
+export type QuickScoutPrompt = { label: string; labelEs: string; query: string };
+
+/** "2026 2027": the current and next calendar year, so queries never go stale. */
+function yearSpan(): string {
+  const y = new Date().getFullYear();
+  return `${y} ${y + 1}`;
+}
+
+/**
+ * Quick web-search prompts built from the active organization's profile
+ * (sectors and operating regions). Falls back to generic prompts when the
+ * profile has neither.
+ */
+export function buildQuickScoutPrompts(
+  sectors: string[] = [],
+  regions: string[] = [],
+): QuickScoutPrompt[] {
+  const years = yearSpan();
+  const clean = (list: string[]) =>
+    Array.from(new Set(list.map((v) => v.trim()).filter(Boolean))).slice(0, 3);
+  const secs = clean(sectors);
+  const regs = clean(regions);
+  const region = regs[0];
+  const prompts: QuickScoutPrompt[] = [];
+
+  for (const sector of secs) {
+    prompts.push({
+      label: region ? `${sector} · ${region}` : sector,
+      labelEs: region ? `${sector} · ${region}` : sector,
+      query: region
+        ? `grants for ${sector} in ${region} ${years}`
+        : `grants for ${sector} ${years}`,
+    });
+  }
+  for (const r of regs.slice(secs.length > 0 ? 1 : 0)) {
+    prompts.push({
+      label: `Open calls · ${r}`,
+      labelEs: `Convocatorias abiertas · ${r}`,
+      query: `open grant calls in ${r} ${years}`,
+    });
+  }
+  if (prompts.length > 0) {
+    prompts.push({
+      label: region ? `Rolling calls · ${region}` : "Rolling / unsolicited calls",
+      labelEs: region
+        ? `Convocatorias continuas · ${region}`
+        : "Convocatorias continuas / abiertas",
+      query: region
+        ? `rolling or unsolicited grant calls in ${region} ${years}`
+        : `rolling or unsolicited grant calls ${years}`,
+    });
+    return prompts.slice(0, 5);
+  }
+
+  return [
+    {
+      label: "Open grant calls",
+      labelEs: "Convocatorias abiertas",
+      query: `open grant calls ${years}`,
+    },
+    {
+      label: "Rolling / unsolicited calls",
+      labelEs: "Convocatorias continuas / abiertas",
+      query: `rolling or unsolicited grant calls ${years}`,
+    },
+    {
+      label: "Research partnerships",
+      labelEs: "Alianzas de investigación",
+      query: `research partnership grants with a college or university partner ${years}`,
+    },
+  ];
+}
 
 /** Web query suggested for a country with no grants in the catalog. */
-export function webQueryForCountry(code: string): string {
-  return `grants ${countryName(code)} agri-food 2026 2027`;
+export function webQueryForCountry(code: string, sector?: string | null): string {
+  const s = sector && sector !== "all" ? `${sector} ` : "";
+  return `grants ${countryName(code)} ${s}${yearSpan()}`;
 }
 
 const MIN_AMOUNTS = [0, 25_000, 50_000, 100_000, 500_000];
@@ -174,6 +227,21 @@ export function RadarToolbar({
   const tr = useTr();
   const lang = useUiLang();
   const [showMore, setShowMore] = useState(false);
+  const { activeOrgId } = useActiveTenant();
+  const fetchProfile = useServerFn(getOrgProfile);
+  const { data: profileData } = useQuery({
+    queryKey: ["org-profile", activeOrgId],
+    queryFn: () => fetchProfile({ data: { orgId: activeOrgId as string } }),
+    enabled: !!activeOrgId,
+    staleTime: 5 * 60_000,
+  });
+  const quickPrompts = useMemo(() => {
+    const profile = (profileData?.profile ?? null) as {
+      sectors?: string[] | null;
+      operating_regions?: string[] | null;
+    } | null;
+    return buildQuickScoutPrompts(profile?.sectors ?? [], profile?.operating_regions ?? []);
+  }, [profileData]);
   const set = <K extends keyof RadarFilterState>(k: K, v: RadarFilterState[K]) =>
     onChange({ ...value, [k]: v });
 
@@ -302,12 +370,12 @@ export function RadarToolbar({
             </Button>
           </form>
 
-          {/* Prompt pills for Rocío's routine requests */}
+          {/* Prompt pills built from the active organization's sectors and regions */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs text-muted-foreground">
               {tr("Quick queries:", "Consultas rápidas:")}
             </span>
-            {QUICK_SCOUT_PROMPTS.map((p) => (
+            {quickPrompts.map((p) => (
               <button
                 key={p.label}
                 type="button"
@@ -327,26 +395,16 @@ export function RadarToolbar({
         /* Mode B: Tracked Catalog Filters */
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <form
-              className="relative min-w-[260px] basis-full"
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSubmitSearch?.(value.search);
-              }}
-            >
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={value.search}
-                onChange={(e) => set("search", e.target.value)}
-                placeholder={tr(
-                  "Search grants in the system and on the internet: name, funder, topic or a link (Enter)",
-                  "Buscar grants en el sistema y en internet: nombre, financiador, tema o un enlace (Enter)",
-                )}
-                aria-label={tr("Search grants", "Buscar grants")}
-                className="h-12 pl-10 text-base"
-                autoFocus
-              />
-            </form>
+            <SearchBox
+              value={value.search}
+              onCommit={(q) => set("search", q)}
+              onSubmit={(q) => onSubmitSearch?.(q)}
+              placeholder={tr(
+                "Search grants in the system and on the internet: name, funder, topic or a link (Enter)",
+                "Buscar grants en el sistema y en internet: nombre, financiador, tema o un enlace (Enter)",
+              )}
+              label={tr("Search grants", "Buscar grants")}
+            />
             <Pick
               label={tr("Country", "País")}
               value={value.country}
@@ -506,5 +564,69 @@ export function RadarToolbar({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The search box keeps what is being typed to itself, so typing never
+ * re-renders the page; the search is committed after a short pause, on Enter,
+ * or when the value is cleared.
+ */
+function SearchBox({
+  value,
+  onCommit,
+  onSubmit,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onCommit: (q: string) => void;
+  onSubmit: (q: string) => void;
+  placeholder: string;
+  label: string;
+}) {
+  const [text, setText] = useState(value);
+  const committed = useRef(value);
+  // Follow outside changes (e.g. a search started on Today, a reset).
+  useEffect(() => {
+    if (value !== committed.current) {
+      committed.current = value;
+      setText(value);
+    }
+  }, [value]);
+  useEffect(() => {
+    if (text === committed.current) return;
+    const t = window.setTimeout(
+      () => {
+        committed.current = text;
+        onCommit(text);
+      },
+      text.trim() ? 300 : 0,
+    );
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+  return (
+    <form
+      className="relative min-w-[260px] basis-full"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (text !== committed.current) {
+          committed.current = text;
+          onCommit(text);
+        }
+        onSubmit(text);
+      }}
+    >
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        className="h-12 pl-10 text-base"
+        autoFocus
+      />
+    </form>
   );
 }

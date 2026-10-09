@@ -63,6 +63,7 @@ describe("application workspace (synthetic)", () => {
       c.item === "Proof of incorporation" ? { ...c, status: "have" as const } : c,
     );
     const memo = decisionMemo(grant, ws, {
+      recipient: "Marcelo",
       applicantNames: ["IIAL"],
       eligibility: [
         {
@@ -123,6 +124,8 @@ describe("application workspace in Spanish (synthetic)", () => {
     ws.blockers = ["No tenemos estados financieros auditados"];
     ws.checklist[0].status = "have";
     const { subject, body } = decisionMemo(grant, ws, {
+      recipient: "Marcelo",
+      orgName: "IIAL",
       applicantNames: ["IIAL"],
       eligibility: [],
       lang: "es",
@@ -156,9 +159,7 @@ describe("application workspace in Spanish (synthetic)", () => {
       ),
     ).toBe("sin fecha fija");
     // English stays the default.
-    expect(decisionMemo(grant, ws, { applicantNames: [], eligibility: [] }).body).toMatch(
-      /^Hi Marcelo/,
-    );
+    expect(decisionMemo(grant, ws, { applicantNames: [], eligibility: [] }).body).toMatch(/^Hi,/);
   });
 
   it("standard documents and milestones can be generated in Spanish", () => {

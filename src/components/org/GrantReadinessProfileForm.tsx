@@ -82,6 +82,12 @@ const ES: Record<string, string> = {
   "e.g. 789456123 or 123456789RR0001": "p. ej. 789456123 o 123456789RR0001",
   "Official website URL": "URL del sitio web oficial",
   "Used by automated evidence collectors": "La usan los recolectores automáticos de evidencia",
+  "Who decides (memos and summaries go to)": "Quién decide (a quién van los memos y resúmenes)",
+  "First name or role, e.g. the executive director":
+    "Nombre o cargo, p. ej. la dirección ejecutiva",
+  "Credentials to cite in partner emails": "Credenciales para citar en correos a socios",
+  "Optional: research, track record or reference with its link":
+    "Opcional: investigación, trayectoria o referencia con su enlace",
   "Open URL": "Abrir URL",
   "Used for Gate F1 — list all that legally apply":
     "Se usa en la compuerta F1: indique todos los que apliquen legalmente",
@@ -129,19 +135,19 @@ const ES: Record<string, string> = {
   "Institutional recovery rate (usually 10–15%)":
     "Tasa de recuperación institucional (normalmente 10–15%)",
   "Consortium Capabilities, Standards & Assets": "Capacidades de consorcio, estándares y activos",
-  "Defines multi-stakeholder roles (Lead vs Technical vs Commercial) and proprietary standards like WCIS.":
-    "Define los roles en alianzas (líder, técnico, comercial) y estándares propios como WCIS.",
+  "Defines multi-stakeholder roles (Lead vs Technical vs Commercial) and the organization's own standards or methodologies.":
+    "Define los roles en alianzas (líder, técnico, comercial) y los estándares o metodologías propios de la organización.",
   "Strategic standards, certifications & intellectual property":
     "Estándares estratégicos, certificaciones y propiedad intelectual",
   "Proprietary assets monetized or deployed in grant projects":
     "Activos propios monetizados o usados en proyectos financiados",
-  "WCIS Standard": "Estándar WCIS",
-  "CSIP Professional": "Profesional CSIP",
-  "CSCIP Professional": "Profesional CSCIP",
-  "CARP Professional": "Profesional CARP",
-  "Direct Trade Protocol": "Protocolo de comercio directo",
+  "Your standard or methodology, staff certifications, software platform":
+    "Su estándar o metodología, certificaciones del equipo, plataforma de software",
+  "ISO 9001 (Quality)": "ISO 9001 (calidad)",
+  "ISO 14001 (Environment)": "ISO 14001 (ambiente)",
   "MRV Emissions Protocol": "Protocolo MRV de emisiones",
-  "Agritech Platform": "Plataforma agritech",
+  "Impact Measurement Framework": "Marco de medición de impacto",
+  "Software / Digital Platform": "Plataforma de software / digital",
   "Technical services and execution competencies": "Servicios técnicos y competencias de ejecución",
   "Applied research, curriculum design, traceability":
     "Investigación aplicada, diseño curricular, trazabilidad",
@@ -151,7 +157,7 @@ const ES: Record<string, string> = {
   "Emissions Reduction": "Reducción de emisiones",
   "Knowledge Mobilization": "Movilización del conocimiento",
   "Farmer Coordination": "Coordinación de productores",
-  "WCIS Audit Protocols": "Protocolos de auditoría WCIS",
+  "Audit & Verification Protocols": "Protocolos de auditoría y verificación",
   "Domains driving grant discovery and retrieval": "Áreas que orientan la búsqueda de grants",
   "education, agriculture, technology": "education, agriculture, technology",
   "Education & Workforce": "Educación y fuerza laboral",
@@ -171,8 +177,8 @@ const ES: Record<string, string> = {
   "Additional strategic focus areas": "Áreas de enfoque estratégico adicionales",
   "Contextual narratives used by the evaluator and Grant Copilot":
     "Contexto que usan el evaluador y el Grant Copilot",
-  "Sustainability, supply chain integrity, Latin America cocoa & coffee value chains, regenerative agriculture...":
-    "Sostenibilidad, integridad de la cadena de suministro, cadenas de valor de cacao y café en América Latina, agricultura regenerativa...",
+  "The themes, value chains or communities your organization wants funders to associate with its work...":
+    "Los temas, cadenas de valor o comunidades que su organización quiere que los financiadores asocien con su trabajo...",
   "Americas Geographic Scope & Partner Ecosystem":
     "Alcance geográfico en las Américas y red de socios",
   "Coverage across Canadian provinces and Latin American jurisdictions, established partners and donor history.":
@@ -180,8 +186,8 @@ const ES: Record<string, string> = {
   "Operating regions & field delivery zones": "Regiones de operación y zonas de trabajo de campo",
   "Where project benefits and field pilots take place":
     "Dónde se generan los beneficios y se realizan los pilotos de campo",
-  "Canada, Ontario, Quebec, Latin America, Costa Rica":
-    "Canadá, Ontario, Quebec, América Latina, Costa Rica",
+  "Countries, provinces or regions where you deliver projects":
+    "Países, provincias o regiones donde ejecuta proyectos",
   "Canada (National)": "Canadá (nacional)",
   "Latin America (General)": "América Latina (general)",
   "Working languages": "Idiomas de trabajo",
@@ -193,11 +199,8 @@ const ES: Record<string, string> = {
   "Established consortium network & partners": "Red de consorcio y socios establecidos",
   "Frequent co-applicants and institutions (Universities, Cooperatives, Off-takers)":
     "Co-solicitantes e instituciones frecuentes (universidades, cooperativas, compradores)",
-  "Lambton College (Postsecondary Lead)": "Lambton College (líder postsecundario)",
-  "SOCODEVI (Territorial Governance Lead)": "SOCODEVI (líder de gobernanza territorial)",
-  "Nahua Canada (Commercial Off-taker)": "Nahua Canada (comprador comercial)",
-  "Université Laval (Academic Lead)": "Université Laval (líder académico)",
-  "FIMI (Indigenous Women's Fund)": "FIMI (Fondo de Mujeres Indígenas)",
+  "Names of partners, e.g. a college or university, a producer cooperative, a buyer":
+    "Nombres de socios, p. ej. un college o universidad, una cooperativa de productores, un comprador",
   "Past funders & grant track record": "Financiadores anteriores e historial de grants",
   "Funding agencies where the organization has prior award or review experience":
     "Agencias en las que la organización ya obtuvo o presentó solicitudes",
@@ -228,17 +231,19 @@ const ES: Record<string, string> = {
   "Signs primary contribution agreement with funder, bears fiduciary compliance, administers disbursements, and oversees reporting.":
     "Firma el acuerdo de contribución con el financiador, asume el cumplimiento fiduciario, administra los desembolsos y supervisa los informes.",
   "Technical & Innovation Partner": "Socio técnico y de innovación",
-  "WCIS / Software / Protocols": "WCIS / software / protocolos",
-  "Provides Whole Chain Integrity Standard (WCIS) validation, digital traceability software, curriculum development, and scientific impact verification.":
-    "Aporta validación del Whole Chain Integrity Standard (WCIS), software de trazabilidad digital, desarrollo curricular y verificación científica del impacto.",
+  "Standards / Software / Protocols": "Estándares / software / protocolos",
+  "Provides the technical core: its own standard or methodology, software or digital tools, curriculum development, and impact verification.":
+    "Aporta el núcleo técnico: su propio estándar o metodología, software o herramientas digitales, desarrollo curricular y verificación del impacto.",
   "Territorial Governance & Field Lead": "Gobernanza territorial y liderazgo de campo",
-  "SOCODEVI / Producer Coops": "SOCODEVI / cooperativas de productores",
-  "Mobilizes field producers, cooperative federations, and local communities (e.g. SOCODEVI or Indigenous territorial governance).":
-    "Moviliza a productores, federaciones cooperativas y comunidades locales (p. ej. SOCODEVI o gobernanza territorial indígena).",
+  "Cooperatives / Community Organizations": "Cooperativas / organizaciones comunitarias",
+  "Mobilizes field producers, cooperative federations, and local communities (e.g. a cooperative development organization or Indigenous territorial governance).":
+    "Moviliza a productores, federaciones cooperativas y comunidades locales (p. ej. una organización de desarrollo cooperativo o una gobernanza territorial indígena).",
   "Commercial Off-taker & Market Deployment": "Comprador comercial y despliegue en el mercado",
-  "Nahua Canada / Exporters": "Nahua Canada / exportadores",
-  "Purchases commodities, validates market economics, tests pilot ingredients in manufacturing, or scales export distribution across the Americas.":
-    "Compra materias primas, valida la economía de mercado, prueba ingredientes piloto en la manufactura o escala la distribución de exportación en las Américas.",
+  "Buyers / Exporters": "Compradores / exportadores",
+  "Purchases products, validates market economics, tests pilot outputs in manufacturing, or scales distribution and exports.":
+    "Compra productos, valida la economía de mercado, prueba resultados piloto en la manufactura o escala la distribución y las exportaciones.",
+  "Maintaining an active partner network enables GrantDesk to recommend viable Consortium Routes (e.g. a college or university as Academic Lead + your organization as Technical Partner) whenever a call requires accredited postsecondary or multi-year audit prerequisites. Partners listed here can be imported into the Partner directory.":
+    "Mantener una red de socios activa permite a GrantDesk recomendar rutas de consorcio viables (p. ej. un college o universidad como líder académico + su organización como socio técnico) cuando una convocatoria exige una institución postsecundaria acreditada o auditorías de varios años. Los socios listados aquí pueden importarse al Directorio de socios.",
 };
 
 type Props = {
@@ -604,11 +609,7 @@ export function GrantReadinessProfileForm({
                     description={L("Used by automated evidence collectors")}
                   >
                     <div className="relative">
-                      <Input
-                        type="url"
-                        {...form.register("website")}
-                        placeholder="https://iial.ca"
-                      />
+                      <Input type="url" {...form.register("website")} placeholder="https://" />
                       {values.website && (
                         <a
                           href={values.website}
@@ -621,6 +622,20 @@ export function GrantReadinessProfileForm({
                         </a>
                       )}
                     </div>
+                  </FormField>
+
+                  <FormField
+                    label={L("Who decides (memos and summaries go to)")}
+                    description={L("First name or role, e.g. the executive director")}
+                  >
+                    <Input {...form.register("decision_maker_name")} />
+                  </FormField>
+
+                  <FormField
+                    label={L("Credentials to cite in partner emails")}
+                    description={L("Optional: research, track record or reference with its link")}
+                  >
+                    <Textarea rows={2} {...form.register("outreach_credentials")} />
                   </FormField>
 
                   <FormField
@@ -857,7 +872,7 @@ export function GrantReadinessProfileForm({
               <ProfileCard
                 title={L("Consortium Capabilities, Standards & Assets")}
                 description={L(
-                  "Defines multi-stakeholder roles (Lead vs Technical vs Commercial) and proprietary standards like WCIS.",
+                  "Defines multi-stakeholder roles (Lead vs Technical vs Commercial) and the organization's own standards or methodologies.",
                 )}
                 icon={<Network className="h-5 w-5 text-primary" />}
               >
@@ -927,26 +942,26 @@ export function GrantReadinessProfileForm({
                         <TagInput
                           value={field.value ?? ""}
                           onChange={field.onChange}
-                          placeholder="WCIS, CSIP, CSCIP, CARP, Traceability Protocol"
+                          placeholder={L(
+                            "Your standard or methodology, staff certifications, software platform",
+                          )}
                           suggestions={[
+                            { value: "ISO 9001 certification", label: L("ISO 9001 (Quality)") },
                             {
-                              value: "WCIS (Whole Chain Integrity Standard)",
-                              label: L("WCIS Standard"),
-                            },
-                            { value: "CSIP Certification", label: L("CSIP Professional") },
-                            { value: "CSCIP Certification", label: L("CSCIP Professional") },
-                            { value: "CARP Certification", label: L("CARP Professional") },
-                            {
-                              value: "Direct Trade Cacao Protocol",
-                              label: L("Direct Trade Protocol"),
+                              value: "ISO 14001 certification",
+                              label: L("ISO 14001 (Environment)"),
                             },
                             {
-                              value: "Supply Chain MRV Protocol",
+                              value: "MRV emissions protocol",
                               label: L("MRV Emissions Protocol"),
                             },
                             {
-                              value: "Proprietary Agritech Platform",
-                              label: L("Agritech Platform"),
+                              value: "Impact measurement framework",
+                              label: L("Impact Measurement Framework"),
+                            },
+                            {
+                              value: "Proprietary software platform",
+                              label: L("Software / Digital Platform"),
                             },
                           ]}
                         />
@@ -994,8 +1009,8 @@ export function GrantReadinessProfileForm({
                                 label: L("Farmer Coordination"),
                               },
                               {
-                                value: "WCIS audit protocols",
-                                label: L("WCIS Audit Protocols"),
+                                value: "Audit and verification protocols",
+                                label: L("Audit & Verification Protocols"),
                               },
                             ]}
                           />
@@ -1076,7 +1091,7 @@ export function GrantReadinessProfileForm({
                       rows={3}
                       {...form.register("focus_areas")}
                       placeholder={L(
-                        "Sustainability, supply chain integrity, Latin America cocoa & coffee value chains, regenerative agriculture...",
+                        "The themes, value chains or communities your organization wants funders to associate with its work...",
                       )}
                     />
                   </FormField>
@@ -1105,7 +1120,9 @@ export function GrantReadinessProfileForm({
                         <TagInput
                           value={field.value ?? ""}
                           onChange={field.onChange}
-                          placeholder={L("Canada, Ontario, Quebec, Latin America, Costa Rica")}
+                          placeholder={L(
+                            "Countries, provinces or regions where you deliver projects",
+                          )}
                           suggestions={[
                             { value: "Canada", label: L("Canada (National)") },
                             { value: "Ontario", label: "Ontario" },
@@ -1160,29 +1177,9 @@ export function GrantReadinessProfileForm({
                         <TagInput
                           value={field.value ?? ""}
                           onChange={field.onChange}
-                          placeholder="Lambton College, SOCODEVI, Nahua Canada, Université Laval"
-                          suggestions={[
-                            {
-                              value: "Lambton College",
-                              label: L("Lambton College (Postsecondary Lead)"),
-                            },
-                            {
-                              value: "SOCODEVI",
-                              label: L("SOCODEVI (Territorial Governance Lead)"),
-                            },
-                            {
-                              value: "Nahua Canada",
-                              label: L("Nahua Canada (Commercial Off-taker)"),
-                            },
-                            {
-                              value: "Université Laval",
-                              label: L("Université Laval (Academic Lead)"),
-                            },
-                            {
-                              value: "FIMI",
-                              label: L("FIMI (Indigenous Women's Fund)"),
-                            },
-                          ]}
+                          placeholder={L(
+                            "Names of partners, e.g. a college or university, a producer cooperative, a buyer",
+                          )}
                         />
                       )}
                     />
@@ -1229,9 +1226,8 @@ export function GrantReadinessProfileForm({
                     {tr("Bilateral & Multi-Partner Synergy", "Sinergia bilateral y multisocio")}
                   </p>
                   <p className="mt-1">
-                    {tr(
-                      "Maintaining an active partner network enables GrantDesk to recommend viable Consortium Routes (e.g. Lambton College as Academic Lead + IIAL as Technical Partner) whenever a call requires accredited postsecondary or multi-year audit prerequisites.",
-                      "Mantener una red de socios activa permite a GrantDesk recomendar rutas de consorcio viables (p. ej. Lambton College como líder académico + IIAL como socio técnico) cuando una convocatoria exige una institución postsecundaria acreditada o auditorías de varios años.",
+                    {L(
+                      "Maintaining an active partner network enables GrantDesk to recommend viable Consortium Routes (e.g. a college or university as Academic Lead + your organization as Technical Partner) whenever a call requires accredited postsecondary or multi-year audit prerequisites. Partners listed here can be imported into the Partner directory.",
                     )}
                   </p>
                 </div>
@@ -1414,22 +1410,22 @@ const CONSORTIUM_ROLES_OPTIONS = [
   {
     id: "technical_partner",
     title: "Technical & Innovation Partner",
-    tag: "WCIS / Software / Protocols",
+    tag: "Standards / Software / Protocols",
     description:
-      "Provides Whole Chain Integrity Standard (WCIS) validation, digital traceability software, curriculum development, and scientific impact verification.",
+      "Provides the technical core: its own standard or methodology, software or digital tools, curriculum development, and impact verification.",
   },
   {
     id: "governance_lead",
     title: "Territorial Governance & Field Lead",
-    tag: "SOCODEVI / Producer Coops",
+    tag: "Cooperatives / Community Organizations",
     description:
-      "Mobilizes field producers, cooperative federations, and local communities (e.g. SOCODEVI or Indigenous territorial governance).",
+      "Mobilizes field producers, cooperative federations, and local communities (e.g. a cooperative development organization or Indigenous territorial governance).",
   },
   {
     id: "commercial_partner",
     title: "Commercial Off-taker & Market Deployment",
-    tag: "Nahua Canada / Exporters",
+    tag: "Buyers / Exporters",
     description:
-      "Purchases commodities, validates market economics, tests pilot ingredients in manufacturing, or scales export distribution across the Americas.",
+      "Purchases products, validates market economics, tests pilot outputs in manufacturing, or scales distribution and exports.",
   },
 ];

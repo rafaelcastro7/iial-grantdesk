@@ -1,6 +1,7 @@
 // The consultant's pipeline: every grant an organization is working, with the
 // decision data from its application plan, in the columns the team uses to
 // decide (status, deadline, applicant, role, money, match, fit, priority).
+import { decisionMakerLabel, useTeamSettings } from "@/lib/team-settings";
 import { cleanTitle } from "@/lib/html-text";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -42,6 +43,7 @@ const PRIORITY_TONE: Record<Priority, string> = {
 
 function PipelinePage() {
   const { activeOrgId, activeOrgName } = useActiveTenant();
+  const { settings: team } = useTeamSettings(activeOrgId);
   const fetchRows = useServerFn(listGrantWorkspaces);
   const [priority, setPriority] = useState<Priority | "all" | "upcoming">("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -122,9 +124,14 @@ function PipelinePage() {
             .map((id) => nameById.get(id) ?? "")
             .filter(Boolean),
         })),
-      { lang: digestLang, orgName: activeOrgName || "IIAL" },
+      {
+        lang: digestLang,
+        orgName: activeOrgName || "",
+        recipient: team.decisionMaker,
+        sender: team.sender,
+      },
     );
-  }, [data, selected, digestLang, activeOrgName]);
+  }, [data, selected, digestLang, activeOrgName, team.decisionMaker, team.sender]);
 
   const toggle = (id: string) =>
     setSelected((s) => {
@@ -299,11 +306,9 @@ function PipelinePage() {
         <section className="mt-6 rounded-lg border bg-card p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <Mail className="h-4 w-4" />{" "}
-              {tr(
-                "One email to Marcelo about the selected grants",
-                "Un correo a Marcelo sobre los grants seleccionados",
-              )}
+              <Mail className="h-4 w-4" /> {tr("One email to", "Un correo a")}{" "}
+              {decisionMakerLabel(team, lang)}{" "}
+              {tr("about the selected grants", "sobre los grants seleccionados")}
             </h2>
             <select
               className="h-9 rounded-md border bg-background px-2 text-sm"

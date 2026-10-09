@@ -1,8 +1,7 @@
 // Application workspace: the working data a consultant keeps per grant —
 // decision, who applies and in what role, consortium, documents checklist,
-// milestones counted back from the deadline, WCIS project idea — plus the
+// milestones counted back from the deadline, project idea — plus the
 // outputs built from it (decision memo, pipeline export). Pure and client-safe.
-import type { ConsortiumRoute } from "@/lib/grant-roadmap";
 
 export const PRIORITIES = ["now", "prepare", "monitor", "discard"] as const;
 export type Priority = (typeof PRIORITIES)[number];
@@ -81,7 +80,7 @@ export type Partner = {
   name: string;
   country?: string | null;
   type?: string | null; // university, college, cooperative, chamber, company, government...
-  role?: string | null; // e.g. "Grant administrator", "Technical partner (WCIS)"
+  role?: string | null; // e.g. "Grant administrator", "Technical partner"
   contact?: string | null;
   status?: "to_contact" | "contacted" | "interested" | "confirmed" | "declined" | null;
 };
@@ -258,8 +257,8 @@ const DOC_RULES: DocRule[] = [
   },
   {
     key: "inkind",
-    en: "In-kind contribution table (hours, services, WCIS)",
-    es: "Tabla de aportes en especie (horas, servicios, WCIS)",
+    en: "In-kind contribution table (hours, services, methods)",
+    es: "Tabla de aportes en especie (horas, servicios, metodologías)",
     when: (t) => /in-?kind|en especie/.test(t),
   },
   {
@@ -514,7 +513,7 @@ const ES_MONTHS = [
 
 /**
  * Decision memo for the decision maker, in plain (B1) English: what it is,
- * who applies and how, WCIS fit, money, deadline, what we have and what is
+ * who applies and how, our methods, money, deadline, what we have and what is
  * missing, and a recommendation. Internal: it may mention blockers.
  */
 /** What the memo takes from the grant dossier. */
@@ -573,8 +572,8 @@ export function decisionMemo(
   },
 ): { subject: string; body: string } {
   if (opts.lang === "es") return decisionMemoEs(grant, ws, opts);
-  const recipient = opts.recipient ?? "Marcelo";
-  const sender = opts.sender ?? "Rocío";
+  const recipient = opts.recipient?.trim() ?? "";
+  const sender = opts.sender?.trim() ?? "";
   const funder = grant.funder?.name ? ` (${grant.funder.name})` : "";
   const applicants = opts.applicantNames.length
     ? opts.applicantNames.join(" and ")
@@ -592,7 +591,7 @@ export function decisionMemo(
     discard: "I recommend we do not apply.",
   };
   const lines: string[] = [
-    `Hi ${recipient},`,
+    `Hi${recipient ? ` ${recipient}` : ""},`,
     "",
     `Here is a short summary of "${grant.title}"${funder}, so we can decide if we apply.`,
     "",
@@ -623,7 +622,7 @@ export function decisionMemo(
     "",
     ws.project_title || ws.wcis_angle ? "Project idea" : "",
     ws.project_title ? `- ${ws.project_title}` : "",
-    ws.wcis_angle ? `- How we use WCIS: ${ws.wcis_angle}` : "",
+    ws.wcis_angle ? `- How we apply our methods: ${ws.wcis_angle}` : "",
     ws.project_title || ws.wcis_angle ? "" : "",
     partners.length ? "Partners" : "",
     ...partners.map(
@@ -645,8 +644,8 @@ export function decisionMemo(
       : "- Nothing, we are ready",
     ...(ws.blockers.length ? ["", "Risks / blockers", ...ws.blockers.map((b) => `- ${b}`)] : []),
     "",
-    `What ${opts.orgName?.trim() || "IIAL"} gets`,
-    ...valueForUs(ws.route, opts.orgName?.trim() || "IIAL").map((v) => `- ${v}`),
+    `What ${opts.orgName?.trim() || "our organization"} gets`,
+    ...valueForUs(ws.route, opts.orgName?.trim() || "our organization").map((v) => `- ${v}`),
     "",
     "Recommendation",
     recommendation[ws.priority],
@@ -675,9 +674,9 @@ function decisionMemoEs(
     dossier?: MemoDossier | null;
   },
 ): { subject: string; body: string } {
-  const recipient = opts.recipient ?? "Marcelo";
-  const sender = opts.sender ?? "Rocío";
-  const org = opts.orgName?.trim() || "IIAL";
+  const recipient = opts.recipient?.trim() ?? "";
+  const sender = opts.sender?.trim() ?? "";
+  const org = opts.orgName?.trim() || "our organization";
   const funder = grant.funder?.name ? ` (${grant.funder.name})` : "";
   const applicants = opts.applicantNames.length
     ? opts.applicantNames.join(" y ")
@@ -703,7 +702,7 @@ function decisionMemoEs(
     discard: "Recomiendo que no apliquemos.",
   };
   const lines: string[] = [
-    `Hola ${recipient}:`,
+    `Hola${recipient ? ` ${recipient}` : ""}:`,
     "",
     `Le comparto un breve resumen de "${grant.title}"${funder}, para que decidamos si aplicamos.`,
     "",
@@ -734,7 +733,7 @@ function decisionMemoEs(
     "",
     ws.project_title || ws.wcis_angle ? "Idea de proyecto" : "",
     ws.project_title ? `- ${ws.project_title}` : "",
-    ws.wcis_angle ? `- Cómo usamos el WCIS: ${ws.wcis_angle}` : "",
+    ws.wcis_angle ? `- Cómo aplicamos nuestros métodos: ${ws.wcis_angle}` : "",
     "",
     partners.length ? "Socios" : "",
     ...partners.map(
@@ -784,16 +783,16 @@ export function valueForUs(
   const en: Record<Route | "none", string[]> = {
     lead: [
       `${orgName} manages the budget: staff time and an administration share (overhead) are paid by the grant.`,
-      "Paid delivery of training, certifications (CSIP, CSCIP, CARP) and applied research inside the project.",
-      "WCIS is applied and validated in a funded project: a case study to sell it later.",
+      "Paid delivery of our own services (training, methods, applied research) inside the project.",
+      "Our methods are applied and validated in a funded project: a reference case for later.",
     ],
     co_lead: [
       `${orgName} receives its own part of the budget for the activities it leads.`,
-      "Paid delivery of training, certifications and WCIS work inside the project.",
+      "Paid delivery of our training, methods and services inside the project.",
       "Shared visibility with the lead institution and access to its network.",
     ],
     partner: [
-      `The lead institution pays ${orgName} for services (WCIS methodology, training, certifications) as a sub-contract or partner budget line.`,
+      `The lead institution pays ${orgName} for services (methods, training, expertise) as a sub-contract or partner budget line.`,
       "No need to manage the funds or have audited statements.",
       "A funded reference project and a new institutional relationship for future calls.",
     ],
@@ -806,16 +805,16 @@ export function valueForUs(
   const es: Record<Route | "none", string[]> = {
     lead: [
       `${orgName} administra el presupuesto: el tiempo del equipo y un porcentaje de administración (overhead) se pagan con el grant.`,
-      "Entrega pagada de formación, certificaciones (CSIP, CSCIP, CARP) e investigación aplicada dentro del proyecto.",
-      "El WCIS se aplica y valida en un proyecto financiado: un caso de éxito para venderlo después.",
+      "Entrega pagada de nuestros servicios (formación, metodologías, investigación aplicada) dentro del proyecto.",
+      "Nuestras metodologías se aplican y validan en un proyecto financiado: un caso de referencia para después.",
     ],
     co_lead: [
       `${orgName} recibe su propia parte del presupuesto por las actividades que lidera.`,
-      "Entrega pagada de formación, certificaciones y trabajo con WCIS dentro del proyecto.",
+      "Entrega pagada de nuestra formación, metodologías y servicios dentro del proyecto.",
       "Visibilidad compartida con la institución líder y acceso a su red.",
     ],
     partner: [
-      `La institución líder paga a ${orgName} por servicios (metodología WCIS, formación, certificaciones) como subcontrato o línea de presupuesto del socio.`,
+      `La institución líder paga a ${orgName} por servicios (metodologías, formación, conocimiento) como subcontrato o línea de presupuesto del socio.`,
       "No es necesario administrar fondos ni tener estados financieros auditados.",
       "Un proyecto financiado de referencia y una nueva relación institucional para futuras convocatorias.",
     ],
@@ -874,102 +873,6 @@ export function pipelineCsv(rows: PipelineRow[]): string {
 
 export function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-/**
- * Adopts a synthesized strategic consortium route directly into an application workspace,
- * populating the role, lead institution, fund administrator, WCIS angle, and consortium partners.
- */
-export function adoptConsortiumRoute(
-  ws: Workspace,
-  route: ConsortiumRoute,
-  orgName = "IIAL",
-): Workspace {
-  let mappedRoute: Route = "partner";
-  let leadInst = ws.lead_institution;
-  let admin = ws.administrator;
-  const partnersToAdd: Partner[] = [];
-
-  switch (route.id) {
-    case "direct":
-      mappedRoute = "lead";
-      leadInst = orgName;
-      admin = orgName;
-      break;
-
-    case "academic":
-      mappedRoute = "partner";
-      leadInst = "Lambton College";
-      admin = "Lambton College / Research Office";
-      partnersToAdd.push({
-        id: newId("partner"),
-        name: "Lambton College",
-        country: "Canada",
-        type: "College",
-        role: "Academic lead applicant and grant administrator",
-        status: "to_contact",
-      });
-      break;
-
-    case "territorial":
-      mappedRoute = "partner";
-      leadInst = "SOCODEVI / APP CACAO";
-      admin = "SOCODEVI";
-      partnersToAdd.push(
-        {
-          id: newId("partner"),
-          name: "SOCODEVI",
-          country: "Canada",
-          type: "NGO / Cooperatives",
-          role: "Fiduciary governance and territorial lead",
-          status: "to_contact",
-        },
-        {
-          id: newId("partner"),
-          name: "APP CACAO",
-          country: "Peru",
-          type: "Cooperative / producers",
-          role: "Beneficiary producer association",
-          status: "to_contact",
-        },
-      );
-      break;
-
-    case "commercial":
-      mappedRoute = orgName === "Nahua Canada" ? "lead" : "partner";
-      leadInst = "Nahua Canada";
-      admin = "Nahua Canada";
-      if (orgName !== "Nahua Canada") {
-        partnersToAdd.push({
-          id: newId("partner"),
-          name: "Nahua Canada",
-          country: "Canada",
-          type: "Company",
-          role: "Commercial applicant and private match lead",
-          status: "to_contact",
-        });
-      }
-      break;
-  }
-
-  // Deduplicate partners by name
-  const existingNames = new Set(ws.partners.map((p) => p.name.trim().toLowerCase()));
-  const mergedPartners = [...ws.partners];
-  for (const p of partnersToAdd) {
-    if (!existingNames.has(p.name.trim().toLowerCase())) {
-      mergedPartners.push(p);
-      existingNames.add(p.name.trim().toLowerCase());
-    }
-  }
-
-  return {
-    ...ws,
-    route: mappedRoute,
-    lead_institution: leadInst,
-    administrator: admin,
-    wcis_angle: ws.wcis_angle?.trim() ? ws.wcis_angle : route.tacticalValue,
-    partners: mergedPartners,
-  };
 }
 
 // ---------------------------------------------------------------------------

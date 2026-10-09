@@ -26,10 +26,6 @@ import {
   type RadarGrant,
 } from "@/lib/grant-radar";
 import {
-  synthesizeGrantRoadmap,
-  type RouteId,
-} from "@/lib/grant-roadmap";
-import {
   evaluateRules,
   DEFAULT_RULES,
   type FitRules,
@@ -66,7 +62,8 @@ describe("Synthetic User Stress: Radar Search & Filter Matrix", () => {
     {
       id: "a0000001-0000-0000-0000-000000000001",
       title: "NSERC Alliance Grant – Applied Agri-Food & Digital Traceability R&D",
-      summary: "Collaborative R&D projects between Canadian accredited post-secondary researchers and partner organizations.",
+      summary:
+        "Collaborative R&D projects between Canadian accredited post-secondary researchers and partner organizations.",
       status: "enriched",
       country: "CA",
       amount_cad_min: 100000,
@@ -86,7 +83,8 @@ describe("Synthetic User Stress: Radar Search & Filter Matrix", () => {
     {
       id: "a0000002-0000-0000-0000-000000000002",
       title: "Global Affairs Canada – Sustainable Agriculture & LATAM Market Access Fund",
-      summary: "Funding for sustainable agricultural development, supply chain transparency, and international trade access in the Americas.",
+      summary:
+        "Funding for sustainable agricultural development, supply chain transparency, and international trade access in the Americas.",
       status: "enriched",
       country: "CA",
       amount_cad_min: 500000,
@@ -105,7 +103,8 @@ describe("Synthetic User Stress: Radar Search & Filter Matrix", () => {
     {
       id: "a0000003-0000-0000-0000-000000000003",
       title: "Impact Canada Challenge – AI & Clean Agricultural Traceability Hub",
-      summary: "Grand challenge prize and milestone-based funding for breakthrough applied technologies.",
+      summary:
+        "Grand challenge prize and milestone-based funding for breakthrough applied technologies.",
       status: "enriched",
       country: "CA",
       amount_cad_min: 250000,
@@ -124,7 +123,8 @@ describe("Synthetic User Stress: Radar Search & Filter Matrix", () => {
     {
       id: "a0000004-0000-0000-0000-000000000004",
       title: "NRC IRAP – International Agri-Food Commercial Innovation Partnership",
-      summary: "Accelerates market readiness, technology demonstration, and international supply chain integration for Canadian innovations.",
+      summary:
+        "Accelerates market readiness, technology demonstration, and international supply chain integration for Canadian innovations.",
       status: "enriched",
       country: "CA",
       amount_cad_min: 50000,
@@ -158,7 +158,7 @@ describe("Synthetic User Stress: Radar Search & Filter Matrix", () => {
       "'; DROP TABLE grants; --",
       "' OR '1'='1",
       "<script>alert('xss')</script>",
-      "\"><img src=x onerror=alert(1)>",
+      '"><img src=x onerror=alert(1)>',
       "%%__**??//\\\\",
       "(((((((((())))))))))",
       "🌱🌾☕ Cacao & Coffee Traceability 🇨🇦",
@@ -186,7 +186,11 @@ describe("Synthetic User Stress: Radar Search & Filter Matrix", () => {
       status: "all",
       verdict: "all",
     });
-    expect(radarOver200k.items.every((item) => (item.grant.amount_cad_max ?? 0) >= 200000 || item.grant.amount_cad_max == null)).toBe(true);
+    expect(
+      radarOver200k.items.every(
+        (item) => (item.grant.amount_cad_max ?? 0) >= 200000 || item.grant.amount_cad_max == null,
+      ),
+    ).toBe(true);
 
     // Extreme filter (none match or hiddenByAmount > 0)
     const radarExtreme = buildRadar(sampleGrants, {
@@ -247,103 +251,6 @@ describe("Synthetic User Stress: Radar Search & Filter Matrix", () => {
   });
 });
 
-describe("Synthetic User Stress: Grant Detail – Strategic Roadmap & Consortia", () => {
-  it("builds all 4 consortium delivery routes with clear roles and barriers", () => {
-    const nsercGrant = {
-      title: "NSERC Alliance Grant – Applied Agri-Food & Digital Traceability R&D",
-      summary: "Collaborative R&D with postsecondary institutions and partner organizations.",
-      funderName: "NSERC",
-      amountMaxCad: 750000,
-      eligibilityNote: "Lead applicant must be an accredited post-secondary institution.",
-      requirements: [
-        { category: "governance", requirement: "Lead applicant must be an accredited Canadian university or college", value: "Lambton College", isCritical: true },
-        { category: "financial", requirement: "Matching contribution required from partner organizations", value: "30% cash/in-kind", isCritical: true },
-      ],
-    };
-
-    const roadmap = synthesizeGrantRoadmap(nsercGrant);
-    expect(roadmap.routes).toHaveLength(4);
-
-    const routeIds: RouteId[] = ["direct", "academic", "territorial", "commercial"];
-    for (const id of routeIds) {
-      const route = roadmap.routes.find((r) => r.id === id);
-      expect(route).toBeDefined();
-      expect(route?.leadEntity.length).toBeGreaterThan(5);
-      expect(route?.iialRole.length).toBeGreaterThan(5);
-      expect(route?.keyBarrier.length).toBeGreaterThan(5);
-      expect(route?.tacticalValue.length).toBeGreaterThan(5);
-    }
-
-    // For NSERC, Route B (Academic) must be recommended
-    expect(roadmap.recommendedRouteId).toBe("academic");
-    const academicRoute = roadmap.routes.find((r) => r.id === "academic");
-    expect(academicRoute?.recommendedPartner).toContain("Lambton");
-  });
-
-  it("evaluates Global Affairs Canada fund for Route C (LATAM Territorial) alignment", () => {
-    const gacGrant = {
-      title: "Global Affairs Canada – Sustainable Agriculture & LATAM Market Access Fund",
-      summary: "Funding for sustainable agricultural development, supply chain transparency, and international trade access in Latin America and the Caribbean.",
-      funderName: "Global Affairs Canada",
-      amountMaxCad: 2000000,
-      requirements: [
-        { category: "geographic", requirement: "Must operate in eligible Latin American / Caribbean partner countries", value: "Americas", isCritical: true },
-        { category: "governance", requirement: "Multi-party consortium with verified local community representation", value: "Territorial partner", isCritical: true },
-      ],
-    };
-
-    const roadmap = synthesizeGrantRoadmap(gacGrant);
-    const territorialRoute = roadmap.routes.find((r) => r.id === "territorial");
-    expect(territorialRoute).toBeDefined();
-    expect(territorialRoute?.iialRole).toContain("technical partner");
-    expect(territorialRoute?.recommendedPartner).toContain("SOCODEVI");
-  });
-});
-
-describe("Synthetic User Stress: Financial Conditions & Hurdles", () => {
-  it("calculates audit level, matching requirement, and allowable OPEX categories", () => {
-    const grant = {
-      title: "Applied Agri-Food Decarbonization Hub",
-      summary: "Matching contribution required. Internal CPA statements accepted.",
-      funderName: "Global Affairs Canada",
-      amountMaxCad: 1000000,
-    };
-
-    const roadmap = synthesizeGrantRoadmap(grant);
-    const conditions = roadmap.financial;
-
-    // Audit tolerance
-    expect(conditions.auditLevel).toBeDefined();
-    expect(conditions.auditLevel.status).not.toBe("fail");
-
-    // Allowable OPEX
-    const strategicReturn = roadmap.strategicReturn;
-    expect(strategicReturn.opexCoverage.salariesAndFees.length).toBeGreaterThan(10);
-    expect(strategicReturn.opexCoverage.managementAdmin.length).toBeGreaterThan(5);
-    expect(strategicReturn.wcisAssetCreation.standardFocus.length).toBeGreaterThan(5);
-  });
-});
-
-describe("Synthetic User Stress: Strategic Outreach Kit Generation", () => {
-  it("generates customizable partner outreach kit for recommended consortium routes", () => {
-    const grant = {
-      title: "NSERC Alliance Grant – Digital Traceability R&D",
-      summary: "Applied research partnership with accredited post-secondary researchers.",
-      funderName: "NSERC",
-      amountMaxCad: 500000,
-    };
-
-    const roadmap = synthesizeGrantRoadmap(grant);
-    const outreach = roadmap.outreach;
-
-    expect(outreach).toBeDefined();
-    expect(outreach.immediateSteps[0]).toContain("Lambton");
-    expect(outreach.templates.length).toBeGreaterThanOrEqual(1);
-    expect(outreach.templates[0]?.subject).toContain("Traceability");
-    expect(outreach.templates[0]?.body).toContain("Whole Chain Integrity Standard");
-  });
-});
-
 describe("Synthetic User Stress: Remediation Cycle & Decision Gate (Breaking & Unlocking)", () => {
   it("verifies locked draftGate when rules fail, then unlocks after manual facts remediation", () => {
     const grant: GrantForRules = {
@@ -377,11 +284,14 @@ describe("Synthetic User Stress: Remediation Cycle & Decision Gate (Breaking & U
     const remediatedGrant: GrantForRules = {
       ...grant,
       applicant_types: ["nonprofit", "for-profit"],
-      summary: "Applicant consortium led by commercial partner. Requires 20% cost-share from applicant.",
+      summary:
+        "Applicant consortium led by commercial partner. Requires 20% cost-share from applicant.",
     };
 
     const remediatedEval = evaluateRules(rules, remediatedGrant);
-    const remediatedCostCheck = remediatedEval.checks.find((c) => c.id === "sop_filter_3_costshare");
+    const remediatedCostCheck = remediatedEval.checks.find(
+      (c) => c.id === "sop_filter_3_costshare",
+    );
     expect(remediatedCostCheck?.status).not.toBe("fail");
 
     // 3. User re-checks fit (force: true) -> evaluation passes -> draft gate opens!
@@ -419,7 +329,8 @@ describe("Synthetic User Stress: Grant Copilot & Action Cards", () => {
       org_id: IIAL_ORG_ID,
       user_id: TEST_USER_ID,
       role: "assistant",
-      content: "Because NSERC requires an accredited post-secondary institution as the primary applicant, use Route B with Lambton College as the lead applicant. IIAL participates as the technical industry/non-profit partner providing WCIS standards.",
+      content:
+        "Because NSERC requires an accredited post-secondary institution as the primary applicant, use Route B with Lambton College as the lead applicant. IIAL participates as the technical industry/non-profit partner providing WCIS standards.",
       actions: [
         {
           type: "outreach_draft",
@@ -616,7 +527,7 @@ describe("Synthetic User Stress: Adversarial Copilot Actions Parsing & Fault Tol
       // Non-array JSON
       'Here is the response. ```actions {"type": "not_an_array"} ```',
       // Code injection attempt inside JSON
-      'Here is the response. ```actions <script>alert(1)</script> ```',
+      "Here is the response. ```actions <script>alert(1)</script> ```",
       // Empty action block
       "Here is the response. ```actions ```",
       // Nested backticks
@@ -637,9 +548,21 @@ describe("Synthetic User Stress: Proposal Readiness & Critical RFP Coverage", ()
     const { computeProposalReadiness } = await import("@/lib/proposal-readiness");
 
     const criticalRequirements = [
-      { category: "governance", requirement: "Must have signed consortium governance agreement with university", isCritical: true },
-      { category: "financial", requirement: "Requires minimum 30% matching contributions", isCritical: true },
-      { category: "technical", requirement: "Digital traceability system architecture specification", isCritical: false },
+      {
+        category: "governance",
+        requirement: "Must have signed consortium governance agreement with university",
+        isCritical: true,
+      },
+      {
+        category: "financial",
+        requirement: "Requires minimum 30% matching contributions",
+        isCritical: true,
+      },
+      {
+        category: "technical",
+        requirement: "Digital traceability system architecture specification",
+        isCritical: false,
+      },
     ];
 
     // 1. Partial/Incomplete proposal: only mentions governance
@@ -648,7 +571,8 @@ describe("Synthetic User Stress: Proposal Readiness & Critical RFP Coverage", ()
         id: "sec-01",
         kind: "summary",
         heading_en: "Executive Summary",
-        content_en: "Our consortium has signed a formal governance agreement with the university partner for applied research.",
+        content_en:
+          "Our consortium has signed a formal governance agreement with the university partner for applied research.",
         citations: ["cite-1"],
         critic_notes: null,
       },
@@ -679,7 +603,8 @@ describe("Synthetic User Stress: Proposal Readiness & Critical RFP Coverage", ()
         id: "sec-03",
         kind: "budget_justification",
         heading_en: "Matching Funds and Financial Commitments",
-        content_en: "The consortium partners formally confirm 30% matching contributions through cash and verified in-kind hours.",
+        content_en:
+          "The consortium partners formally confirm 30% matching contributions through cash and verified in-kind hours.",
         citations: ["cite-2"],
         critic_notes: null,
       },
@@ -862,29 +787,6 @@ describe("Synthetic User Stress: Zod Schema Boundaries (Manual Facts & Backlog)"
   });
 });
 
-describe("Synthetic User Stress: Roadmap Resilience to Corrupt or Empty Grant Records", () => {
-  it("survives completely empty or null inputs without throwing and generates viable fallbacks", () => {
-    const corruptInputs = [
-      { id: "corrupt-1", title: "" },
-      { id: "corrupt-2", title: "Untitled Call", funderName: null, summary: null, amountCadMax: null, requirements: null },
-      { id: "corrupt-3", title: "   ", applicantTypes: null, sectors: null, deadline: null, deadlineKind: null },
-    ];
-
-    for (const input of corruptInputs) {
-      expect(() => {
-        const roadmap = synthesizeGrantRoadmap(input);
-        expect(roadmap.routes).toHaveLength(4);
-        expect(roadmap.financial).toBeDefined();
-        expect(roadmap.strategicReturn).toBeDefined();
-        expect(roadmap.outreach).toBeDefined();
-        expect(["direct", "academic", "territorial", "commercial"]).toContain(roadmap.recommendedRouteId);
-        expect(roadmap.financial.matchingFunds.label).toBeTruthy();
-        expect(roadmap.financial.auditLevel.label).toBeTruthy();
-      }).not.toThrow();
-    }
-  });
-});
-
 describe("Synthetic User Stress: Grant Dismissals Allowlist & Integrity", () => {
   it("validates dismiss reasons allowlist and rejects unapproved dismissal keys", async () => {
     const { z } = await import("zod");
@@ -904,12 +806,13 @@ describe("Synthetic User Stress: Grant Dismissals Allowlist & Integrity", () => 
     }
 
     // Adversarial / invalid dismissal reasons
-    expect(() =>
-      dismissSchema.parse({ grantId: validId, reason: "boring_call" as any }),
-    ).toThrow();
+    expect(() => dismissSchema.parse({ grantId: validId, reason: "boring_call" as any })).toThrow();
 
     expect(() =>
-      dismissSchema.parse({ grantId: validId, reason: "'; DROP TABLE grant_dismissals; --" as any }),
+      dismissSchema.parse({
+        grantId: validId,
+        reason: "'; DROP TABLE grant_dismissals; --" as any,
+      }),
     ).toThrow();
   });
 });
@@ -984,119 +887,6 @@ describe("Synthetic User Stress: Multi-Tenant Client Visibility & Rocio Access",
   });
 });
 
-describe("Synthetic User Stress: Multi-Tenant Grant Strategic Roadmap & Entity Personalization", () => {
-  const sampleGacGrant = {
-    id: "gac-001",
-    title: "GAC Unsolicited Concept Note – Climate Resilient Agriculture in the Americas",
-    funderName: "Global Affairs Canada",
-    summary: "Unsolicited proposals for international development cooperation in Latin America.",
-    amountCadMax: 2000000,
-    costSharePct: 20,
-    deadline: null,
-    deadlineKind: "unsolicited",
-  };
-
-  it("dynamically personalizes all roadmap sections for IIAL", () => {
-    const roadmap = synthesizeGrantRoadmap({
-      ...sampleGacGrant,
-      orgName: "IIAL",
-    });
-
-    // Route A Lead
-    expect(roadmap.routes[0]?.leadEntity).toBe("IIAL (Sole Lead Applicant)");
-    expect(roadmap.routes[0]?.tacticalValue).toContain("Allows IIAL to submit an initiative continuously");
-
-    // Audit Level
-    expect(roadmap.financial.auditLevel.detail).toContain("disqualify IIAL");
-    expect(roadmap.financial.auditLevel.allowsInternalSigned).toBe(true);
-
-    // Strategic Return
-    expect(roadmap.strategicReturn.opexCoverage.salariesAndFees).toContain("IIAL core personnel");
-
-    // Outreach Email Templates
-    const academicEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "academic");
-    expect(academicEmail?.body).toContain("Institute of Innovation and Advanced Learning (IIAL)");
-    expect(academicEmail?.body).toContain("Rocío Cruz");
-
-    const territorialEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "territorial");
-    expect(territorialEmail?.body).toContain("IIAL is reaching out");
-    expect(territorialEmail?.body).toContain("Institute of Innovation and Advanced Learning (IIAL)");
-  });
-
-  it("dynamically personalizes all roadmap sections for Nahua Canada without leaking IIAL identity", () => {
-    const roadmap = synthesizeGrantRoadmap({
-      ...sampleGacGrant,
-      orgName: "Nahua Canada",
-    });
-
-    // Route A Lead
-    expect(roadmap.routes[0]?.leadEntity).toBe("Nahua Canada (Sole Lead Applicant)");
-    expect(roadmap.routes[0]?.tacticalValue).toContain("Allows Nahua Canada to submit an initiative continuously");
-
-    // Audit Level
-    expect(roadmap.financial.auditLevel.detail).toContain("disqualify Nahua Canada");
-    expect(roadmap.financial.auditLevel.detail).not.toContain("disqualify IIAL");
-
-    // Strategic Return
-    expect(roadmap.strategicReturn.opexCoverage.salariesAndFees).toContain("Nahua Canada core personnel");
-
-    // Outreach Email Templates
-    const academicEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "academic");
-    expect(academicEmail?.body).toContain("Nahua Canada");
-    expect(academicEmail?.body).not.toContain("Institute of Innovation and Advanced Learning (IIAL)");
-
-    const territorialEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "territorial");
-    expect(territorialEmail?.body).toContain("Nahua Canada is reaching out");
-    expect(territorialEmail?.body).not.toContain("Institute of Innovation and Advanced Learning (IIAL)");
-
-    const funderEmail = roadmap.outreach.templates.find((t) => t.targetAudience === "funder_officer");
-    expect(funderEmail?.body).toContain("Nahua Canada");
-    expect(funderEmail?.body).not.toContain("Institute of Innovation and Advanced Learning (IIAL)");
-  });
-});
-
-describe("Synthetic User Stress: In-Kind Matching & Cost-Share Calculation Stress", () => {
-  it("accurately calculates matching funds and allowable in-kind percentages across varying grant amounts", () => {
-    // Case 1: 50% cost share on $500,000 grant
-    const grant500k = {
-      id: "grant-500k",
-      title: "Agri-Tech Commercialization Fund",
-      funderName: "FedDev Ontario",
-      costSharePct: 50,
-      amountCadMax: 500000,
-    };
-    const roadmap1 = synthesizeGrantRoadmap(grant500k);
-    expect(roadmap1.financial.matchingFunds.percentage).toBe(50);
-    expect(roadmap1.financial.matchingFunds.inKindAllowed).toBe(true);
-    expect(roadmap1.financial.matchingFunds.inKindCapPct).toBe(50);
-
-    // Case 2: 0% cost share (100% non-repayable)
-    const grantZeroMatch = {
-      id: "grant-zero",
-      title: "CFLI Local Development Award",
-      funderName: "Global Affairs Canada",
-      costSharePct: 0,
-      amountCadMax: 100000,
-    };
-    const roadmap2 = synthesizeGrantRoadmap(grantZeroMatch);
-    expect(roadmap2.financial.matchingFunds.percentage).toBe(0);
-    expect(roadmap2.financial.matchingFunds.label).toContain("100% Non-Repayable");
-
-    // Case 3: In-kind hourly rate budgeting simulation
-    const seniorResearcherRate = 120; // CAD/hour
-    const fieldAgronomistRate = 75; // CAD/hour
-    const plannedResearchHours = 1000;
-    const plannedFieldHours = 1500;
-
-    const totalInKindValue = (seniorResearcherRate * plannedResearchHours) + (fieldAgronomistRate * plannedFieldHours);
-    expect(totalInKindValue).toBe(232500); // 120k + 112.5k = 232.5k CAD
-
-    // Verifies in-kind covers required match if match requirement is <= 232.5k
-    const requiredMatch200k = 200000;
-    expect(totalInKindValue >= requiredMatch200k).toBe(true);
-  });
-});
-
 describe("Synthetic User Stress: Organization Profile Workspace Validation", () => {
   it("enforces strict tenant separation on organization profiles and CRA credentials", () => {
     type OrgProfile = {
@@ -1137,7 +927,9 @@ describe("Synthetic User Stress: Organization Profile Workspace Validation", () 
     // Verify isolation
     expect(profileStore[IIAL_ORG_ID]?.applicantType).toBe("non_profit");
     expect(profileStore[NAHUA_ORG_ID]?.applicantType).toBe("for_profit_sme");
-    expect(profileStore[IIAL_ORG_ID]?.craBusinessNumber).not.toBe(profileStore[NAHUA_ORG_ID]?.craBusinessNumber);
+    expect(profileStore[IIAL_ORG_ID]?.craBusinessNumber).not.toBe(
+      profileStore[NAHUA_ORG_ID]?.craBusinessNumber,
+    );
 
     // Profile update under Nahua tenant must not mutate IIAL
     const updatedNahua = {
@@ -1168,7 +960,8 @@ describe("Synthetic User Stress: Proposal Workflow & Word Budget Tracking", () =
         id: "sec-1",
         title: "Executive Summary",
         maxWords: 500,
-        content: "This project implements the Whole Chain Integrity Standard (WCIS) across cocoa cooperatives.",
+        content:
+          "This project implements the Whole Chain Integrity Standard (WCIS) across cocoa cooperatives.",
         status: "draft",
       },
       {
@@ -1199,4 +992,3 @@ describe("Synthetic User Stress: Proposal Workflow & Word Budget Tracking", () =
     expect(isOverflowing).toBe(true);
   });
 });
-

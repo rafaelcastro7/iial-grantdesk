@@ -269,9 +269,9 @@ export function grantsDigest(
   opts: { lang?: Lang; recipient?: string; sender?: string; orgName?: string } = {},
 ): { subject: string; body: string } {
   const lang = opts.lang ?? "en";
-  const recipient = opts.recipient ?? "Marcelo";
-  const sender = opts.sender ?? "Rocío";
-  const orgName = opts.orgName ?? "IIAL";
+  const recipient = opts.recipient?.trim() ?? "";
+  const sender = opts.sender?.trim() ?? "";
+  const orgName = opts.orgName?.trim() || (lang === "es" ? "nuestra organización" : "our organization");
   const n = entries.length;
   const sorted = [...entries].sort((a, b) =>
     (a.grant.deadline ?? "9999").localeCompare(b.grant.deadline ?? "9999"),
@@ -279,7 +279,7 @@ export function grantsDigest(
   const es = lang === "es";
   const L = es
     ? {
-        hi: `Hola ${recipient},`,
+        hi: `Hola${recipient ? ` ${recipient}` : ""},`,
         intro: `Te comparto un resumen de ${n} oportunidad${n === 1 ? "" : "es"} para decidir dónde aplicamos. Están ordenadas por fecha límite.`,
         what: "Qué es",
         how: "Cómo aplicamos",
@@ -296,7 +296,7 @@ export function grantsDigest(
         subject: `Resumen de ${n} grant${n === 1 ? "" : "s"} para decidir`,
       }
     : {
-        hi: `Hi ${recipient},`,
+        hi: `Hi${recipient ? ` ${recipient}` : ""},`,
         intro: `Here is a short summary of ${n} opportunit${n === 1 ? "y" : "ies"} so we can decide where to apply. They are sorted by deadline.`,
         what: "What it is",
         how: "How we apply",
@@ -369,12 +369,12 @@ export function partnerBrief(
   opts: { lang?: Lang; recipient?: string; sender?: string } = {},
 ): { subject: string; body: string } {
   const es = opts.lang === "es";
-  const recipient = opts.recipient ?? "Marcelo";
-  const sender = opts.sender ?? "Rocío";
+  const recipient = opts.recipient?.trim() ?? "";
+  const sender = opts.sender?.trim() ?? "";
   const where = [p.type, p.country].filter(Boolean).join(es ? " de " : " in ");
   const lines = es
     ? [
-        `Hola ${recipient},`,
+        `Hola${recipient ? ` ${recipient}` : ""},`,
         "",
         `Te comparto un resumen corto de ${p.name}${where ? ` (${where})` : ""}.`,
         p.notes?.trim() ? `- Qué hacen: ${p.notes.trim()}` : "",
@@ -391,7 +391,7 @@ export function partnerBrief(
         sender,
       ]
     : [
-        `Hi ${recipient},`,
+        `Hi${recipient ? ` ${recipient}` : ""},`,
         "",
         `Here is a short summary of ${p.name}${where ? ` (${where})` : ""}.`,
         p.notes?.trim() ? `- What they do: ${p.notes.trim()}` : "",
@@ -427,14 +427,17 @@ export function whatsappIntro(opts: {
   orgName: string;
   links?: string[];
   reason?: string;
+  /** What the organization does, from its profile (mission). */
+  about?: string;
 }): string {
   const es = opts.lang !== "en";
+  const about = opts.about?.trim().replace(/\s+/g, " ") ?? "";
   const name = opts.recipientName?.trim();
   const links = (opts.links ?? []).filter(Boolean);
   const lines = es
     ? [
         `Hola${name ? ` ${name}` : ""}, ¿cómo está? Le saluda ${opts.senderName}, de ${opts.orgName}.`,
-        `${opts.orgName} es una organización canadiense sin fines de lucro que trabaja en innovación aplicada, formación profesional y certificaciones (CSIP, CSCIP, CARP) y en el fortalecimiento de cadenas de valor con el Whole-Chain International Standard (WCIS).`,
+        about,
         opts.reason?.trim()
           ? opts.reason.trim()
           : "Nos encantaría explorar cómo podemos colaborar.",
@@ -443,7 +446,7 @@ export function whatsappIntro(opts: {
       ]
     : [
         `Hello${name ? ` ${name}` : ""}, this is ${opts.senderName} from ${opts.orgName}.`,
-        `${opts.orgName} is a Canadian non-profit working on applied innovation, professional training and certifications (CSIP, CSCIP, CARP), and stronger value chains with the Whole-Chain International Standard (WCIS).`,
+        about,
         opts.reason?.trim()
           ? opts.reason.trim()
           : "We would love to explore how we can work together.",

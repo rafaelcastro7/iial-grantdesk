@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { decisionMakerLabel, useTeamSettings } from "@/lib/team-settings";
+import { useActiveTenant } from "@/lib/tenant-context";
 import {
   Calendar,
   CheckCircle2,
@@ -32,6 +34,8 @@ export function WebScoutRadarCard({
 }) {
   const tr = useTr();
   const uiLang = useUiLang();
+  const { activeOrgId } = useActiveTenant();
+  const { settings: team } = useTeamSettings(activeOrgId);
   const [copiedBrief, setCopiedBrief] = useState(false);
   const [briefLang, setBriefLang] = useState<"en" | "es">(uiLang);
 
@@ -40,7 +44,7 @@ export function WebScoutRadarCard({
     const brief = isEs
       ? `Asunto: Oportunidad: ${grant.title} (${grant.funder})
 
-Hola Marcelo,
+Hola${team.decisionMaker ? ` ${team.decisionMaker}` : ""},
 
 Encontré esta oportunidad en la web que encaja con ${orgName}:
 - Programa: ${grant.title}
@@ -53,10 +57,10 @@ Encontré esta oportunidad en la web que encaja con ${orgName}:
 ¿Te parece si la priorizamos y exploramos socios de consorcio?
 
 Saludos,
-Rocío`
+${team.sender}`
       : `Subject: Opportunity: ${grant.title} (${grant.funder})
 
-Hi Marcelo,
+Hi${team.decisionMaker ? ` ${team.decisionMaker}` : ""},
 
 I found this opportunity on the web that fits ${orgName}:
 - Program: ${grant.title}
@@ -69,7 +73,7 @@ I found this opportunity on the web that fits ${orgName}:
 Would you like us to prioritize this one and explore consortium partners?
 
 Best,
-Rocío`;
+${team.sender}`;
 
     try {
       await navigator.clipboard.writeText(brief);
@@ -142,7 +146,9 @@ Rocío`;
                 ) : (
                   <>
                     <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{tr("Brief for Marcelo", "Resumen para Marcelo")}</span>
+                    <span>
+                      {tr("Brief for", "Resumen para")} {decisionMakerLabel(team, uiLang)}
+                    </span>
                   </>
                 )}
               </Button>
