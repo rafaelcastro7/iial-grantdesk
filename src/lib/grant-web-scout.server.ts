@@ -109,10 +109,18 @@ Return ONLY this JSON:
           `"${opts.query}" — convocatorias oficiales 2026 2027 (fuentes en español)`,
         );
     // The second (other-language) search only when the first finds few results.
-    const first = await searchWebGrounded(prompt, { maxChars: 60000 });
+    const first = await searchWebGrounded(prompt, {
+      maxChars: 60000,
+      query: `${opts.query} grant funding call 2026`,
+    });
     const firstCount = first ? (first.text.match(/"title"\s*:/g) ?? []).length : 0;
     const second =
-      first && firstCount < 5 ? await searchWebGrounded(variant, { maxChars: 60000 }) : null;
+      first && firstCount < 5
+        ? await searchWebGrounded(variant, {
+            maxChars: 60000,
+            query: es ? `${opts.query} call for proposals 2026` : `${opts.query} convocatoria 2026`,
+          })
+        : null;
     const answers = [first, second];
     const providerUsed = (first ?? second)?.provider ?? "none";
     if (!answers.some(Boolean)) {

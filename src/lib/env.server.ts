@@ -18,6 +18,9 @@ const schema = z.object({
   GROQ_API_KEY: z.string().min(10).optional(),
   GOOGLE_AI_STUDIO_KEY: z.string().min(10).optional(),
   GEMINI_API_KEY: z.string().min(10).optional(),
+  /** Free-tier search APIs (results only; a free AI answers from them). */
+  TAVILY_API_KEY: z.string().min(10).optional(),
+  BRAVE_SEARCH_API_KEY: z.string().min(10).optional(),
 });
 
 export type ServerEnv = z.infer<typeof schema>;

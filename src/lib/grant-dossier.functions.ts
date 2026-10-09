@@ -170,6 +170,7 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
       within(
         searchWebGrounded(
           `Research the funding program "${grant.title}" by ${funderName}${grant.url ? ` (${grant.url})` : ""}. From official and reliable sources only, report: its streams or variants and how they differ; who exactly can apply and in which role; how the money flows (who pays what, cash vs in-kind, when funds are released); the official forms and documents required; how long approval takes; deadlines or intake mode; conditions people usually miss (letters required, conflicts of interest, IP, eligible costs, registration); program officer or advisor contact page. Say "not published" when something is not stated.`,
+          { query: `"${grant.title}" ${funderName} requirements documents how to apply` },
         ),
         60000,
         null,
@@ -179,7 +180,11 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
       within(
         searchWebGrounded(
           `Official facts of the funding call "${grant.title}" by ${funderName}${grant.url ? ` (${grant.url})` : ""}: the current or next application deadline (exact date), the award amount range and its currency, and who is eligible to apply (organization types, countries, lead or partner role). Cite the official page.`,
-          { maxChars: 3000, allowPaid: !page },
+          {
+            maxChars: 3000,
+            allowPaid: !page,
+            query: `"${grant.title}" ${funderName} deadline amount eligibility`,
+          },
         ),
         45000,
         null,

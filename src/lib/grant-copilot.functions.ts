@@ -234,7 +234,10 @@ export const askGrantCopilot = createServerFn({ method: "POST" })
             await import("@/lib/web-grounding.server")
           ).searchWebGrounded(
             `Find the official, current information for the funding call "${grant.title}" by ${(grant.funder as { name?: string } | null)?.name ?? "the funder"}${grant.url ? ` (official page: ${grant.url})` : ""}. Report: is it open, upcoming or closed and the next cycle; exact deadline(s) with time zone; amount per project; who can apply (applicant types and countries); key requirements (registration, financial statements, match / cost-share, consortium rules); how to apply. Also answer: ${data.message.slice(0, 500)}. Only state facts found on official or reliable pages; say "not published" otherwise.`,
-            { allowPaid: explicitWeb },
+            {
+              allowPaid: explicitWeb,
+              query: `"${grant.title}" ${(grant.funder as { name?: string } | null)?.name ?? ""} call deadline eligibility`,
+            },
           )
         : null;
     const webText = web
