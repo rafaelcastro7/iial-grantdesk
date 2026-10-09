@@ -128,7 +128,7 @@ await step("application plan: fill and save", async () => {
 
 await step("emails never include the internal blocker", async () => {
   // With a dossier, the composer lives in a collapsed "More email templates and the memo".
-  const more = page.getByText("5. More email templates and the memo");
+  const more = page.getByText("More email templates and the memo");
   if (await more.count()) await more.first().click();
   const write = page.locator('section:has-text("5. Write")').last();
   const emailPre = await write.locator("pre").first().innerText();

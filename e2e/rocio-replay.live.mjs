@@ -105,7 +105,7 @@ try {
   const t = await main();
   const i = t.indexOf("Para: Marcelo");
   const wa = i >= 0 ? t.slice(i, i + 1200) : "(no hay mensaje a Marcelo en el dossier)";
-  const more = page.getByText("5. Más plantillas de correo y el memo");
+  const more = page.getByText("Más plantillas de correo y el memo");
   if (await more.count()) await more.first().click();
   await page.getByRole("button", { name: "Memo para Marcelo" }).click();
   const memo = await page.locator('section:has-text("5. Redactar") pre').last().innerText();
@@ -148,7 +148,7 @@ try {
   const t0 = Date.now();
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByText("1. ¿Podemos aplicar?").waitFor({ timeout: 60000 });
-  const more = page.getByText("5. Más plantillas de correo y el memo");
+  const more = page.getByText("Más plantillas de correo y el memo");
   if (await more.count()) await more.first().click();
   const write = page.locator('section:has-text("5. Redactar")').last();
   await page.getByRole("button", { name: "Socios y financiadores" }).click();
