@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { countryName, formatMoney, type RadarFocus, type RadarResult } from "@/lib/grant-radar";
 import { RadarCard, type RadarActions } from "./RadarCard";
 import { RadarToolbar, webQueryForCountry, type RadarFilterState } from "./RadarToolbar";
-import { WebScoutRadarCard } from "./WebScoutRadarCard";
+import { WebResultRow } from "./WebResultRow";
 import { searchWebGrants, type DiscoveredWebGrant } from "@/lib/grant-web-scout.functions";
 import { addGrantByUrl } from "@/lib/grants.functions";
 import { useActiveTenant } from "@/lib/tenant-context";
@@ -208,21 +208,28 @@ export function RadarWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.search, radar.items.length, isWebSearching]);
 
-  const handleImportWebGrant = async (grant: DiscoveredWebGrant) => {
+  // "Interested": import the opportunity (once), open it and let the agents
+  // research and verify it there.
+  const handleInterested = async (grant: DiscoveredWebGrant) => {
+    const known = importedMap.get(grant.url);
+    if (known) {
+      void navigate({ to: "/grants/$id", params: { id: known } });
+      return;
+    }
     setImportingUrls((prev) => new Set(prev).add(grant.url));
     try {
       const res = await addGrantFn({ data: { url: grant.url } });
       await queryClient.invalidateQueries({ queryKey: ["grants"] });
       setImportedMap((prev) => new Map(prev).set(grant.url, res.grantId));
+      try {
+        window.sessionStorage.setItem(`grant.research:${res.grantId}`, "1");
+      } catch {
+        /* storage unavailable: the grant page offers the button */
+      }
+      void navigate({ to: "/grants/$id", params: { id: res.grantId } });
     } catch (err: unknown) {
-      setWebError(
-        err instanceof Error
-          ? err.message
-          : tr(
-              `Failed to import "${grant.title}" to Radar.`,
-              `No se pudo importar "${grant.title}" al radar.`,
-            ),
-      );
+      // Shown under "Could not add…", not as a failed search.
+      setWebError(`link: ${grant.title} — ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImportingUrls((prev) => {
         const next = new Set(prev);
@@ -485,6 +492,11 @@ export function RadarWorkspace({
                 <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
                   <Globe className="h-4 w-4 text-primary" />
                   {tr("From the internet", "En internet")}
+                  {!isWebSearching && webResults.length > 0 && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      ({webResults.length})
+                    </span>
+                  )}
                 </h2>
                 {(webQuery || filters.search) && !isWebSearching && (
                   <Button
@@ -507,7 +519,7 @@ export function RadarWorkspace({
                   <div className="space-y-1">
                     <p className="font-semibold">
                       {webError.startsWith("link:")
-                        ? tr("Could not add this link", "No se pudo agregar este enlace")
+                        ? tr("Could not add this grant", "No se pudo agregar este grant")
                         : tr(
                             "Web search could not retrieve opportunities",
                             "La búsqueda web no pudo obtener oportunidades",
@@ -539,88 +551,27 @@ export function RadarWorkspace({
                 </div>
               )}
 
-              {/* Discovered results list */}
+              {/* One list: one row per opportunity, details on demand. */}
               {!isWebSearching && webResults.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b pb-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      {tr(
-                        `Discovered ${webResults.length} funding opportunities on the live web`,
-                        `Se encontraron ${webResults.length} oportunidades de financiamiento en la web`,
-                      )}
-                    </span>
-                    <span>{tr(`Targeted for ${orgName}`, `Para ${orgName}`)}</span>
-                  </div>
-
-                  {/* Overview table: one row per opportunity. */}
-                  <div className="overflow-x-auto rounded-lg border">
-                    <table className="w-full min-w-[820px] text-left text-sm">
-                      <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2">{tr("Opportunity", "Oportunidad")}</th>
-                          <th className="px-3 py-2">{tr("Status", "Estado")}</th>
-                          <th className="px-3 py-2">{tr("Deadline", "Cierre")}</th>
-                          <th className="px-3 py-2">{tr("Who applies", "Quién aplica")}</th>
-                          <th className="px-3 py-2">{tr("Amount and type", "Monto y tipo")}</th>
-                          <th className="px-3 py-2">{tr("Link", "Enlace")}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {webResults.map((g) => (
-                          <tr key={g.url} className="align-top">
-                            <td className="px-3 py-2">
-                              <div className="font-medium">{g.title}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {g.funder} · {g.country}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {g.status === "open"
-                                ? tr("Open", "Abierta")
-                                : g.status === "upcoming"
-                                  ? tr("Upcoming", "Por abrir")
-                                  : g.status === "continuous"
-                                    ? tr("Continuous", "Continua")
-                                    : tr("Closed", "Cerrada")}
-                            </td>
-                            <td className="px-3 py-2">{g.deadline}</td>
-                            <td className="px-3 py-2">{g.applicant || "—"}</td>
-                            <td className="px-3 py-2">{g.amount_range}</td>
-                            <td className="px-3 py-2">
-                              <a
-                                href={g.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                {tr("Official page", "Página oficial")}
-                              </a>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {tr(
-                      "Found by AI on the internet: verify amounts and dates on the official page. Import one to analyze it and prepare its dossier.",
-                      "Encontrado con IA en internet: verifique montos y fechas en la página oficial. Importe uno para analizarlo y preparar su dossier.",
-                    )}
-                  </p>
-
-                  <div className="space-y-3">
+                <div>
+                  <ul className="divide-y">
                     {webResults.map((grant) => (
-                      <WebScoutRadarCard
+                      <WebResultRow
                         key={grant.url}
                         grant={grant}
                         orgName={orgName}
                         importedId={importedMap.get(grant.url)}
-                        isImporting={importingUrls.has(grant.url)}
-                        onImport={handleImportWebGrant}
-                        onOpenWorkspace={(id) => navigate({ to: "/grants/$id", params: { id } })}
+                        busy={importingUrls.has(grant.url)}
+                        onInterested={handleInterested}
                       />
                     ))}
-                  </div>
+                  </ul>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {tr(
+                      "Found with AI on the internet. Mark the ones you care about: the agents verify dates, amounts and eligibility on the official page.",
+                      "Encontrado con IA en internet. Marque las que le interesan: los agentes verifican fechas, montos y elegibilidad en la página oficial.",
+                    )}
+                  </p>
                 </div>
               )}
             </div>

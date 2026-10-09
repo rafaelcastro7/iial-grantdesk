@@ -7,6 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   AlertTriangle,
   CalendarClock,
+  CheckCircle2,
   Check,
   ClipboardList,
   Copy,
@@ -29,6 +30,7 @@ import {
   type Dossier,
   type DossierFit,
 } from "@/lib/grant-dossier.shared";
+import type { CheckedFact } from "@/lib/grant-fact-check.shared";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ROUTES, routeLabel, type Route } from "@/lib/grant-workspace.shared";
 import {
@@ -69,8 +71,9 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
   useEffect(() => {
     setApplied(new Set());
   }, [savedAt]);
-  // A grant the team is working (it has a saved plan) gets its dossier
-  // automatically the first time it is opened; others wait for the button.
+  // A grant the team is working (it has a saved plan, or was just marked
+  // "Interested") is researched automatically the first time it is opened;
+  // others wait for the button.
   const fetchWs = useServerFn(getGrantWorkspace);
   const { data: wsData } = useQuery({
     queryKey: ["grant-workspace", grantId, orgId, lang],
@@ -80,8 +83,11 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
   useEffect(() => {
     const onceKey = `dossier-auto:${grantId}:${orgId}`;
     let triedBefore = false;
+    // Marked "Interested" in the search: research it right away.
+    let interested = false;
     try {
       triedBefore = window.sessionStorage.getItem(onceKey) === "1";
+      interested = window.sessionStorage.getItem(`grant.research:${grantId}`) === "1";
     } catch {
       /* storage unavailable */
     }
@@ -90,7 +96,7 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
       isLoading ||
       saved ||
       busy ||
-      !wsData?.saved ||
+      (!wsData?.saved && !interested) ||
       data?.available !== true ||
       data.otherLang ||
       triedBefore
@@ -99,6 +105,7 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
     autoStarted.current = true;
     try {
       window.sessionStorage.setItem(onceKey, "1");
+      window.sessionStorage.removeItem(`grant.research:${grantId}`);
     } catch {
       /* storage unavailable */
     }
@@ -113,6 +120,16 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
         data: { grantId, orgId, lang, decisionMaker: team.decisionMaker },
       });
       setLocal(res.saved);
+      // The fact checker corrected the grant: the header, fit and lists follow.
+      if (res.checked?.length) {
+        void qc.invalidateQueries({ queryKey: ["grant-detail", grantId] });
+        void qc.invalidateQueries({ queryKey: ["grants"] });
+        for (const ms of [10000, 30000])
+          setTimeout(() => {
+            void qc.invalidateQueries({ queryKey: ["grant-detail", grantId] });
+            void qc.invalidateQueries({ queryKey: ["grants"] });
+          }, ms);
+      }
       if (!res.persisted)
         toast.info(
           res.persistError
@@ -139,19 +156,19 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
       <section className="rounded-xl border border-primary/30 bg-primary/5 p-5 shadow-sm">
         <h2 className="flex items-center gap-2 text-base font-semibold">
           <Sparkles className="h-4 w-4 text-primary" />
-          {tr("Grant dossier", "Dossier del grant")}
+          {tr("Do we apply?", "¿Aplicamos?")}
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
           {tr(
-            "The full analysis in one place: verdict, what the brochure does not say, routes compared, official documents, money and timeline, and the messages ready to send. Prepared from the official page, an internet search and your organization's profile.",
-            "El análisis completo en un solo lugar: veredicto, lo que el folleto no dice, rutas comparadas, documentos oficiales, dinero y cronograma, y los mensajes listos para enviar. Se prepara con la página oficial, una búsqueda en internet y el perfil de su organización.",
+            "The agents read the official page and the internet, verify the deadline, amount and who can apply (and correct the grant, with sources), re-check our fit and write the decision with what we need and the strategy.",
+            "Los agentes leen la página oficial e internet, verifican fecha límite, monto y quién puede aplicar (y corrigen el grant, con fuentes), revisan nuestro fit y escriben la decisión con lo que necesitamos y la estrategia.",
           )}
         </p>
         <Button className="mt-3 gap-2" onClick={run} disabled={busy}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           {busy
-            ? tr("Preparing (30–90 s)…", "Preparando (30–90 s)…")
-            : tr("Prepare the dossier", "Preparar el dossier")}
+            ? tr("Researching and verifying (30–90 s)…", "Investigando y verificando (30–90 s)…")
+            : tr("We are interested — research it", "Nos interesa — investigarlo")}
         </Button>
       </section>
     );
@@ -222,6 +239,24 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
               {(d as { fit_reason?: string }).fit_reason && (
                 <p className="mt-1 text-sm text-muted-foreground">
                   {(d as { fit_reason?: string }).fit_reason}
+                </p>
+              )}
+              {(d.checked?.length ?? 0) > 0 && (
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {tr("Verified and updated:", "Verificado y actualizado:")}
+                  {d.checked!.map((c) => (
+                    <a
+                      key={c.field}
+                      href={c.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline-offset-2 hover:underline"
+                      title={c.from ? tr(`Was: ${c.from}`, `Antes: ${c.from}`) : undefined}
+                    >
+                      {checkedLabel(c, tr)}
+                    </a>
+                  ))}
                 </p>
               )}
             </div>
@@ -712,4 +747,21 @@ function MessageCard({ message: m }: { message: Dossier["messages"][number] }) {
       </div>
     </div>
   );
+}
+
+/** "Deadline 2026-11-30", "Max. $50,000"… for the verified-facts line. */
+function checkedLabel(c: CheckedFact, tr: (en: string, es: string) => string): string {
+  const money = (v: string) => `$${Number(v).toLocaleString()}`;
+  switch (c.field) {
+    case "deadline":
+      return tr(`Deadline ${c.to}`, `Fecha límite ${c.to}`);
+    case "amount_cad_min":
+      return tr(`Min. ${money(c.to)}`, `Mín. ${money(c.to)}`);
+    case "amount_cad_max":
+      return tr(`Max. ${money(c.to)}`, `Máx. ${money(c.to)}`);
+    case "applicant_types":
+      return tr(`Who applies: ${c.to}`, `Quién aplica: ${c.to}`);
+    default:
+      return tr("Who can apply", "Quién puede aplicar");
+  }
 }

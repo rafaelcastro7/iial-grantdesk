@@ -3,7 +3,13 @@
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
-const env = Object.fromEntries([".env", ".env.local"].filter((f) => fs.existsSync(f)).flatMap((f) => fs.readFileSync(f, "utf8").split(/\r?\n/)).filter((l) => l.includes("=") && !l.trim().startsWith("#")).map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]));
+const env = Object.fromEntries(
+  [".env", ".env.local"]
+    .filter((f) => fs.existsSync(f))
+    .flatMap((f) => fs.readFileSync(f, "utf8").split(/\r?\n/))
+    .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
+    .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
+);
 const BASE = process.env.BASE_URL || "http://localhost:5199";
 const OUT = process.env.E2E_OUT || "e2e-artifacts";
 const GRANT = process.argv[2] || "4c434e92-d2b0-42ee-b7cd-67547e03fa34";
@@ -17,11 +23,23 @@ await p.fill('input[type="password"]', env.SYNTH_USER_PASSWORD);
 await p.click('button[type="submit"]');
 await p.waitForURL((u) => !u.pathname.startsWith("/auth"));
 await p.goto(`${BASE}/grants/${GRANT}`, { waitUntil: "networkidle", timeout: 90000 });
-const btn = p.getByRole("button", { name: /Preparar el dossier|Actualizar/ }).first();
+const btn = p.getByRole("button", { name: /Nos interesa — investigarlo|Actualizar/ }).first();
 await btn.waitFor({ timeout: 60000 });
 const t0 = Date.now();
 await btn.click();
-await p.getByText("¿Aplicamos?", { exact: true }).or(p.getByText(/No se pudo preparar/)).first().waitFor({ timeout: 300000 });
+// Wait for this run to finish (the button spins while the agents work).
+await p.waitForTimeout(3000);
+await p.waitForFunction(
+  () =>
+    !document.querySelector("main button svg.animate-spin, main button:disabled svg.animate-spin"),
+  null,
+  { timeout: 300000 },
+);
+await p
+  .getByText(/^Preparado el/)
+  .or(p.getByText(/No se pudo preparar/))
+  .first()
+  .waitFor({ timeout: 30000 });
 await p.waitForTimeout(1500);
 const txt = await p.locator("main").innerText();
 console.log(`(${Math.round((Date.now() - t0) / 1000)} s)\n` + txt.slice(0, 9000));

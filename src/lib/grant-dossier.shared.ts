@@ -51,6 +51,8 @@ export type Dossier = {
   money_note?: string;
   messages: DossierMessage[];
   questions_to_confirm?: string[];
+  /** Facts the fact checker verified and saved to the grant while preparing it. */
+  checked?: import("@/lib/grant-fact-check.shared").CheckedFact[];
 };
 
 const s = (v: unknown, max = 2000) =>
@@ -153,6 +155,18 @@ export function sanitizeDossier(raw: unknown, opts: { standards?: string[] } = {
       .map((q) => clean(s(q, 300)))
       .filter(Boolean),
   };
+}
+
+/**
+ * The AI's "no role possible" stands only when the deterministic rules also
+ * block the organization (same policy as the evaluator); otherwise it is a
+ * question to confirm with the funder, never a closed door.
+ */
+export function reconcileFit(
+  fit: DossierFit,
+  ruleVerdict: "eligible" | "needs_input" | "not_eligible" | undefined,
+): DossierFit {
+  return fit === "not_eligible" && ruleVerdict !== "not_eligible" ? "unclear" : fit;
 }
 
 /** The plan changes for "Use this route", "Add these documents", "Add these dates". */

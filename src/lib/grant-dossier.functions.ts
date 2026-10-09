@@ -1,5 +1,11 @@
 // Grant dossier server functions: read the saved dossier, or prepare a new
-// one with the free-tier AI, Google search and the official page.
+// one. Preparing it is a small team of agents, so nobody has to complete the
+// grant by hand in the Copilot:
+//   1. Researchers (in parallel, no AI): official page + two web searches.
+//   2. Fact checker: verifies deadline, amounts and who can apply, writes what
+//      is missing or wrong to the grant (with its source; a person's
+//      correction always wins) and re-checks eligibility (rules, 0 tokens).
+//   3. Strategist: the dossier, from the facts as just verified.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -107,14 +113,18 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
     if (gErr || !grant) throw new Error("grant_not_found");
     const funder = Array.isArray(grant.funder) ? grant.funder[0] : grant.funder;
 
-    const [{ eligibilityByOrg }, { sanitizeDossier }, { serverEnv }] = await Promise.all([
-      import("@/lib/grant-workspace.functions"),
-      import("@/lib/grant-dossier.shared"),
-      import("@/lib/env.server"),
-    ]);
+    const [{ eligibilityByOrg }, { sanitizeDossier }, factCheck, { searchWebGrounded }] =
+      await Promise.all([
+        import("@/lib/grant-workspace.functions"),
+        import("@/lib/grant-dossier.shared"),
+        import("@/lib/grant-fact-check.shared"),
+        import("@/lib/web-grounding.server"),
+      ]);
+    const funderName = funder?.name ?? "the funder";
 
-    // Everything we know, gathered in parallel (no AI).
-    const [profiles, plan, directory, eligibility, page, userRes] = await Promise.all([
+    // Researchers: everything we know, gathered in parallel (no AI).
+    const t1 = Date.now();
+    const [profiles, plan, directory, page, userRes] = await Promise.all([
       db
         .from("org_profiles")
         .select(
@@ -142,12 +152,6 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
           (r: { data: unknown }) => (r.data ?? []) as Array<Record<string, unknown>>,
           () => [],
         ),
-      eligibilityByOrg(
-        db,
-        grant,
-        orgs.filter((o) => o.id === data.orgId),
-        data.lang,
-      ),
       grant.url
         ? within(
             import("@/lib/web-fetch.server")
@@ -162,18 +166,107 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
       context.supabase.auth.getUser().catch(() => null),
     ]);
 
-    const env = serverEnv();
-    const t1 = Date.now();
-    void env;
-    const web = await within(
-      (await import("@/lib/web-grounding.server")).searchWebGrounded(
-        `Research the funding program "${grant.title}" by ${funder?.name ?? "the funder"}${grant.url ? ` (${grant.url})` : ""}. From official and reliable sources only, report: its streams or variants and how they differ; who exactly can apply and in which role; how the money flows (who pays what, cash vs in-kind, when funds are released); the official forms and documents required; how long approval takes; deadlines or intake mode; conditions people usually miss (letters required, conflicts of interest, IP, eligible costs, registration); program officer or advisor contact page. Say "not published" when something is not stated.`,
+    const [web, factsWeb] = await Promise.all([
+      within(
+        searchWebGrounded(
+          `Research the funding program "${grant.title}" by ${funderName}${grant.url ? ` (${grant.url})` : ""}. From official and reliable sources only, report: its streams or variants and how they differ; who exactly can apply and in which role; how the money flows (who pays what, cash vs in-kind, when funds are released); the official forms and documents required; how long approval takes; deadlines or intake mode; conditions people usually miss (letters required, conflicts of interest, IP, eligible costs, registration); program officer or advisor contact page. Say "not published" when something is not stated.`,
+        ),
+        60000,
+        null,
       ),
-      60000,
-      null,
-    );
+      // The fact checker's own search: free providers only when the official
+      // page could be read (the page is then the main source).
+      within(
+        searchWebGrounded(
+          `Official facts of the funding call "${grant.title}" by ${funderName}${grant.url ? ` (${grant.url})` : ""}: the current or next application deadline (exact date), the award amount range and its currency, and who is eligible to apply (organization types, countries, lead or partner role). Cite the official page.`,
+          { maxChars: 3000, allowPaid: !page },
+        ),
+        45000,
+        null,
+      ),
+    ]);
     console.info(
-      `[dossier] context: page=${page ? page.length : 0} chars, web=${web ? "yes" : "no"}, ${Date.now() - t1} ms`,
+      `[dossier] research: page=${page ? page.length : 0} chars, web=${web ? "yes" : "no"}, facts-web=${factsWeb ? "yes" : "no"}, ${Date.now() - t1} ms`,
+    );
+
+    const { callLlm } = await import("@/agents/llm.server");
+
+    // Fact checker: verifies the call's hard facts and writes the missing or
+    // wrong ones to the grant. A failure never blocks the dossier.
+    const checked: import("@/lib/grant-fact-check.shared").CheckedFact[] = [];
+    let current = grant as Record<string, unknown>;
+    if (page || factsWeb) {
+      const proposed = await within(
+        callLlm({
+          agent: "enricher",
+          messages: [
+            {
+              role: "system",
+              content: factCheck.factCheckPrompt(new Date().toISOString().slice(0, 10)),
+            },
+            {
+              role: "user",
+              content: `CALL: ${grant.title} — ${funderName}${grant.url ? ` — ${grant.url}` : ""}
+
+OFFICIAL PAGE TEXT:
+${page ? page.slice(0, 8000) : "(could not be read)"}
+
+WEB RESEARCH:
+${factsWeb ? `${factsWeb.text}\nSources:\n${factsWeb.sources.map((x) => `- ${x.url}`).join("\n")}` : "(not available)"}`,
+            },
+          ],
+          temperature: 0,
+          maxOutputTokens: 800,
+          responseFormat: "json",
+        }).then((r) => JSON.parse(r.text.replace(/^```(?:json)?\s*|\s*```$/g, "")) as unknown),
+        45000,
+        null,
+      );
+      for (const fact of factCheck.factsToApply(grant, proposed)) {
+        const { error } = await context.supabase.rpc(
+          "set_grant_manual_field" as never,
+          {
+            p_grant_id: data.grantId,
+            p_field: fact.field,
+            p_value: factCheck.factValue(fact),
+            p_note: factCheck.agentNote(fact.source_url),
+          } as never,
+        );
+        if (error) console.warn(`[dossier] fact ${fact.field} not saved: ${error.message}`);
+        else checked.push(fact);
+      }
+      if (checked.length) {
+        const { data: fresh } = await db
+          .from("grants")
+          .select("*, funder:funders(name, jurisdiction, website)")
+          .eq("id", data.grantId)
+          .maybeSingle();
+        if (fresh) current = fresh as Record<string, unknown>;
+        // The full fit review follows the corrected facts (free tier, in the background).
+        const [{ evaluateGrantImpl }, { runInBackground }] = await Promise.all([
+          import("@/agents/evaluator.impl.server"),
+          import("@/lib/background.server"),
+        ]);
+        runInBackground(() =>
+          evaluateGrantImpl({
+            grantId: data.grantId,
+            userId: context.userId,
+            userSupabase: context.supabase,
+            orgId: data.orgId,
+            force: true,
+            freeOnly: true,
+          }),
+        );
+      }
+      console.info(`[dossier] fact checker: ${checked.length} fact(s) updated`);
+    }
+
+    // Rule check per organization, on the facts as just verified (no AI).
+    const eligibility = await eligibilityByOrg(
+      db,
+      current,
+      orgs.filter((o) => o.id === data.orgId),
+      data.lang,
     );
 
     const user = (
@@ -228,25 +321,25 @@ Give 3-6 traps, 2-3 route options (always include the realistic alternative if t
     const context_ = `GRANT RECORD:
 ${JSON.stringify(
   {
-    title: grant.title,
+    title: current.title,
     funder: funder?.name,
-    url: grant.url,
-    country: grant.country,
-    summary: grant.summary,
-    eligibility_note: grant.eligibility_note,
-    eligibility: grant.eligibility,
-    amount_min: grant.amount_cad_min ?? grant.amount_min,
-    amount_max: grant.amount_cad_max ?? grant.amount_max,
-    currency: grant.currency,
-    deadline: grant.deadline,
-    deadline_kind: grant.deadline_kind,
-    applicant_types: grant.applicant_types,
-    requirements: grant.requirements,
+    url: current.url,
+    country: current.country,
+    summary: current.summary,
+    eligibility_note: current.eligibility_note,
+    eligibility: current.eligibility,
+    amount_min: current.amount_cad_min ?? current.amount_min,
+    amount_max: current.amount_cad_max ?? current.amount_max,
+    currency: current.currency,
+    deadline: current.deadline,
+    deadline_kind: current.deadline_kind,
+    applicant_types: current.applicant_types,
+    requirements: current.requirements,
   },
   null,
   1,
 ).slice(0, 6000)}
-
+${checked.length ? `FACTS JUST VERIFIED BY THE FACT CHECKER (already saved): ${checked.map((c) => `${c.field}: ${c.from ?? "missing"} -> ${c.to} (${c.source_url})`).join("; ")}\n` : ""}
 OUR ORGANIZATIONS (the team can act through any of them):
 ${JSON.stringify(profiles, null, 1).slice(0, 6000)}
 
@@ -262,7 +355,6 @@ ${page || "(could not be read)"}
 WEB RESEARCH (Google):
 ${web ? `${web.text}\nSources:\n${web.sources.map((x) => `- ${x.title}: ${x.url}`).join("\n")}` : "(not available)"}`;
 
-    const { callLlm } = await import("@/agents/llm.server");
     const result = await callLlm({
       agent: "strategist",
       messages: [
@@ -281,16 +373,27 @@ ${web ? `${web.text}\nSources:\n${web.sources.map((x) => `- ${x.title}: ${x.url}
       },
     });
     console.info(`[dossier] AI answered via ${result.provider ?? "?"} after ${Date.now() - t1} ms`);
-    const dossier = sanitizeDossier(
+    const sanitized = sanitizeDossier(
       JSON.parse(result.text.replace(/^```(?:json)?\s*|\s*```$/g, "")),
       { standards },
     );
-    if (!dossier) throw new Error("dossier_invalid");
+    if (!sanitized) throw new Error("dossier_invalid");
+    const { reconcileFit } = await import("@/lib/grant-dossier.shared");
+    const dossier = {
+      ...sanitized,
+      fit: reconcileFit(
+        sanitized.fit,
+        eligibility.find((e) => e.orgId === data.orgId)?.verdict as
+          "eligible" | "needs_input" | "not_eligible" | undefined,
+      ),
+      ...(checked.length ? { checked } : {}),
+    };
     const sources = [
       ...(grant.url
         ? [{ title: es ? "Página oficial" : "Official page", url: grant.url as string }]
         : []),
       ...(web?.sources ?? []),
+      ...checked.map((c) => ({ title: c.source_url, url: c.source_url })),
     ].filter((x, i, a) => a.findIndex((y) => y.url === x.url) === i);
 
     const { error: saveErr } = await db.from("grant_dossiers").upsert(
@@ -318,5 +421,6 @@ ${web ? `${web.text}\nSources:\n${web.sources.map((x) => `- ${x.title}: ${x.url}
       persistError: saveErr && !missingTable(saveErr.message) ? saveErr.message : null,
       usedWeb: !!web,
       readPage: !!page,
+      checked,
     };
   });

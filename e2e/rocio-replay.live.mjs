@@ -80,7 +80,7 @@ try {
   await box.press("Enter");
   await page.waitForURL(/\/grants\/[0-9a-f-]{36}/, { timeout: 120000 });
   grantUrl = page.url();
-  const prep = page.getByRole("button", { name: "Preparar el dossier" });
+  const prep = page.getByRole("button", { name: "Nos interesa — investigarlo" });
   await prep
     .or(page.getByText("¿Aplicamos?", { exact: true }))
     .first()
