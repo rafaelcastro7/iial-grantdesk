@@ -135,6 +135,7 @@ export function RadarWorkspace({
   };
 
   const [linkBusy, setLinkBusy] = useState(false);
+  const linkInFlight = useRef(false);
   const handleSubmitSearch = async (raw: string) => {
     const q = raw.trim();
     if (!q) return;
@@ -150,7 +151,8 @@ export function RadarWorkspace({
         void navigate({ to: "/grants/$id", params: { id: known.grant.id } });
         return;
       }
-      if (linkBusy) return;
+      if (linkInFlight.current) return;
+      linkInFlight.current = true;
       setLinkBusy(true);
       try {
         const res = await addGrantFn({ data: { url: q } });
@@ -163,6 +165,7 @@ export function RadarWorkspace({
       } catch (err) {
         setWebError(`link: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
+        linkInFlight.current = false;
         setLinkBusy(false);
       }
       return;

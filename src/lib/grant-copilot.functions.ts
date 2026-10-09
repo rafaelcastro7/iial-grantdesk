@@ -226,7 +226,7 @@ export const askGrantCopilot = createServerFn({ method: "POST" })
         data.message,
       );
     // Paid (Lovable) web search only when the user explicitly asks to search.
-    const explicitWeb = /\b(busca|buscar|search|internet|web)\b/i.test(data.message);
+    const explicitWeb = /\b(b[uú]sca(me|r|lo|la)?|search|internet|web)\b/i.test(data.message);
     const web =
       (freeSearch && (factsMissing || wantsWeb || history.length === 0)) ||
       (canSearch && explicitWeb)

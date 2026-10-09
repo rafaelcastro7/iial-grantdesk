@@ -161,6 +161,15 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
   const fit = (d as { fit?: DossierFit }).fit;
   const tone = fit ? fitTone(fit) : "muted";
   const recommended = d.routes.options.find((o) => o.recommended) ?? null;
+  // A selected tab that became empty after an Update falls back to the first one.
+  const tabCounts: Record<string, number> = {
+    needs: 1,
+    strategy: d.routes.options.length,
+    risks: d.traps.length + (d.questions_to_confirm?.length ?? 0),
+    messages: d.messages.length,
+    sources: saved.sources.length,
+  };
+  const shownTab = (tabCounts[tab] ?? 0) > 0 ? tab : "needs";
   const recIndex = recommended ? d.routes.options.indexOf(recommended) : -1;
   const nextStep = d.timeline[0]?.step ?? d.questions_to_confirm?.[0] ?? null;
   const critical = d.documents.filter((x) => x.critical).length;
@@ -283,7 +292,7 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
 
         {/* 2. Everything else, one tab at a time. */}
         <Tabs
-          value={tab}
+          value={shownTab}
           onValueChange={setTab}
           className="rounded-xl border bg-card p-3 shadow-sm sm:p-4"
         >
