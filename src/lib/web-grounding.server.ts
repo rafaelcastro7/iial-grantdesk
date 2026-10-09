@@ -174,7 +174,7 @@ async function viaLovable(
  */
 export async function searchWebGrounded(
   question: string,
-  opts: { maxChars?: number } = {},
+  opts: { maxChars?: number; allowPaid?: boolean } = {},
 ): Promise<WebResult | null> {
   const maxChars = opts.maxChars ?? 6000;
   const env = serverEnv();
@@ -185,7 +185,7 @@ export async function searchWebGrounded(
     for (const model of ["openai/gpt-oss-20b", "openai/gpt-oss-120b"])
       attempts.push([`groq:${model}`, () => viaGroq(env.GROQ_API_KEY!, model, question, maxChars)]);
   // Paid floor: Lovable AI, only when the free providers could not answer.
-  if (env.LOVABLE_API_KEY)
+  if (env.LOVABLE_API_KEY && opts.allowPaid !== false)
     attempts.push(["lovable", () => viaLovable(env.LOVABLE_API_KEY!, question, maxChars)]);
   for (const [name, run] of attempts) {
     if (cooling(name)) continue;

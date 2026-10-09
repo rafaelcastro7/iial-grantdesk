@@ -40,9 +40,11 @@ export function ConsultantToday({ greeting }: { greeting: string }) {
     const text = q.trim();
     if (!text) return;
     try {
+      const isLink = /^https?:\/\//i.test(text);
       const key = "grants.radar.filters.v1";
       const prev = JSON.parse(window.sessionStorage.getItem(key) ?? "{}");
-      window.sessionStorage.setItem(key, JSON.stringify({ ...prev, search: text }));
+      // A link is opened, not used as a catalog filter.
+      if (!isLink) window.sessionStorage.setItem(key, JSON.stringify({ ...prev, search: text }));
       window.sessionStorage.setItem(
         /^https?:\/\//i.test(text) ? "grants.autoLink" : "grants.autoWeb",
         text,

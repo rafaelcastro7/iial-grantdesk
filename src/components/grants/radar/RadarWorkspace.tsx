@@ -134,6 +134,7 @@ export function RadarWorkspace({
     }
   };
 
+  const [linkBusy, setLinkBusy] = useState(false);
   const handleSubmitSearch = async (raw: string) => {
     const q = raw.trim();
     if (!q) return;
@@ -149,6 +150,8 @@ export function RadarWorkspace({
         void navigate({ to: "/grants/$id", params: { id: known.grant.id } });
         return;
       }
+      if (linkBusy) return;
+      setLinkBusy(true);
       try {
         const res = await addGrantFn({ data: { url: q } });
         await queryClient.invalidateQueries({ queryKey: ["grants"] });
@@ -159,6 +162,8 @@ export function RadarWorkspace({
         });
       } catch (err) {
         setWebError(`link: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setLinkBusy(false);
       }
       return;
     }
@@ -198,7 +203,7 @@ export function RadarWorkspace({
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.search, radar.items.length]);
+  }, [filters.search, radar.items.length, isWebSearching]);
 
   const handleImportWebGrant = async (grant: DiscoveredWebGrant) => {
     setImportingUrls((prev) => new Set(prev).add(grant.url));
@@ -400,6 +405,18 @@ export function RadarWorkspace({
         </div>
 
         <div className="flex flex-col">
+          {linkBusy && (
+            <div
+              role="status"
+              className="flex items-center gap-2 border-b px-4 py-3 text-sm text-muted-foreground md:px-7"
+            >
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              {tr(
+                "Opening the link and reading the call…",
+                "Abriendo el enlace y leyendo la convocatoria…",
+              )}
+            </div>
+          )}
           {/* Catalog results */}
           {radar.items.length === 0 ? (
             <EmptyState

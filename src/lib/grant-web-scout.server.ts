@@ -51,7 +51,7 @@ export async function searchWebForGrantsImpl(
   if (!apiKey) {
     return {
       ok: false,
-      provider: "gemini_google_search",
+      provider: "none",
       query: opts.query,
       searchedAt: new Date().toISOString(),
       grants: [],
@@ -111,7 +111,8 @@ Return ONLY this JSON:
     // The second (other-language) search only when the first finds few results.
     const first = await searchWebGrounded(prompt, { maxChars: 60000 });
     const firstCount = first ? (first.text.match(/"title"\s*:/g) ?? []).length : 0;
-    const second = firstCount < 5 ? await searchWebGrounded(variant, { maxChars: 60000 }) : null;
+    const second =
+      first && firstCount < 5 ? await searchWebGrounded(variant, { maxChars: 60000 }) : null;
     const answers = [first, second];
     const providerUsed = (first ?? second)?.provider ?? "none";
     if (!answers.some(Boolean)) {
@@ -229,7 +230,7 @@ Return ONLY this JSON:
   } catch (err: unknown) {
     return {
       ok: false,
-      provider: "gemini_google_search",
+      provider: "none",
       query: opts.query,
       searchedAt: new Date().toISOString(),
       grants: [],

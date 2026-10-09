@@ -1481,7 +1481,7 @@ export function GrantApplicationWorkspace({ grantId, orgId }: { grantId: string;
       {dossierData?.saved && (dossierData.saved.dossier as Dossier).messages?.length ? (
         <details className="rounded-lg border bg-card shadow-sm">
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
-            {tr("5. More email templates and the memo", "5. Más plantillas de correo y el memo")}
+            {tr("More email templates and the memo", "Más plantillas de correo y el memo")}
             <span className="ml-2 font-normal text-muted-foreground">
               {tr(
                 "the dossier above already has the messages for this call",

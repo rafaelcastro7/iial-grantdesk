@@ -225,12 +225,16 @@ export const askGrantCopilot = createServerFn({ method: "POST" })
       /busca|search|web|internet|oficial|official|verific|verify|fecha|deadline|monto|amount|requisit|requirement|elegib|eligib|abre|open|próxim|next|cycle|ciclo/i.test(
         data.message,
       );
+    // Paid (Lovable) web search only when the user explicitly asks to search.
+    const explicitWeb = /\b(busca|buscar|search|internet|web)\b/i.test(data.message);
     const web =
-      (freeSearch && (factsMissing || wantsWeb || history.length === 0)) || (canSearch && wantsWeb)
+      (freeSearch && (factsMissing || wantsWeb || history.length === 0)) ||
+      (canSearch && explicitWeb)
         ? await (
             await import("@/lib/web-grounding.server")
           ).searchWebGrounded(
             `Find the official, current information for the funding call "${grant.title}" by ${(grant.funder as { name?: string } | null)?.name ?? "the funder"}${grant.url ? ` (official page: ${grant.url})` : ""}. Report: is it open, upcoming or closed and the next cycle; exact deadline(s) with time zone; amount per project; who can apply (applicant types and countries); key requirements (registration, financial statements, match / cost-share, consortium rules); how to apply. Also answer: ${data.message.slice(0, 500)}. Only state facts found on official or reliable pages; say "not published" otherwise.`,
+            { allowPaid: explicitWeb },
           )
         : null;
     const webText = web
