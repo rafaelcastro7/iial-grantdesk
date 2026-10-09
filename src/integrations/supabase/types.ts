@@ -3346,8 +3346,6 @@ export type Database = {
           updated_at: string
           user_id: string | null
           website: string | null
-          decision_maker_name: string | null
-          outreach_credentials: string | null
           years_operating: number | null
         }
         Insert: {
@@ -3386,8 +3384,6 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           website?: string | null
-          decision_maker_name?: string | null
-          outreach_credentials?: string | null
           years_operating?: number | null
         }
         Update: {
@@ -3426,8 +3422,6 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           website?: string | null
-          decision_maker_name?: string | null
-          outreach_credentials?: string | null
           years_operating?: number | null
         }
         Relationships: [
