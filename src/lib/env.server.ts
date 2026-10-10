@@ -15,6 +15,13 @@ const schema = z.object({
   LOVABLE_API_KEY: z.string().min(10).optional(),
   /** User's own Anthropic key: features that explicitly run on their Claude account. */
   ANTHROPIC_API_KEY: z.string().min(10).optional(),
+  /** Optional override; defaults to Anthropic's stable Claude Sonnet alias. */
+  ANTHROPIC_MODEL: z.string().min(3).optional(),
+  /** Required only for Anthropic keys that can access more than one workspace. */
+  ANTHROPIC_WORKSPACE_ID: z
+    .string()
+    .regex(/^wrkspc_[A-Za-z0-9]+$/)
+    .optional(),
   /** External chat providers, tried before the gateway to save its credits. */
   CEREBRAS_API_KEY: z.string().min(10).optional(),
   GROQ_API_KEY: z.string().min(10).optional(),

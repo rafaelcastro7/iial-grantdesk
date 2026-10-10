@@ -15,6 +15,8 @@
 
 - Server functions live in `src/lib/*.functions.ts`; import `src/server/` modules dynamically inside handlers (client bundle safety).
 - Text AI: configured free-tier providers first (Gemini via `GOOGLE_AI_STUDIO_KEY` or Lovable's `GEMINI_API_KEY` → Groq → Cerebras, only when their key is set), Lovable AI Gateway as the paid floor; embeddings Lovable `google/gemini-embedding-2` @768. User chose cost-first ordering (Sep 30 2026); with no external secrets in Lovable Cloud, Lovable AI is effectively the only provider.
+- Claude: `ANTHROPIC_API_KEY` is server-only and currently powers the explicit proposal-checklist action through `src/server/claude.ts`; multi-workspace credentials also need `ANTHROPIC_WORKSPACE_ID`. It is not part of the general cost-first provider chain. Checklist items must preserve provenance (`published`, `operational`, `verify`), and only numbered extracted requirements may be labelled published.
+- OpenRouter is not integrated yet. If approved, add it as an explicit budget-controlled paid provider after configured direct/free providers and before the Lovable paid floor; never silently switch model quality or spend policy.
 - No client deadlines on AI calls (aborted generations still bill); live AI tests only with `LIVE_CLOUD=1`.
 - Eligibility is deterministic in `src/lib/eligibility.ts`; `unknown` is valid; soft-check failures are surfaced without changing verdicts.
 - Evaluator never aborts batches: on LLM failure fall back to `rules-engine-deterministic`; normalize `fit_score` to [0,1]; persisted `grant_evaluations` override heuristics in `toRadarItem`; short-circuit hard fails with deterministic rules (0 tokens) before calling LLM.
