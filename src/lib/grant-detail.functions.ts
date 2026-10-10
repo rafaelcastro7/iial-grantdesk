@@ -17,7 +17,7 @@ export const getGrantDetail = createServerFn({ method: "GET" })
     const { data: grant, error } = await context.supabase
       .from("grants")
       .select(
-        "id, title, title_fr, summary, summary_fr, amount_cad_min, amount_cad_max, currency, country, deadline, sectors, eligibility, eligibility_note, applicant_types, requirements, language, url, status, fit_score, discovered_at, enriched_at, scored_at, last_seen_at, times_seen, enrich_attempts, enrich_last_error, funder_id, funder:funders(id, name, name_fr, jurisdiction, source_url)",
+        "id, title, title_fr, summary, summary_fr, amount_min, amount_max, amount_cad_min, amount_cad_max, currency, country, deadline, sectors, eligibility, eligibility_note, applicant_types, requirements, language, url, status, fit_score, discovered_at, enriched_at, scored_at, last_seen_at, times_seen, enrich_attempts, enrich_last_error, funder_id, funder:funders(id, name, name_fr, jurisdiction, source_url)",
       )
       .eq("id", data.id)
       .maybeSingle();
@@ -58,37 +58,9 @@ export const getGrantDetail = createServerFn({ method: "GET" })
     (grant as Record<string, unknown>).manual_fields = prov?.manual_fields ?? {};
     (grant as Record<string, unknown>).field_search_status = prov?.field_search_status ?? {};
 
-    // Ensure requirements are populated: if absent or empty in database,
-    // synthesize baseline requirements dynamically from grant narrative and attributes.
-    const currentReqs = (grant as { requirements?: unknown }).requirements;
-    if (!currentReqs || (Array.isArray(currentReqs) && currentReqs.length === 0)) {
-      const { synthesizeRequirementsForGrant } =
-        await import("@/agents/grant-requirements-analyzer.server");
-      const syn = synthesizeRequirementsForGrant({
-        title: grant.title,
-        summary: grant.summary,
-        eligibility_note: grant.eligibility_note,
-        eligibility: grant.eligibility,
-        funding_uses: (grant as { funding_uses?: string[] | null }).funding_uses,
-        amount_cad_max: grant.amount_cad_max,
-        applicant_types: grant.applicant_types,
-        funder_name: (grant.funder as { name?: string } | null)?.name,
-      });
-      if (syn.length > 0) {
-        (grant as Record<string, unknown>).requirements = syn;
-        import("@/integrations/supabase/client.server")
-          .then(({ supabaseAdmin }) =>
-            supabaseAdmin
-              .from("grants")
-              .update({ requirements: syn } as never)
-              .eq("id", data.id),
-          )
-          .then(
-            () => {},
-            () => {},
-          );
-      }
-    }
+    // Missing requirements stay missing. Generic proposal/budget/registration
+    // templates are operational advice, not published requirements, and must
+    // never be persisted as if the funder had requested them.
 
     // Same duplicate-record signal as listGrants — a real, recurring
     // data-quality issue (see grants.functions.ts's normalizeTitle comment).

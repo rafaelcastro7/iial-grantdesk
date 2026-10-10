@@ -665,8 +665,10 @@ export function buildRadar<T extends RadarGrant>(grants: T[], opts: RadarOptions
       continue;
     }
     if (text) {
-      const hay = `${g.title ?? ""} ${funderOf(g)?.name ?? ""}`.toLowerCase();
-      if (!hay.includes(text)) {
+      const hay =
+        `${g.title ?? ""} ${g.summary ?? ""} ${g.eligibility_note ?? ""} ${funderOf(g)?.name ?? ""} ${g.country ?? ""}`.toLowerCase();
+      const terms = lexicalFallbackTokens(text);
+      if (terms.length > 0 && !terms.every((term) => hay.includes(term))) {
         hiddenByFilters++;
         continue;
       }

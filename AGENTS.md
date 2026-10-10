@@ -32,6 +32,9 @@
 - Enrichment: semantic windowing (`targeted-chunks.server.ts`, 70% token savings); early-exit deep crawl and LLM gap-fill if deadline is closed/expired (0 tokens); conditional critic in requirements extraction when primary pass is high confidence.
 - Keep loose TS settings; exclude tests/e2e/fixtures from typecheck.
 - Theme via `src/styles.css` tokens (iial.ca style); V2 is the only UI.
+- Grant detail automatically assembles a tenant-scoped decision dossier on open; it must account for all eight decision facts (eligibility, deadline, amount, eligible costs, matching funds, application documents, submission process, contact) as verified, not published, not applicable, or conflicting. Never require the reader to invoke a copilot or research agent.
+- Missing source data stays explicitly unknown/not published. Do not synthesize generic proposal, budget, or registration items as official grant requirements.
+- Multi-word Radar filtering tokenizes natural-language queries and searches title, summary, eligibility, country, and funder; do not revert to literal phrase-only matching.
 - Multitenancy: evaluations, profiles and fit rules are strictly scoped by `org_id`; active tenant is driven by session context (`useActiveTenant`), never by mutating `profiles.org_id`.
 - Grant Copilot & Backlog: contextual assistant uses active tenant profile and grant evidence; feature requests and gap observations persist in `product_design_backlog`.
 - Consortium & America coverage: evaluations distinguish lead applicant vs consortium partner (technical partner WCIS vs territorial/governance lead); support rolling/unsolicited deadlines and in-kind match.

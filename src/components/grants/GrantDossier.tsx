@@ -24,6 +24,8 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  dossierCoverage,
+  dossierFactLabel,
   dossierToPlan,
   fitLabel,
   fitTone,
@@ -44,7 +46,7 @@ import {
   getGrantDossier,
   type SavedDossier,
 } from "@/lib/grant-dossier.functions";
-import { applyCopilotPlanUpdate, getGrantWorkspace } from "@/lib/grant-workspace.functions";
+import { applyCopilotPlanUpdate } from "@/lib/grant-workspace.functions";
 import { localeOf, useTr, useUiLang } from "@/lib/ui-lang";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +58,7 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
   const generate = useServerFn(generateGrantDossier);
   const [local, setLocal] = useState<SavedDossier | null>(null);
   const [busy, setBusy] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
   const { settings: team } = useTeamSettings(orgId);
   // Kept outside the keyed dossier view, so an Update does not reset the tab.
   const [tab, setTab] = useState("needs");
@@ -71,50 +74,27 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
   useEffect(() => {
     setApplied(new Set());
   }, [savedAt]);
-  // A grant the team is working (it has a saved plan, or was just marked
-  // "Interested") is researched automatically the first time it is opened;
-  // others wait for the button.
-  const fetchWs = useServerFn(getGrantWorkspace);
-  const { data: wsData } = useQuery({
-    queryKey: ["grant-workspace", grantId, orgId, lang],
-    queryFn: () => fetchWs({ data: { grantId, orgId, lang } }),
-  });
+  // Opening a grant is enough: the reader receives the researched decision
+  // dossier without first learning which agent or copilot to invoke.
   const autoStarted = useRef(false);
   useEffect(() => {
-    const onceKey = `dossier-auto:${grantId}:${orgId}`;
-    let triedBefore = false;
-    // Marked "Interested" in the search: research it right away.
-    let interested = false;
-    try {
-      triedBefore = window.sessionStorage.getItem(onceKey) === "1";
-      interested = window.sessionStorage.getItem(`grant.research:${grantId}`) === "1";
-    } catch {
-      /* storage unavailable */
-    }
+    const coverage = saved ? dossierCoverage(saved.dossier) : null;
     if (
       autoStarted.current ||
       isLoading ||
-      saved ||
       busy ||
-      (!wsData?.saved && !interested) ||
       data?.available !== true ||
-      data.otherLang ||
-      triedBefore
+      (saved && coverage?.complete)
     )
       return;
     autoStarted.current = true;
-    try {
-      window.sessionStorage.setItem(onceKey, "1");
-      window.sessionStorage.removeItem(`grant.research:${grantId}`);
-    } catch {
-      /* storage unavailable */
-    }
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, saved, wsData?.saved, data?.available]);
+  }, [isLoading, saved, data?.available, lang]);
 
   const run = async () => {
     setBusy(true);
+    setAutoError(null);
     try {
       const res = await generate({
         data: { grantId, orgId, lang, decisionMaker: team.decisionMaker },
@@ -141,6 +121,7 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
         );
       await qc.invalidateQueries({ queryKey: ["grant-dossier", grantId, orgId, lang] });
     } catch (e) {
+      setAutoError(e instanceof Error ? e.message : String(e));
       toast.error(
         `${tr("Could not prepare the dossier", "No se pudo preparar el dossier")}: ${e instanceof Error ? e.message : String(e)}`,
       );
@@ -155,25 +136,34 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
     return (
       <section className="rounded-xl border border-primary/30 bg-primary/5 p-5 shadow-sm">
         <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Sparkles className="h-4 w-4 text-primary" />
-          {tr("Do we apply?", "¿Aplicamos?")}
+          {busy ? (
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          ) : (
+            <Sparkles className="h-4 w-4 text-primary" />
+          )}
+          {busy
+            ? tr("Preparing the decision brief", "Preparando la ficha de decisión")
+            : tr("Do we apply?", "¿Aplicamos?")}
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
           {tr(
-            "The agents read the official page and the internet, verify the deadline, amount and who can apply (and correct the grant, with sources), re-check our fit and write the decision with what we need and the strategy.",
-            "Los agentes leen la página oficial e internet, verifican fecha límite, monto y quién puede aplicar (y corrigen el grant, con fuentes), revisan nuestro fit y escriben la decisión con lo que necesitamos y la estrategia.",
+            "Research agents are reading the official sources, checking every decision fact and assembling the recommendation, documents, timeline and questions for the funder. You can stay on this page.",
+            "Los agentes están leyendo las fuentes oficiales, verificando cada dato de decisión y armando la recomendación, los documentos, el cronograma y las preguntas para el financiador. Puedes permanecer en esta página.",
           )}
         </p>
-        <Button className="mt-3 gap-2" onClick={run} disabled={busy}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {busy
-            ? tr("Researching and verifying (30–90 s)…", "Investigando y verificando (30–90 s)…")
-            : tr("We are interested — research it", "Nos interesa — investigarlo")}
-        </Button>
+        {autoError && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <p className="text-xs text-destructive">{autoError}</p>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={run} disabled={busy}>
+              <RefreshCw className="h-3.5 w-3.5" /> {tr("Try again", "Intentar de nuevo")}
+            </Button>
+          </div>
+        )}
       </section>
     );
 
   const d = saved.dossier;
+  const coverage = dossierCoverage(d);
   const when = new Date(saved.updated_at).toLocaleDateString(localeOf(lang), {
     day: "numeric",
     month: "short",
@@ -275,6 +265,38 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
             </div>
           </div>
 
+          <div
+            className={cn(
+              "mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs",
+              coverage.decisionReady
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+            )}
+          >
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              {coverage.decisionReady ? (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              ) : (
+                <AlertTriangle className="h-3.5 w-3.5" />
+              )}
+              {coverage.complete
+                ? tr(
+                    `All ${coverage.total} decision facts reviewed`,
+                    `Los ${coverage.total} datos de decisión fueron revisados`,
+                  )
+                : tr(
+                    `${coverage.accounted} of ${coverage.total} decision facts reviewed`,
+                    `${coverage.accounted} de ${coverage.total} datos de decisión revisados`,
+                  )}
+            </span>
+            <span>
+              {tr(
+                `${coverage.verified} source-verified · ${coverage.notPublished} explicitly not published`,
+                `${coverage.verified} verificados con fuente · ${coverage.notPublished} no publicados explícitamente`,
+              )}
+            </span>
+          </div>
+
           <dl className="mt-4 grid gap-3 text-sm md:grid-cols-3">
             <div className="rounded-lg bg-muted/40 p-3">
               <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
@@ -367,55 +389,112 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
           </TabsList>
 
           <TabsContent value="needs" className="space-y-4 pt-2">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">
+                {tr("Decision facts", "Datos para decidir")}
+              </h3>
+              <dl className="grid gap-2 sm:grid-cols-2">
+                {(d.facts ?? []).map((fact) => (
+                  <div key={fact.key} className="rounded-lg border bg-background/70 p-3">
+                    <dt className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase text-muted-foreground">
+                      <span>{dossierFactLabel(fact.key, lang)}</span>
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 py-0.5 text-[10px] normal-case",
+                          fact.status === "verified"
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                            : fact.status === "conflict"
+                              ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                              : "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                        )}
+                      >
+                        {fact.status === "verified"
+                          ? tr("Verified", "Verificado")
+                          : fact.status === "not_applicable"
+                            ? tr("Not applicable", "No aplica")
+                            : fact.status === "conflict"
+                              ? tr("Conflicting sources", "Fuentes en conflicto")
+                              : tr("Not published", "No publicado")}
+                      </span>
+                    </dt>
+                    <dd className="mt-1 text-sm">{fact.value}</dd>
+                    {fact.source_url && (
+                      <dd className="mt-1">
+                        <a
+                          href={fact.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                        >
+                          {tr("Evidence", "Evidencia")} <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </dd>
+                    )}
+                  </div>
+                ))}
+              </dl>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">
                 {tr("Official documents", "Documentos oficiales")}
               </h3>
-              <ApplyButton
-                grantId={grantId}
-                orgId={orgId}
-                dossier={d}
-                part="documents"
-                label={tr("Add to the plan", "Agregar al plan")}
-              />
+              {d.documents.length > 0 && (
+                <ApplyButton
+                  grantId={grantId}
+                  orgId={orgId}
+                  dossier={d}
+                  part="documents"
+                  label={tr("Add to the plan", "Agregar al plan")}
+                />
+              )}
             </div>
-            <Accordion type="multiple" className="rounded-lg border">
-              {d.documents.map((doc, i) => (
-                <AccordionItem key={i} value={`doc-${i}`} className="px-3">
-                  <AccordionTrigger className="py-2.5 text-left font-sans text-sm font-medium hover:no-underline">
-                    <span>
-                      {doc.item}
-                      {doc.critical && (
-                        <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
-                          {tr("critical", "crítico")}
-                        </span>
+            {d.documents.length > 0 ? (
+              <Accordion type="multiple" className="rounded-lg border">
+                {d.documents.map((doc, i) => (
+                  <AccordionItem key={i} value={`doc-${i}`} className="px-3">
+                    <AccordionTrigger className="py-2.5 text-left font-sans text-sm font-medium hover:no-underline">
+                      <span>
+                        {doc.item}
+                        {doc.critical && (
+                          <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
+                            {tr("critical", "crítico")}
+                          </span>
+                        )}
+                        {doc.only_for && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            {tr("only for", "solo para")}{" "}
+                            {(ROUTES as readonly string[]).includes(doc.only_for)
+                              ? routeLabel(doc.only_for as Route, lang)
+                              : doc.only_for}
+                          </span>
+                        )}
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      {(doc.details ?? []).length > 0 ? (
+                        <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                          {doc.details!.map((x, xi) => (
+                            <li key={`${xi}-${x}`}>{x}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          {tr("No more detail published.", "No hay más detalle publicado.")}
+                        </p>
                       )}
-                      {doc.only_for && (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {tr("only for", "solo para")}{" "}
-                          {(ROUTES as readonly string[]).includes(doc.only_for)
-                            ? routeLabel(doc.only_for as Route, lang)
-                            : doc.only_for}
-                        </span>
-                      )}
-                    </span>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {(doc.details ?? []).length > 0 ? (
-                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
-                        {doc.details!.map((x, xi) => (
-                          <li key={`${xi}-${x}`}>{x}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        {tr("No more detail published.", "No hay más detalle publicado.")}
-                      </p>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            ) : (
+              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                {tr(
+                  "The reviewed sources do not publish the application package. The dossier includes this in the prepared funder questions.",
+                  "Las fuentes revisadas no publican el paquete de postulación. El dossier incluye este punto en las preguntas preparadas para el financiador.",
+                )}
+              </p>
+            )}
 
             {(d.timeline.length > 0 || d.money_note) && (
               <div>
@@ -598,8 +677,8 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
               {tr(
-                "Prepared by AI from these sources; verify amounts and dates on the official page before sending.",
-                "Preparado con IA a partir de estas fuentes; verifique montos y fechas en la página oficial antes de enviar.",
+                "The agents used these sources for the answers above. Unknown or conflicting facts are labelled explicitly and included in the prepared funder questions.",
+                "Los agentes usaron estas fuentes para las respuestas anteriores. Los datos desconocidos o contradictorios están identificados explícitamente e incluidos en las preguntas preparadas para el financiador.",
               )}
             </p>
           </TabsContent>

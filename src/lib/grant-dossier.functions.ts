@@ -53,6 +53,8 @@ export const getGrantDossier = createServerFn({ method: "GET" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    await getTenantPrincipal(context.supabase, context.userId, data.orgId);
     const db = context.supabase as unknown as Db;
     const { data: rows, error } = await db
       .from("grant_dossiers")
@@ -113,13 +115,17 @@ export const generateGrantDossier = createServerFn({ method: "POST" })
     if (gErr || !grant) throw new Error("grant_not_found");
     const funder = Array.isArray(grant.funder) ? grant.funder[0] : grant.funder;
 
-    const [{ eligibilityByOrg }, { sanitizeDossier }, factCheck, { searchWebGrounded }] =
-      await Promise.all([
-        import("@/lib/grant-workspace.functions"),
-        import("@/lib/grant-dossier.shared"),
-        import("@/lib/grant-fact-check.shared"),
-        import("@/lib/web-grounding.server"),
-      ]);
+    const [
+      { eligibilityByOrg },
+      { auditDossierForReader, completeDossierFacts, reconcileFit, sanitizeDossier },
+      factCheck,
+      { searchWebGrounded },
+    ] = await Promise.all([
+      import("@/lib/grant-workspace.functions"),
+      import("@/lib/grant-dossier.shared"),
+      import("@/lib/grant-fact-check.shared"),
+      import("@/lib/web-grounding.server"),
+    ]);
     const funderName = funder?.name ?? "the funder";
 
     // Researchers: everything we know, gathered in parallel (no AI).
@@ -319,9 +325,13 @@ Return ONLY a JSON object with this shape:
     { "channel": "email", "to": "the academic or local partner", "subject": "...", "body": "..." },
     { "channel": "whatsapp", "to": "${data.decisionMaker?.trim() || "the decision maker"}", "body": "short decision message in plain words, ending with the question to approve the next step" }
   ],
+  "facts": [
+    { "key": "eligibility|deadline|amount|eligible_costs|matching_funds|application_documents|submission_process|contact", "status": "verified|not_published|not_applicable|conflict", "value": "the concise answer the user needs", "source_url": "required http(s) URL when status is verified" }
+  ],
   "questions_to_confirm": ["what we must confirm with the funder before investing time"]
 }
-Give 3-6 traps, 2-3 route options (always include the realistic alternative if the obvious route is blocked, e.g. a partner-led route), the complete document set, and a timeline of 4-8 steps. Emails are formal (usted in Spanish), sign as ${sender || "the consultant"}${sender ? "" : " (leave the name out)"}, from ${orgs.find((o) => o.id === data.orgId)?.name ?? "our organization"}.`;
+Return exactly one fact for each of the eight keys. A fact is verified only with its exact source URL; otherwise mark it not_published, not_applicable or conflict. Every important unknown must also appear in questions_to_confirm, and the funder email must ask all those questions in one concise message. Do not tell the user to search elsewhere or use a copilot.
+Give 3-6 traps, 2-3 route options (always include the realistic alternative if the obvious route is blocked, e.g. a partner-led route), the complete official document set, and a timeline of 4-8 steps. Emails are formal (usted in Spanish), sign as ${sender || "the consultant"}${sender ? "" : " (leave the name out)"}, from ${orgs.find((o) => o.id === data.orgId)?.name ?? "our organization"}.`;
 
     const context_ = `GRANT RECORD:
 ${JSON.stringify(
@@ -371,7 +381,20 @@ ${web ? `${web.text}\nSources:\n${web.sources.map((x) => `- ${x.title}: ${x.url}
       responseFormat: "json",
       validate: (t) => {
         try {
-          return !!sanitizeDossier(JSON.parse(t.replace(/^```(?:json)?\s*|\s*```$/g, "")));
+          const candidate = sanitizeDossier(
+            JSON.parse(t.replace(/^```(?:json)?\s*|\s*```$/g, "")),
+            { standards },
+          );
+          if (!candidate) return false;
+          return auditDossierForReader(
+            completeDossierFacts(candidate, current, {
+              lang: data.lang,
+              officialUrl:
+                typeof current.url === "string" && /^https?:\/\//i.test(current.url)
+                  ? current.url
+                  : undefined,
+            }),
+          ).ready;
         } catch {
           return false;
         }
@@ -383,16 +406,25 @@ ${web ? `${web.text}\nSources:\n${web.sources.map((x) => `- ${x.title}: ${x.url}
       { standards },
     );
     if (!sanitized) throw new Error("dossier_invalid");
-    const { reconcileFit } = await import("@/lib/grant-dossier.shared");
-    const dossier = {
-      ...sanitized,
-      fit: reconcileFit(
-        sanitized.fit,
-        eligibility.find((e) => e.orgId === data.orgId)?.verdict as
-          "eligible" | "needs_input" | "not_eligible" | undefined,
-      ),
-      ...(checked.length ? { checked } : {}),
-    };
+    const dossier = completeDossierFacts(
+      {
+        ...sanitized,
+        fit: reconcileFit(
+          sanitized.fit,
+          eligibility.find((e) => e.orgId === data.orgId)?.verdict as
+            "eligible" | "needs_input" | "not_eligible" | undefined,
+        ),
+        ...(checked.length ? { checked } : {}),
+      },
+      current,
+      {
+        lang: data.lang,
+        officialUrl:
+          typeof current.url === "string" && /^https?:\/\//i.test(current.url)
+            ? current.url
+            : undefined,
+      },
+    );
     const sources = [
       ...(grant.url
         ? [{ title: es ? "Página oficial" : "Official page", url: grant.url as string }]

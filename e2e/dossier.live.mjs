@@ -1,47 +1,59 @@
-// Prepares a grant dossier in the browser and prints it.
-// Run: node e2e/dossier.live.mjs [grantId]   (E2E_OUT, BASE_URL optional)
+// Opens a grant as the synthetic user and verifies that its autonomous dossier is complete.
+// Run: LIVE_CLOUD=1 node e2e/dossier.live.mjs [grantId]
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
+
+if (process.env.LIVE_CLOUD !== "1") throw new Error("Set LIVE_CLOUD=1 for live AI tests.");
 const env = Object.fromEntries(
   [".env", ".env.local"]
-    .filter((f) => fs.existsSync(f))
-    .flatMap((f) => fs.readFileSync(f, "utf8").split(/\r?\n/))
-    .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
-    .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
+    .filter((file) => fs.existsSync(file))
+    .flatMap((file) => fs.readFileSync(file, "utf8").split(/\r?\n/))
+    .filter((line) => line.includes("=") && !line.trim().startsWith("#"))
+    .map((line) => [
+      line.slice(0, line.indexOf("=")).trim(),
+      line.slice(line.indexOf("=") + 1).trim(),
+    ]),
 );
-const BASE = process.env.BASE_URL || "http://localhost:5199";
-const OUT = process.env.E2E_OUT || "e2e-artifacts";
-const GRANT = process.argv[2] || "4c434e92-d2b0-42ee-b7cd-67547e03fa34";
-fs.mkdirSync(OUT, { recursive: true });
-const b = await chromium.launch();
-const p = await b.newPage({ viewport: { width: 1440, height: 1000 } });
-await p.goto(`${BASE}/auth`, { waitUntil: "networkidle" });
-await p.evaluate(() => localStorage.setItem("iial.lang", "es"));
-await p.fill('input[type="email"]', env.SYNTH_USER_EMAIL);
-await p.fill('input[type="password"]', env.SYNTH_USER_PASSWORD);
-await p.click('button[type="submit"]');
-await p.waitForURL((u) => !u.pathname.startsWith("/auth"));
-await p.goto(`${BASE}/grants/${GRANT}`, { waitUntil: "networkidle", timeout: 90000 });
-const btn = p.getByRole("button", { name: /Nos interesa — investigarlo|Actualizar/ }).first();
-await btn.waitFor({ timeout: 60000 });
-const t0 = Date.now();
-await btn.click();
-// Wait for this run to finish (the button spins while the agents work).
-await p.waitForTimeout(3000);
-await p.waitForFunction(
-  () =>
-    !document.querySelector("main button svg.animate-spin, main button:disabled svg.animate-spin"),
-  null,
-  { timeout: 300000 },
-);
-await p
-  .getByText(/^Preparado el/)
-  .or(p.getByText(/No se pudo preparar/))
-  .first()
-  .waitFor({ timeout: 30000 });
-await p.waitForTimeout(1500);
-const txt = await p.locator("main").innerText();
-console.log(`(${Math.round((Date.now() - t0) / 1000)} s)\n` + txt.slice(0, 9000));
-await p.screenshot({ path: path.join(OUT, "dossier.png"), fullPage: true });
-await b.close();
+const base = process.env.BASE_URL || "http://localhost:5173";
+const out = process.env.E2E_OUT || "e2e-artifacts";
+const grantId = process.argv[2] || "4c434e92-d2b0-42ee-b7cd-67547e03fa34";
+const dossierTimeout = Number(process.env.DOSSIER_TIMEOUT_MS || 300000);
+fs.mkdirSync(out, { recursive: true });
+
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+try {
+  await page.goto(`${base}/auth`, { waitUntil: "domcontentloaded", timeout: 90000 });
+  await page.evaluate(() => localStorage.setItem("iial.lang", "es"));
+  await page.fill('input[type="email"]', env.SYNTH_USER_EMAIL);
+  await page.fill('input[type="password"]', env.SYNTH_USER_PASSWORD);
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => !url.pathname.startsWith("/auth"));
+
+  const startedAt = Date.now();
+  await page.goto(`${base}/grants/${grantId}`, {
+    waitUntil: "domcontentloaded",
+    timeout: 90000,
+  });
+  try {
+    await page
+      .getByText(/Los 8 datos de decisi.n (?:fueron )?revisados|All 8 decision facts reviewed/)
+      .or(page.getByText(/No se pudo preparar/))
+      .first()
+      .waitFor({ timeout: dossierTimeout });
+  } catch (error) {
+    const diagnostic = (await page.locator("body").innerText()).slice(0, 4000);
+    await page.screenshot({ path: path.join(out, "dossier-failure.png"), fullPage: true });
+    throw new Error(`Dossier wait failed at ${page.url()}:\n${diagnostic}`, { cause: error });
+  }
+  const text = await page.locator("main").innerText();
+  if (!/Los 8 datos de decisi.n (?:fueron )?revisados|All 8 decision facts reviewed/.test(text))
+    throw new Error("The autonomous dossier did not account for all eight facts.");
+  if (/Nos interesa.+investigarlo|Research it for me/.test(text))
+    throw new Error("The reader is still being asked to operate a research agent manually.");
+  console.log(`PASS autonomous dossier (${Math.round((Date.now() - startedAt) / 1000)} s)`);
+  await page.screenshot({ path: path.join(out, "dossier.png"), fullPage: true });
+} finally {
+  await browser.close();
+}

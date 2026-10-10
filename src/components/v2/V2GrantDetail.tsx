@@ -27,7 +27,6 @@ import { FitEvaluation } from "@/components/grants/FitEvaluation";
 import type { AxisScore } from "@/agents/fit-rules.shared";
 import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
 import { GrantCopilotSheet } from "@/components/grants/GrantCopilotSheet";
-import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { GrantPlanPanel } from "@/components/grants/GrantPlanPanel";
 import { GrantChecklistPanel } from "@/components/grants/GrantChecklistPanel";
@@ -89,6 +88,8 @@ type Grant = {
   summary: string | null;
   amount_cad_min: number | null;
   amount_cad_max: number | null;
+  amount_min?: number | null;
+  amount_max?: number | null;
   currency?: string | null;
   country?: string | null;
   deadline: string | null;
@@ -182,7 +183,6 @@ export function V2GrantDetail({
   const tr = useTr();
   const lang = useUiLang();
   const [copilotOpen, setCopilotOpen] = useState(false);
-  const [backlogModalOpen, setBacklogModalOpen] = useState(false);
   // The dossier (filled automatically by the research agents) gives the
   // authoritative "can we apply?"; the header chip defers to it once saved.
   const fetchDossier = useServerFn(getGrantDossier);
@@ -194,6 +194,12 @@ export function V2GrantDetail({
   });
   const savedFit = (dossierData?.saved?.dossier as { fit?: DossierFit } | undefined) ?? null;
   const hasDossierFit = !!savedFit?.fit;
+  const showApplicationWorkspace =
+    !!activeOrgId &&
+    (!!existingProposalId ||
+      savedFit?.fit === "lead" ||
+      savedFit?.fit === "partner_only" ||
+      savedFit?.fit === "next_cycle");
 
   const funderName = grant.funder?.name ?? tr("Funding agency", "Agencia financiadora");
   const eligibilityRows = grant.eligibility ? Object.entries(grant.eligibility) : [];
@@ -216,8 +222,8 @@ export function V2GrantDetail({
 
   const deadline = getDeadlineState(grant.deadline, lang, grant.deadline_kind);
   const amount = amountLabel(
-    grant.amount_cad_min,
-    grant.amount_cad_max,
+    grant.amount_min ?? grant.amount_cad_min,
+    grant.amount_max ?? grant.amount_cad_max,
     grant.status !== "discovered",
     grantCurrency(grant),
     lang,
@@ -340,8 +346,8 @@ export function V2GrantDetail({
                 <DropdownMenuItem onSelect={() => setCopilotOpen(true)}>
                   <Bot className="mr-2 h-4 w-4" />{" "}
                   {tr(
-                    "Ask the Copilot (uses AI credits)",
-                    "Preguntar al Copilot (usa créditos de IA)",
+                    "Ask an optional follow-up (uses AI credits)",
+                    "Hacer una pregunta adicional opcional (usa créditos de IA)",
                   )}
                 </DropdownMenuItem>
                 {existingProposalId ? (
@@ -443,13 +449,20 @@ export function V2GrantDetail({
         />
       )}
 
-      {activeOrgId && <GrantPlanPanel grantId={grant.id} orgId={activeOrgId} />}
-
-      {activeOrgId && <GrantChecklistPanel grantId={grant.id} orgId={activeOrgId} />}
-
       {/* Everything secondary, folded. Closed content is unmounted, so the
           technical panels load nothing until opened. */}
-      <Accordion type="single" collapsible className="rounded-xl border bg-card shadow-sm">
+      <Accordion type="multiple" className="rounded-xl border bg-card shadow-sm">
+        {showApplicationWorkspace && activeOrgId && (
+          <AccordionItem value="application">
+            <AccordionTrigger className="px-5 py-3 text-sm font-semibold hover:no-underline">
+              {tr("Prepare the application", "Preparar la postulación")}
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 border-t px-4 pt-4 sm:px-5">
+              <GrantPlanPanel grantId={grant.id} orgId={activeOrgId} />
+              <GrantChecklistPanel grantId={grant.id} orgId={activeOrgId} />
+            </AccordionContent>
+          </AccordionItem>
+        )}
         <AccordionItem value="details" className="border-b-0">
           <AccordionTrigger className="px-5 py-3 text-sm font-semibold hover:no-underline">
             {tr("Details and sources", "Detalles y fuentes")}
@@ -560,12 +573,6 @@ export function V2GrantDetail({
         grantTitle={grant.title}
         open={copilotOpen}
         onOpenChange={setCopilotOpen}
-      />
-
-      <ProductDesignBacklogModal
-        grantId={grant.id}
-        open={backlogModalOpen}
-        onOpenChange={setBacklogModalOpen}
       />
     </div>
   );

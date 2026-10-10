@@ -29,6 +29,25 @@ export type DossierMessage = {
   channel: "email" | "whatsapp";
 };
 
+export const DOSSIER_FACT_KEYS = [
+  "eligibility",
+  "deadline",
+  "amount",
+  "eligible_costs",
+  "matching_funds",
+  "application_documents",
+  "submission_process",
+  "contact",
+] as const;
+export type DossierFactKey = (typeof DOSSIER_FACT_KEYS)[number];
+export type DossierFactStatus = "verified" | "not_published" | "not_applicable" | "conflict";
+export type DossierFact = {
+  key: DossierFactKey;
+  status: DossierFactStatus;
+  value: string;
+  source_url?: string;
+};
+
 /** The dossier's answer to "can we apply?" for the active organization. */
 export type DossierFit = "lead" | "partner_only" | "not_eligible" | "next_cycle" | "unclear";
 export const DOSSIER_FITS: DossierFit[] = [
@@ -50,6 +69,8 @@ export type Dossier = {
   timeline: DossierStep[];
   money_note?: string;
   messages: DossierMessage[];
+  /** One explicit answer for every fact a reader needs before deciding. */
+  facts: DossierFact[];
   questions_to_confirm?: string[];
   /** Facts the fact checker verified and saved to the grant while preparing it. */
   checked?: import("@/lib/grant-fact-check.shared").CheckedFact[];
@@ -141,6 +162,33 @@ export function sanitizeDossier(raw: unknown, opts: { standards?: string[] } = {
       channel: (s(m.channel, 20) === "whatsapp" ? "whatsapp" : "email") as "email" | "whatsapp",
     }))
     .filter((m) => m.body);
+  const seenFacts = new Set<DossierFactKey>();
+  const facts = arr(r.facts, 20)
+    .map((f) => f as Record<string, unknown>)
+    .flatMap((f): DossierFact[] => {
+      const key = s(f.key, 40) as DossierFactKey;
+      const status = s(f.status, 30) as DossierFactStatus;
+      const value = clean(s(f.value, 1200));
+      const sourceUrl = /^https?:\/\//i.test(s(f.source_url, 500))
+        ? s(f.source_url, 500)
+        : undefined;
+      if (
+        !(DOSSIER_FACT_KEYS as readonly string[]).includes(key) ||
+        !(["verified", "not_published", "not_applicable", "conflict"] as const).includes(status) ||
+        !value ||
+        seenFacts.has(key)
+      )
+        return [];
+      seenFacts.add(key);
+      return [
+        {
+          key,
+          status: status === "verified" && !sourceUrl ? "conflict" : status,
+          value,
+          source_url: sourceUrl,
+        },
+      ];
+    });
   return {
     fit,
     fit_reason,
@@ -151,10 +199,151 @@ export function sanitizeDossier(raw: unknown, opts: { standards?: string[] } = {
     timeline,
     money_note: clean(s(r.money_note, 1200)) || undefined,
     messages,
+    facts,
     questions_to_confirm: arr(r.questions_to_confirm, 8)
       .map((q) => clean(s(q, 300)))
       .filter(Boolean),
   };
+}
+
+export function dossierCoverage(dossier: Pick<Dossier, "facts">) {
+  const facts = dossier.facts ?? [];
+  const byKey = new Map(facts.map((fact) => [fact.key, fact]));
+  const missing = DOSSIER_FACT_KEYS.filter((key) => !byKey.has(key));
+  const conflicts = facts.filter((fact) => fact.status === "conflict").map((fact) => fact.key);
+  const verified = facts.filter((fact) => fact.status === "verified").length;
+  const notPublished = facts.filter((fact) => fact.status === "not_published").length;
+  return {
+    accounted: DOSSIER_FACT_KEYS.length - missing.length,
+    total: DOSSIER_FACT_KEYS.length,
+    pct: Math.round(((DOSSIER_FACT_KEYS.length - missing.length) / DOSSIER_FACT_KEYS.length) * 100),
+    complete: missing.length === 0,
+    decisionReady: missing.length === 0 && conflicts.length === 0,
+    missing,
+    conflicts,
+    verified,
+    notPublished,
+  };
+}
+
+/** Product-level acceptance test for a dossier a non-expert can use alone. */
+export function auditDossierForReader(dossier: Dossier) {
+  const coverage = dossierCoverage(dossier);
+  const missing: string[] = [];
+  if (!dossier.fit_reason?.trim()) missing.push("decision reason");
+  if (!dossier.verdict.trim()) missing.push("full verdict");
+  if (!coverage.complete) missing.push("decision facts");
+  if (
+    !["not_eligible", "unclear"].includes(dossier.fit) &&
+    !dossier.routes.options.some((option) => option.recommended)
+  )
+    missing.push("recommended route");
+  if (dossier.timeline.length === 0 && (dossier.questions_to_confirm?.length ?? 0) === 0)
+    missing.push("next step");
+  const unresolved = dossier.facts.filter(
+    (fact) => fact.status === "not_published" || fact.status === "conflict",
+  );
+  if (unresolved.length > 0 && (dossier.questions_to_confirm?.length ?? 0) === 0)
+    missing.push("questions for unpublished facts");
+  if (
+    unresolved.length > 0 &&
+    !dossier.messages.some((message) => message.channel === "email" && message.body.trim())
+  )
+    missing.push("ready-to-send funder email");
+  return { ready: missing.length === 0, missing, coverage };
+}
+
+/**
+ * Ensures a generated dossier answers every decision fact explicitly. Missing
+ * information becomes “not published”; it is never filled with generic grant
+ * assumptions. Source-backed database facts override an uncertain model value.
+ */
+export function completeDossierFacts(
+  dossier: Dossier,
+  grant: {
+    deadline?: unknown;
+    deadline_kind?: unknown;
+    amount_cad_min?: unknown;
+    amount_cad_max?: unknown;
+    amount_min?: unknown;
+    amount_max?: unknown;
+    currency?: unknown;
+    applicant_types?: unknown;
+    eligible_applicant_types?: unknown;
+    eligibility_note?: unknown;
+    funding_uses?: unknown;
+  },
+  options: { lang: "en" | "es"; officialUrl?: string },
+): Dossier {
+  const es = options.lang === "es";
+  const facts = new Map((dossier.facts ?? []).map((fact) => [fact.key, fact]));
+  const verified = (key: DossierFactKey, value: string) => {
+    if (!value || !options.officialUrl) return;
+    facts.set(key, {
+      key,
+      status: "verified",
+      value,
+      source_url: options.officialUrl,
+    });
+  };
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+  const strings = (value: unknown) =>
+    Array.isArray(value) ? value.map((item) => text(item)).filter(Boolean) : [];
+
+  const deadline = text(grant.deadline);
+  if (deadline) verified("deadline", deadline);
+  else if (text(grant.deadline_kind) === "rolling")
+    verified(
+      "deadline",
+      es ? "Convocatoria continua, sin fecha fija." : "Rolling intake; no fixed deadline.",
+    );
+
+  const min = grant.amount_cad_min ?? grant.amount_min;
+  const max = grant.amount_cad_max ?? grant.amount_max;
+  if (typeof min === "number" || typeof max === "number") {
+    const range = [
+      typeof min === "number" ? min.toLocaleString("en-US") : null,
+      typeof max === "number" ? max.toLocaleString("en-US") : null,
+    ]
+      .filter(Boolean)
+      .join("–");
+    verified("amount", `${range} ${text(grant.currency) || "CAD"}`);
+  }
+
+  const applicants = [
+    ...strings(grant.eligible_applicant_types),
+    ...strings(grant.applicant_types),
+  ];
+  const eligibility = text(grant.eligibility_note) || [...new Set(applicants)].join(", ");
+  if (eligibility) verified("eligibility", eligibility);
+  const uses = strings(grant.funding_uses);
+  if (uses.length) verified("eligible_costs", [...new Set(uses)].join(", "));
+
+  for (const key of DOSSIER_FACT_KEYS) {
+    if (facts.has(key)) continue;
+    facts.set(key, {
+      key,
+      status: "not_published",
+      value: es
+        ? "No publicado en las fuentes revisadas; se incluyó en las preguntas preparadas para el financiador."
+        : "Not published in the reviewed sources; included in the prepared questions for the funder.",
+    });
+  }
+  return { ...dossier, facts: DOSSIER_FACT_KEYS.map((key) => facts.get(key)!) };
+}
+
+export function dossierFactLabel(key: DossierFactKey, lang: "en" | "es" = "en") {
+  const labels: Record<DossierFactKey, [string, string]> = {
+    eligibility: ["Who can apply", "Quién puede aplicar"],
+    deadline: ["Deadline", "Fecha límite"],
+    amount: ["Award amount", "Monto"],
+    eligible_costs: ["Eligible costs", "Costos elegibles"],
+    matching_funds: ["Matching funds", "Aporte requerido"],
+    application_documents: ["Documents and forms", "Documentos y formularios"],
+    submission_process: ["Submission process", "Proceso de envío"],
+    contact: ["Program contact", "Contacto del programa"],
+  };
+  return labels[key][lang === "es" ? 1 : 0];
 }
 
 /**
