@@ -30,6 +30,7 @@ import { GrantCopilotSheet } from "@/components/grants/GrantCopilotSheet";
 import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { GrantPlanPanel } from "@/components/grants/GrantPlanPanel";
+import { GrantChecklistPanel } from "@/components/grants/GrantChecklistPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -443,6 +444,8 @@ export function V2GrantDetail({
       )}
 
       {activeOrgId && <GrantPlanPanel grantId={grant.id} orgId={activeOrgId} />}
+
+      {activeOrgId && <GrantChecklistPanel grantId={grant.id} orgId={activeOrgId} />}
 
       {/* Everything secondary, folded. Closed content is unmounted, so the
           technical panels load nothing until opened. */}

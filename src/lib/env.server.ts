@@ -13,6 +13,8 @@ const schema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(10).optional(),
   /** Lovable AI Gateway. One key for chat models and embeddings alike. */
   LOVABLE_API_KEY: z.string().min(10).optional(),
+  /** User's own Anthropic key: features that explicitly run on their Claude account. */
+  ANTHROPIC_API_KEY: z.string().min(10).optional(),
   /** External chat providers, tried before the gateway to save its credits. */
   CEREBRAS_API_KEY: z.string().min(10).optional(),
   GROQ_API_KEY: z.string().min(10).optional(),
