@@ -1823,6 +1823,47 @@ export type Database = {
           },
         ]
       }
+      grant_checklists: {
+        Row: {
+          created_at: string
+          grant_id: string
+          id: string
+          items: Json
+          lang: string
+          model: string | null
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          grant_id: string
+          id?: string
+          items?: Json
+          lang?: string
+          model?: string | null
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          grant_id?: string
+          id?: string
+          items?: Json
+          lang?: string
+          model?: string | null
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_checklists_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grant_copilot_messages: {
         Row: {
           actions: Json | null
