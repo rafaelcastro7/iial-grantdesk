@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import type { AxisScore } from "@/agents/fit-rules.shared";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 import { useTr, useUiLang, localeOf } from "@/lib/ui-lang";
+import { useContentLanguage } from "@/lib/use-content-language";
 
 type Stage = "discovered" | "enriched" | "evaluated" | "verdict";
 
@@ -254,6 +255,8 @@ export function FitEvaluation(props: Props) {
   const tr = useTr();
   const L = lang === "es" ? LABELS_ES : LABELS;
   const e = props.evaluation;
+  const rationale = humanizeRationale(e?.rationale_en, lang) || e?.rationale_fr || "";
+  const content = useContentLanguage([rationale], rationale === e?.rationale_en ? "en" : lang);
   const t = e ? tier(e.fit_score) : null;
   const VerdictIcon = t?.icon;
   const [open, setOpen] = useState(false);
@@ -357,7 +360,7 @@ export function FitEvaluation(props: Props) {
                 {L.rationale}
               </p>
               <p className="mt-0.5 text-sm leading-relaxed text-foreground/90">
-                {humanizeRationale(e.rationale_en) || e.rationale_fr || ""}
+                {content.text(rationale)}
               </p>
             </div>
           </div>

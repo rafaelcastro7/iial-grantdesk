@@ -1,6 +1,7 @@
 // EN / ES switch in the top bar. The whole interface follows it.
 import { setUiLang, useUiLang } from "@/lib/ui-lang";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export function LanguageToggle() {
   const lang = useUiLang();
@@ -11,7 +12,9 @@ export function LanguageToggle() {
       className="inline-flex h-9 items-center rounded-md border bg-background p-0.5 text-xs font-semibold"
     >
       {(["en", "es"] as const).map((l) => (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           key={l}
           type="button"
           aria-pressed={lang === l}
@@ -22,7 +25,7 @@ export function LanguageToggle() {
           )}
         >
           {l}
-        </button>
+        </Button>
       ))}
     </div>
   );

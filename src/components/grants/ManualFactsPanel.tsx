@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setGrantManualField } from "@/lib/grants.functions";
 import { useTr, useUiLang, localeOf } from "@/lib/ui-lang";
+import { useContentLanguage } from "@/lib/use-content-language";
 
 type FieldKey =
   | "amount_cad_min"
@@ -122,6 +123,8 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
     applicant_types: grant.applicant_types ?? null,
     sectors: grant.sectors,
   };
+  const proseFields = FIELDS.filter((f) => f.kind === "text" || f.kind === "list");
+  const content = useContentLanguage(open ? proseFields.map((f) => display(f.kind, values[f.key], locale)) : []);
 
   const start = (key: FieldKey, kind: Kind) => {
     const current = values[key];
@@ -250,7 +253,7 @@ export function ManualFactsPanel({ grant }: { grant: ManualFactsGrant }) {
                         </div>
                       ) : (
                         <div className="mt-0.5 text-sm">
-                          {shown ?? (
+                          {(shown && (kind === "text" || kind === "list") ? content.text(shown) : shown) ?? (
                             <span className="text-muted-foreground">
                               {notFound
                                 ? tr("Not found", "No encontrado")

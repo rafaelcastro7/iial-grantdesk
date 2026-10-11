@@ -28,6 +28,7 @@ import {
 } from "@/lib/grant-radar";
 import { cn } from "@/lib/utils";
 import { useTr, useUiLang } from "@/lib/ui-lang";
+import { useContentLanguage } from "@/lib/use-content-language";
 
 export type RadarActions = {
   pending: string | null;
@@ -66,6 +67,8 @@ export function RadarCard({
   const criticalRequirements = (g.requirements ?? []).filter(
     (requirement) => requirement.isCritical,
   );
+  const content = useContentLanguage([g.title, item.reason, g.reviewState?.next_action,
+    ...criticalRequirements.map((r) => r.requirement)]);
   const busy =
     actions.evaluatingIds.has(g.id) ||
     actions.pending === g.id ||
@@ -125,7 +128,7 @@ export function RadarCard({
             params={{ id: g.id }}
             className="line-clamp-2 font-display text-base font-semibold leading-snug text-foreground hover:text-primary"
           >
-            {cleanTitle(g.title) || tr("Untitled opportunity", "Oportunidad sin título")}
+            {cleanTitle(content.text(g.title)) || tr("Untitled opportunity", "Oportunidad sin título")}
           </Link>
           {funderName(g) && (
             <p className="mt-0.5 truncate text-sm text-muted-foreground">{funderName(g)}</p>
@@ -138,7 +141,7 @@ export function RadarCard({
                   ? "border-destructive/30 bg-destructive/5 text-destructive"
                   : "border-border/60 bg-muted/40 text-muted-foreground",
               )}
-              title={item.reason}
+              title={content.text(item.reason)}
             >
               <p className="line-clamp-3 whitespace-pre-line">
                 <span className="font-semibold text-foreground">
@@ -148,7 +151,7 @@ export function RadarCard({
                       ? tr("Why: ", "Por qué: ")
                       : tr("Check: ", "Revisar: ")}
                 </span>
-                {item.reason}
+                {content.text(item.reason)}
               </p>
             </div>
           )}
@@ -164,7 +167,7 @@ export function RadarCard({
                     )}
               </p>
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                {criticalRequirements.map((requirement) => requirement.requirement).join(" · ")}
+                {criticalRequirements.map((requirement) => content.text(requirement.requirement)).join(" · ")}
               </p>
             </div>
           )}
@@ -192,7 +195,7 @@ export function RadarCard({
               )}
               {g.reviewState.next_action && (
                 <span className="line-clamp-1 text-muted-foreground">
-                  {tr("Next:", "Siguiente:")} {g.reviewState.next_action}
+                  {tr("Next:", "Siguiente:")} {content.text(g.reviewState.next_action)}
                 </span>
               )}
             </div>

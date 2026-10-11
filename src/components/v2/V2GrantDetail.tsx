@@ -56,6 +56,7 @@ import {
 import { cn } from "@/lib/utils";
 import { localeOf, pick, useTr, useUiLang, type UiLang } from "@/lib/ui-lang";
 import { humanizeRationale } from "@/lib/eligibility-explain";
+import { useContentLanguage } from "@/lib/use-content-language";
 
 type Requirement = {
   category: string;
@@ -272,8 +273,13 @@ export function V2GrantDetail({
   );
   const showEligibility = eligibleGroups.length > 0 || eligibilityDetails.length > 0;
   const rationale = evaluation?.rationale_en?.trim()
-    ? humanizeRationale(evaluation.rationale_en)
+    ? humanizeRationale(evaluation.rationale_en, lang)
     : "";
+  const content = useContentLanguage([
+    grant.title,
+    ...(rationale === evaluation?.rationale_en ? [rationale] : []),
+    ...eligibilityDetails.map(([, value]) => typeof value === "object" ? JSON.stringify(value) : String(value)),
+  ]);
   const showCheck = ruleChecks.length > 0 || !!rationale;
   const sources = [
     grant.funder?.source_url && grant.funder.source_url !== grant.url
@@ -388,7 +394,7 @@ export function V2GrantDetail({
 
         <div>
           <h1 className="font-display text-xl font-bold leading-tight tracking-tight sm:text-2xl lg:text-3xl">
-            {cleanTitle(grant.title)}
+            {cleanTitle(content.text(grant.title))}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {[funderName, grant.funder?.jurisdiction, fundingKindLabel(kind, lang)]
@@ -495,7 +501,7 @@ export function V2GrantDetail({
                           {eligibilityLabel(key, lang) ?? humanizeKey(key)}
                         </dt>
                         <dd className="mt-1 text-xs">
-                          {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                          {content.text(typeof value === "object" ? JSON.stringify(value) : String(value))}
                         </dd>
                       </div>
                     ))}
@@ -516,7 +522,7 @@ export function V2GrantDetail({
                 {ruleChecks.length > 0 && <EligibilityIssues checks={ruleChecks} />}
                 {rationale && (
                   <p className="rounded-lg border bg-muted/20 p-3 text-xs leading-relaxed">
-                    {rationale}
+                    {rationale === evaluation?.rationale_en ? content.text(rationale) : rationale}
                   </p>
                 )}
               </Block>
