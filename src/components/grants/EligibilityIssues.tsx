@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { describeCheck } from "@/lib/eligibility-explain";
-import { useTr } from "@/lib/ui-lang";
+import { useTr, useUiLang } from "@/lib/ui-lang";
+import { useContentLanguage } from "@/lib/use-content-language";
 
 type Check = { id?: string; label: string; status?: string; detail?: string; hard?: boolean };
 
@@ -12,13 +13,16 @@ type Check = { id?: string; label: string; status?: string; detail?: string; har
  */
 export function EligibilityIssues({ checks }: { checks: Check[] }) {
   const tr = useTr();
+  const lang = useUiLang();
   const issues = checks.filter((check) => check.status === "fail" || check.status === "warn");
+  const explanations = issues.map((check) => describeCheck(check));
+  const content = useContentLanguage(explanations.flatMap((info) => [info.grantSays, info.profileSays, info.fix]));
   if (issues.length === 0) return null;
 
   return (
     <ul className="mt-3 space-y-2">
       {issues.map((check, index) => {
-        const info = describeCheck(check);
+        const info = { ...explanations[index], title: describeCheck(check, lang).title };
         return (
           <li
             key={`${check.id ?? check.label}-${index}`}
@@ -32,18 +36,18 @@ export function EligibilityIssues({ checks }: { checks: Check[] }) {
                     <dt className="text-muted-foreground">
                       {tr("Grant asks for", "El grant pide")}
                     </dt>
-                    <dd className="text-foreground">{info.grantSays}</dd>
+                    <dd className="text-foreground">{content.text(info.grantSays)}</dd>
                   </>
                 )}
                 {info.profileSays && (
                   <>
                     <dt className="text-muted-foreground">{tr("Your profile", "Tu perfil")}</dt>
-                    <dd className="text-foreground">{info.profileSays}</dd>
+                    <dd className="text-foreground">{content.text(info.profileSays)}</dd>
                   </>
                 )}
               </dl>
             )}
-            <p className="mt-2 text-muted-foreground">{info.fix}</p>
+            <p className="mt-2 text-muted-foreground">{content.text(info.fix)}</p>
             {info.profileFixable && (
               <Link
                 to="/org"

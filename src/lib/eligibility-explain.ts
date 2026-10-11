@@ -268,10 +268,10 @@ const humanList = (raw: string) =>
  * asks for, what the profile says, and what the consultant can do. Parses the
  * rule engine's stored detail strings, so it also works on old evaluations.
  */
-export function describeCheck(check: FullCheck): CheckExplanation {
+export function describeCheck(check: FullCheck, lang: Lang = "en"): CheckExplanation {
   const key = `${check.id ?? ""} ${check.label}`;
   const detail = check.detail ?? "";
-  const title = explainCheck(check);
+  const title = explainCheck(check, lang);
   let m: RegExpMatchArray | null;
 
   if (/sop_filter_1_legal|legal eligibility/i.test(key)) {

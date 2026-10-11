@@ -4,6 +4,7 @@
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { localeOf, useTr, useUiLang } from "@/lib/ui-lang";
+import { useContentLanguage } from "@/lib/use-content-language";
 
 type Requirement = {
   requirement?: string | null;
@@ -22,6 +23,7 @@ export type CallFacts = {
   requirements?: Requirement[] | null;
   url?: string | null;
   enriched_at?: string | null;
+  language?: string | null;
 };
 
 /** Boilerplate a generic extraction produces for any call; not a fact about this one. */
@@ -65,6 +67,10 @@ function parts(facts: CallFacts) {
 /** True when the card has at least one fact to show. */
 export function hasCallFacts(facts: CallFacts): boolean {
   const p = parts(facts);
+  const content = useContentLanguage([
+    p.summary, p.who, ...p.applicants, ...p.uses, ...p.populations, ...p.sectors,
+    ...p.specific.map((r) => r.requirement),
+  ], facts.language ?? "en");
   return !!(
     p.summary ||
     p.who ||
@@ -139,9 +145,9 @@ export function CallFactsCard({
             <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
               {tr("What it funds", "Qué financia")}
             </dt>
-            <dd className="mt-0.5 whitespace-pre-line">{p.summary}</dd>
+            <dd className="mt-0.5 whitespace-pre-line">{content.text(p.summary)}</dd>
             {p.sectors.length > 0 && (
-              <dd className="mt-1 text-xs text-muted-foreground">{p.sectors.join(" · ")}</dd>
+              <dd className="mt-1 text-xs text-muted-foreground">{p.sectors.map(content.text).join(" · ")}</dd>
             )}
           </div>
         )}
@@ -150,7 +156,7 @@ export function CallFactsCard({
             <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
               {tr("Who can apply (funder's words)", "Quién puede aplicar (según el financiador)")}
             </dt>
-            <dd className="mt-0.5">{p.who}</dd>
+            <dd className="mt-0.5">{content.text(p.who)}</dd>
           </div>
         )}
         {tags
@@ -158,7 +164,7 @@ export function CallFactsCard({
           .map(([label, values]) => (
             <div key={label}>
               <dt className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</dt>
-              <dd className="mt-0.5">{values.map(displayTag).join(" · ")}</dd>
+              <dd className="mt-0.5">{values.map(content.text).join(" · ")}</dd>
             </div>
           ))}
         {(p.specific.length > 0 || p.generic > 0) && (
@@ -171,7 +177,7 @@ export function CallFactsCard({
                 <ul className="list-disc space-y-0.5 pl-5">
                   {p.specific.slice(0, 8).map((r, i) => (
                     <li key={i}>
-                      {r.requirement}
+                      {content.text(r.requirement)}
                       {r.isCritical && (
                         <span className="ml-1 text-xs font-semibold text-destructive">
                           {tr("(critical)", "(crítico)")}
@@ -206,6 +212,3 @@ export function CallFactsCard({
   );
 }
 
-function displayTag(value: string) {
-  return value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-}
