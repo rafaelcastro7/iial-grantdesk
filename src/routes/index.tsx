@@ -12,13 +12,15 @@ export const Route = createFileRoute("/")({
       { title: "IIAL — AI Grant Intelligence" },
       {
         name: "description",
-        content: "Discover, evaluate, and win Canadian grants with AI agents. Bilingual EN/FR..",
+        content: "GrantDesk: discover and evaluate funding opportunities across the Americas in English or Spanish.",
       },
       { property: "og:title", content: "IIAL — AI Grant Intelligence" },
       {
         property: "og:description",
         content: "Discover, evaluate, and win Canadian grants with AI agents.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Index,

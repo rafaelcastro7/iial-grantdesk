@@ -42,7 +42,14 @@ type GrantSearch = {
 
 export const Route = createFileRoute("/_authenticated/grants/$id")({
   head: ({ params }) => ({
-    meta: [{ title: `Grant ${params.id.slice(0, 8)} - IIAL` }],
+    meta: [
+      { title: `Grant ${params.id.slice(0, 8)} — GrantDesk` },
+      { name: "description", content: "Review funding facts, source evidence and organization eligibility in GrantDesk." },
+      { property: "og:title", content: `Grant ${params.id.slice(0, 8)} — GrantDesk` },
+      { property: "og:description", content: "Funding facts, sources and a tenant-specific decision dossier." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
   }),
   validateSearch: (raw: Record<string, unknown>): GrantSearch => ({
     analyze: raw.analyze === "1" || raw.analyze === 1 ? "1" : undefined,

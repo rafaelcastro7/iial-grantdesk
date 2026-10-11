@@ -67,10 +67,6 @@ function parts(facts: CallFacts) {
 /** True when the card has at least one fact to show. */
 export function hasCallFacts(facts: CallFacts): boolean {
   const p = parts(facts);
-  const content = useContentLanguage([
-    p.summary, p.who, ...p.applicants, ...p.uses, ...p.populations, ...p.sectors,
-    ...p.specific.map((r) => r.requirement),
-  ], facts.language ?? "en");
   return !!(
     p.summary ||
     p.who ||
@@ -95,6 +91,10 @@ export function CallFactsCard({
   const tr = useTr();
   const lang = useUiLang();
   const p = parts(facts);
+  const content = useContentLanguage([
+    p.summary, p.who, ...p.applicants, ...p.uses, ...p.populations, ...p.sectors,
+    ...p.specific.map((r) => r.requirement),
+  ], facts.language ?? "en");
   const read = facts.enriched_at
     ? new Date(facts.enriched_at).toLocaleDateString(localeOf(lang), {
         day: "numeric",
