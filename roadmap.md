@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Unificar idioma de detalles, requisitos y evaluaciones con el selector EN/ES, sin alterar evidencia ni decisiones.
+
 - [ ] Replicar para Juan Marcelo y Clarissa el perfil institucional y preparación de conocimiento usados por Rocío.
 - [x] Unificar el sistema visual en todas las pantallas, eliminando mezclas incoherentes de superficies claras y oscuras.
 - [x] Automatizar búsqueda, validación determinista y clasificación de todos los grants existentes y nuevos.
