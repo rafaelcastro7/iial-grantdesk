@@ -1862,13 +1862,6 @@ export type Database = {
             referencedRelation: "grants"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "grant_checklists_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
         ]
       }
       grant_copilot_messages: {
@@ -5080,16 +5073,6 @@ export type Database = {
           p_value: Json
         }
         Returns: undefined
-      }
-      set_grant_checklist_item_done: {
-        Args: {
-          p_done: boolean
-          p_grant_id: string
-          p_item_id: string
-          p_lang: string
-          p_org_id: string
-        }
-        Returns: Json
       }
       tenant_membership_role: { Args: { _org_id: string }; Returns: string }
       user_org_ids: {
