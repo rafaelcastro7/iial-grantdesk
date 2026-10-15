@@ -45,6 +45,23 @@ const raw = {
 };
 
 describe("grant dossier reader contract", () => {
+  it("labels converted amounts as CAD rather than the original currency", () => {
+    const sanitized = sanitizeDossier(raw);
+    if (!sanitized) throw new Error("Invalid test dossier");
+    const dossier = completeDossierFacts(sanitized, {
+      amount_cad_min: 140_000, amount_cad_max: 280_000,
+      amount_min: 100_000, amount_max: 200_000, currency: "USD",
+    }, { lang: "en", officialUrl: "https://example.org/call" });
+    expect(dossier.facts.find((fact) => fact.key === "amount")?.value).toBe("140,000–280,000 CAD");
+  });
+  it("never mixes a partial CAD conversion with an original currency bound", () => {
+    const sanitized = sanitizeDossier(raw);
+    if (!sanitized) throw new Error("Invalid test dossier");
+    const dossier = completeDossierFacts(sanitized, {
+      amount_cad_min: 140_000, amount_max: 200_000, currency: "USD",
+    }, { lang: "en", officialUrl: "https://example.org/call" });
+    expect(dossier.facts.find((fact) => fact.key === "amount")?.value).toBe("140,000 CAD");
+  });
   it("accounts for every decision fact without inventing missing information", () => {
     const sanitized = sanitizeDossier(raw);
     expect(sanitized).not.toBeNull();

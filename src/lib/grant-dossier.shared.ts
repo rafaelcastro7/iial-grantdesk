@@ -298,8 +298,9 @@ export function completeDossierFacts(
       es ? "Convocatoria continua, sin fecha fija." : "Rolling intake; no fixed deadline.",
     );
 
-  const min = grant.amount_cad_min ?? grant.amount_min;
-  const max = grant.amount_cad_max ?? grant.amount_max;
+  const hasCad = typeof grant.amount_cad_min === "number" || typeof grant.amount_cad_max === "number";
+  const min = hasCad ? grant.amount_cad_min : grant.amount_min;
+  const max = hasCad ? grant.amount_cad_max : grant.amount_max;
   if (typeof min === "number" || typeof max === "number") {
     const range = [
       typeof min === "number" ? min.toLocaleString("en-US") : null,
@@ -307,7 +308,7 @@ export function completeDossierFacts(
     ]
       .filter(Boolean)
       .join("–");
-    verified("amount", `${range} ${text(grant.currency) || "CAD"}`);
+    verified("amount", `${range} ${hasCad ? "CAD" : text(grant.currency) || (es ? "moneda no publicada" : "currency not published")}`);
   }
 
   const applicants = [
@@ -329,7 +330,10 @@ export function completeDossierFacts(
         : "Not published in the reviewed sources; included in the prepared questions for the funder.",
     });
   }
-  return { ...dossier, facts: DOSSIER_FACT_KEYS.map((key) => facts.get(key)!) };
+  return { ...dossier, facts: DOSSIER_FACT_KEYS.flatMap((key) => {
+    const fact = facts.get(key);
+    return fact ? [fact] : [];
+  }) };
 }
 
 export function dossierFactLabel(key: DossierFactKey, lang: "en" | "es" = "en") {
