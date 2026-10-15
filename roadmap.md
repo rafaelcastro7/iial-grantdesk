@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Recomendar usos de las nuevas funciones de IA de Lovable para GrantDesk; no activar servicios sin autorización.
+
 - [ ] Unificar idioma de detalles, requisitos y evaluaciones con el selector EN/ES, sin alterar evidencia ni decisiones.
 
 - [ ] Replicar para Juan Marcelo y Clarissa el perfil institucional y preparación de conocimiento usados por Rocío.
