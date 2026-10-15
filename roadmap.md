@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Mejorar relevancia de búsqueda y análisis de grants con evidencia verificable, sin cambiar proveedores ni aumentar llamadas pagadas.
+- [x] Mejorar búsqueda y análisis: citas por convocatoria, aviso de enlaces no corroborados, fechas desconocidas explícitas y montos sin mezclar monedas; 71 pruebas pasan, sin cambiar proveedores ni añadir llamadas pagadas.
+- [ ] Verificar búsqueda → abrir → análisis con una sesión real. Bloqueo: no hay cuenta asociada al usuario solicitante para obtener una sesión autorizada; necesita iniciar sesión en la vista previa. No se ejecutaron llamadas de IA en vivo.
 
 - [x] Recomendar usos de las nuevas funciones de IA de Lovable para GrantDesk; no activar servicios sin autorización.
 
