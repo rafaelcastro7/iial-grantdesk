@@ -50,8 +50,8 @@ export function WebResultRow({
     const hi = team.decisionMaker ? ` ${team.decisionMaker}` : "";
     const brief =
       lang === "es"
-        ? `Asunto: Oportunidad: ${grant.title} (${grant.funder})\n\nHola${hi},\n\nEncontré esta oportunidad para ${orgName}:\n- Programa: ${grant.title}\n- Financiador: ${grant.funder} (${grant.country})\n- Monto (por verificar): ${grant.amount_range}\n- Fecha límite (por verificar): ${grant.deadline} (${status})\n- Por qué encaja: ${why}\n- Enlace oficial: ${grant.url}\n\n¿La priorizamos?\n\nSaludos,\n${team.sender}`
-        : `Subject: Opportunity: ${grant.title} (${grant.funder})\n\nHi${hi},\n\nI found this opportunity for ${orgName}:\n- Program: ${grant.title}\n- Funder: ${grant.funder} (${grant.country})\n- Amount (to verify): ${grant.amount_range}\n- Deadline (to verify): ${grant.deadline} (${status})\n- Why it fits: ${why}\n- Official link: ${grant.url}\n\nShall we prioritize it?\n\nBest,\n${team.sender}`;
+        ? `Asunto: Oportunidad: ${grant.title} (${grant.funder})\n\nHola${hi},\n\nEncontré esta oportunidad para ${orgName}:\n- Programa: ${grant.title}\n- Financiador: ${grant.funder} (${grant.country})\n- Monto (por verificar): ${grant.amount_range}\n- Fecha límite (por verificar): ${grant.deadline} (${status})\n- Por qué encaja: ${why}\n- Enlace (por verificar): ${grant.url}\n\n¿La priorizamos?\n\nSaludos,\n${team.sender}`
+        : `Subject: Opportunity: ${grant.title} (${grant.funder})\n\nHi${hi},\n\nI found this opportunity for ${orgName}:\n- Program: ${grant.title}\n- Funder: ${grant.funder} (${grant.country})\n- Amount (to verify): ${grant.amount_range}\n- Deadline (to verify): ${grant.deadline} (${status})\n- Why it fits: ${why}\n- Link (to verify): ${grant.url}\n\nShall we prioritize it?\n\nBest,\n${team.sender}`;
     try {
       await navigator.clipboard.writeText(brief.trim());
       setCopied(true);
