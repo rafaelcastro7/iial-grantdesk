@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { serverEnv } from "@/lib/env.server";
+import { matchGrantSources, normalizeEvidenceUrl, type GrantSearchSource } from "@/lib/grant-source-evidence.shared";
 
 export type DiscoveredWebGrant = {
   title: string;
@@ -18,6 +19,8 @@ export type DiscoveredWebGrant = {
   instrument?: string;
   alreadyInCatalog: boolean;
   existingGrantId?: string | null;
+  sourceMatch?: "grounded" | "unverified";
+  sources?: GrantSearchSource[];
 };
 
 export type WebScoutResult = {
@@ -194,9 +197,11 @@ Return ONLY this JSON:
 
     const grants: DiscoveredWebGrant[] = rawGrants
       .filter((g) => Boolean(g.title && g.url))
+      .filter((g) => typeof g.url === "string" && normalizeEvidenceUrl(g.url) !== null)
       .filter((g) => !/^prize$/i.test((g.instrument ?? "").trim()))
       .map((g) => {
-        const url = g.url!.trim();
+        const url = (g.url ?? "").trim();
+        const sources = matchGrantSources(url, answers.flatMap((answer) => answer?.sources ?? []));
         const existingId = existingByUrl.get(url.toLowerCase()) ?? null;
         const statusStr = (g.status || "open").toLowerCase();
         const validStatus: DiscoveredWebGrant["status"] =
@@ -209,19 +214,21 @@ Return ONLY this JSON:
                 : "open";
 
         return {
-          title: g.title!.trim(),
+          title: (g.title ?? "").trim(),
           funder: (g.funder || "Funder").trim(),
           country: (g.country || "INT").toUpperCase().slice(0, 3),
           url,
           summary: (g.summary || "").trim(),
-          amount_range: (g.amount_range || "Unspecified").trim(),
-          deadline: (g.deadline || "Rolling").trim(),
+          amount_range: (g.amount_range || (es ? "No publicado" : "Not published")).trim(),
+          deadline: (g.deadline || (es ? "No publicado" : "Not published")).trim(),
           status: validStatus,
           applicant_fit: (g.applicant_fit || "").trim(),
           applicant: (g.applicant || "").trim() || undefined,
           instrument: (g.instrument || "").trim().toLowerCase() || undefined,
           alreadyInCatalog: Boolean(existingId),
           existingGrantId: existingId,
+          sourceMatch: sources.length ? "grounded" : "unverified",
+          sources,
         };
       });
 

@@ -50,8 +50,8 @@ export function WebResultRow({
     const hi = team.decisionMaker ? ` ${team.decisionMaker}` : "";
     const brief =
       lang === "es"
-        ? `Asunto: Oportunidad: ${grant.title} (${grant.funder})\n\nHola${hi},\n\nEncontré esta oportunidad para ${orgName}:\n- Programa: ${grant.title}\n- Financiador: ${grant.funder} (${grant.country})\n- Monto (por verificar): ${grant.amount_range}\n- Fecha límite (por verificar): ${grant.deadline} (${status})\n- Por qué encaja: ${why}\n- Enlace oficial: ${grant.url}\n\n¿La priorizamos?\n\nSaludos,\n${team.sender}`
-        : `Subject: Opportunity: ${grant.title} (${grant.funder})\n\nHi${hi},\n\nI found this opportunity for ${orgName}:\n- Program: ${grant.title}\n- Funder: ${grant.funder} (${grant.country})\n- Amount (to verify): ${grant.amount_range}\n- Deadline (to verify): ${grant.deadline} (${status})\n- Why it fits: ${why}\n- Official link: ${grant.url}\n\nShall we prioritize it?\n\nBest,\n${team.sender}`;
+        ? `Asunto: Oportunidad: ${grant.title} (${grant.funder})\n\nHola${hi},\n\nEncontré esta oportunidad para ${orgName}:\n- Programa: ${grant.title}\n- Financiador: ${grant.funder} (${grant.country})\n- Monto (por verificar): ${grant.amount_range}\n- Fecha límite (por verificar): ${grant.deadline} (${status})\n- Por qué encaja: ${why}\n- Enlace (por verificar): ${grant.url}\n\n¿La priorizamos?\n\nSaludos,\n${team.sender}`
+        : `Subject: Opportunity: ${grant.title} (${grant.funder})\n\nHi${hi},\n\nI found this opportunity for ${orgName}:\n- Program: ${grant.title}\n- Funder: ${grant.funder} (${grant.country})\n- Amount (to verify): ${grant.amount_range}\n- Deadline (to verify): ${grant.deadline} (${status})\n- Why it fits: ${why}\n- Link (to verify): ${grant.url}\n\nShall we prioritize it?\n\nBest,\n${team.sender}`;
     try {
       await navigator.clipboard.writeText(brief.trim());
       setCopied(true);
@@ -119,12 +119,17 @@ export function WebResultRow({
             target="_blank"
             rel="noreferrer noopener"
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            title={tr("Official page", "Página oficial")}
-            aria-label={tr("Official page", "Página oficial")}
+            title={tr("Source page", "Página de la fuente")}
+            aria-label={tr("Source page", "Página de la fuente")}
           >
             <ExternalLink className="h-4 w-4" />
           </a>
         </div>
+        <p className="pl-6 text-xs text-muted-foreground md:col-span-4">
+          {grant.sourceMatch === "grounded"
+            ? tr("Link cited in search · requirements to verify", "Enlace citado en la búsqueda · requisitos por verificar")
+            : tr("Link not corroborated by search citations", "Enlace no corroborado por las citas de búsqueda")}
+        </p>
       </div>
       {open && (
         <div className="mt-2 space-y-2 pl-6 text-sm">
@@ -135,6 +140,11 @@ export function WebResultRow({
               {grant.applicant_fit}
             </p>
           )}
+          {(grant.sources ?? []).map((source) => (
+            <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" className="block break-words text-primary underline underline-offset-4">
+              {source.title || tr("Search citation", "Cita de búsqueda")}
+            </a>
+          ))}
           <Button
             size="sm"
             variant="ghost"
