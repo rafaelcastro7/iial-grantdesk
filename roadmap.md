@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Mejorar relevancia de búsqueda y análisis de grants con evidencia verificable, sin cambiar proveedores ni aumentar llamadas pagadas.
+
 - [x] Recomendar usos de las nuevas funciones de IA de Lovable para GrantDesk; no activar servicios sin autorización.
 
 - [ ] Unificar idioma de detalles, requisitos y evaluaciones con el selector EN/ES, sin alterar evidencia ni decisiones. Cambios y pruebas unitarias aplicados; verificación de traducción real bloqueada por falta de una sesión válida del usuario en la vista previa.
