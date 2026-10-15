@@ -5,6 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 const save = vi.fn(async () => ({ ok: true }));
 vi.mock("@tanstack/react-start", () => ({ useServerFn: () => save }));
 vi.mock("@/lib/grants.functions", () => ({ setGrantManualField: {} }));
+vi.mock("@/lib/use-content-language", () => ({
+  useContentLanguage: () => ({ text: (value: string) => value, error: false, loading: false }),
+}));
 
 import { ManualFactsPanel, type ManualFactsGrant } from "./ManualFactsPanel";
 
