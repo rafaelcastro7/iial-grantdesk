@@ -534,8 +534,8 @@ export function GrantJourney({
           </ul>
           <p className="text-[11px] text-muted-foreground">
             {tr(
-              "Tap the circle: missing → in progress → ready. AI buttons use credits.",
-              "Toque el círculo: falta → en curso → listo. Los botones con IA usan créditos.",
+              "Tap the circle: missing → in progress → ready. Required = published by the funder · Suggested = our recommendation · Verify = confirm with the funder. AI buttons use credits.",
+              "Toque el círculo: falta → en curso → listo. Exigido = publicado por el financiador · Sugerido = nuestra recomendación · Verificar = confirmar con el financiador. Los botones con IA usan créditos.",
             )}
           </p>
         </section>
