@@ -1,15 +1,13 @@
 import { serverEnv } from "@/lib/env.server";
 
 /**
- * Direct Anthropic API access with the workspace's own ANTHROPIC_API_KEY.
- * Used for features the user explicitly asked to run on their Claude account
- * (the automatic proposal checklist). Every call streams, even when the
- * caller only wants the final text: a buffered request that outlives its
- * socket is billed anyway and reports nothing.
+ * Claude through the Lovable AI Gateway (native Messages endpoint), billed to
+ * Lovable credits — the user chose this over their own Anthropic key. Every
+ * call streams, even when the caller only wants the final text.
  */
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const DEFAULT_MODEL = "claude-sonnet-5-5";
+const ANTHROPIC_URL = "https://ai.gateway.lovable.dev/v1/messages";
+const DEFAULT_MODEL = "anthropic/claude-sonnet-5";
 
 export type ClaudeMessage = { role: "user" | "assistant"; content: string };
 
@@ -70,21 +68,18 @@ export async function callClaude(opts: {
   maxTokens?: number;
 }): Promise<ClaudeResponse> {
   const env = serverEnv();
-  if (!env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured in the project secrets");
+  if (!env.LOVABLE_API_KEY) {
+    throw new Error("LOVABLE_API_KEY is not configured");
   }
   const started = Date.now();
-  const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const model = DEFAULT_MODEL;
 
   const response = await fetch(ANTHROPIC_URL, {
     method: "POST",
     headers: {
-      "x-api-key": env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
+      Authorization: `Bearer ${env.LOVABLE_API_KEY}`,
+      "X-Lovable-AIG-SDK": "fetch",
       "Content-Type": "application/json",
-      ...(env.ANTHROPIC_WORKSPACE_ID
-        ? { "anthropic-workspace-id": env.ANTHROPIC_WORKSPACE_ID }
-        : {}),
     },
     body: JSON.stringify({
       model,
