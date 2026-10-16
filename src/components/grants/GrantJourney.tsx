@@ -166,6 +166,7 @@ export function GrantJourney({
           `Confirm with the funder: ${dossierFactLabel(f.key, "en").toLowerCase()}`,
           `Confirmar con el financiador: ${dossierFactLabel(f.key, "es").toLowerCase()}`,
         ),
+        basis: "verify" as const,
       })),
       () => newId("item"),
     );
@@ -191,7 +192,7 @@ export function GrantJourney({
       const items = res.saved?.items ?? [];
       const merged = mergeTodoItems(
         ws.checklist,
-        items.map((i) => ({ item: i.label })),
+        items.map((i) => ({ item: i.label, basis: i.basis, detail: i.detail })),
         () => newId("item"),
       );
       await save({ data: { ...ws, checklist: backwardSchedule(deadline, merged) } as never });
