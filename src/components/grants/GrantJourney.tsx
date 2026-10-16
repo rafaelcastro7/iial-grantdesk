@@ -332,12 +332,23 @@ export function GrantJourney({
 
           {known.length > 0 && (
             <dl className="grid gap-2 sm:grid-cols-2">
-              {known.slice(0, 6).map((f) => (
+              {known.map((f) => (
                 <div key={f.key} className="rounded-lg border bg-background/60 px-3 py-2">
-                  <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  <dt className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase text-muted-foreground">
                     {dossierFactLabel(f.key, lang)}
+                    {f.source_url && (
+                      <a
+                        href={f.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-primary hover:underline"
+                        aria-label={tr("Source", "Fuente")}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
                   </dt>
-                  <dd className="line-clamp-2 text-xs">{f.value}</dd>
+                  <dd className="text-xs leading-relaxed">{f.value}</dd>
                 </div>
               ))}
             </dl>
@@ -351,6 +362,19 @@ export function GrantJourney({
                   <span>
                     <span className="font-medium">{t.title}.</span>{" "}
                     <span className="text-muted-foreground">{t.detail}</span>
+                    {t.source_url && (
+                      <>
+                        {" "}
+                        <a
+                          href={t.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          {tr("Source", "Fuente")}
+                        </a>
+                      </>
+                    )}
                   </span>
                 </li>
               ))}
