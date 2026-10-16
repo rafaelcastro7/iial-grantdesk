@@ -389,51 +389,8 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
           </TabsList>
 
           <TabsContent value="needs" className="space-y-4 pt-2">
-            <div>
-              <h3 className="mb-2 text-sm font-semibold">
-                {tr("Decision facts", "Datos para decidir")}
-              </h3>
-              <dl className="grid gap-2 sm:grid-cols-2">
-                {(d.facts ?? []).map((fact) => (
-                  <div key={fact.key} className="rounded-lg border bg-background/70 p-3">
-                    <dt className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase text-muted-foreground">
-                      <span>{dossierFactLabel(fact.key, lang)}</span>
-                      <span
-                        className={cn(
-                          "rounded-full px-1.5 py-0.5 text-[10px] normal-case",
-                          fact.status === "verified"
-                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                            : fact.status === "conflict"
-                              ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
-                              : "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-                        )}
-                      >
-                        {fact.status === "verified"
-                          ? tr("Verified", "Verificado")
-                          : fact.status === "not_applicable"
-                            ? tr("Not applicable", "No aplica")
-                            : fact.status === "conflict"
-                              ? tr("Conflicting sources", "Fuentes en conflicto")
-                              : tr("Not published", "No publicado")}
-                      </span>
-                    </dt>
-                    <dd className="mt-1 text-sm">{fact.value}</dd>
-                    {fact.source_url && (
-                      <dd className="mt-1">
-                        <a
-                          href={fact.source_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-                        >
-                          {tr("Evidence", "Evidencia")} <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </dd>
-                    )}
-                  </div>
-                ))}
-              </dl>
-            </div>
+            <DecisionFacts facts={d.facts ?? []} />
+
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">
@@ -685,6 +642,85 @@ export function GrantDossier({ grantId, orgId }: { grantId: string; orgId: strin
         </Tabs>
       </section>
     </AppliedContext.Provider>
+  );
+}
+
+// Known facts get full cards; facts the sources do not publish are listed
+// compactly under one shared note instead of repeating the same sentence.
+function DecisionFacts({ facts }: { facts: NonNullable<Dossier["facts"]> }) {
+  const tr = useTr();
+  const lang = useUiLang();
+  const known = facts.filter((f) => f.status === "verified" || f.status === "conflict");
+  const pending = facts.filter((f) => f.status !== "verified" && f.status !== "conflict");
+  if (facts.length === 0) return null;
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold">{tr("Decision facts", "Datos para decidir")}</h3>
+      {known.length > 0 && (
+        <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {known.map((fact) => (
+            <div
+              key={fact.key}
+              className={cn(
+                "rounded-lg border bg-background/70 p-3",
+                fact.status === "conflict" && "border-rose-500/40",
+              )}
+            >
+              <dt className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase text-muted-foreground">
+                <span>{dossierFactLabel(fact.key, lang)}</span>
+                {fact.status === "verified" ? (
+                  <CheckCircle2
+                    className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400"
+                    aria-label={tr("Verified", "Verificado")}
+                  />
+                ) : (
+                  <span className="rounded-full bg-rose-500/10 px-1.5 py-0.5 text-[10px] normal-case text-rose-700 dark:text-rose-300">
+                    {tr("Conflicting sources", "Fuentes en conflicto")}
+                  </span>
+                )}
+              </dt>
+              <dd className="mt-1 text-sm font-medium">{fact.value}</dd>
+              {fact.source_url && (
+                <dd className="mt-1">
+                  <a
+                    href={fact.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                  >
+                    {tr("Evidence", "Evidencia")} <ExternalLink className="h-3 w-3" />
+                  </a>
+                </dd>
+              )}
+            </div>
+          ))}
+        </dl>
+      )}
+      {pending.length > 0 && (
+        <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
+          <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+            {tr(
+              "Not published in the reviewed sources — ask the funder",
+              "No publicado en las fuentes revisadas — preguntar al financiador",
+            )}
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {pending.map((fact) => (
+              <li
+                key={fact.key}
+                title={fact.value}
+                className="rounded-md border bg-background px-2 py-1 text-xs"
+              >
+                {dossierFactLabel(fact.key, lang)}
+                {fact.status === "not_applicable" && (
+                  <span className="ml-1 text-muted-foreground">· {tr("not applicable", "no aplica")}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 

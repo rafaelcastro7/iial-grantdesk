@@ -299,10 +299,13 @@ export function V2GrantDetail({
       : null,
   ].filter(Boolean);
 
+  const actionBtn = "h-9 w-full justify-start gap-2 text-xs";
+
   return (
-    <div className="w-full max-w-[1700px] space-y-4 px-3 py-4 sm:px-6 lg:py-5">
-      {/* Compact header: what it is, money, deadline, one status chip, actions. */}
-      <header className="space-y-3 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+    <div className="w-full max-w-[1600px] space-y-4 px-3 py-4 sm:px-6 lg:py-5">
+      {/* Identity only: what it is and who funds it. Money, deadline and
+          actions live in the side rail so they stay visible while reading. */}
+      <header className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Link
             to="/grants"
@@ -310,66 +313,130 @@ export function V2GrantDetail({
           >
             <ArrowLeft className="h-3.5 w-3.5" /> {tr("Find grants", "Buscar grants")}
           </Link>
-          <div className="flex flex-wrap items-center gap-2">
+          <DismissGrantControl
+            grantId={grant.id}
+            defaultReason={kind === "loan" ? "loan_not_grant" : "outside_field"}
+          />
+        </div>
+        <h1 className="font-display text-2xl font-bold leading-tight tracking-tight lg:text-3xl">
+          {cleanTitle(content.text(grant.title))}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {[funderName, grant.funder?.jurisdiction, fundingKindLabel(kind, lang)]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      </header>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_288px]">
+        <aside className="order-first space-y-3 lg:sticky lg:top-20 lg:order-last">
+          <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+              <div>
+                <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  {tr("Amount", "Monto")}
+                </dt>
+                <dd className="text-base font-semibold">{amount}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  {tr("Deadline", "Fecha límite")}
+                </dt>
+                <dd
+                  className={cn(
+                    "text-base font-semibold",
+                    deadline.days != null &&
+                      deadline.days >= 0 &&
+                      deadline.days <= 14 &&
+                      "text-amber-600 dark:text-amber-400",
+                  )}
+                >
+                  {[deadline.date, deadline.label].filter(Boolean).join(" · ")}
+                </dd>
+              </div>
+            </dl>
+            {chip && (
+              <Badge
+                variant="outline"
+                className={cn("rounded-full text-xs", TONE_CLASS[chip.tone])}
+              >
+                {chip.label}
+              </Badge>
+            )}
             {grant.url && (
               <ExternalLinkPreview
                 url={grant.url}
-                className={buttonVariants({
-                  size: "sm",
-                  variant: "outline",
-                  className: "h-8 gap-1.5 text-xs",
-                })}
+                showIcon={false}
+                className={buttonVariants({ size: "sm", className: "h-9 w-full gap-1.5 text-xs" })}
               >
-                <span>{tr("Official page", "Página oficial")}</span>
-                <ExternalLink className="h-3 w-3" />
+                {tr("Open the official page", "Abrir la página oficial")}
+                <ExternalLink className="h-3.5 w-3.5" />
               </ExternalLinkPreview>
             )}
+          </section>
+
+          <section className="space-y-1.5 rounded-xl border bg-card p-3 shadow-sm">
+            <p className="px-1 pb-1 text-[11px] font-semibold uppercase text-muted-foreground">
+              {tr("Actions", "Acciones")}
+            </p>
+            {existingProposalId ? (
+              <Link
+                to="/proposals/$id"
+                params={{ id: existingProposalId }}
+                className={buttonVariants({ variant: "outline", className: actionBtn })}
+              >
+                <FileText className="h-4 w-4" />
+                {tr("Open proposal draft", "Abrir borrador de propuesta")}
+              </Link>
+            ) : (
+              <Button
+                variant="outline"
+                className={actionBtn}
+                disabled={actionDisabled || !canDraft}
+                title={
+                  canDraft
+                    ? undefined
+                    : tr(
+                        "Available once the eligibility check passes",
+                        "Disponible cuando la revisión de elegibilidad sea favorable",
+                      )
+                }
+                onClick={() => onDraft()}
+              >
+                <Send className="h-4 w-4" />
+                {tr("Draft a proposal (AI)", "Redactar una propuesta (IA)")}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className={actionBtn}
+              disabled={actionDisabled || !canEvaluate}
+              onClick={() => onEvaluate()}
+            >
+              {busy === "evaluate" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <SearchCheck className="h-4 w-4" />
+              )}
+              {evaluation
+                ? tr("Re-check fit", "Volver a revisar encaje")
+                : tr("Check fit", "Revisar encaje")}
+            </Button>
+            <Button variant="outline" className={actionBtn} onClick={() => setCopilotOpen(true)}>
+              <Bot className="h-4 w-4" />
+              {tr("Ask a question (AI)", "Hacer una pregunta (IA)")}
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-                  {tr("More", "Más")} <ChevronDown className="h-3.5 w-3.5" />
+                <Button variant="ghost" className={cn(actionBtn, "text-muted-foreground")}>
+                  <ChevronDown className="h-4 w-4" /> {tr("More", "Más")}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  disabled={actionDisabled || !canEvaluate}
-                  onSelect={() => onEvaluate()}
-                >
-                  <SearchCheck className="mr-2 h-4 w-4" />
-                  {evaluation
-                    ? tr("Re-check fit", "Volver a revisar encaje")
-                    : tr("Check fit", "Revisar encaje")}
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-60">
                 {canFetch && (
                   <DropdownMenuItem disabled={actionDisabled} onSelect={() => onFetchDetails()}>
-                    <RefreshCw className="mr-2 h-4 w-4" />{" "}
-                    {tr(
-                      "Fetch details from the official page",
-                      "Obtener detalles de la página oficial",
-                    )}
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onSelect={() => setCopilotOpen(true)}>
-                  <Bot className="mr-2 h-4 w-4" />{" "}
-                  {tr(
-                    "Ask an optional follow-up (uses AI credits)",
-                    "Hacer una pregunta adicional opcional (usa créditos de IA)",
-                  )}
-                </DropdownMenuItem>
-                {existingProposalId ? (
-                  <DropdownMenuItem asChild>
-                    <Link to="/proposals/$id" params={{ id: existingProposalId }}>
-                      <FileText className="mr-2 h-4 w-4" />{" "}
-                      {tr("Open proposal draft", "Abrir borrador de propuesta")}
-                    </Link>
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    disabled={actionDisabled || !canDraft}
-                    onSelect={() => onDraft()}
-                  >
-                    <Send className="mr-2 h-4 w-4" />{" "}
-                    {tr("Draft a proposal (AI)", "Redactar una propuesta (IA)")}
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {tr("Fetch details from the official page", "Obtener detalles de la página oficial")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem disabled={busy === "share"} onSelect={() => onShare()}>
@@ -385,55 +452,13 @@ export function V2GrantDetail({
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-            <DismissGrantControl
-              grantId={grant.id}
-              defaultReason={kind === "loan" ? "loan_not_grant" : "outside_field"}
-            />
-          </div>
-        </div>
+            <p className="px-1 pt-1 text-[11px] leading-snug text-muted-foreground">
+              {tr("AI actions use credits.", "Las acciones con IA usan créditos.")}
+            </p>
+          </section>
+        </aside>
 
-        <div>
-          <h1 className="font-display text-xl font-bold leading-tight tracking-tight sm:text-2xl lg:text-3xl">
-            {cleanTitle(content.text(grant.title))}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {[funderName, grant.funder?.jurisdiction, fundingKindLabel(kind, lang)]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
-
-        <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <div className="flex items-baseline gap-1.5">
-            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
-              {tr("Amount", "Monto")}
-            </dt>
-            <dd className="font-semibold">{amount}</dd>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
-              {tr("Deadline", "Fecha límite")}
-            </dt>
-            <dd
-              className={cn(
-                "font-semibold",
-                deadline.days != null &&
-                  deadline.days >= 0 &&
-                  deadline.days <= 14 &&
-                  "text-amber-600 dark:text-amber-400",
-              )}
-            >
-              {[deadline.date, deadline.label].filter(Boolean).join(" · ")}
-            </dd>
-          </div>
-          {chip && (
-            <Badge variant="outline" className={cn("rounded-full text-xs", TONE_CLASS[chip.tone])}>
-              {chip.label}
-            </Badge>
-          )}
-        </dl>
-      </header>
-
+        <main className="min-w-0 space-y-4">
       {err && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
           {err}
@@ -446,7 +471,7 @@ export function V2GrantDetail({
         </div>
       )}
 
-      {/* The decision comes first: the dossier is researched automatically. */}
+      {/* 1. The decision: researched automatically on open. */}
       {activeOrgId && (
         <GrantDossier
           key={`${grant.id}:${activeOrgId}:${lang}`}
@@ -455,23 +480,24 @@ export function V2GrantDetail({
         />
       )}
 
-      {/* Everything secondary, folded. Closed content is unmounted, so the
+      {/* 2. When we can apply, the plan and the proposal checklist are the
+          next job, so they are shown open instead of folded. */}
+      {showApplicationWorkspace && activeOrgId && (
+        <section className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+          <h2 className="font-display text-lg font-semibold">
+            {tr("Prepare the application", "Preparar la postulación")}
+          </h2>
+          <GrantPlanPanel grantId={grant.id} orgId={activeOrgId} />
+          <GrantChecklistPanel grantId={grant.id} orgId={activeOrgId} />
+        </section>
+      )}
+
+      {/* 3. Reference material, folded. Closed content is unmounted, so the
           technical panels load nothing until opened. */}
       <Accordion type="multiple" className="rounded-xl border bg-card shadow-sm">
-        {showApplicationWorkspace && activeOrgId && (
-          <AccordionItem value="application">
-            <AccordionTrigger className="px-5 py-3 text-sm font-semibold hover:no-underline">
-              {tr("Prepare the application", "Preparar la postulación")}
-            </AccordionTrigger>
-            <AccordionContent className="space-y-4 border-t px-4 pt-4 sm:px-5">
-              <GrantPlanPanel grantId={grant.id} orgId={activeOrgId} />
-              <GrantChecklistPanel grantId={grant.id} orgId={activeOrgId} />
-            </AccordionContent>
-          </AccordionItem>
-        )}
         <AccordionItem value="details" className="border-b-0">
           <AccordionTrigger className="px-5 py-3 text-sm font-semibold hover:no-underline">
-            {tr("Details and sources", "Detalles y fuentes")}
+            {tr("Call details, rules and sources", "Detalles de la convocatoria, reglas y fuentes")}
           </AccordionTrigger>
           <AccordionContent className="space-y-5 border-t px-4 pt-4 sm:px-5">
             {showCallFacts && (
@@ -573,6 +599,8 @@ export function V2GrantDetail({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+        </main>
+      </div>
 
       <GrantCopilotSheet
         grantId={grant.id}
