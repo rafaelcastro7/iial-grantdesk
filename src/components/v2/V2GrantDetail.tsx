@@ -599,6 +599,8 @@ export function V2GrantDetail({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+        </main>
+      </div>
 
       <GrantCopilotSheet
         grantId={grant.id}
