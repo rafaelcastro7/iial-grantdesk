@@ -73,6 +73,9 @@ export type ChecklistItem = {
   owner?: string | null;
   due?: string | null; // YYYY-MM-DD
   critical?: boolean;
+  /** Provenance: published requirement, suggested operational work, or fact to verify. */
+  basis?: "published" | "operational" | "verify";
+  detail?: string;
 };
 
 export type Partner = {

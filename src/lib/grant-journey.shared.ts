@@ -5,7 +5,17 @@ import type { DossierFit } from "@/lib/grant-dossier.shared";
 
 export type JourneyStage = "decide" | "prepare" | "submit";
 export type TodoStatus = "missing" | "in_progress" | "have" | "not_needed";
-export type JourneyTodo = { id: string; item: string; status: TodoStatus; due?: string | null; critical?: boolean };
+/** Where the item comes from: a published requirement, suggested operational work, or a fact to verify. */
+export type TodoBasis = "published" | "operational" | "verify";
+export type JourneyTodo = {
+  id: string;
+  item: string;
+  status: TodoStatus;
+  due?: string | null;
+  critical?: boolean;
+  basis?: TodoBasis;
+  detail?: string;
+};
 
 const DAY = 86_400_000;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -103,7 +113,7 @@ const norm = (s: string) =>
 /** Appends items whose normalized text is not already in the list. */
 export function mergeTodoItems(
   base: JourneyTodo[],
-  extra: Array<{ item: string; critical?: boolean }>,
+  extra: Array<{ item: string; critical?: boolean; basis?: TodoBasis; detail?: string }>,
   makeId: () => string,
 ): JourneyTodo[] {
   const seen = new Set(base.map((t) => norm(t.item)));
@@ -112,7 +122,14 @@ export function mergeTodoItems(
     const k = norm(e.item);
     if (!k || seen.has(k)) continue;
     seen.add(k);
-    out.push({ id: makeId(), item: e.item.slice(0, 300), status: "missing", critical: !!e.critical });
+    out.push({
+      id: makeId(),
+      item: e.item.slice(0, 300),
+      status: "missing",
+      critical: !!e.critical,
+      ...(e.basis ? { basis: e.basis } : {}),
+      ...(e.detail ? { detail: e.detail.slice(0, 500) } : {}),
+    });
   }
   return out;
 }

@@ -166,6 +166,7 @@ export function GrantJourney({
           `Confirm with the funder: ${dossierFactLabel(f.key, "en").toLowerCase()}`,
           `Confirmar con el financiador: ${dossierFactLabel(f.key, "es").toLowerCase()}`,
         ),
+        basis: "verify" as const,
       })),
       () => newId("item"),
     );
@@ -191,7 +192,7 @@ export function GrantJourney({
       const items = res.saved?.items ?? [];
       const merged = mergeTodoItems(
         ws.checklist,
-        items.map((i) => ({ item: i.label })),
+        items.map((i) => ({ item: i.label, basis: i.basis, detail: i.detail })),
         () => newId("item"),
       );
       await save({ data: { ...ws, checklist: backwardSchedule(deadline, merged) } as never });
@@ -331,12 +332,23 @@ export function GrantJourney({
 
           {known.length > 0 && (
             <dl className="grid gap-2 sm:grid-cols-2">
-              {known.slice(0, 6).map((f) => (
+              {known.map((f) => (
                 <div key={f.key} className="rounded-lg border bg-background/60 px-3 py-2">
-                  <dt className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  <dt className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase text-muted-foreground">
                     {dossierFactLabel(f.key, lang)}
+                    {f.source_url && (
+                      <a
+                        href={f.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-primary hover:underline"
+                        aria-label={tr("Source", "Fuente")}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
                   </dt>
-                  <dd className="line-clamp-2 text-xs">{f.value}</dd>
+                  <dd className="text-xs leading-relaxed">{f.value}</dd>
                 </div>
               ))}
             </dl>
@@ -350,6 +362,19 @@ export function GrantJourney({
                   <span>
                     <span className="font-medium">{t.title}.</span>{" "}
                     <span className="text-muted-foreground">{t.detail}</span>
+                    {t.source_url && (
+                      <>
+                        {" "}
+                        <a
+                          href={t.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          {tr("Source", "Fuente")}
+                        </a>
+                      </>
+                    )}
                   </span>
                 </li>
               ))}
@@ -474,6 +499,30 @@ export function GrantJourney({
                         {tr("key", "clave")}
                       </span>
                     )}
+                    {t.basis && (
+                      <span
+                        className={cn(
+                          "ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                          t.basis === "published" &&
+                            "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                          t.basis === "operational" &&
+                            "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+                          t.basis === "verify" &&
+                            "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                        )}
+                      >
+                        {t.basis === "published"
+                          ? tr("Required", "Exigido")
+                          : t.basis === "operational"
+                            ? tr("Suggested", "Sugerido")
+                            : tr("Verify", "Verificar")}
+                      </span>
+                    )}
+                    {t.detail && (
+                      <span className="block text-xs font-normal text-muted-foreground no-underline">
+                        {t.detail}
+                      </span>
+                    )}
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {t.status === "in_progress" && `${tr("in progress", "en curso")} · `}
@@ -485,8 +534,8 @@ export function GrantJourney({
           </ul>
           <p className="text-[11px] text-muted-foreground">
             {tr(
-              "Tap the circle: missing → in progress → ready. AI buttons use credits.",
-              "Toque el círculo: falta → en curso → listo. Los botones con IA usan créditos.",
+              "Tap the circle: missing → in progress → ready. Required = published by the funder · Suggested = our recommendation · Verify = confirm with the funder. AI buttons use credits.",
+              "Toque el círculo: falta → en curso → listo. Exigido = publicado por el financiador · Sugerido = nuestra recomendación · Verificar = confirmar con el financiador. Los botones con IA usan créditos.",
             )}
           </p>
         </section>

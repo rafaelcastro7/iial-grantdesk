@@ -54,4 +54,13 @@ describe("grant journey", () => {
     );
     expect(out.map((t) => t.item)).toEqual(["Carta de apoyo", "Presupuesto"]);
   });
+
+  it("keeps the provenance and detail of AI-reviewed items", () => {
+    const out = mergeTodoItems(
+      [],
+      [{ item: "Budget form", basis: "published", detail: "Required by rule 3" }],
+      () => "x1",
+    );
+    expect(out[0]).toMatchObject({ basis: "published", detail: "Required by rule 3" });
+  });
 });
