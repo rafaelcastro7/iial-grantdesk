@@ -28,8 +28,8 @@ import type { AxisScore } from "@/agents/fit-rules.shared";
 import { ManualFactsPanel, type ManualFactsGrant } from "@/components/grants/ManualFactsPanel";
 import { GrantCopilotSheet } from "@/components/grants/GrantCopilotSheet";
 import { useActiveTenant } from "@/lib/tenant-context";
-import { GrantPlanPanel } from "@/components/grants/GrantPlanPanel";
-import { GrantChecklistPanel } from "@/components/grants/GrantChecklistPanel";
+import { GrantJourney } from "@/components/grants/GrantJourney";
+import { GrantApplicationWorkspace } from "@/components/grants/GrantApplicationWorkspace";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -471,30 +471,41 @@ export function V2GrantDetail({
         </div>
       )}
 
-      {/* 1. The decision: researched automatically on open. */}
+      {/* Decide → Prepare → Submit: one verdict, one list, one next step. */}
       {activeOrgId && (
-        <GrantDossier
+        <GrantJourney
           key={`${grant.id}:${activeOrgId}:${lang}`}
           grantId={grant.id}
           orgId={activeOrgId}
+          deadline={grant.deadline}
+          officialUrl={grant.url}
+          onDraft={onDraft}
+          canDraft={canDraft && !existingProposalId}
         />
       )}
 
-      {/* 2. When we can apply, the plan and the proposal checklist are the
-          next job, so they are shown open instead of folded. */}
-      {showApplicationWorkspace && activeOrgId && (
-        <section className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
-          <h2 className="font-display text-lg font-semibold">
-            {tr("Prepare the application", "Preparar la postulación")}
-          </h2>
-          <GrantPlanPanel grantId={grant.id} orgId={activeOrgId} />
-          <GrantChecklistPanel grantId={grant.id} orgId={activeOrgId} />
-        </section>
-      )}
-
-      {/* 3. Reference material, folded. Closed content is unmounted, so the
-          technical panels load nothing until opened. */}
+      {/* Depth on demand, folded. Closed content is unmounted. */}
       <Accordion type="multiple" className="rounded-xl border bg-card shadow-sm">
+        {activeOrgId && (
+          <AccordionItem value="analysis">
+            <AccordionTrigger className="px-5 py-3 text-sm font-semibold hover:no-underline">
+              {tr("Full analysis: routes, documents, timeline", "Análisis completo: rutas, documentos, cronograma")}
+            </AccordionTrigger>
+            <AccordionContent className="border-t px-4 pt-4 sm:px-5">
+              <GrantDossier grantId={grant.id} orgId={activeOrgId} />
+            </AccordionContent>
+          </AccordionItem>
+        )}
+        {activeOrgId && showApplicationWorkspace && (
+          <AccordionItem value="plan">
+            <AccordionTrigger className="px-5 py-3 text-sm font-semibold hover:no-underline">
+              {tr("Partners, role and notes", "Socios, rol y notas")}
+            </AccordionTrigger>
+            <AccordionContent className="border-t px-4 pt-4 sm:px-5">
+              <GrantApplicationWorkspace grantId={grant.id} orgId={activeOrgId} />
+            </AccordionContent>
+          </AccordionItem>
+        )}
         <AccordionItem value="details" className="border-b-0">
           <AccordionTrigger className="px-5 py-3 text-sm font-semibold hover:no-underline">
             {tr("Call details, rules and sources", "Detalles de la convocatoria, reglas y fuentes")}
