@@ -499,6 +499,30 @@ export function GrantJourney({
                         {tr("key", "clave")}
                       </span>
                     )}
+                    {t.basis && (
+                      <span
+                        className={cn(
+                          "ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                          t.basis === "published" &&
+                            "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                          t.basis === "operational" &&
+                            "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+                          t.basis === "verify" &&
+                            "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                        )}
+                      >
+                        {t.basis === "published"
+                          ? tr("Required", "Exigido")
+                          : t.basis === "operational"
+                            ? tr("Suggested", "Sugerido")
+                            : tr("Verify", "Verificar")}
+                      </span>
+                    )}
+                    {t.detail && (
+                      <span className="block text-xs font-normal text-muted-foreground no-underline">
+                        {t.detail}
+                      </span>
+                    )}
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {t.status === "in_progress" && `${tr("in progress", "en curso")} · `}
