@@ -152,6 +152,7 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
   }, [threadId, sendMessage]);
 
   const busy = status === "submitted" || status === "streaming";
+  const [panelOpen, setPanelOpen] = useState(false);
   const submit = (value: string) => {
     const v = value.trim();
     if (!v || busy) return;
@@ -160,7 +161,8 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <Conversation className="min-h-0 flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl">
           {messages.length === 0 && (
