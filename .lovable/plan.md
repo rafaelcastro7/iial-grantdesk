@@ -74,6 +74,24 @@ Los resultados web no entran al catálogo solos: el usuario pulsa "Guardar", y a
 - Conocimiento del equipo: usa propuestas, respuestas y resultados anteriores del propio sistema.
 - Trabajo compartido: las conversaciones quedan en la cuenta para el equipo.
 
+## Roast honesto del pedido y qué es posible hoy
+
+- "Dots" y "Muse" no figuran en el catálogo de modelos de Lovable verificado hoy; no se pueden usar. Lo más potente disponible y verificado:
+  - Cerebro del agente: `openai/gpt-6-astra` (razonamiento, herramientas, búsqueda web), con `anthropic/claude-opus-5-5` para análisis profundo de una convocatoria y redacción de correos importantes.
+  - Rápido y barato para vigilancia nocturna: `google/gemini-3.8-flash`.
+  - Voz opcional (hablar con el agente): `openai/gpt-live-1`.
+- "Vivo todo el tiempo" se logra con trabajos programados que corren aunque Rocío no entre; no con una pestaña abierta.
+- "Que trabaje por Rocío" tiene un límite sano: el agente prepara y propone; enviar a terceros (financiadores, socios) siempre requiere un clic de Rocío. A ella misma sí le escribe solo.
+
+## Agente proactivo (trabaja aunque Rocío no entre)
+
+- Vigilancia diaria: revisa sus búsquedas guardadas y los grants que sigue; detecta convocatorias nuevas, cambios de fecha o monto, y cierres próximos.
+- Correo a Rocío: resumen matutino ("3 nuevas, 1 cierra en 10 días, Mitacs cambió fecha") y alertas urgentes, con enlace directo a la conversación.
+- Bandeja "Hecho por el agente": cada mañana encuentra borradores listos (memo a Marcelo, correo al socio, plan con fechas) para aprobar o descartar.
+- Seguimientos: si un socio no respondió en X días, propone el recordatorio.
+- Correos a terceros: se redactan, Rocío aprueba con un clic y salen desde el dominio de IIAL.
+- Controles: Rocío elige frecuencia, temas y puede pausar el agente; el gasto diario de créditos tiene tope.
+
 ## Cómo trabaja Rocío (de sus conversaciones con ChatGPT)
 
 Su ciclo real, en este orden:
