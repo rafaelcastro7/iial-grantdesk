@@ -87,9 +87,9 @@ export function nextBestAction(opts: {
   if (opts.availability === "conflict") return { kind: "confirm_availability" };
   if (opts.availability === "closed" || (left != null && left < 0)) return { kind: "closed" };
   if (!opts.fit) return { kind: "wait_research" };
+  if (opts.fit === "not_eligible") return { kind: "not_for_us" };
+  if (opts.fit === "unclear") return { kind: "ask_funder", unknown: opts.unknownFacts };
   if (!opts.planStarted) {
-    if (opts.fit === "not_eligible") return { kind: "not_for_us" };
-    if (opts.fit === "unclear") return { kind: "ask_funder", unknown: opts.unknownFacts };
     return { kind: "start_plan" };
   }
   const open = opts.todos.filter((t) => t.status === "missing" || t.status === "in_progress");

@@ -32,6 +32,9 @@ describe("cleanup regressions", () => {
   it.each([[], [{ id: "a", item: "x", status: "have" as const }], [{ id: "a", item: "x", status: "missing" as const }]])("never recommends submission after expiry", (todos) => {
     expect(nextBestAction({ fit: "lead", unknownFacts: 0, planStarted: true, todos, deadline: "2026-10-15", today })).toEqual({ kind: "closed" });
   });
+  it("does not recommend submission when a newer decision blocks an existing plan", () => {
+    expect(nextBestAction({ fit: "not_eligible", unknownFacts: 0, planStarted: true, todos: [{ id: "a", item: "Ready", status: "have" }], deadline: "2026-11-15", today }).kind).toBe("not_for_us");
+  });
   it("never marks an empty plan ready", () => expect(nextBestAction({ fit: "lead", unknownFacts: 0, planStarted: true, todos: [], deadline: "2026-11-15", today })).toEqual({ kind: "review_plan" }));
   it("marks contradictory future deadline and closure for confirmation, not reopening", () => {
     const availability = grantAvailability({ deadline: "2026-11-15", status: "expired" }, today);
