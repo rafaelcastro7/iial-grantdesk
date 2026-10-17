@@ -233,11 +233,32 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
             onChange={(e) => setText(e.currentTarget.value)}
             placeholder={tr("Ask for grants, paste a link, ask for a memo…", "Pida grants, pegue un enlace, pida un memo…")}
           />
-          <PromptInputFooter className="justify-end">
+          <PromptInputFooter className="justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs text-muted-foreground"
+              onClick={() => setPanelOpen((v) => !v)}
+            >
+              <ListTodo className="h-3.5 w-3.5" />
+              {tr("Work plan", "Plan de trabajo")}
+            </Button>
             <PromptInputSubmit status={status} onStop={stop} disabled={!busy && !text.trim()} />
           </PromptInputFooter>
         </PromptInput>
       </div>
+    </div>
+    <aside className="hidden w-80 shrink-0 border-l border-border bg-muted/20 lg:block">
+      <AgentWorkspacePanel />
+    </aside>
+    {panelOpen && (
+      <div className="fixed inset-0 z-40 flex justify-end bg-background/60 lg:hidden" onClick={() => setPanelOpen(false)}>
+        <div className="h-full w-80 max-w-[85vw] border-l border-border bg-background shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <AgentWorkspacePanel onClose={() => setPanelOpen(false)} />
+        </div>
+      </div>
+    )}
     </div>
   );
 }
