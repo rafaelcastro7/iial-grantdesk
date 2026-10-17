@@ -22,7 +22,10 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
-import { generateGrantDossier, getGrantDossier } from "@/lib/grant-dossier.functions";
+import { currentDossierDecision } from "@/lib/dossier-decision.shared";
+import { dossierGenerationResult } from "@/lib/dossier-recovery.shared";
+import { grantAvailability } from "@/lib/grant-availability.shared";
+import { generateGrantDossier, getGrantDossier, saveGeneratedDossier, type SavedDossier } from "@/lib/grant-dossier.functions";
 import {
   dossierFactLabel,
   dossierToPlan,
@@ -64,6 +67,9 @@ export function GrantJourney({
   grantId,
   orgId,
   deadline,
+  grantStatus,
+  deadlineKind,
+  evaluation,
   officialUrl,
   onDraft,
   canDraft,
@@ -71,6 +77,9 @@ export function GrantJourney({
   grantId: string;
   orgId: string;
   deadline: string | null;
+  grantStatus?: string;
+  deadlineKind?: string | null;
+  evaluation?: Parameters<typeof currentDossierDecision>[2];
   officialUrl?: string | null;
   onDraft: () => void;
   canDraft: boolean;
@@ -81,6 +90,8 @@ export function GrantJourney({
   const { settings: team } = useTeamSettings(orgId);
   const fetchDossier = useServerFn(getGrantDossier);
   const generate = useServerFn(generateGrantDossier);
+  const retrySave = useServerFn(saveGeneratedDossier);
+  const [unsaved, setUnsaved] = useState<SavedDossier | null>(null);
   const fetchWs = useServerFn(getGrantWorkspace);
   const save = useServerFn(saveGrantWorkspace);
   const genChecklist = useServerFn(generateGrantChecklist);
@@ -98,7 +109,9 @@ export function GrantJourney({
   const [saving, setSaving] = useState<string | null>(null);
   const [showEmail, setShowEmail] = useState(false);
 
-  const dossier = (dData?.saved?.dossier as Dossier | undefined) ?? null;
+  const savedDossier = unsaved ?? dData?.saved;
+  const dossier = savedDossier ? currentDossierDecision(savedDossier.dossier as Dossier, savedDossier.updated_at, evaluation ?? null, lang) : null;
+  const availability = grantAvailability({ deadline, status: grantStatus, deadlineKind });
 
   // Opening the grant is enough to get the decision researched (once).
   const started = useRef(false);
@@ -107,7 +120,13 @@ export function GrantJourney({
     started.current = true;
     setResearching(true);
     generate({ data: { grantId, orgId, lang, decisionMaker: team.decisionMaker } })
-      .then(() => qc.invalidateQueries({ queryKey: dossierKey }))
+      .then((result) => {
+        const recovered = dossierGenerationResult(result);
+        if (recovered.unsaved) {
+          setUnsaved(recovered.saved);
+          toast.error(tr("Analysis generated but not saved. Retry saving without using more AI credits.", "Análisis generado pero no guardado. Reintente guardarlo sin gastar más créditos de IA."));
+        } else { void qc.invalidateQueries({ queryKey: dossierKey }); }
+      })
       .catch((e) =>
         toast.error(
           `${tr("Could not research this grant", "No se pudo investigar este grant")}: ${e instanceof Error ? e.message : String(e)}`,
@@ -120,7 +139,7 @@ export function GrantJourney({
   const ws = wData?.workspace ?? null;
   const planStarted = !!wData?.saved;
   const todos = planStarted ? (ws?.checklist ?? []) : [];
-  const stage: JourneyStage = journeyStage({ planStarted, todos });
+  const stage: JourneyStage = availability === "closed" || availability === "conflict" ? "decide" : journeyStage({ planStarted, todos });
   const unknown = (dossier?.facts ?? []).filter(
     (f) => f.status === "not_published" || f.status === "conflict",
   );
@@ -131,6 +150,7 @@ export function GrantJourney({
     planStarted,
     todos,
     deadline,
+    availability,
   });
   const email = dossier?.messages.find((m) => m.channel === "email");
   const recommended = dossier?.routes.options.find((o) => o.recommended);
@@ -225,6 +245,10 @@ export function GrantJourney({
           "We are reading the official page and the web to answer “should we apply?”.",
           "Estamos leyendo la página oficial y la web para responder “¿postulamos?”.",
         );
+      case "confirm_availability":
+        return tr("The saved closure and future deadline disagree. Confirm the current call with the funder.", "El cierre guardado y la fecha futura se contradicen. Confirme la convocatoria actual con el financiador.");
+      case "review_plan":
+        return tr("Confirm the required documents before marking this application ready.", "Confirme los documentos requeridos antes de dar la postulación por lista.");
       case "closed":
         return tr(
           "This call is closed. Save it for the next cycle or dismiss it.",
@@ -269,6 +293,15 @@ export function GrantJourney({
 
   return (
     <div className="space-y-4">
+      {unsaved && <div role="alert" className="border border-destructive p-3 text-sm">
+        {tr("This analysis is not saved yet.", "Este análisis todavía no está guardado.")}
+        <Button size="sm" variant="outline" disabled={saving === "dossier"} onClick={async () => {
+          setSaving("dossier");
+          try { await retrySave({ data: { grantId, orgId, lang, saved: unsaved } }); setUnsaved(null); await qc.invalidateQueries({ queryKey: dossierKey }); }
+          catch { toast.error(tr("Could not save the analysis. It remains available here.", "No se pudo guardar el análisis. Sigue disponible aquí.")); }
+          finally { setSaving(null); }
+        }}>{tr("Retry saving", "Reintentar guardado")}</Button>
+      </div>}
       {/* Where we are + what to do today */}
       <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <ol className="flex items-center gap-2 border-b px-4 py-3 text-sm">
@@ -466,7 +499,7 @@ export function GrantJourney({
           <ul className="divide-y rounded-lg border">
             {todos.map((t) => {
               const Icon = t.status === "have" || t.status === "not_needed" ? CheckCircle2 : t.status === "in_progress" ? CircleDot : Circle;
-              const late = t.due && t.status !== "have" && t.due < new Date().toISOString().slice(0, 10);
+              const late = t.due && t.status !== "have" && t.status !== "not_needed" && t.due < new Date().toISOString().slice(0, 10);
               return (
                 <li key={t.id} className="flex items-center gap-3 px-3 py-2">
                   <button
@@ -564,7 +597,7 @@ export function GrantJourney({
             <Button size="sm" variant="outline" disabled={!canDraft} onClick={onDraft}>
               <Wand2 className="h-4 w-4" /> {tr("Write the proposal (AI)", "Redactar la propuesta (IA)")}
             </Button>
-            {officialUrl && (
+            {officialUrl && action.kind === "submit" && (
               <ExternalLinkPreview
                 url={officialUrl}
                 showIcon={false}

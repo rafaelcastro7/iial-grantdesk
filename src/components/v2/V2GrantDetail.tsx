@@ -1,8 +1,11 @@
+import { currentDossierDecision } from "@/lib/dossier-decision.shared";
+import type { Dossier } from "@/lib/grant-dossier.shared";
+import { daysUntil } from "@/lib/grant-journey.shared";
+import { grantAvailability } from "@/lib/grant-availability.shared";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getGrantDossier } from "@/lib/grant-dossier.functions";
-import { type DossierFit } from "@/lib/grant-dossier.shared";
 import { GrantDossier } from "@/components/grants/GrantDossier";
 import { CallFactsCard, hasCallFacts, type CallFacts } from "@/components/grants/CallFactsCard";
 import { cleanTitle } from "@/lib/html-text";
@@ -71,6 +74,7 @@ type Evaluation = {
   rationale_en: string;
   rationale_fr?: string | null;
   created_at: string;
+  evaluated_at?: string | null;
   axis_breakdown?: unknown;
   rule_snapshot?: unknown;
   model?: string | null;
@@ -155,7 +159,6 @@ type Props = {
   onShortlist: () => void;
 };
 
-const DAY_MS = 86_400_000;
 
 type Tone = "good" | "warn" | "bad" | "info";
 
@@ -193,7 +196,8 @@ export function V2GrantDetail({
       fetchDossier({ data: { grantId: grant.id, orgId: activeOrgId as string, lang } }),
     enabled: !!activeOrgId,
   });
-  const savedFit = (dossierData?.saved?.dossier as { fit?: DossierFit } | undefined) ?? null;
+  const saved = dossierData?.saved;
+  const savedFit = saved ? currentDossierDecision(saved.dossier as Dossier, saved.updated_at, evaluation, lang) : null;
   const hasDossierFit = !!savedFit?.fit;
   const showApplicationWorkspace =
     !!activeOrgId &&
@@ -229,7 +233,8 @@ export function V2GrantDetail({
     grantCurrency(grant),
     lang,
   );
-  const stage = getStage({
+  const availability = grantAvailability({ deadline: grant.deadline, status: grant.status, deadlineKind: grant.deadline_kind });
+  const stage = availability === "conflict" ? { label: tr("Dates need confirmation", "Fechas por confirmar"), tone: "warn" as const, enrichmentFailed: false } : getStage({
     deadlineDays: deadline.days,
     status: grant.status,
     enrichAttempts: grant.enrich_attempts,
@@ -256,7 +261,7 @@ export function V2GrantDetail({
   const canFetch = grant.status === "discovered" && !stage.enrichmentFailed;
   const canEvaluate =
     grant.status !== "discovered" || !!evaluation || (grant.summary ?? "").trim().length > 0;
-  const canDraft = draftGate(evaluation) === "ok";
+  const canDraft = draftGate(evaluation) === "ok" && availability !== "closed" && availability !== "conflict";
   const actionDisabled = busy != null;
   const kind = fundingKindOf(grant);
 
@@ -478,6 +483,9 @@ export function V2GrantDetail({
           grantId={grant.id}
           orgId={activeOrgId}
           deadline={grant.deadline}
+          grantStatus={grant.status}
+          deadlineKind={grant.deadline_kind}
+          evaluation={evaluation}
           officialUrl={grant.url}
           onDraft={onDraft}
           canDraft={canDraft && !existingProposalId}
@@ -699,7 +707,7 @@ function getDeadlineState(deadline: string | null, lang: UiLang = "en", kind?: s
   if (Number.isNaN(date.getTime())) {
     return { label: deadline, date: null, days: null as number | null };
   }
-  const days = Math.ceil((date.getTime() - Date.now()) / DAY_MS);
+  const days = daysUntil(deadline) ?? 0;
   const shown = formatDate(deadline, lang);
   // Past dates: the status chip already says "Closed".
   if (days < 0) return { label: "", date: shown, days };

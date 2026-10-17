@@ -11,6 +11,13 @@ import { PageContainer, PageHeader } from "@/components/PageLayout";
 const qo = queryOptions({ queryKey: ["admin", "history"], queryFn: () => listDiscoveryHistory() });
 
 export const Route = createFileRoute("/_authenticated/admin/history")({
+  head: () => ({ meta: [{ title: "Admin History — GrantDesk" },
+      { name: "description", content: "GrantDesk admin history: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Admin History — GrantDesk" },
+      { property: "og:description", content: "GrantDesk admin history: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(qo),
   errorComponent: ({ error }) => (
     <p className="text-sm text-destructive">Failed: {(error as Error).message}</p>

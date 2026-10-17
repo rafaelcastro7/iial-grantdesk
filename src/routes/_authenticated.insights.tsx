@@ -11,6 +11,13 @@ import { autoEvaluatePending } from "@/lib/grants.functions";
 import { useActiveTenant } from "@/lib/tenant-context";
 
 export const Route = createFileRoute("/_authenticated/insights")({
+  head: () => ({ meta: [{ title: "Insights — GrantDesk" },
+      { name: "description", content: "GrantDesk insights: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Insights — GrantDesk" },
+      { property: "og:description", content: "GrantDesk insights: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: FitInsightsPage,
 });
 

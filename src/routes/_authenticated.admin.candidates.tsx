@@ -26,6 +26,13 @@ import { Input } from "@/components/ui/input";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
 
 export const Route = createFileRoute("/_authenticated/admin/candidates")({
+  head: () => ({ meta: [{ title: "Admin Candidates — GrantDesk" },
+      { name: "description", content: "GrantDesk admin candidates: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Admin Candidates — GrantDesk" },
+      { property: "og:description", content: "GrantDesk admin candidates: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: CandidatesPage,
 });
 

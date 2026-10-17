@@ -16,7 +16,13 @@ import "@/i18n";
 const opts = queryOptions({ queryKey: ["submissions"], queryFn: () => listSubmissions() });
 
 export const Route = createFileRoute("/_authenticated/submissions")({
-  head: () => ({ meta: [{ title: "Submissions — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Submissions — IIAL" },
+      { name: "description", content: "GrantDesk submissions: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Submissions — IIAL" },
+      { property: "og:description", content: "GrantDesk submissions: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(opts),
   errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,
   pendingComponent: SubmissionsSkeleton,

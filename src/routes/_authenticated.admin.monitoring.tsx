@@ -19,7 +19,13 @@ const cacheQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/admin/monitoring")({
-  head: () => ({ meta: [{ title: "Platform Monitoring — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Platform Monitoring — IIAL" },
+      { name: "description", content: "GrantDesk admin monitoring: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Platform Monitoring — IIAL" },
+      { property: "og:description", content: "GrantDesk admin monitoring: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(rateLimitQO);
     await context.queryClient.ensureQueryData(cacheQO);

@@ -18,7 +18,13 @@ const statsQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/renewal")({
-  head: () => ({ meta: [{ title: "Renewal Intelligence — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Renewal Intelligence — IIAL" },
+      { name: "description", content: "GrantDesk renewal: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Renewal Intelligence — IIAL" },
+      { property: "og:description", content: "GrantDesk renewal: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(candidatesQO);
     await context.queryClient.ensureQueryData(statsQO);

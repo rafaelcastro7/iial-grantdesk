@@ -56,6 +56,13 @@ const qo = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/admin/agents")({
+  head: () => ({ meta: [{ title: "Admin Agents — GrantDesk" },
+      { name: "description", content: "GrantDesk admin agents: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Admin Agents — GrantDesk" },
+      { property: "og:description", content: "GrantDesk admin agents: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(qo),
   errorComponent: ({ error }) => (
     <p className="text-sm text-destructive">Failed: {(error as Error).message}</p>

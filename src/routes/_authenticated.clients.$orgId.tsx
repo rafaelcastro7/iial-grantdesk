@@ -17,7 +17,13 @@ import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/clients/$orgId")({
   head: () => ({
-    meta: [{ title: "Client Detail — IIAL" }],
+    meta: [{ title: "Client Detail — IIAL" },
+      { name: "description", content: "GrantDesk clients client: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Client Detail — IIAL" },
+      { property: "og:description", content: "GrantDesk clients client: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(clientQueryOptions(params.orgId)),

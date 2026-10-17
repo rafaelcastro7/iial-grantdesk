@@ -14,7 +14,13 @@ const auditQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/admin/audit-trail")({
-  head: () => ({ meta: [{ title: "Audit Trail — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Audit Trail — IIAL" },
+      { name: "description", content: "GrantDesk admin audit-trail: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Audit Trail — IIAL" },
+      { property: "og:description", content: "GrantDesk admin audit-trail: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(auditQO);
   },

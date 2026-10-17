@@ -25,6 +25,13 @@ import { useActiveTenant } from "@/lib/tenant-context";
 import { useTr, useUiLang } from "@/lib/ui-lang";
 
 export const Route = createFileRoute("/_authenticated/partners")({
+  head: () => ({ meta: [{ title: "Partners — GrantDesk" },
+      { name: "description", content: "GrantDesk partners: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Partners — GrantDesk" },
+      { property: "og:description", content: "GrantDesk partners: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: PartnersPage,
 });
 

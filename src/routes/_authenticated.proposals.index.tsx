@@ -35,7 +35,12 @@ export const Route = createFileRoute("/_authenticated/proposals/")({
         content:
           "AI-drafted grant proposals with cited evidence from your organization knowledge base.",
       },
-    ],
+    
+      { property: "og:title", content: "Proposals — IIAL" },
+      { property: "og:description", content: "GrantDesk proposals: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(proposalsQueryOptions),
   errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,

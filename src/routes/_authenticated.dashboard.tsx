@@ -48,7 +48,12 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
     meta: [
       { title: "Dashboard - IIAL" },
       { name: "description", content: "Your IIAL grant intelligence dashboard." },
-    ],
+    
+      { property: "og:title", content: "Dashboard - IIAL" },
+      { property: "og:description", content: "GrantDesk dashboard: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   component: Dashboard,
   pendingComponent: DashboardSkeleton,

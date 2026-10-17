@@ -5,7 +5,8 @@ import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-
 import { useServerFn } from "@tanstack/react-start";
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
-import { startEvaluator } from "@/agents/evaluator.functions";
+import { waitForEvaluation } from "@/lib/evaluation-progress.shared";
+import { startEvaluator, getEvaluatorProgress } from "@/agents/evaluator.functions";
 import { runStrategist } from "@/agents/strategist.functions";
 import { AgentTracePanel } from "@/components/grants/AgentTracePanel";
 import { EvidencePanel } from "@/components/grants/EvidencePanel";
@@ -103,6 +104,7 @@ function GrantDetailPage({ orgId }: { orgId: string }) {
   const qc = useQueryClient();
   const isAdmin = useIsAdmin();
   const startEval = useServerFn(startEvaluator);
+  const readEvaluation = useServerFn(getEvaluatorProgress);
   const enrichOne = useServerFn(enrichGrant);
   const strategize = useServerFn(runStrategist);
   const curate = useServerFn(markGrantsCurated);
@@ -174,13 +176,7 @@ function GrantDetailPage({ orgId }: { orgId: string }) {
   async function evaluate() {
     const started = await startEval({ data: { grantId: id, orgId, force: true } });
     setTraceFromRun(started, "evaluator", true);
-    const startedAt = new Date(started.startedAt).getTime() - 5_000;
-    for (let attempt = 0; attempt < 120; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 2_500));
-      const detail = await getGrantDetail({ data: { id, orgId } });
-      const evaluatedAt = (detail.evaluation as { evaluated_at?: string } | null)?.evaluated_at;
-      if (evaluatedAt && new Date(evaluatedAt).getTime() >= startedAt) return started;
-    }
+    await waitForEvaluation(() => readEvaluation({ data: { grantId: id, orgId, runId: started.runId } }));
     return started;
   }
 
@@ -240,6 +236,7 @@ function GrantDetailPage({ orgId }: { orgId: string }) {
       // can leave the old eligibility CTA visible until a later navigation.
       await qc.refetchQueries({ queryKey: ["grant-detail", id], type: "active" });
       await qc.invalidateQueries({ queryKey: ["grants"] });
+      await qc.invalidateQueries({ queryKey: ["grant-workspace", id, orgId] });
     } catch (e) {
       setErr(toUserFacingActionError(e));
     } finally {
@@ -337,6 +334,9 @@ function toUserFacingActionError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
   const lower = raw.toLowerCase();
   const t = (en: string, es: string) => pick(getUiLang(), en, es);
+
+  if (raw.includes("evaluation_still_running")) return t("The review is still running. Check its progress before starting another review.", "La revisión sigue en curso. Consulte su progreso antes de iniciar otra.");
+  if (raw.includes("evaluation_failed")) return t("The review could not finish. Your previous evaluation is unchanged.", "La revisión no pudo terminar. Su evaluación anterior no cambió.");
 
   if (lower.includes("ollama") || lower.includes("model") || lower.includes("llm")) {
     return t(

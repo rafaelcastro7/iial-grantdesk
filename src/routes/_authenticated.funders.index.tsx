@@ -47,7 +47,13 @@ const directoryQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/funders/")({
-  head: () => ({ meta: [{ title: "Funders — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Funders — IIAL" },
+      { name: "description", content: "GrantDesk funders: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Funders — IIAL" },
+      { property: "og:description", content: "GrantDesk funders: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(statsQO);
     await context.queryClient.ensureQueryData(directoryQO);

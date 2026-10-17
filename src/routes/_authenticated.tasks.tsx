@@ -33,7 +33,13 @@ const tasksQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/tasks")({
-  head: () => ({ meta: [{ title: "Tasks — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Tasks — IIAL" },
+      { name: "description", content: "GrantDesk tasks: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Tasks — IIAL" },
+      { property: "og:description", content: "GrantDesk tasks: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(tasksQO);
   },

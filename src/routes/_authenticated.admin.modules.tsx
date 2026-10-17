@@ -12,6 +12,13 @@ import { PageContainer, PageHeader } from "@/components/PageLayout";
 const qo = queryOptions({ queryKey: ["admin", "modules"], queryFn: () => listModuleFlags() });
 
 export const Route = createFileRoute("/_authenticated/admin/modules")({
+  head: () => ({ meta: [{ title: "Admin Modules — GrantDesk" },
+      { name: "description", content: "GrantDesk admin modules: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Admin Modules — GrantDesk" },
+      { property: "og:description", content: "GrantDesk admin modules: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(qo),
   errorComponent: ({ error }) => (
     <p className="text-sm text-destructive">Failed: {(error as Error).message}</p>

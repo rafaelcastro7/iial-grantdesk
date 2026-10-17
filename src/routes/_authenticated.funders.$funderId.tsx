@@ -59,6 +59,13 @@ type FunderGrant = Pick<
 >;
 
 export const Route = createFileRoute("/_authenticated/funders/$funderId")({
+  head: () => ({ meta: [{ title: "Funders Funder — GrantDesk" },
+      { name: "description", content: "GrantDesk funders funder: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Funders Funder — GrantDesk" },
+      { property: "og:description", content: "GrantDesk funders funder: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: FunderProfilePage,
 });
 

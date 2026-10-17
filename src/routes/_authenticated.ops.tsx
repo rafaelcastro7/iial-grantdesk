@@ -15,7 +15,13 @@ import "@/i18n";
 const opts = queryOptions({ queryKey: ["ops"], queryFn: () => getOpsMetrics() });
 
 export const Route = createFileRoute("/_authenticated/ops")({
-  head: () => ({ meta: [{ title: "Ops - IIAL" }] }),
+  head: () => ({ meta: [{ title: "Ops - IIAL" },
+      { name: "description", content: "GrantDesk ops: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Ops - IIAL" },
+      { property: "og:description", content: "GrantDesk ops: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(opts),
   component: OpsPage,
   errorComponent: ({ error }) => (

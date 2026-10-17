@@ -17,6 +17,13 @@ import { useActiveTenant } from "@/lib/tenant-context";
 import { ProductDesignBacklogModal } from "@/components/grants/ProductDesignBacklogModal";
 
 export const Route = createFileRoute("/_authenticated/backlog")({
+  head: () => ({ meta: [{ title: "Backlog — GrantDesk" },
+      { name: "description", content: "GrantDesk backlog: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Backlog — GrantDesk" },
+      { property: "og:description", content: "GrantDesk backlog: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: ProductDesignBacklogPage,
 });
 

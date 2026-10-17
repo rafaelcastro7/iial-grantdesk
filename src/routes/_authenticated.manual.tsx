@@ -26,7 +26,12 @@ export const Route = createFileRoute("/_authenticated/manual")({
         name: "description",
         content: "Professional user manual for the IIAL Grants platform.",
       },
-    ],
+    
+      { property: "og:title", content: "User Manual - IIAL Grants" },
+      { property: "og:description", content: "GrantDesk manual: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   component: UserManualRoute,
 });

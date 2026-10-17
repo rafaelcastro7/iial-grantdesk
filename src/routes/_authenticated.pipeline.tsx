@@ -31,6 +31,14 @@ import { useActiveTenant } from "@/lib/tenant-context";
 import { useTr, useUiLang } from "@/lib/ui-lang";
 
 export const Route = createFileRoute("/_authenticated/pipeline")({
+  head: () => ({ meta: [
+    { title: "Application Pipeline — GrantDesk" },
+    { name: "description", content: "Track grant application plans, deadlines, responsibilities and readiness across your clients." },
+    { property: "og:title", content: "Application Pipeline — GrantDesk" },
+    { property: "og:description", content: "Track grant application plans, deadlines, responsibilities and readiness across your clients." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: PipelinePage,
 });
 

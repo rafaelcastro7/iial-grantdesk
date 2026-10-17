@@ -29,3 +29,12 @@
 - [x] Auditoría extrema, erradicación de bugs y deuda técnica: resolución atómica en `funders_name_country_key`, persistencia administrativa de requisitos/briefs y guardas defensivas en `FitRules`.
 - [x] Ciclo de subsanación (remediation loop): habilitar actualización de facts manuales con re-evaluación forzada determinista (`Re-check fit`) para desbloquear propuestas bloqueadas.
 - [x] Suite de pruebas sintéticas end-to-end (`npm run test:synthetic`) cubriendo ingestión, síntesis de requerimientos, brief financiero, subsanación y aislamiento multi-tenant.
+
+## Limpieza y estabilización aprobada
+
+- [ ] Retirar código huérfano y selección V1/V2; conservar interfaces públicas.
+- [ ] Conservar procedencia y detalle de pendientes; impedir nuevas duplicaciones.
+- [ ] Sincronizar evaluación, decisión y siguiente acción; resolver fechas contradictorias.
+- [ ] Evitar catálogo truncado y errores de fuentes presentados como éxito.
+- [ ] Recuperar análisis no guardados sin regenerar IA; pruebas y verificación real.
+- [ ] Consolidar contratos y documentación; seguridad pendiente de nueva revisión en Security.

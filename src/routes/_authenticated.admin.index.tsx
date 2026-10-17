@@ -10,6 +10,13 @@ const usersQO = queryOptions({ queryKey: ["admin", "users"], queryFn: () => list
 const modsQO = queryOptions({ queryKey: ["admin", "modules"], queryFn: () => listModuleFlags() });
 
 export const Route = createFileRoute("/_authenticated/admin/")({
+  head: () => ({ meta: [{ title: "Admin — GrantDesk" },
+      { name: "description", content: "GrantDesk admin: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Admin — GrantDesk" },
+      { property: "og:description", content: "GrantDesk admin: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(usersQO),

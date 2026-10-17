@@ -22,7 +22,13 @@ const auditQuery = (id: string, orgId: string) =>
 
 export const Route = createFileRoute("/_authenticated/grants/$id/audit")({
   head: ({ params }) => ({
-    meta: [{ title: `Scoring details · Grant ${params.id.slice(0, 8)} — IIAL` }],
+    meta: [{ title: `Scoring details · Grant ${params.id.slice(0, 8)} — IIAL` },
+      { name: "description", content: "GrantDesk grants detail audit: manage grant research, application preparation and related records." },
+      { property: "og:title", content: `Scoring details · Grant ${params.id.slice(0, 8)} — IIAL` },
+      { property: "og:description", content: "GrantDesk grants detail audit: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   errorComponent: ({ error }) => (
     <div className="p-6 text-destructive">{(error as Error).message}</div>

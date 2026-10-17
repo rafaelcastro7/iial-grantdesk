@@ -30,6 +30,13 @@ import { ExternalLinkPreview } from "@/components/ExternalLinkPreview";
 import { PageContainer, PageHeader } from "@/components/PageLayout";
 
 export const Route = createFileRoute("/_authenticated/admin/sources")({
+  head: () => ({ meta: [{ title: "Admin Sources — GrantDesk" },
+      { name: "description", content: "GrantDesk admin sources: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Admin Sources — GrantDesk" },
+      { property: "og:description", content: "GrantDesk admin sources: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: SourcesPage,
 });
 

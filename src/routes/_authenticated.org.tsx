@@ -26,7 +26,13 @@ const orgQueryOptions = (orgId: string) =>
   });
 
 export const Route = createFileRoute("/_authenticated/org")({
-  head: () => ({ meta: [{ title: "Organization Readiness Profile — IIAL Grants" }] }),
+  head: () => ({ meta: [{ title: "Organization Readiness Profile — IIAL Grants" },
+      { name: "description", content: "GrantDesk org: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Organization Readiness Profile — IIAL Grants" },
+      { property: "og:description", content: "GrantDesk org: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: OrgPage,
 });
 

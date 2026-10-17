@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { useSuspenseQuery, useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useSuspenseQuery, useSuspenseInfiniteQuery, useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   autoEvaluatePending,
@@ -8,7 +8,8 @@ import {
   enrichGrant,
   listGrants,
 } from "@/lib/grants.functions";
-import { startEvaluator } from "@/agents/evaluator.functions";
+import { waitForEvaluation } from "@/lib/evaluation-progress.shared";
+import { startEvaluator, getEvaluatorProgress } from "@/agents/evaluator.functions";
 import { getGrantDetail } from "@/lib/grant-detail.functions";
 import { runStrategist } from "@/agents/strategist.functions";
 import { useIsAdmin, useIsConsultant } from "@/lib/use-platform";
@@ -118,17 +119,12 @@ function GrantsPage({ orgId }: { orgId: string }) {
   const qc = useQueryClient();
   const fetchGrants = useServerFn(listGrants);
   const startEval = useServerFn(startEvaluator);
+  const readEvaluation = useServerFn(getEvaluatorProgress);
   // Evaluations run in the background on the server (they finish even if the
   // tab is closed); wait here until the new verdict is saved.
   const evaluate = async ({ data }: { data: { grantId: string } }) => {
     const started = await startEval({ data: { ...data, orgId } });
-    const since = new Date(started.startedAt).getTime() - 5_000;
-    for (let attempt = 0; attempt < 120; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 2_500));
-      const detail = await getGrantDetail({ data: { id: data.grantId, orgId } });
-      const at = (detail.evaluation as { evaluated_at?: string } | null)?.evaluated_at;
-      if (at && new Date(at).getTime() >= since) return started;
-    }
+    await waitForEvaluation(() => readEvaluation({ data: { grantId: data.grantId, orgId, runId: started.runId } }));
     return started;
   };
   const strategize = useServerFn(runStrategist);
@@ -177,7 +173,7 @@ function GrantsPage({ orgId }: { orgId: string }) {
 
   // Country is filtered on the server: a page of 100 filtered locally for a
   // smaller country would show almost nothing.
-  const { data } = useSuspenseQuery({
+  const { data: catalogPages, fetchNextPage, isFetchingNextPage } = useSuspenseInfiniteQuery({
     queryKey: [
       "grants",
       "all",
@@ -189,10 +185,12 @@ function GrantsPage({ orgId }: { orgId: string }) {
       includeDismissed,
       orgId,
     ],
-    queryFn: () =>
-      fetchGrants({
+    initialPageParam: 0,
+    getNextPageParam: (last: Awaited<ReturnType<typeof listGrants>>) => last.hasMore ? last.offset + 100 : undefined,
+    queryFn: ({ pageParam }: { pageParam: number }) => fetchGrants({
         data: {
           limit: 100,
+          offset: pageParam,
           search: searching ? serverSearch : undefined,
           profileId: searchProfileId ?? undefined,
           country: filters.country !== "all" ? filters.country : undefined,
@@ -210,6 +208,9 @@ function GrantsPage({ orgId }: { orgId: string }) {
         },
       }),
   });
+  const lastCatalogPage = catalogPages.pages.at(-1);
+  if (!lastCatalogPage) throw new Error("catalog_unavailable");
+  const data = { ...lastCatalogPage, grants: catalogPages.pages.flatMap((p) => p.grants) };
 
   const grants = data.grants as GrantRowData[];
   const { data: radarProfiles = [] } = useQuery({
@@ -625,6 +626,7 @@ function GrantsPage({ orgId }: { orgId: string }) {
         }}
         profileBar={
           <>
+            {data.hasMore && <Button variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{tr(`Load more (${grants.length} of ${data.total})`, `Cargar más (${grants.length} de ${data.total})`)}</Button>}
             <EligibilityCheckBar
               profiles={radarProfiles}
               selected={checkProfile}

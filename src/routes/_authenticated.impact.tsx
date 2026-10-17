@@ -26,7 +26,13 @@ const authorshipQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/impact")({
-  head: () => ({ meta: [{ title: "Impact Measurement — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Impact Measurement — IIAL" },
+      { name: "description", content: "GrantDesk impact: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Impact Measurement — IIAL" },
+      { property: "og:description", content: "GrantDesk impact: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(metricsQO);
     await context.queryClient.ensureQueryData(detailsQO);

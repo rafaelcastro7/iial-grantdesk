@@ -42,7 +42,13 @@ const CRITIC_RUBRIC_LABELS: Record<string, string> = {
 
 export const Route = createFileRoute("/_authenticated/proposals/$id")({
   head: ({ params }) => ({
-    meta: [{ title: `Proposal ${params.id.slice(0, 8)} - IIAL` }],
+    meta: [{ title: `Proposal ${params.id.slice(0, 8)} - IIAL` },
+      { name: "description", content: "GrantDesk proposals detail: manage grant research, application preparation and related records." },
+      { property: "og:title", content: `Proposal ${params.id.slice(0, 8)} - IIAL` },
+      { property: "og:description", content: "GrantDesk proposals detail: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   component: ProposalDetailPage,
 });

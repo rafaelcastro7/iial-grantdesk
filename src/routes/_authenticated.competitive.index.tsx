@@ -18,7 +18,13 @@ const topRecipientsQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/competitive/")({
-  head: () => ({ meta: [{ title: "Competitive Intel — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Competitive Intel — IIAL" },
+      { name: "description", content: "GrantDesk competitive: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Competitive Intel — IIAL" },
+      { property: "og:description", content: "GrantDesk competitive: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(landscapeQO);
     await context.queryClient.ensureQueryData(topRecipientsQO);

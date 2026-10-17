@@ -20,7 +20,12 @@ export const Route = createFileRoute("/auth")({
     meta: [
       { title: "Sign in - IIAL" },
       { name: "description", content: "Sign in to IIAL grant intelligence platform." },
-    ],
+    
+      { property: "og:title", content: "Sign in - IIAL" },
+      { property: "og:description", content: "GrantDesk auth: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   component: AuthPage,
 });
