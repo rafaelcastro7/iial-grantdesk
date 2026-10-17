@@ -24,7 +24,7 @@ export async function runAgentWatches() {
       failures.push(`${w.id}: ${sErr.message}`);
       continue;
     }
-    const ids = (hits ?? []).filter((h) => h.relevance > 0.15).map((h) => h.grant_id);
+    const ids = ((hits ?? []) as Array<{ grant_id: string; relevance: number }>).filter((h) => h.relevance > 0.15).map((h) => h.grant_id);
     const fresh = newForWatch(ids, w.seen_grant_ids ?? []);
     const { data: grants } = ids.length
       ? await supabaseAdmin.from("grants").select("id, title, deadline, status").in("id", ids)

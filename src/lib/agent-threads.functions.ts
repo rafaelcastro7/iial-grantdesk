@@ -53,7 +53,7 @@ export const getAgentThread = createServerFn({ method: "GET" })
       .eq("thread_id", data.id)
       .order("created_at", { ascending: true });
     if (mErr) throw new Error(mErr.message);
-    return { ...thread, messages: (msgs ?? []).map((m) => m.message) as unknown[] };
+    return { ...thread, messagesJson: JSON.stringify((msgs ?? []).map((m) => m.message)) };
   });
 
 export const listAgentInbox = createServerFn({ method: "GET" })

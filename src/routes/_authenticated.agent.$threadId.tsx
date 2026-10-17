@@ -38,5 +38,5 @@ function AgentThreadPage() {
         <Link to="/agent" className="text-primary underline">{tr("Start a new one", "Empezar una nueva")}</Link>
       </div>
     );
-  return <AgentChat key={threadId} threadId={threadId} initialMessages={q.data.messages as UIMessage[]} />;
+  return <AgentChat key={threadId} threadId={threadId} initialMessages={JSON.parse(q.data.messagesJson) as UIMessage[]} />;
 }

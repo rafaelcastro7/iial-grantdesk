@@ -186,7 +186,11 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
                     return (
                       <div key={i} className="flex flex-col gap-2">
                         <Tool defaultOpen={false}>
-                          <ToolHeader type={part.type} state={part.state} title={meta ? (es ? meta.es : meta.en) : name} />
+                          {part.type === "dynamic-tool" ? (
+                            <ToolHeader type="dynamic-tool" state={part.state} toolName={name} title={meta ? (es ? meta.es : meta.en) : name} />
+                          ) : (
+                            <ToolHeader type={part.type} state={part.state} title={meta ? (es ? meta.es : meta.en) : name} />
+                          )}
                           <ToolContent>
                             <ToolInput input={part.input} />
                             <ToolOutput output={part.state === "output-available" ? part.output : undefined} errorText={part.state === "output-error" ? part.errorText : undefined} />
