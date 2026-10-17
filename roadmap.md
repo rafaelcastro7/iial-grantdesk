@@ -54,6 +54,6 @@
 - [x] Tabla `agent_workspace` (estado, decisión, análisis con citas, tareas con procedencia) con RLS por usuario.
 - [x] Extractor rápido (Gemini Flash, JSON estricto, cita exacta por dato) aislado del orquestador.
 - [x] Herramientas `analyze_grant` y `save_to_workspace`; panel "Plan de trabajo" editable junto al chat.
-- [ ] Activar la vigilancia diaria automática (pg_cron + firma del hook). Bloqueo: pendiente de aprobación del usuario.
+- [x] Activar la vigilancia diaria automática: trabajo `iial-agent-watch-daily` (11:30 UTC) firmado con HMAC; secreto sembrado en `webhook_config`. Entra en vigor al publicar (el cron apunta a la URL publicada).
 - [ ] Correos del agente (resumen matutino, alertas). Bloqueo: falta configurar el dominio de correo de IIAL.
 - [ ] Lectura de PDFs subidos dentro del chat.
