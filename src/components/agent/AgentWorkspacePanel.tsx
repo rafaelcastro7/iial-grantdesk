@@ -178,6 +178,8 @@ export function AgentWorkspacePanel({ onClose }: { onClose?: () => void }) {
         )}
         {items.map((i) => (
           <WorkspaceCard key={i.id} item={i} es={langEs} />
+          {/* eslint-disable-next-line */}
+
         ))}
       </div>
     </div>
