@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Retirar la dependencia Mermaid/graphlib del chat; inicio y conversación guardada comprobados con sesión real, sin errores. Compilación automática y 5 pruebas pasan; la revisión publicada requiere publicación.
+- [x] Comparar OpenClaw, Hermes y capacidades de Lovable: priorizar vigilancia verificable, memoria editable, lectura de PDFs y acciones con aprobación; sin activar servicios.
+
 - [x] Agente de grants (/agent): conversaciones guardadas, catálogo → web → página oficial, fichas recomendadas, chequeo de país, glosario, vigilancias y bandeja "Hecho por el agente". Probado con sesión real.
 - [ ] Vigilancia diaria automática: falta activar la tarea programada (requiere activar programación y firma en el backend).
 - [ ] Correos del agente (resumen matutino, alertas, envíos aprobados): requiere configurar el dominio de correo de IIAL.
