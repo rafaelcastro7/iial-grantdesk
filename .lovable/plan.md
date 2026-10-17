@@ -55,13 +55,34 @@ Los resultados web no entran al catálogo solos: el usuario pulsa "Guardar", y a
 - Qué falta (máximo 3 puntos)
 - Fuente oficial y acciones: Ver detalle, Guardar, Preguntar al agente
 
+## Tan potente como ChatGPT
+
+- Razonamiento profundo visible (pasos y resumen de lo que pensó).
+- Búsqueda web en vivo con citas por enlace.
+- Lee páginas y PDFs de convocatorias que el usuario pegue o suba.
+- Conversación larga con memoria del hilo y seguimiento natural.
+- Tablas comparativas y borradores de texto dentro del chat.
+
+## Lo que ChatGPT no puede (la ventaja)
+
+- Conoce a tus organizaciones: perfil, sectores, capacidades y socios ya guardados; no hay que explicarlos cada vez.
+- Elegibilidad con reglas fijas y auditables, no opinión del modelo: mismo grant, mismo resultado.
+- Distingue "dato oficial con cita exacta" de "sin verificar"; nunca inventa montos ni fechas.
+- Recuerda lo ya revisado: no vuelve a proponer grants descartados y avisa de los nuevos.
+- Ejecuta acciones: guarda en el pipeline, crea el plan con fechas hacia atrás, genera la checklist y abre el dossier.
+- Vigilancia: "avísame cuando abra algo así" queda como búsqueda guardada que revisa periódicamente.
+- Conocimiento del equipo: usa propuestas, respuestas y resultados anteriores del propio sistema.
+- Trabajo compartido: las conversaciones quedan en la cuenta para el equipo.
+
 ## Fases
 
 1. Página, lista de conversaciones, guardado en cuenta y chat con streaming.
 2. Herramienta de catálogo y fichas con elegibilidad determinista.
 3. Búsqueda web con citas y marca de verificación.
-4. Lectura bajo demanda de páginas oficiales y botón Guardar.
-5. Verificación en vivo con sesión real, dos conversaciones y recarga.
+4. Lectura bajo demanda de páginas oficiales y PDFs subidos, y botón Guardar.
+5. Contexto de organizaciones, memoria de descartes y acciones (pipeline, plan, checklist).
+6. Búsquedas guardadas con aviso de novedades.
+7. Verificación en vivo con sesión real, dos conversaciones y recarga.
 
 ## Detalles técnicos
 
