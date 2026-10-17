@@ -395,6 +395,69 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_workspace: {
+        Row: {
+          analysis: Json
+          created_at: string
+          decision: string | null
+          grant_id: string | null
+          id: string
+          org_id: string | null
+          status: string
+          tasks: Json
+          thread_id: string | null
+          title: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis?: Json
+          created_at?: string
+          decision?: string | null
+          grant_id?: string | null
+          id?: string
+          org_id?: string | null
+          status?: string
+          tasks?: Json
+          thread_id?: string | null
+          title: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis?: Json
+          created_at?: string
+          decision?: string | null
+          grant_id?: string | null
+          id?: string
+          org_id?: string | null
+          status?: string
+          tasks?: Json
+          thread_id?: string | null
+          title?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_workspace_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_workspace_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "agent_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       answer_library: {
         Row: {
           answer_en: string | null
