@@ -25,6 +25,7 @@ export function useModuleFlags() {
 // Pages a consultant may open (links from a grant, e.g. a proposal draft or a
 // client profile, keep working).
 export const CONSULTANT_PATHS = [
+  "/agent",
   "/dashboard",
   "/clients",
   "/grants",
@@ -36,7 +37,7 @@ export const CONSULTANT_PATHS = [
   "/backlog",
 ];
 // The consultant's menu: only what she uses every day.
-export const CONSULTANT_MENU = ["/dashboard", "/grants", "/pipeline", "/partners", "/org"];
+export const CONSULTANT_MENU = ["/dashboard", "/agent", "/grants", "/pipeline", "/partners", "/org"];
 export function isConsultantPath(path: string) {
   return CONSULTANT_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 }

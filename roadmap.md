@@ -1,5 +1,10 @@
 # Roadmap
 
+- [x] Agente de grants (/agent): conversaciones guardadas, catálogo → web → página oficial, fichas recomendadas, chequeo de país, glosario, vigilancias y bandeja "Hecho por el agente". Probado con sesión real.
+- [ ] Vigilancia diaria automática: falta activar la tarea programada (requiere activar programación y firma en el backend).
+- [ ] Correos del agente (resumen matutino, alertas, envíos aprobados): requiere configurar el dominio de correo de IIAL.
+- [ ] Lectura de PDFs subidos y acciones del agente (guardar en pipeline, crear plan, checklist) desde el chat.
+
 - [x] Mejorar búsqueda y análisis: citas por convocatoria, aviso de enlaces no corroborados, fechas desconocidas explícitas y montos sin mezclar monedas; 71 pruebas pasan, sin cambiar proveedores ni añadir llamadas pagadas.
 - [ ] Verificar búsqueda → abrir → análisis con una sesión real. Radar, detalle y plan comprobados con sesión real; falta una nueva ejecución IA en vivo.
 
