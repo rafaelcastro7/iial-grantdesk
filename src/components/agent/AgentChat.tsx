@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName, type UIMessage } from "ai";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Globe, Library, MapPin, Radar } from "lucide-react";
+import { BookOpen, Globe, Library, ListTodo, MapPin, Radar, Save, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,8 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "@/components/ai-elements/tool";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AgentWorkspacePanel } from "@/components/agent/AgentWorkspacePanel";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { useTr, useUiLang } from "@/lib/ui-lang";
 import type { AgentGrantCard } from "@/lib/agent/agent-rules.shared";
@@ -42,6 +44,8 @@ const TOOL_META: Record<string, { icon: typeof Globe; en: string; es: string }> 
   search_catalog: { icon: Library, en: "Searching our catalog", es: "Buscando en el catálogo" },
   search_web: { icon: Globe, en: "Searching the internet", es: "Buscando en internet" },
   read_official_page: { icon: BookOpen, en: "Reading the official page", es: "Leyendo la página oficial" },
+  analyze_grant: { icon: Search, en: "Deep analysis (extractor agent)", es: "Análisis profundo (agente extractor)" },
+  save_to_workspace: { icon: Save, en: "Saving to your work plan", es: "Guardando en tu plan de trabajo" },
   check_country: { icon: MapPin, en: "Checking country eligibility", es: "Chequeando el país" },
   explain_terms: { icon: BookOpen, en: "Glossary", es: "Glosario" },
   watch_search: { icon: Radar, en: "Saving a watch", es: "Guardando vigilancia" },
@@ -131,7 +135,10 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
     id: threadId,
     messages: initialMessages,
     transport,
-    onFinish: () => qc.invalidateQueries({ queryKey: ["agent-threads"] }),
+    onFinish: () => {
+      qc.invalidateQueries({ queryKey: ["agent-threads"] });
+      qc.invalidateQueries({ queryKey: ["agent-workspace"] });
+    },
     onError: (e) => toast.error(e.message || tr("The agent could not answer.", "El agente no pudo responder.")),
   });
 
@@ -148,6 +155,7 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
   }, [threadId, sendMessage]);
 
   const busy = status === "submitted" || status === "streaming";
+  const [panelOpen, setPanelOpen] = useState(false);
   const submit = (value: string) => {
     const v = value.trim();
     if (!v || busy) return;
@@ -156,7 +164,8 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <Conversation className="min-h-0 flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl">
           {messages.length === 0 && (
@@ -227,11 +236,32 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
             onChange={(e) => setText(e.currentTarget.value)}
             placeholder={tr("Ask for grants, paste a link, ask for a memo…", "Pida grants, pegue un enlace, pida un memo…")}
           />
-          <PromptInputFooter className="justify-end">
+          <PromptInputFooter className="justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs text-muted-foreground"
+              onClick={() => setPanelOpen((v) => !v)}
+            >
+              <ListTodo className="h-3.5 w-3.5" />
+              {tr("Work plan", "Plan de trabajo")}
+            </Button>
             <PromptInputSubmit status={status} onStop={stop} disabled={!busy && !text.trim()} />
           </PromptInputFooter>
         </PromptInput>
       </div>
+    </div>
+    <aside className="hidden w-80 shrink-0 border-l border-border bg-muted/20 lg:block">
+      <AgentWorkspacePanel />
+    </aside>
+    {panelOpen && (
+      <div className="fixed inset-0 z-40 flex justify-end bg-background/60 lg:hidden" onClick={() => setPanelOpen(false)}>
+        <div className="h-full w-80 max-w-[85vw] border-l border-border bg-background shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <AgentWorkspacePanel onClose={() => setPanelOpen(false)} />
+        </div>
+      </div>
+    )}
     </div>
   );
 }

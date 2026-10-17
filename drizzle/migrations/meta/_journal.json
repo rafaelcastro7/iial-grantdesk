@@ -225,6 +225,13 @@
       "when": 1792258317118,
       "tag": "0031_agent_threads_messages_watches",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792278714966,
+      "tag": "0032_agent_workspace",
+      "breakpoints": true
     }
   ]
 }
