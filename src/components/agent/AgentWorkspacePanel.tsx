@@ -11,7 +11,7 @@ import {
   toggleWorkspaceTask,
 } from "@/lib/agent-workspace.functions";
 import { nextTask, tasksProgress, type WorkspaceItem, type WorkspaceStatus } from "@/lib/agent/agent-workspace.shared";
-import { useTr } from "@/lib/ui-lang";
+import { useTr, useUiLang } from "@/lib/ui-lang";
 import { cn } from "@/lib/utils";
 
 export const workspaceKey = ["agent-workspace"] as const;
@@ -150,11 +150,9 @@ function WorkspaceCard({ item, es }: { item: WorkspaceItem; es: boolean }) {
 
 export function AgentWorkspacePanel({ onClose }: { onClose?: () => void }) {
   const tr = useTr();
-  const es = tr("x", "x") !== undefined; // lang via useTr pattern below
+  const langEs = useUiLang() === "es";
   const q = useQuery({ queryKey: workspaceKey, queryFn: () => listWorkspace(), refetchInterval: 30_000 });
   const items = q.data ?? [];
-  const isEs = typeof document !== "undefined" && document.documentElement.lang === "es";
-  const langEs = es && isEs;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
