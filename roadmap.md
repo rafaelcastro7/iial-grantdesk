@@ -48,3 +48,12 @@
 - [x] Consolidar contratos y documentación; pruebas deterministas y compilación automática limpias.
 - [ ] Revisar permisos señalados por el escáner nuevo: acceso amplio a requirements, tenants, source_runs y configuración. Bloqueo: validar el acceso intencionado por rol antes de restringirlo; no se cambiaron permisos en esta limpieza.
 - [ ] Verificación de revisión IA y recuperación de guardado fallido contra servicios reales. Las regresiones automatizadas pasan; no se forzó un fallo en datos reales ni se inició otra revisión pagada.
+
+## Agente: workspace dual y pipeline multiagente
+
+- [x] Tabla `agent_workspace` (estado, decisión, análisis con citas, tareas con procedencia) con RLS por usuario.
+- [x] Extractor rápido (Gemini Flash, JSON estricto, cita exacta por dato) aislado del orquestador.
+- [x] Herramientas `analyze_grant` y `save_to_workspace`; panel "Plan de trabajo" editable junto al chat.
+- [ ] Activar la vigilancia diaria automática (pg_cron + firma del hook). Bloqueo: pendiente de aprobación del usuario.
+- [ ] Correos del agente (resumen matutino, alertas). Bloqueo: falta configurar el dominio de correo de IIAL.
+- [ ] Lectura de PDFs subidos dentro del chat.
