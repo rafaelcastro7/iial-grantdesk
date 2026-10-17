@@ -131,6 +131,88 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_inbox: {
+        Row: {
+          body: string
+          created_at: string
+          grant_id: string | null
+          id: string
+          kind: string
+          status: string
+          title: string
+          user_id: string
+          watch_id: string | null
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          grant_id?: string | null
+          id?: string
+          kind: string
+          status?: string
+          title: string
+          user_id: string
+          watch_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          grant_id?: string | null
+          id?: string
+          kind?: string
+          status?: string
+          title?: string
+          user_id?: string
+          watch_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_inbox_watch_id_fkey"
+            columns: ["watch_id"]
+            isOneToOne: false
+            referencedRelation: "agent_watches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_messages: {
+        Row: {
+          ai_message_id: string
+          created_at: string
+          id: string
+          message: Json
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          ai_message_id: string
+          created_at?: string
+          id?: string
+          message: Json
+          role: string
+          thread_id: string
+          user_id?: string
+        }
+        Update: {
+          ai_message_id?: string
+          created_at?: string
+          id?: string
+          message?: Json
+          role?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "agent_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_runs: {
         Row: {
           agent: string
@@ -203,6 +285,33 @@ export type Database = {
           },
         ]
       }
+      agent_threads: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       agent_trace_steps: {
         Row: {
           agent: string
@@ -249,6 +358,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      agent_watches: {
+        Row: {
+          created_at: string
+          frequency: string
+          id: string
+          last_run_at: string | null
+          org_id: string | null
+          paused: boolean
+          query: string
+          seen_grant_ids: string[]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          org_id?: string | null
+          paused?: boolean
+          query: string
+          seen_grant_ids?: string[]
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          org_id?: string | null
+          paused?: boolean
+          query?: string
+          seen_grant_ids?: string[]
+          user_id?: string
+        }
+        Relationships: []
       }
       answer_library: {
         Row: {
@@ -1860,6 +2005,13 @@ export type Database = {
             columns: ["grant_id"]
             isOneToOne: false
             referencedRelation: "grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_checklists_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -5064,6 +5216,16 @@ export type Database = {
       search_term_matches: {
         Args: { haystack: string; needle: string }
         Returns: boolean
+      }
+      set_grant_checklist_item_done: {
+        Args: {
+          p_done: boolean
+          p_grant_id: string
+          p_item_id: string
+          p_lang: string
+          p_org_id: string
+        }
+        Returns: Json
       }
       set_grant_manual_field: {
         Args: {

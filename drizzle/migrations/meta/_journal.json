@@ -218,6 +218,13 @@
       "when": 1791634200000,
       "tag": "0030_harden_grant_checklists",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792258317118,
+      "tag": "0031_agent_threads_messages_watches",
+      "breakpoints": true
     }
   ]
 }
