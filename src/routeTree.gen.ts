@@ -34,6 +34,7 @@ import { Route as AuthenticatedQualityRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedRenewalRouteImport } from './routes/_authenticated.renewal'
 import { Route as AuthenticatedSubmissionsRouteImport } from './routes/_authenticated.submissions'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated.tasks'
+import { Route as ApiAgentRouteImport } from './routes/api/agent'
 import { Route as ReportTokenRouteImport } from './routes/report.$token'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated.admin.index'
 import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated.admin.agents'
@@ -196,6 +197,11 @@ const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiAgentRoute = ApiAgentRouteImport.update({
+  id: '/api/agent',
+  path: '/api/agent',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ReportTokenRoute = ReportTokenRouteImport.update({
   id: '/report/$token',
@@ -430,6 +436,7 @@ export interface FileRoutesByFullPath {
   '/renewal': typeof AuthenticatedRenewalRoute
   '/submissions': typeof AuthenticatedSubmissionsRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/api/agent': typeof ApiAgentRoute
   '/report/$token': typeof ReportTokenRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
@@ -491,6 +498,7 @@ export interface FileRoutesByTo {
   '/renewal': typeof AuthenticatedRenewalRoute
   '/submissions': typeof AuthenticatedSubmissionsRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/api/agent': typeof ApiAgentRoute
   '/report/$token': typeof ReportTokenRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
@@ -555,6 +563,7 @@ export interface FileRoutesById {
   '/_authenticated/renewal': typeof AuthenticatedRenewalRoute
   '/_authenticated/submissions': typeof AuthenticatedSubmissionsRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
+  '/api/agent': typeof ApiAgentRoute
   '/report/$token': typeof ReportTokenRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/_authenticated/admin/audit-trail': typeof AuthenticatedAdminAuditTrailRoute
@@ -619,6 +628,7 @@ export interface FileRouteTypes {
     | '/renewal'
     | '/submissions'
     | '/tasks'
+    | '/api/agent'
     | '/report/$token'
     | '/admin/agents'
     | '/admin/audit-trail'
@@ -680,6 +690,7 @@ export interface FileRouteTypes {
     | '/renewal'
     | '/submissions'
     | '/tasks'
+    | '/api/agent'
     | '/report/$token'
     | '/admin/agents'
     | '/admin/audit-trail'
@@ -743,6 +754,7 @@ export interface FileRouteTypes {
     | '/_authenticated/renewal'
     | '/_authenticated/submissions'
     | '/_authenticated/tasks'
+    | '/api/agent'
     | '/report/$token'
     | '/_authenticated/admin/agents'
     | '/_authenticated/admin/audit-trail'
@@ -786,6 +798,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
   ComplianceRoute: typeof ComplianceRoute
+  ApiAgentRoute: typeof ApiAgentRoute
   ReportTokenRoute: typeof ReportTokenRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
   ApiPublicHooksDeadlinesRoute: typeof ApiPublicHooksDeadlinesRoute
@@ -974,6 +987,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/tasks'
       preLoaderRoute: typeof AuthenticatedTasksRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/agent': {
+      id: '/api/agent'
+      path: '/api/agent'
+      fullPath: '/api/agent'
+      preLoaderRoute: typeof ApiAgentRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/report/$token': {
       id: '/report/$token'
@@ -1374,6 +1394,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
   ComplianceRoute: ComplianceRoute,
+  ApiAgentRoute: ApiAgentRoute,
   ReportTokenRoute: ReportTokenRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
   ApiPublicHooksDeadlinesRoute: ApiPublicHooksDeadlinesRoute,
