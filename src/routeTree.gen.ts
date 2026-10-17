@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
+import { Route as AuthenticatedAgentRouteImport } from './routes/_authenticated.agent'
 import { Route as AuthenticatedAnswersRouteImport } from './routes/_authenticated.answers'
 import { Route as AuthenticatedAutonomyRouteImport } from './routes/_authenticated.autonomy'
 import { Route as AuthenticatedBacklogRouteImport } from './routes/_authenticated.backlog'
@@ -95,6 +96,11 @@ const ComplianceRoute = ComplianceRouteImport.update({
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAgentRoute = AuthenticatedAgentRouteImport.update({
+  id: '/agent',
+  path: '/agent',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAnswersRoute = AuthenticatedAnswersRouteImport.update({
@@ -423,6 +429,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/agent': typeof AuthenticatedAgentRoute
   '/answers': typeof AuthenticatedAnswersRoute
   '/autonomy': typeof AuthenticatedAutonomyRoute
   '/backlog': typeof AuthenticatedBacklogRoute
@@ -486,6 +493,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
+  '/agent': typeof AuthenticatedAgentRoute
   '/answers': typeof AuthenticatedAnswersRoute
   '/autonomy': typeof AuthenticatedAutonomyRoute
   '/backlog': typeof AuthenticatedBacklogRoute
@@ -552,6 +560,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/agent': typeof AuthenticatedAgentRoute
   '/_authenticated/answers': typeof AuthenticatedAnswersRoute
   '/_authenticated/autonomy': typeof AuthenticatedAutonomyRoute
   '/_authenticated/backlog': typeof AuthenticatedBacklogRoute
@@ -618,6 +627,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compliance'
     | '/admin'
+    | '/agent'
     | '/answers'
     | '/autonomy'
     | '/backlog'
@@ -681,6 +691,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/compliance'
+    | '/agent'
     | '/answers'
     | '/autonomy'
     | '/backlog'
@@ -746,6 +757,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compliance'
     | '/_authenticated/admin'
+    | '/_authenticated/agent'
     | '/_authenticated/answers'
     | '/_authenticated/autonomy'
     | '/_authenticated/backlog'
@@ -860,6 +872,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/agent': {
+      id: '/_authenticated/agent'
+      path: '/agent'
+      fullPath: '/agent'
+      preLoaderRoute: typeof AuthenticatedAgentRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/answers': {
@@ -1334,6 +1353,7 @@ const AuthenticatedGrantsIdRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedAgentRoute: typeof AuthenticatedAgentRoute
   AuthenticatedAnswersRoute: typeof AuthenticatedAnswersRoute
   AuthenticatedAutonomyRoute: typeof AuthenticatedAutonomyRoute
   AuthenticatedBacklogRoute: typeof AuthenticatedBacklogRoute
@@ -1370,6 +1390,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedAgentRoute: AuthenticatedAgentRoute,
   AuthenticatedAnswersRoute: AuthenticatedAnswersRoute,
   AuthenticatedAutonomyRoute: AuthenticatedAutonomyRoute,
   AuthenticatedBacklogRoute: AuthenticatedBacklogRoute,
