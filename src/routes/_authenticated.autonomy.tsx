@@ -42,6 +42,13 @@ const qo = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/autonomy")({
+  head: () => ({ meta: [{ title: "Autonomy — GrantDesk" },
+      { name: "description", content: "GrantDesk autonomy: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Autonomy — GrantDesk" },
+      { property: "og:description", content: "GrantDesk autonomy: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(qo),
   errorComponent: ({ error }) => (
     <PageContainer size="wide">

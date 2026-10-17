@@ -19,7 +19,13 @@ const topRecipientsQO = (limit: number) =>
   });
 
 export const Route = createFileRoute("/_authenticated/competitive/recipients")({
-  head: () => ({ meta: [{ title: "Recipient Profiling — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Recipient Profiling — IIAL" },
+      { name: "description", content: "GrantDesk competitive recipients: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Recipient Profiling — IIAL" },
+      { property: "og:description", content: "GrantDesk competitive recipients: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(topRecipientsQO(25));
   },

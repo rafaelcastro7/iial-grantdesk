@@ -47,7 +47,13 @@ const statsQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/compliance-calendar")({
-  head: () => ({ meta: [{ title: "Compliance Calendar — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Compliance Calendar — IIAL" },
+      { name: "description", content: "GrantDesk compliance-calendar: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Compliance Calendar — IIAL" },
+      { property: "og:description", content: "GrantDesk compliance-calendar: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(calendarQO);
     await context.queryClient.ensureQueryData(statsQO);

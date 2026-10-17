@@ -37,6 +37,13 @@ import { AlertTriangle } from "lucide-react";
 const qo = queryOptions({ queryKey: ["admin", "users"], queryFn: () => listAdminUsers() });
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
+  head: () => ({ meta: [{ title: "Admin Users — GrantDesk" },
+      { name: "description", content: "GrantDesk admin users: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Admin Users — GrantDesk" },
+      { property: "og:description", content: "GrantDesk admin users: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(qo),
   errorComponent: ({ error }) => (
     <p className="text-sm text-destructive">Failed: {(error as Error).message}</p>

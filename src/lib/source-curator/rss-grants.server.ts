@@ -41,14 +41,16 @@ function extractAgency(item: FeedItem, fallback?: string): string | null {
   }
 }
 
-export async function fetchRssGrantCandidates(
+export async function fetchRssGrantCandidatesWithDiagnostics(
   extraFeeds: Array<{ key: string; url: string; defaultAgency?: string }> = [],
-): Promise<RawCandidate[]> {
+): Promise<import("./source-result.shared").SourceResult> {
   const seen = new Map<string, RawCandidate>();
+  const errors: string[] = [];
   for (const feed of [...GRANT_FEEDS, ...extraFeeds]) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 12_000);
+      timer = setTimeout(() => ctrl.abort(), 12_000);
       // A self-identifying UA gets 403'd by WAFs some funder sites already
       // run (confirmed elsewhere in this codebase — see web-fetch.server.ts);
       // the same proven realistic browser UA is strictly better here too.
@@ -57,16 +59,17 @@ export async function fetchRssGrantCandidates(
         signal: ctrl.signal,
         headers: { "User-Agent": CHROME_UA },
       });
-      clearTimeout(t);
-      if (!res.ok) continue;
+      if (!res.ok) throw new Error(`http_${res.status}`);
       const xml = await res.text();
+      if (!/<(?:rss|feed|rdf:RDF)[\s>]/i.test(xml)) throw new Error("invalid_feed");
       const items = parseFeed(xml, feed.url).slice(0, 25);
       for (const item of items) {
         const agency = extractAgency(item, feed.defaultAgency);
         if (!agency) continue;
         const key = agency.toLowerCase();
-        if (seen.has(key)) {
-          seen.get(key)!.source_signals.push(`${feed.key}:${item.pubDate ?? ""}`);
+        const existing = seen.get(key);
+        if (existing) {
+          existing.source_signals.push(`${feed.key}:${item.pubDate ?? ""}`);
           continue;
         }
         let host = "";
@@ -83,9 +86,16 @@ export async function fetchRssGrantCandidates(
           raw_metadata: { sample_title: item.title.slice(0, 200), sample_link: item.link },
         });
       }
-    } catch {
-      /* skip feed on error */
-    }
+    } catch (error) {
+      errors.push(`${feed.key}:${error instanceof Error ? error.message : String(error)}`);
+    } finally { if (timer) clearTimeout(timer); }
   }
-  return Array.from(seen.values());
+  return { candidates: Array.from(seen.values()), errors };
+}
+
+/** Compatibility for existing array consumers. The curator consumes diagnostics. */
+export async function fetchRssGrantCandidates(extraFeeds: Array<{ key: string; url: string; defaultAgency?: string }> = []): Promise<RawCandidate[]> {
+  const result = await fetchRssGrantCandidatesWithDiagnostics(extraFeeds);
+  if (result.errors.length && !result.candidates.length) throw new Error(result.errors.join(";"));
+  return result.candidates;
 }

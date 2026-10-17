@@ -21,7 +21,12 @@ export const Route = createFileRoute("/_authenticated/privacy")({
     meta: [
       { title: "Privacy Center — IIAL" },
       { name: "description", content: "Manage your consents, export your data, request deletion." },
-    ],
+    
+      { property: "og:title", content: "Privacy Center — IIAL" },
+      { property: "og:description", content: "GrantDesk privacy: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   component: PrivacyCenter,
 });

@@ -41,7 +41,12 @@ export const Route = createFileRoute("/_authenticated/clients/")({
         name: "description",
         content: "Manage client organizations and their grant opportunities.",
       },
-    ],
+    
+      { property: "og:title", content: "Clients — IIAL" },
+      { property: "og:description", content: "GrantDesk clients: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+],
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(orgsQueryOptions),
   errorComponent: ({ error, reset }) => <RouteErrorBoundary error={error as Error} reset={reset} />,

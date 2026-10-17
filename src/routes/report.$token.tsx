@@ -12,7 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { humanizeRationale } from "@/lib/eligibility-explain";
 
 export const Route = createFileRoute("/report/$token")({
-  head: () => ({ meta: [{ title: "Grant Fit Report — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Grant Fit Report — IIAL" },
+      { name: "description", content: "GrantDesk report shared report: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Grant Fit Report — IIAL" },
+      { property: "og:description", content: "GrantDesk report shared report: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: SharedReportPage,
 });
 

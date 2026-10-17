@@ -48,7 +48,13 @@ const workflowsQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/admin/workflows")({
-  head: () => ({ meta: [{ title: "Approval Workflows — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Approval Workflows — IIAL" },
+      { name: "description", content: "GrantDesk admin workflows: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Approval Workflows — IIAL" },
+      { property: "og:description", content: "GrantDesk admin workflows: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(workflowsQO);
   },

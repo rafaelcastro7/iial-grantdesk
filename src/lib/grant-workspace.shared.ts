@@ -1036,7 +1036,12 @@ export function applyPlanUpdate(ws: Workspace, u: PlanUpdate, today = new Date()
     next.partners = [
       ...ws.partners,
       ...u.add_partners
-        .filter((p) => !have.has(low(p.name)))
+        .filter((p) => {
+          const key = low(p.name);
+          if (have.has(key)) return false;
+          have.add(key);
+          return true;
+        })
         .map((p) => ({
           id: newId("partner"),
           name: p.name,
@@ -1051,7 +1056,12 @@ export function applyPlanUpdate(ws: Workspace, u: PlanUpdate, today = new Date()
     next.checklist = [
       ...ws.checklist,
       ...u.add_checklist
-        .filter((c) => !have.has(low(c.item)))
+        .filter((c) => {
+          const key = low(c.item);
+          if (have.has(key)) return false;
+          have.add(key);
+          return true;
+        })
         .map((c) => ({
           id: newId("item"),
           item: c.item,
@@ -1065,7 +1075,12 @@ export function applyPlanUpdate(ws: Workspace, u: PlanUpdate, today = new Date()
     next.milestones = [
       ...ws.milestones,
       ...u.add_milestones
-        .filter((m) => !have.has(`${low(m.label)}|${m.date}`))
+        .filter((m) => {
+          const key = `${low(m.label)}|${m.date}`;
+          if (have.has(key)) return false;
+          have.add(key);
+          return true;
+        })
         .map((m) => ({ id: newId("ms"), label: m.label, date: m.date })),
     ].sort((a, b) => a.date.localeCompare(b.date));
   }

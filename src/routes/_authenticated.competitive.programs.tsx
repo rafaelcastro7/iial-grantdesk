@@ -17,7 +17,13 @@ const allGrantsQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/competitive/programs")({
-  head: () => ({ meta: [{ title: "Program Analysis — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Program Analysis — IIAL" },
+      { name: "description", content: "GrantDesk competitive programs: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Program Analysis — IIAL" },
+      { property: "og:description", content: "GrantDesk competitive programs: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(allGrantsQO);
   },

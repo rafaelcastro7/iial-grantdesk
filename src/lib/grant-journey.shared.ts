@@ -64,6 +64,8 @@ export function backwardSchedule(
 export type NextAction =
   | { kind: "wait_research" }
   | { kind: "closed" }
+  | { kind: "confirm_availability" }
+  | { kind: "review_plan" }
   | { kind: "ask_funder"; unknown: number }
   | { kind: "not_for_us" }
   | { kind: "start_plan" }
@@ -76,19 +78,22 @@ export function nextBestAction(opts: {
   unknownFacts: number;
   planStarted: boolean;
   todos: JourneyTodo[];
+  availability?: "open" | "closed" | "conflict" | "unknown";
   deadline?: string | null;
   today?: Date;
 }): NextAction {
   const today = opts.today ?? new Date();
   const left = daysUntil(opts.deadline, today);
+  if (opts.availability === "conflict") return { kind: "confirm_availability" };
+  if (opts.availability === "closed" || (left != null && left < 0)) return { kind: "closed" };
   if (!opts.fit) return { kind: "wait_research" };
+  if (opts.fit === "not_eligible") return { kind: "not_for_us" };
+  if (opts.fit === "unclear") return { kind: "ask_funder", unknown: opts.unknownFacts };
   if (!opts.planStarted) {
-    if (left != null && left < 0 && opts.fit !== "next_cycle") return { kind: "closed" };
-    if (opts.fit === "not_eligible") return { kind: "not_for_us" };
-    if (opts.fit === "unclear") return { kind: "ask_funder", unknown: opts.unknownFacts };
     return { kind: "start_plan" };
   }
   const open = opts.todos.filter((t) => t.status === "missing" || t.status === "in_progress");
+  if (opts.todos.length === 0) return { kind: "review_plan" };
   if (open.length === 0) return { kind: "submit", daysLeft: left };
   const todayIso = iso(today);
   const overdue = open.filter((t) => t.due && t.due < todayIso);
@@ -106,7 +111,7 @@ const norm = (s: string) =>
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\([^)]*\)/g, "")
+    .replace(/\((?:partner|socio)\)/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 

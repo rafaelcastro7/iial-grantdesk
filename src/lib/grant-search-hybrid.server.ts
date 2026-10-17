@@ -65,7 +65,7 @@ export async function searchGrantCatalogHybrid(
     const embedding = await getEmbeddingCached(expansion.semanticQuery);
     if (embedding.length !== 768) throw new Error(`embedding_dimension_${embedding.length}`);
     const { data, error } = await supabase.rpc("match_grant_search_documents", {
-      query_embedding: embedding as unknown as string,
+      query_embedding: JSON.stringify(embedding),
       match_threshold: 0.35,
       match_count: Math.min(Math.max(boundedLimit * 2, 40), 100),
     });

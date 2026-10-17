@@ -17,7 +17,13 @@ const budgetQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/financial")({
-  head: () => ({ meta: [{ title: "Financial Tracking — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Financial Tracking — IIAL" },
+      { name: "description", content: "GrantDesk financial: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Financial Tracking — IIAL" },
+      { property: "og:description", content: "GrantDesk financial: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(summaryQO);
     await context.queryClient.ensureQueryData(budgetQO);

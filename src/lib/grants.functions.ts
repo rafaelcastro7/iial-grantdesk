@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { PROMPTS } from "@/agents/schemas";
+import { readCatalogPages, catalogPage } from "./catalog-pagination.shared";
 import { evaluationVerdict } from "@/lib/grant-radar";
 
 const EVALUATOR_PROMPT_VERSION = PROMPTS.evaluator.version;
@@ -116,6 +117,7 @@ export const listGrants = createServerFn({ method: "GET" })
           .optional(),
         includeHardBlocked: z.boolean().default(true),
         includeDismissed: z.boolean().default(false),
+        offset: z.number().int().min(0).default(0),
         limit: z.number().int().min(1).max(100).default(50),
       })
       .parse(input ?? {}),
@@ -296,7 +298,7 @@ export const listGrants = createServerFn({ method: "GET" })
         .select(GRANT_COLUMNS)
         .order("fit_score", { ascending: false, nullsFirst: false })
         .order("deadline", { ascending: true, nullsFirst: false })
-        .limit(100);
+        .order("id", { ascending: true });
       if (data.status) q = q.eq("status", data.status);
       if (data.country) q = q.eq("country", data.country);
       return q;
@@ -319,27 +321,8 @@ export const listGrants = createServerFn({ method: "GET" })
       rows = collected;
     } else if (hasSearch) {
       rows = [];
-    } else if (data.country) {
-      const { data: allRows, error } = await buildQuery();
-      if (error) throw new Error(error.message);
-      rows = allRows;
     } else {
-      // Browsing with no country chosen. A single deadline-ordered page of 100
-      // is dominated by US federal calls (they all carry close dates, while
-      // many Canadian programs are rolling), so Canadian opportunities never
-      // made it into the page the boost could reorder. Fetch the domestic page
-      // first and only top it up with foreign rows.
-      const { data: domestic, error: domesticError } = await buildQuery().eq("country", "CA");
-      if (domesticError) throw new Error(domesticError.message);
-      const collected: NonNullable<typeof rows> = [...(domestic ?? [])];
-      if (collected.length < 100) {
-        const { data: foreign, error: foreignError } = await buildQuery()
-          .neq("country", "CA")
-          .limit(100 - collected.length);
-        if (foreignError) throw new Error(foreignError.message);
-        collected.push(...(foreign ?? []));
-      }
-      rows = collected;
+      rows = await readCatalogPages((from, to) => buildQuery().range(from, to));
     }
 
     const evalsByGrant = new Map<
@@ -362,7 +345,7 @@ export const listGrants = createServerFn({ method: "GET" })
         .select(
           "grant_id, fit_score, llm_fit_score, model, eligibility_pass, rationale_en, rationale_fr, created_at, rule_snapshot, rule_verdict:rule_snapshot->>verdict",
         )
-        .eq("org_id", principal.orgId!)
+        .eq("org_id", principal.orgId)
         .in("grant_id", chunk);
       if (evalsError) throw new Error(`grant_evaluations: ${evalsError.message}`);
       for (const evaluation of evals ?? []) {
@@ -549,15 +532,16 @@ export const listGrants = createServerFn({ method: "GET" })
           (data.includeHardBlocked || !hardBlocked),
       );
 
-    const grantsWithProfile = rankedCandidates
+    const sortedCandidates = rankedCandidates
       .filter(({ facets }) => facetsMatch(facets, data.evidenceStates))
       .sort(
         (a, b) =>
           b.combinedRelevance - a.combinedRelevance ||
           (b.evaluation?.fit_score ?? b.grant.fit_score ?? 0) -
             (a.evaluation?.fit_score ?? a.grant.fit_score ?? 0),
-      )
-      .slice(0, data.limit);
+      );
+    const page = catalogPage(sortedCandidates, data.offset, data.limit);
+    const grantsWithProfile = page.rows;
     const grants = grantsWithProfile.map(({ grant }) => grant);
     const reviewByGrant = new Map<
       string,
@@ -726,6 +710,9 @@ export const listGrants = createServerFn({ method: "GET" })
     }
 
     return {
+      total: page.total,
+      hasMore: page.hasMore,
+      offset: data.offset,
       searchDegradedReason,
       searchTelemetryError,
       searchMode: hasSearch ? effectiveSearchMode : null,
@@ -1129,6 +1116,7 @@ export const autoEvaluatePending = createServerFn({ method: "POST" })
         .from("grants")
         .select("id, status, summary")
         .or("status.in.(active,enriched,scored,shortlisted),summary.neq.''")
+        .not("status", "in", "(won,lost,archived,expired)")
         .order("id")
         .range(from, from + 999);
       if (pageError) throw new Error(`grants: ${pageError.message}`);

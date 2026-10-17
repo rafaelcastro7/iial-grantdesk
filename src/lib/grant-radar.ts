@@ -1,3 +1,4 @@
+import { grantAvailability } from "./grant-availability.shared";
 // Grant Radar — single, pure source of truth for how the radar classifies,
 // filters, prioritises and groups grants. No React, no I/O: every rule here is
 // deterministic and unit-tested (src/lib/grant-radar.test.ts).
@@ -261,7 +262,7 @@ export function ruleDecision(
       country: grantCountry(g),
       deadline: g.deadline ?? null,
       // Pipeline stages are not call availability; only "expired" means closed.
-      status: g.status === "expired" || (daysUntil(g.deadline, now) ?? 0) < 0 ? "closed" : "open",
+      status: grantAvailability({ deadline: g.deadline, status: g.status, deadlineKind: g.deadline_kind }, new Date(now)) === "closed" ? "closed" : "open",
       eligibleApplicantTypes: g.eligible_applicant_types ?? null,
       amountMin: g.amount_min ?? g.amount_cad_min ?? null,
       amountMax: g.amount_max ?? g.amount_cad_max ?? null,

@@ -18,7 +18,13 @@ function revisionQO(proposalId: string) {
 }
 
 export const Route = createFileRoute("/_authenticated/proposals/$proposalId/revision")({
-  head: () => ({ meta: [{ title: "Revision Plan — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Revision Plan — IIAL" },
+      { name: "description", content: "GrantDesk proposals proposal revision: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Revision Plan — IIAL" },
+      { property: "og:description", content: "GrantDesk proposals proposal revision: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context, params }) => {
     await context.queryClient.ensureQueryData(revisionQO(params.proposalId));
   },

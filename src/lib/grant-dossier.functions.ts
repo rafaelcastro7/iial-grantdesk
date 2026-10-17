@@ -463,3 +463,21 @@ ${web ? `${web.text}\nSources:\n${web.sources.map((x) => `- ${x.title}: ${x.url}
       checked,
     };
   });
+
+/** Retry storing an already generated dossier without purchasing another generation. */
+export const saveGeneratedDossier = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ grantId: z.string().uuid(), orgId: z.string().uuid(), lang: z.enum(["en", "es"]), saved: z.object({ dossier: z.unknown(), sources: z.array(z.object({ title: z.string().max(2000), url: z.string().url() })).max(100), model: z.string().nullable(), updated_at: z.string() }) }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { getTenantPrincipal } = await import("@/lib/tenant-access.server");
+    await getTenantPrincipal(context.supabase, context.userId, data.orgId);
+    const { sanitizeDossier } = await import("@/lib/grant-dossier.shared");
+    const dossier = sanitizeDossier(data.saved.dossier);
+    if (!dossier) throw new Error("invalid_dossier");
+    const { error } = await context.supabase.from("grant_dossiers").upsert({
+      org_id: data.orgId, grant_id: data.grantId, lang: data.lang, content: dossier as unknown as import("@/integrations/supabase/types").Json,
+      sources: data.saved.sources, model: data.saved.model, created_by: context.userId, updated_at: new Date().toISOString(),
+    }, { onConflict: "org_id,grant_id,lang" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

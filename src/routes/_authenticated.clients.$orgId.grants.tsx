@@ -30,6 +30,13 @@ import { format, differenceInDays } from "date-fns";
 import { useState, useMemo } from "react";
 
 export const Route = createFileRoute("/_authenticated/clients/$orgId/grants")({
+  head: () => ({ meta: [{ title: "Clients Client Grants — GrantDesk" },
+      { name: "description", content: "GrantDesk clients client grants: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Clients Client Grants — GrantDesk" },
+      { property: "og:description", content: "GrantDesk clients client grants: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: ClientGrantsTab,
 });
 

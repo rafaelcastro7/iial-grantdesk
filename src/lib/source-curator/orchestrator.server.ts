@@ -9,6 +9,8 @@
 // All ingestors return RawCandidate[]; the curator handles dedup + scoring +
 // auto-promote + telemetry into source_ingest_runs and updates the registry.
 
+import { promoteCandidate, reconcileCandidateApproval } from "./promotion.server";
+import { sourceOutcome, type SourceResult } from "./source-result.shared";
 import { newRunId } from "@/lib/otel";
 import { findDuplicate, scoreCandidate, type RawCandidate } from "./scoring.server";
 import type { DiscoveryConfig } from "@/lib/discovery-config.server";
@@ -42,7 +44,7 @@ export type CuratorResult = {
   };
 };
 
-type SourceFn = () => Promise<RawCandidate[]>;
+type SourceFn = () => Promise<RawCandidate[] | SourceResult>;
 
 export function mergeCandidateEvidence(
   existing: RawCandidate,
@@ -79,7 +81,11 @@ async function runSource(
   let status: "succeeded" | "failed" | "degraded" = "succeeded";
   let errorMessage: string | null = null;
   try {
-    raw = await fn();
+    const outcome = sourceOutcome(await fn());
+    raw = outcome.candidates;
+    status = outcome.status;
+    bucket.err += outcome.errors.length;
+    errorMessage = outcome.errors.length ? outcome.errors.join(";") : null;
   } catch (e) {
     bucket.err++;
     status = "failed";
@@ -87,11 +93,12 @@ async function runSource(
   }
   bucket.rows = raw.length;
 
-  if (status === "succeeded") {
+  if (status !== "failed") {
     for (const c of raw) {
       try {
         const dupe = await findDuplicate(c);
         if (dupe.kind === "existing_funder") {
+          await reconcileCandidateApproval(supabaseAdmin, c);
           bucket.dup++;
           continue;
         }
@@ -106,7 +113,13 @@ async function runSource(
           if (existingError || !existing) {
             throw new Error(existingError?.message ?? "candidate_missing");
           }
-          if (existing.status === "approved" || existing.status === "rejected") {
+          if (existing.status === "approved") {
+            await promoteCandidate(supabaseAdmin, dupe.candidateId, mergeCandidateEvidence(existing as RawCandidate, c));
+            bucket.dup++;
+            bucket.auto++;
+            continue;
+          }
+          if (existing.status === "rejected") {
             bucket.dup++;
             continue;
           }
@@ -130,6 +143,10 @@ async function runSource(
             })
             .eq("id", dupe.candidateId);
           if (mergeError) throw new Error(mergeError.message);
+          if (mergedScore >= cfg.candidateAutoApproveThreshold) {
+            await promoteCandidate(supabaseAdmin, dupe.candidateId, merged);
+            bucket.auto++;
+          }
           bucket.dup++;
           if (mergedStatus === "candidate") bucket.held++;
           continue;
@@ -173,30 +190,16 @@ async function runSource(
             disbursed_annual: c.disbursed_annual ?? null,
             source_signals: c.source_signals,
             score,
-            status: cStatus,
+            status: "pending_review",
             raw_metadata: (c.raw_metadata ?? {}) as never,
           })
           .select("id")
           .single();
-        if (error) {
-          bucket.err++;
-          continue;
-        }
+        if (error) throw new Error(error.message);
         bucket.new++;
         if (cStatus === "approved" && inserted) {
-          const { error: fErr } = await supabaseAdmin.from("funders").insert({
-            name: c.name,
-            name_fr: c.name_fr ?? null,
-            country: "CA",
-            jurisdiction: c.province ?? null,
-            website: c.website ?? null,
-            source_url: c.website ?? null,
-            source_type: "manual",
-            bn_number: c.bn_number ?? null,
-            disbursed_annual: c.disbursed_annual ?? null,
-            active: true,
-          });
-          if (!fErr) bucket.auto++;
+          await promoteCandidate(supabaseAdmin, inserted.id, c);
+          bucket.auto++;
         }
       } catch (error) {
         bucket.err++;
@@ -209,7 +212,7 @@ async function runSource(
     }
   }
 
-  await supabaseAdmin.from("source_ingest_runs").insert({
+  const { error: logError } = await supabaseAdmin.from("source_ingest_runs").insert({
     dataset: name,
     rows_in: bucket.rows,
     candidates_out: bucket.new,
@@ -229,8 +232,10 @@ async function runSource(
     },
   });
 
+  if (logError) throw new Error(`source_run_log_failed:${logError.message}`);
+
   // Update registry health snapshot.
-  await supabaseAdmin
+  const { error: registryError } = await supabaseAdmin
     .from("discovery_sources_registry")
     .update({
       last_run_at: new Date().toISOString(),
@@ -238,6 +243,7 @@ async function runSource(
       last_error: errorMessage,
     })
     .eq("dataset_key", name);
+  if (registryError) throw new Error(`source_registry_update_failed:${registryError.message}`);
 }
 
 // Per-tier ingestor map. Lazy-imported so cold paths stay cheap.
@@ -248,9 +254,9 @@ async function ingestorsForTier(
   const out: Array<{ key: string; fn: SourceFn }> = [];
 
   if (tier === "A" || tier === "all") {
-    const { fetchRssGrantCandidates } = await import("./rss-grants.server");
+    const { fetchRssGrantCandidatesWithDiagnostics } = await import("./rss-grants.server");
     const { fetchGrantsGovAgencies } = await import("./grants-gov.server");
-    out.push({ key: "rss_grants_bundle", fn: () => fetchRssGrantCandidates(cfg.extraRssFeeds) });
+    out.push({ key: "rss_grants_bundle", fn: () => fetchRssGrantCandidatesWithDiagnostics(cfg.extraRssFeeds) });
     out.push({ key: "grants_gov_api", fn: () => fetchGrantsGovAgencies() });
   }
 

@@ -1,11 +1,11 @@
 # Roadmap
 
 - [x] Mejorar búsqueda y análisis: citas por convocatoria, aviso de enlaces no corroborados, fechas desconocidas explícitas y montos sin mezclar monedas; 71 pruebas pasan, sin cambiar proveedores ni añadir llamadas pagadas.
-- [ ] Verificar búsqueda → abrir → análisis con una sesión real. Bloqueo: no hay cuenta asociada al usuario solicitante para obtener una sesión autorizada; necesita iniciar sesión en la vista previa. No se ejecutaron llamadas de IA en vivo.
+- [ ] Verificar búsqueda → abrir → análisis con una sesión real. Radar, detalle y plan comprobados con sesión real; falta una nueva ejecución IA en vivo.
 
 - [x] Recomendar usos de las nuevas funciones de IA de Lovable para GrantDesk; no activar servicios sin autorización.
 
-- [ ] Unificar idioma de detalles, requisitos y evaluaciones con el selector EN/ES, sin alterar evidencia ni decisiones. Cambios y pruebas unitarias aplicados; verificación de traducción real bloqueada por falta de una sesión válida del usuario en la vista previa.
+- [ ] Unificar idioma de detalles, requisitos y evaluaciones con el selector EN/ES, sin alterar evidencia ni decisiones. Etiquetas y cambio EN/ES comprobados con sesión real; la traducción de contenido mostró espera y textos históricos en inglés, por lo que la cobertura completa sigue pendiente de traducción en vivo.
 
 - [ ] Replicar para Juan Marcelo y Clarissa el perfil institucional y preparación de conocimiento usados por Rocío.
 - [x] Unificar el sistema visual en todas las pantallas, eliminando mezclas incoherentes de superficies claras y oscuras.
@@ -29,3 +29,14 @@
 - [x] Auditoría extrema, erradicación de bugs y deuda técnica: resolución atómica en `funders_name_country_key`, persistencia administrativa de requisitos/briefs y guardas defensivas en `FitRules`.
 - [x] Ciclo de subsanación (remediation loop): habilitar actualización de facts manuales con re-evaluación forzada determinista (`Re-check fit`) para desbloquear propuestas bloqueadas.
 - [x] Suite de pruebas sintéticas end-to-end (`npm run test:synthetic`) cubriendo ingestión, síntesis de requerimientos, brief financiero, subsanación y aislamiento multi-tenant.
+
+## Limpieza y estabilización aprobada
+
+- [x] Retirar código huérfano y selección V1/V2; conservar interfaces públicas.
+- [x] Conservar procedencia y detalle de pendientes; impedir nuevas duplicaciones.
+- [x] Sincronizar evaluación, decisión y siguiente acción; resolver fechas contradictorias.
+- [x] Evitar catálogo truncado y errores de fuentes presentados como éxito.
+- [x] Recuperar análisis no guardados sin regenerar IA; pruebas y verificación real.
+- [x] Consolidar contratos y documentación; pruebas deterministas y compilación automática limpias.
+- [ ] Revisar permisos señalados por el escáner nuevo: acceso amplio a requirements, tenants, source_runs y configuración. Bloqueo: validar el acceso intencionado por rol antes de restringirlo; no se cambiaron permisos en esta limpieza.
+- [ ] Verificación de revisión IA y recuperación de guardado fallido contra servicios reales. Las regresiones automatizadas pasan; no se forzó un fallo en datos reales ni se inició otra revisión pagada.

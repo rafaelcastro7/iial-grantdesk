@@ -44,7 +44,13 @@ const rulesQO = (orgId: string) =>
   });
 
 export const Route = createFileRoute("/_authenticated/fit-rules")({
-  head: () => ({ meta: [{ title: "Screening Rules — GrantDesk" }] }),
+  head: () => ({ meta: [{ title: "Screening Rules — GrantDesk" },
+      { name: "description", content: "GrantDesk fit-rules: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Screening Rules — GrantDesk" },
+      { property: "og:description", content: "GrantDesk fit-rules: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: TenantFitRulesPage,
 });
 

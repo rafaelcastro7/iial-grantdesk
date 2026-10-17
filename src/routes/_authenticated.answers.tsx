@@ -19,7 +19,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_authenticated/answers")({
-  head: () => ({ meta: [{ title: "Answer Library â€” IIAL" }] }),
+  head: () => ({ meta: [
+    { title: "Answer Library — GrantDesk" },
+    { name: "description", content: "Maintain verified, reusable answers and evidence for grant proposals." },
+    { property: "og:title", content: "Answer Library — GrantDesk" },
+    { property: "og:description", content: "Maintain verified, reusable answers and evidence for grant proposals." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: AnswerLibraryPage,
 });
 

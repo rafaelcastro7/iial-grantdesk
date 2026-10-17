@@ -13,7 +13,13 @@ import { PageContainer, PageHeader } from "@/components/PageLayout";
 import { Plus, X, Save, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/discovery-config")({
-  head: () => ({ meta: [{ title: "Discovery Config — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Discovery Config — IIAL" },
+      { name: "description", content: "GrantDesk admin discovery-config: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Discovery Config — IIAL" },
+      { property: "og:description", content: "GrantDesk admin discovery-config: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: DiscoveryConfigPage,
 });
 

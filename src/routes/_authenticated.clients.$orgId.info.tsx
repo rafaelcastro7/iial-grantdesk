@@ -19,6 +19,13 @@ import {
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/clients/$orgId/info")({
+  head: () => ({ meta: [{ title: "Clients Client Info — GrantDesk" },
+      { name: "description", content: "GrantDesk clients client info: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Clients Client Info — GrantDesk" },
+      { property: "og:description", content: "GrantDesk clients client info: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   component: ClientInfoTab,
 });
 

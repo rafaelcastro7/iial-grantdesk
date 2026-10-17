@@ -17,7 +17,13 @@ const trendsQO = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/quality")({
-  head: () => ({ meta: [{ title: "Quality Dashboard — IIAL" }] }),
+  head: () => ({ meta: [{ title: "Quality Dashboard — IIAL" },
+      { name: "description", content: "GrantDesk quality: manage grant research, application preparation and related records." },
+      { property: "og:title", content: "Quality Dashboard — IIAL" },
+      { property: "og:description", content: "GrantDesk quality: manage grant research, application preparation and related records." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+] }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(metricsQO);
     await context.queryClient.ensureQueryData(trendsQO);
