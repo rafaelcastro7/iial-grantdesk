@@ -111,7 +111,7 @@ const norm = (s: string) =>
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\([^)]*\)/g, "")
+    .replace(/\((?:partner|socio)\)/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 

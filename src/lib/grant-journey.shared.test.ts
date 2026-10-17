@@ -55,6 +55,12 @@ describe("grant journey", () => {
     expect(out.map((t) => t.item)).toEqual(["Carta de apoyo", "Presupuesto"]);
   });
 
+  it("keeps separate tasks for named partners", () => {
+    let n = 0;
+    const out = mergeTodoItems([], [{ item: "Letter (Partner A)" }, { item: "Letter (Partner B)" }], () => `n${++n}`);
+    expect(out.map((t) => t.item)).toEqual(["Letter (Partner A)", "Letter (Partner B)"]);
+  });
+
   it("keeps the provenance and detail of AI-reviewed items", () => {
     const out = mergeTodoItems(
       [],

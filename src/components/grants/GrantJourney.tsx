@@ -1,6 +1,6 @@
 // The grant, as one path: Decide → Prepare → Submit. One verdict, one list of
 // what is missing, one "what to do today". The full analysis stays available
-// below, folded; nothing here costs credits unless the user presses an AI button.
+// below, folded; first-open research follows the shared dossier generation policy.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -47,6 +47,7 @@ import {
 } from "@/lib/grant-journey.shared";
 import { useTeamSettings } from "@/lib/team-settings";
 import { localeOf, useTr, useUiLang } from "@/lib/ui-lang";
+import { useContentLanguage } from "@/lib/use-content-language";
 import { cn } from "@/lib/utils";
 
 const TONE = {
@@ -144,6 +145,7 @@ export function GrantJourney({
     (f) => f.status === "not_published" || f.status === "conflict",
   );
   const known = (dossier?.facts ?? []).filter((f) => f.status === "verified");
+  const planContent = useContentLanguage(todos.flatMap((t) => [t.item, t.detail]));
   const action = nextBestAction({
     fit: dossier?.fit ?? null,
     unknownFacts: unknown.length,
@@ -526,7 +528,7 @@ export function GrantJourney({
                       (t.status === "have" || t.status === "not_needed") && "text-muted-foreground line-through",
                     )}
                   >
-                    {t.item}
+                    {planContent.text(t.item)}
                     {t.critical && (
                       <span className="ml-2 rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-rose-700 dark:text-rose-300">
                         {tr("key", "clave")}
@@ -553,7 +555,7 @@ export function GrantJourney({
                     )}
                     {t.detail && (
                       <span className="block text-xs font-normal text-muted-foreground no-underline">
-                        {t.detail}
+                        {planContent.text(t.detail)}
                       </span>
                     )}
                   </span>
