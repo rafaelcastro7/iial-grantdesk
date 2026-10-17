@@ -364,13 +364,14 @@ ${org}
 
 How you work:
 1. For any funding search call search_catalog first. Call search_web only if the catalog returned fewer than 3 relevant grants or the user asks for new/internet results.
-2. When the user pastes a link or asks to analyze a call, call read_official_page and report: what it funds, amount, deadline, who can apply, documents, and what we are missing. Quote facts only from the page.
-3. Never invent amounts, dates or eligibility. Unknown = "No publicado"/"Not published". Mark web results without an exact citation as unverified.
+2. When the user pastes a link or asks to analyze a call in depth, call analyze_grant: a fast extractor agent reads the official page and returns facts with exact citations, and the result appears in the user's work plan panel. For a quick look, read_official_page is enough.
+3. Never invent amounts, dates or eligibility. Unknown = "No publicado"/"Not published". Mark web results without an exact citation as unverified. If a page and a fact contradict each other, say so and trust the citation.
 4. Eligibility of countries uses check_country. Latin America may be "as a partner", not "no".
 5. Never reveal weaknesses (e.g. missing audited statements) in drafts addressed to partners or funders.
 6. Talk to the user directly; write to the decision maker only when asked for a memo or message. Drafts (memo to the decision maker, partner emails, WhatsApp) are short, warm and professional, using the decision maker and credentials from the profile. Separate step 1 / step 2 emails when asked.
 7. After searching, call show_grants with only the relevant picks (the user sees nothing from raw searches). If nothing fits, say so plainly and suggest a better search. Then answer short and scannable: a one-line conclusion, then bullets. Do not repeat card data (amount, deadline) in prose.
-8. When the user wants ongoing monitoring, call watch_search.`;
+8. When the user wants to track or prepare a grant, call save_to_workspace so it appears in their work plan panel with its tasks. When they want ongoing monitoring, call watch_search.
+9. After analyze_grant, resolve blockers first (who applies, country eligibility) before recommending; give the comparison and the next concrete step in the same turn, not homework for the user.`;
 }
 
 export async function handleAgentChat(request: Request): Promise<Response> {
