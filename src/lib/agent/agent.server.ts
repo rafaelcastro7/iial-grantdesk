@@ -240,6 +240,117 @@ function buildTools(ctx: Ctx) {
         return { ok: true, watchId: data.id, query, frequency };
       },
     }),
+    analyze_grant: tool({
+      description:
+        "Deep analysis of ONE grant: a fast extractor agent reads the official page and returns amount, deadline, eligible applicants, countries and required documents, each with an exact citation. Results are saved to the user's work plan panel. Use when the user asks to analyze a grant or link in depth.",
+      inputSchema: z.object({
+        url: z.string().url().describe("Official call page URL (from a card or pasted by the user)"),
+        grantId: z.string().uuid().nullish().describe("Catalog grant id when known"),
+        title: z.string().describe("Grant title"),
+      }),
+      execute: async ({ url, grantId, title }) => {
+        const { normalizeEvidenceUrl } = await import("@/lib/grant-source-evidence.shared");
+        if (!normalizeEvidenceUrl(url)) return { ok: false, error: "invalid_url" };
+        const { scrapeWithFallback } = await import("@/lib/web-fetch.server");
+        const page = await scrapeWithFallback(url, { skipFirecrawl: true });
+        if (!page.ok) return { ok: false, error: page.error };
+        const { extractGrantFacts } = await import("./extractor.server");
+        const facts = await extractGrantFacts(page.markdown, ctx.lang);
+        if (!facts) return { ok: false, error: ctx.lang === "es" ? "El extractor no pudo leer la página." : "The extractor could not read the page." };
+
+        // Deterministic blockers against the org profile (0 tokens).
+        const blockers: string[] = [];
+        if (facts.countries && ctx.orgId) {
+          const { checkCountryEligibility } = await import("@/lib/consultant-desk.shared");
+          const { data: p } = await ctx.supabase.from("org_profiles").select("jurisdictions").eq("org_id", ctx.orgId).maybeSingle();
+          for (const j of (p?.jurisdictions ?? []).slice(0, 3)) {
+            const check = checkCountryEligibility(j, [facts.countries, facts.eligible_applicants ?? ""], ctx.lang);
+            if (check && "eligible" in check && check.eligible === false) {
+              blockers.push(ctx.lang === "es" ? `${j} no aparece como país elegible.` : `${j} is not listed as an eligible country.`);
+            }
+          }
+        }
+
+        const analysis = {
+          amount: facts.amount ? `${facts.amount}${facts.currency ? ` ${facts.currency}` : ""}` : null,
+          deadline: facts.deadline,
+          eligible_applicants: facts.eligible_applicants,
+          countries: facts.countries,
+          required_documents: facts.required_documents,
+          blockers,
+          citations: facts.citations,
+          analyzedAt: new Date().toISOString(),
+        };
+        const tasks = facts.required_documents.slice(0, 8).map((label) => ({ label, done: false, source: "official" as const }));
+
+        // Upsert into the live workspace so the side panel shows it immediately.
+        const { data: existing } = await ctx.supabase
+          .from("agent_workspace")
+          .select("id, tasks")
+          .eq("user_id", ctx.userId)
+          .eq(grantId ? "grant_id" : "url", grantId ?? url)
+          .maybeSingle();
+        const { mergeTasks } = await import("./agent-workspace.shared");
+        const merged = mergeTasks(((existing?.tasks as unknown as never[]) ?? []) as never, tasks as never);
+        const row = {
+          user_id: ctx.userId,
+          org_id: ctx.orgId,
+          grant_id: grantId ?? null,
+          url,
+          title: cleanTitle(title),
+          status: "considering" as const,
+          analysis: analysis as never,
+          tasks: merged as never,
+          updated_at: new Date().toISOString(),
+        };
+        if (existing) {
+          await ctx.supabase.from("agent_workspace").update(row).eq("id", existing.id);
+        } else {
+          await ctx.supabase.from("agent_workspace").insert(row);
+        }
+        return { ok: true, analysis, tasksCount: merged.length, savedToWorkspace: true };
+      },
+    }),
+    save_to_workspace: tool({
+      description:
+        "Save a grant to the user's work plan panel (the live workspace next to the chat) with a status. Use when the user says to track, save or prepare a grant.",
+      inputSchema: z.object({
+        grantId: z.string().uuid().nullish(),
+        url: z.string().nullish(),
+        title: z.string(),
+        status: z.enum(["considering", "preparing", "submitted", "discarded"]).default("considering"),
+        tasks: z.array(z.string()).max(10).default([]).describe("Short action items for the plan"),
+      }),
+      execute: async ({ grantId, url, title, status, tasks }) => {
+        const { mergeTasks } = await import("./agent-workspace.shared");
+        const incoming = tasks.map((label) => ({ label, done: false, source: "agent" as const }));
+        const matchCol = grantId ? "grant_id" : "url";
+        const matchVal = grantId ?? url ?? null;
+        if (!matchVal) return { ok: false, error: "missing_key" };
+        const { data: existing } = await ctx.supabase
+          .from("agent_workspace")
+          .select("id, tasks")
+          .eq("user_id", ctx.userId)
+          .eq(matchCol, matchVal)
+          .maybeSingle();
+        const merged = mergeTasks(((existing?.tasks as unknown as never[]) ?? []) as never, incoming as never);
+        const row = {
+          user_id: ctx.userId,
+          org_id: ctx.orgId,
+          grant_id: grantId ?? null,
+          url: url ?? null,
+          title: cleanTitle(title),
+          status,
+          tasks: merged as never,
+          updated_at: new Date().toISOString(),
+        };
+        const { error } = existing
+          ? await ctx.supabase.from("agent_workspace").update(row).eq("id", existing.id)
+          : await ctx.supabase.from("agent_workspace").insert(row);
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, saved: true, tasksCount: merged.length };
+      },
+    }),
   };
 }
 
