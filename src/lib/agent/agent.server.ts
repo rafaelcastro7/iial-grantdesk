@@ -252,6 +252,22 @@ export async function handleAgentChat(request: Request): Promise<Response> {
   }
   const ctx: Ctx = { supabase: auth.supabase, userId: auth.userId, orgId, lang };
 
+  // Save the user's turn right away so leaving mid-answer never loses it.
+  const last = messages[messages.length - 1];
+  if (last?.role === "user") {
+    const { error: uErr } = await auth.supabase.from("agent_messages").upsert(
+      {
+        thread_id: threadId,
+        user_id: auth.userId,
+        ai_message_id: last.id,
+        role: "user",
+        message: last as unknown as Database["public"]["Tables"]["agent_messages"]["Insert"]["message"],
+      },
+      { onConflict: "thread_id,ai_message_id" },
+    );
+    if (uErr) console.error("agent user message persist failed", uErr.message);
+  }
+
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return json(500, "ai_not_configured");
 
