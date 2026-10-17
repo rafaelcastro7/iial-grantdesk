@@ -82,7 +82,7 @@ Los resultados web no entran al catálogo solos: el usuario pulsa "Guardar", y a
 4. Lectura bajo demanda de páginas oficiales y PDFs subidos, y botón Guardar.
 5. Contexto de organizaciones, memoria de descartes y acciones (pipeline, plan, checklist).
 6. Búsquedas guardadas con aviso de novedades.
-5. Verificación en vivo con sesión real, dos conversaciones y recarga.
+7. Verificación en vivo con sesión real, dos conversaciones y recarga.
 
 ## Detalles técnicos
 
