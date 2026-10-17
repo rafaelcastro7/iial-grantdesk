@@ -239,6 +239,13 @@
       "when": 1792279597263,
       "tag": "0033_schedule_agent_watch_cron",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792279625133,
+      "tag": "0034_seed_webhook_hmac_secret",
+      "breakpoints": true
     }
   ]
 }
