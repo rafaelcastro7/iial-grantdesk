@@ -134,15 +134,16 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
     onError: (e) => toast.error(e.message || tr("The agent could not answer.", "El agente no pudo responder.")),
   });
 
-  const sentPending = useRef(false);
+  // Deferred one tick so a StrictMode remount cancels the first attempt
+  // instead of sending into a chat instance that is about to be replaced.
   useEffect(() => {
-    if (sentPending.current) return;
     const pending = sessionStorage.getItem(PENDING_KEY(threadId));
-    if (pending) {
-      sentPending.current = true;
+    if (!pending) return;
+    const timer = setTimeout(() => {
       sessionStorage.removeItem(PENDING_KEY(threadId));
       sendMessage({ text: pending });
-    }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [threadId, sendMessage]);
 
   const busy = status === "submitted" || status === "streaming";
