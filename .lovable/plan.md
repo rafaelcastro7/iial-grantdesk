@@ -74,6 +74,27 @@ Los resultados web no entran al catálogo solos: el usuario pulsa "Guardar", y a
 - Conocimiento del equipo: usa propuestas, respuestas y resultados anteriores del propio sistema.
 - Trabajo compartido: las conversaciones quedan en la cuenta para el equipo.
 
+## Cómo trabaja Rocío (de sus conversaciones con ChatGPT)
+
+Su ciclo real, en este orden:
+1. Buscar: "grants vigentes o por abrir donde IIAL sea principal, cacao/agroalimentos, Latinoamérica"; también "qué abre en próximos ciclos (FONTAGRO 2027, BID)".
+2. Analizar: pega el enlace oficial y pide "analiza este grant".
+3. Chequear: "¿entra Madagascar / quién es el país beneficiario?", "¿puede aplicar Nahua Canada con 1 mes de creada?", "¿qué significa Organization Attestation?".
+4. Decidir con Marcelo: "mensaje a Marcelo: de qué trata, si aplica WCIS, requisitos, plazos, monto, qué falta".
+5. Escribir: emails a socios y financiadores (paso 1 y paso 2 separados), WhatsApp de presentación, seguimiento al rector, tono cercano.
+6. Resumir: "un solo email con todos los grants que trabajamos", ordenado por fecha.
+
+Reglas que el agente debe respetar (ya probadas en el sistema):
+- Nunca revelar debilidades a socios (por ejemplo, "sin estados financieros auditados" no va en el correo a Lambton).
+- Latinoamérica es "como socio", no "no"; Europa sigue siendo "no".
+- Citar la tesis del Dr. Juan Marcelo Gómez y los programas CSIP/CSCIP/CARP y WCIS cuando suma.
+- Rol según ruta (principal o socio) y qué gana IIAL en cada caso.
+
+Lo que esto cambia en el plan:
+- Sugerencias de inicio con sus frases reales: Buscar, Analizar enlace, ¿Califica este país/organización?, Mensaje a Marcelo, Resumen de todos mis grants.
+- El agente reutiliza las herramientas ya existentes y gratuitas (memo a Marcelo, resumen de grants, glosario, chequeo de país, paquete de cumplimiento, plantillas de correo y WhatsApp) en vez de redactar desde cero; la IA solo une y ajusta el tono.
+- Todo lo que hoy le pide a ChatGPT pasa a un solo hilo por grant o tema, sin cambiar de pantalla.
+
 ## Fases
 
 1. Página, lista de conversaciones, guardado en cuenta y chat con streaming.
