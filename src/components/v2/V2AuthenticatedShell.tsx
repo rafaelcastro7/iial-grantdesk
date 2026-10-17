@@ -95,6 +95,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Home,
       },
       {
+        to: "/agent",
+        label: "Grant agent",
+        description: "Ask, search and get drafts; it watches for you",
+        icon: Bot,
+      },
+      {
         to: "/grants",
         label: "Find grants",
         description: "Search and check if we can apply",

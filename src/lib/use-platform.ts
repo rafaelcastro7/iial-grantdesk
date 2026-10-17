@@ -25,6 +25,7 @@ export function useModuleFlags() {
 // Pages a consultant may open (links from a grant, e.g. a proposal draft or a
 // client profile, keep working).
 export const CONSULTANT_PATHS = [
+  "/agent",
   "/dashboard",
   "/clients",
   "/grants",
