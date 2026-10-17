@@ -63,6 +63,7 @@ import { Route as AuthenticatedClientsOrgIdGrantsRouteImport } from './routes/_a
 import { Route as AuthenticatedClientsOrgIdInfoRouteImport } from './routes/_authenticated.clients.$orgId.info'
 import { Route as AuthenticatedGrantsIdAuditRouteImport } from './routes/_authenticated.grants.$id.audit'
 import { Route as AuthenticatedProposalsProposalIdRevisionRouteImport } from './routes/_authenticated.proposals.$proposalId.revision'
+import { Route as ApiPublicHooksAgentWatchRouteImport } from './routes/api/public/hooks/agent-watch'
 import { Route as ApiPublicHooksDeadlinesRouteImport } from './routes/api/public/hooks/deadlines'
 import { Route as ApiPublicHooksDiscoverRouteImport } from './routes/api/public/hooks/discover'
 import { Route as ApiPublicHooksEnrichRouteImport } from './routes/api/public/hooks/enrich'
@@ -366,6 +367,12 @@ const AuthenticatedProposalsProposalIdRevisionRoute =
     path: '/proposals/$proposalId/revision',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const ApiPublicHooksAgentWatchRoute =
+  ApiPublicHooksAgentWatchRouteImport.update({
+    id: '/api/public/hooks/agent-watch',
+    path: '/api/public/hooks/agent-watch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksDeadlinesRoute = ApiPublicHooksDeadlinesRouteImport.update({
   id: '/api/public/hooks/deadlines',
   path: '/api/public/hooks/deadlines',
@@ -465,6 +472,7 @@ export interface FileRoutesByFullPath {
   '/clients/$orgId/info': typeof AuthenticatedClientsOrgIdInfoRoute
   '/grants/$id/audit': typeof AuthenticatedGrantsIdAuditRoute
   '/proposals/$proposalId/revision': typeof AuthenticatedProposalsProposalIdRevisionRoute
+  '/api/public/hooks/agent-watch': typeof ApiPublicHooksAgentWatchRoute
   '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
   '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
   '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
@@ -527,6 +535,7 @@ export interface FileRoutesByTo {
   '/clients/$orgId/info': typeof AuthenticatedClientsOrgIdInfoRoute
   '/grants/$id/audit': typeof AuthenticatedGrantsIdAuditRoute
   '/proposals/$proposalId/revision': typeof AuthenticatedProposalsProposalIdRevisionRoute
+  '/api/public/hooks/agent-watch': typeof ApiPublicHooksAgentWatchRoute
   '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
   '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
   '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
@@ -592,6 +601,7 @@ export interface FileRoutesById {
   '/_authenticated/clients/$orgId/info': typeof AuthenticatedClientsOrgIdInfoRoute
   '/_authenticated/grants/$id/audit': typeof AuthenticatedGrantsIdAuditRoute
   '/_authenticated/proposals/$proposalId/revision': typeof AuthenticatedProposalsProposalIdRevisionRoute
+  '/api/public/hooks/agent-watch': typeof ApiPublicHooksAgentWatchRoute
   '/api/public/hooks/deadlines': typeof ApiPublicHooksDeadlinesRoute
   '/api/public/hooks/discover': typeof ApiPublicHooksDiscoverRoute
   '/api/public/hooks/enrich': typeof ApiPublicHooksEnrichRoute
@@ -657,6 +667,7 @@ export interface FileRouteTypes {
     | '/clients/$orgId/info'
     | '/grants/$id/audit'
     | '/proposals/$proposalId/revision'
+    | '/api/public/hooks/agent-watch'
     | '/api/public/hooks/deadlines'
     | '/api/public/hooks/discover'
     | '/api/public/hooks/enrich'
@@ -719,6 +730,7 @@ export interface FileRouteTypes {
     | '/clients/$orgId/info'
     | '/grants/$id/audit'
     | '/proposals/$proposalId/revision'
+    | '/api/public/hooks/agent-watch'
     | '/api/public/hooks/deadlines'
     | '/api/public/hooks/discover'
     | '/api/public/hooks/enrich'
@@ -783,6 +795,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clients/$orgId/info'
     | '/_authenticated/grants/$id/audit'
     | '/_authenticated/proposals/$proposalId/revision'
+    | '/api/public/hooks/agent-watch'
     | '/api/public/hooks/deadlines'
     | '/api/public/hooks/discover'
     | '/api/public/hooks/enrich'
@@ -801,6 +814,7 @@ export interface RootRouteChildren {
   ApiAgentRoute: typeof ApiAgentRoute
   ReportTokenRoute: typeof ReportTokenRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
+  ApiPublicHooksAgentWatchRoute: typeof ApiPublicHooksAgentWatchRoute
   ApiPublicHooksDeadlinesRoute: typeof ApiPublicHooksDeadlinesRoute
   ApiPublicHooksDiscoverRoute: typeof ApiPublicHooksDiscoverRoute
   ApiPublicHooksEnrichRoute: typeof ApiPublicHooksEnrichRoute
@@ -1191,6 +1205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProposalsProposalIdRevisionRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/public/hooks/agent-watch': {
+      id: '/api/public/hooks/agent-watch'
+      path: '/api/public/hooks/agent-watch'
+      fullPath: '/api/public/hooks/agent-watch'
+      preLoaderRoute: typeof ApiPublicHooksAgentWatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/deadlines': {
       id: '/api/public/hooks/deadlines'
       path: '/api/public/hooks/deadlines'
@@ -1397,6 +1418,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAgentRoute: ApiAgentRoute,
   ReportTokenRoute: ReportTokenRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
+  ApiPublicHooksAgentWatchRoute: ApiPublicHooksAgentWatchRoute,
   ApiPublicHooksDeadlinesRoute: ApiPublicHooksDeadlinesRoute,
   ApiPublicHooksDiscoverRoute: ApiPublicHooksDiscoverRoute,
   ApiPublicHooksEnrichRoute: ApiPublicHooksEnrichRoute,
