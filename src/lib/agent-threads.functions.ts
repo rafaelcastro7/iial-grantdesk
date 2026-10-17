@@ -8,6 +8,7 @@ export const listAgentThreads = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("agent_threads")
       .select("id, title, updated_at")
+      .neq("title", "Nueva conversación")
       .order("updated_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);
