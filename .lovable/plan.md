@@ -120,10 +120,15 @@ Lo que esto cambia en el plan:
 3. Búsqueda web con citas y marca de verificación.
 4. Lectura bajo demanda de páginas oficiales y PDFs subidos, y botón Guardar.
 5. Contexto de organizaciones, memoria de descartes y acciones (pipeline, plan, checklist).
-6. Búsquedas guardadas con aviso de novedades.
-7. Verificación en vivo con sesión real, dos conversaciones y recarga.
+6. Agente proactivo: búsquedas guardadas, vigilancia diaria, bandeja "Hecho por el agente".
+7. Correos: resumen y alertas a Rocío; envío a terceros con aprobación (requiere configurar el dominio de correo de IIAL).
+8. Verificación en vivo con sesión real, dos conversaciones, recarga y un ciclo de vigilancia completo.
 
 ## Detalles técnicos
+
+- Proactividad: tablas `agent_watches` (búsqueda guardada, frecuencia, pausa), `agent_inbox` (borradores y alertas con estado) y `agent_budget` (tope diario); ruta programada en `/api/public/hooks/agent-watch` verificada por firma, ejecutada con pg_cron.
+- Correos: correo de Lovable con dominio propio; plantillas de resumen, alerta y borrador aprobado; nunca se envía a terceros sin aprobación registrada.
+- Errores 402 de créditos pausan toda la vigilancia hasta acción del usuario.
 
 - Ruta `/_authenticated/agent` y `/_authenticated/agent/$threadId`; endpoint de streaming separado en server route autenticada.
 - Tablas nuevas `agent_threads` y `agent_messages` (UIMessage JSON, id UUID generado por la base, `ai_message_id` texto), RLS por usuario y tenant; migración aditiva.
