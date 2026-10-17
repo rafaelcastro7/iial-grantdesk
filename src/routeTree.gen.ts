@@ -48,6 +48,8 @@ import { Route as AuthenticatedAdminMonitoringRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminSourcesRouteImport } from './routes/_authenticated.admin.sources'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated.admin.users'
 import { Route as AuthenticatedAdminWorkflowsRouteImport } from './routes/_authenticated.admin.workflows'
+import { Route as AuthenticatedAgentIndexRouteImport } from './routes/_authenticated.agent.index'
+import { Route as AuthenticatedAgentThreadIdRouteImport } from './routes/_authenticated.agent.$threadId'
 import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authenticated.clients.index'
 import { Route as AuthenticatedClientsOrgIdRouteImport } from './routes/_authenticated.clients.$orgId'
 import { Route as AuthenticatedCompetitiveIndexRouteImport } from './routes/_authenticated.competitive.index'
@@ -279,6 +281,17 @@ const AuthenticatedAdminWorkflowsRoute =
     path: '/workflows',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAgentIndexRoute = AuthenticatedAgentIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAgentRoute,
+} as any)
+const AuthenticatedAgentThreadIdRoute =
+  AuthenticatedAgentThreadIdRouteImport.update({
+    id: '/$threadId',
+    path: '/$threadId',
+    getParentRoute: () => AuthenticatedAgentRoute,
+  } as any)
 const AuthenticatedClientsIndexRoute =
   AuthenticatedClientsIndexRouteImport.update({
     id: '/clients/',
@@ -429,7 +442,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/agent': typeof AuthenticatedAgentRoute
+  '/agent': typeof AuthenticatedAgentRouteWithChildren
   '/answers': typeof AuthenticatedAnswersRoute
   '/autonomy': typeof AuthenticatedAutonomyRoute
   '/backlog': typeof AuthenticatedBacklogRoute
@@ -462,6 +475,7 @@ export interface FileRoutesByFullPath {
   '/admin/sources': typeof AuthenticatedAdminSourcesRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workflows': typeof AuthenticatedAdminWorkflowsRoute
+  '/agent/$threadId': typeof AuthenticatedAgentThreadIdRoute
   '/clients/$orgId': typeof AuthenticatedClientsOrgIdRouteWithChildren
   '/competitive/programs': typeof AuthenticatedCompetitiveProgramsRoute
   '/competitive/recipients': typeof AuthenticatedCompetitiveRecipientsRoute
@@ -470,6 +484,7 @@ export interface FileRoutesByFullPath {
   '/proposals/$id': typeof AuthenticatedProposalsIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/agent/': typeof AuthenticatedAgentIndexRoute
   '/clients/': typeof AuthenticatedClientsIndexRoute
   '/competitive/': typeof AuthenticatedCompetitiveIndexRoute
   '/funders/': typeof AuthenticatedFundersIndexRoute
@@ -493,7 +508,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
-  '/agent': typeof AuthenticatedAgentRoute
   '/answers': typeof AuthenticatedAnswersRoute
   '/autonomy': typeof AuthenticatedAutonomyRoute
   '/backlog': typeof AuthenticatedBacklogRoute
@@ -526,6 +540,7 @@ export interface FileRoutesByTo {
   '/admin/sources': typeof AuthenticatedAdminSourcesRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workflows': typeof AuthenticatedAdminWorkflowsRoute
+  '/agent/$threadId': typeof AuthenticatedAgentThreadIdRoute
   '/clients/$orgId': typeof AuthenticatedClientsOrgIdRouteWithChildren
   '/competitive/programs': typeof AuthenticatedCompetitiveProgramsRoute
   '/competitive/recipients': typeof AuthenticatedCompetitiveRecipientsRoute
@@ -534,6 +549,7 @@ export interface FileRoutesByTo {
   '/proposals/$id': typeof AuthenticatedProposalsIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/agent': typeof AuthenticatedAgentIndexRoute
   '/clients': typeof AuthenticatedClientsIndexRoute
   '/competitive': typeof AuthenticatedCompetitiveIndexRoute
   '/funders': typeof AuthenticatedFundersIndexRoute
@@ -560,7 +576,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/compliance': typeof ComplianceRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/_authenticated/agent': typeof AuthenticatedAgentRoute
+  '/_authenticated/agent': typeof AuthenticatedAgentRouteWithChildren
   '/_authenticated/answers': typeof AuthenticatedAnswersRoute
   '/_authenticated/autonomy': typeof AuthenticatedAutonomyRoute
   '/_authenticated/backlog': typeof AuthenticatedBacklogRoute
@@ -593,6 +609,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/sources': typeof AuthenticatedAdminSourcesRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/workflows': typeof AuthenticatedAdminWorkflowsRoute
+  '/_authenticated/agent/$threadId': typeof AuthenticatedAgentThreadIdRoute
   '/_authenticated/clients/$orgId': typeof AuthenticatedClientsOrgIdRouteWithChildren
   '/_authenticated/competitive/programs': typeof AuthenticatedCompetitiveProgramsRoute
   '/_authenticated/competitive/recipients': typeof AuthenticatedCompetitiveRecipientsRoute
@@ -601,6 +618,7 @@ export interface FileRoutesById {
   '/_authenticated/proposals/$id': typeof AuthenticatedProposalsIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/agent/': typeof AuthenticatedAgentIndexRoute
   '/_authenticated/clients/': typeof AuthenticatedClientsIndexRoute
   '/_authenticated/competitive/': typeof AuthenticatedCompetitiveIndexRoute
   '/_authenticated/funders/': typeof AuthenticatedFundersIndexRoute
@@ -660,6 +678,7 @@ export interface FileRouteTypes {
     | '/admin/sources'
     | '/admin/users'
     | '/admin/workflows'
+    | '/agent/$threadId'
     | '/clients/$orgId'
     | '/competitive/programs'
     | '/competitive/recipients'
@@ -668,6 +687,7 @@ export interface FileRouteTypes {
     | '/proposals/$id'
     | '/api/public/health'
     | '/admin/'
+    | '/agent/'
     | '/clients/'
     | '/competitive/'
     | '/funders/'
@@ -691,7 +711,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/compliance'
-    | '/agent'
     | '/answers'
     | '/autonomy'
     | '/backlog'
@@ -724,6 +743,7 @@ export interface FileRouteTypes {
     | '/admin/sources'
     | '/admin/users'
     | '/admin/workflows'
+    | '/agent/$threadId'
     | '/clients/$orgId'
     | '/competitive/programs'
     | '/competitive/recipients'
@@ -732,6 +752,7 @@ export interface FileRouteTypes {
     | '/proposals/$id'
     | '/api/public/health'
     | '/admin'
+    | '/agent'
     | '/clients'
     | '/competitive'
     | '/funders'
@@ -790,6 +811,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/sources'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/workflows'
+    | '/_authenticated/agent/$threadId'
     | '/_authenticated/clients/$orgId'
     | '/_authenticated/competitive/programs'
     | '/_authenticated/competitive/recipients'
@@ -798,6 +820,7 @@ export interface FileRouteTypes {
     | '/_authenticated/proposals/$id'
     | '/api/public/health'
     | '/_authenticated/admin/'
+    | '/_authenticated/agent/'
     | '/_authenticated/clients/'
     | '/_authenticated/competitive/'
     | '/_authenticated/funders/'
@@ -1112,6 +1135,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminWorkflowsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/agent/': {
+      id: '/_authenticated/agent/'
+      path: '/'
+      fullPath: '/agent/'
+      preLoaderRoute: typeof AuthenticatedAgentIndexRouteImport
+      parentRoute: typeof AuthenticatedAgentRoute
+    }
+    '/_authenticated/agent/$threadId': {
+      id: '/_authenticated/agent/$threadId'
+      path: '/$threadId'
+      fullPath: '/agent/$threadId'
+      preLoaderRoute: typeof AuthenticatedAgentThreadIdRouteImport
+      parentRoute: typeof AuthenticatedAgentRoute
+    }
     '/_authenticated/clients/': {
       id: '/_authenticated/clients/'
       path: '/clients'
@@ -1322,6 +1359,19 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
+interface AuthenticatedAgentRouteChildren {
+  AuthenticatedAgentThreadIdRoute: typeof AuthenticatedAgentThreadIdRoute
+  AuthenticatedAgentIndexRoute: typeof AuthenticatedAgentIndexRoute
+}
+
+const AuthenticatedAgentRouteChildren: AuthenticatedAgentRouteChildren = {
+  AuthenticatedAgentThreadIdRoute: AuthenticatedAgentThreadIdRoute,
+  AuthenticatedAgentIndexRoute: AuthenticatedAgentIndexRoute,
+}
+
+const AuthenticatedAgentRouteWithChildren =
+  AuthenticatedAgentRoute._addFileChildren(AuthenticatedAgentRouteChildren)
+
 interface AuthenticatedClientsOrgIdRouteChildren {
   AuthenticatedClientsOrgIdGrantsRoute: typeof AuthenticatedClientsOrgIdGrantsRoute
   AuthenticatedClientsOrgIdInfoRoute: typeof AuthenticatedClientsOrgIdInfoRoute
@@ -1353,7 +1403,7 @@ const AuthenticatedGrantsIdRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
-  AuthenticatedAgentRoute: typeof AuthenticatedAgentRoute
+  AuthenticatedAgentRoute: typeof AuthenticatedAgentRouteWithChildren
   AuthenticatedAnswersRoute: typeof AuthenticatedAnswersRoute
   AuthenticatedAutonomyRoute: typeof AuthenticatedAutonomyRoute
   AuthenticatedBacklogRoute: typeof AuthenticatedBacklogRoute
@@ -1390,7 +1440,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
-  AuthenticatedAgentRoute: AuthenticatedAgentRoute,
+  AuthenticatedAgentRoute: AuthenticatedAgentRouteWithChildren,
   AuthenticatedAnswersRoute: AuthenticatedAnswersRoute,
   AuthenticatedAutonomyRoute: AuthenticatedAutonomyRoute,
   AuthenticatedBacklogRoute: AuthenticatedBacklogRoute,
