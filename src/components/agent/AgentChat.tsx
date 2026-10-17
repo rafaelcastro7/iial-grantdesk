@@ -38,6 +38,7 @@ export function agentSuggestions(es: boolean) {
 }
 
 const TOOL_META: Record<string, { icon: typeof Globe; en: string; es: string }> = {
+  show_grants: { icon: Library, en: "Recommended grants", es: "Grants recomendados" },
   search_catalog: { icon: Library, en: "Searching our catalog", es: "Buscando en el catálogo" },
   search_web: { icon: Globe, en: "Searching the internet", es: "Buscando en internet" },
   read_official_page: { icon: BookOpen, en: "Reading the official page", es: "Leyendo la página oficial" },
@@ -64,7 +65,7 @@ function GrantCard({ g, es }: { g: AgentGrantCard; es: boolean }) {
         </div>
         {g.fit != null && <Badge variant="secondary">{g.fit}/100</Badge>}
       </div>
-      {g.summary && <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{g.summary}</p>}
+      {g.why ? <p className="mt-1.5 text-xs">{g.why}</p> : g.summary && <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{g.summary}</p>}
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
         <div><span className="text-muted-foreground">{es ? "Monto" : "Amount"}: </span>{g.amount}</div>
         <div><span className="text-muted-foreground">{es ? "Cierre" : "Deadline"}: </span>{g.deadline}</div>
@@ -197,7 +198,7 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
                             <ToolOutput output={part.state === "output-available" ? part.output : undefined} errorText={part.state === "output-error" ? part.errorText : undefined} />
                           </ToolContent>
                         </Tool>
-                        {part.state === "output-available" && <ToolCards output={part.output} es={es} />}
+                        {part.state === "output-available" && name === "show_grants" && <ToolCards output={part.output} es={es} />}
                       </div>
                     );
                   }

@@ -13,6 +13,7 @@ export type AgentGrantCard = {
   status: string;
   fit: number | null;
   origin: "catalog" | "web_verified" | "web_unverified";
+  why?: string;
 };
 
 /** Web results are "verified" only when an exact-URL citation backs them. */

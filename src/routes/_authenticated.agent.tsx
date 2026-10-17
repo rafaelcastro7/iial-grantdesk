@@ -82,7 +82,7 @@ function AgentLayout() {
     <div className="flex h-[calc(100dvh-4rem)] min-h-0 w-full">
       <aside className="hidden w-72 shrink-0 flex-col border-r border-border bg-muted/30 md:flex">
         <div className="p-3">
-          <Button className="w-full justify-start gap-2" onClick={() => newThread.mutate()} disabled={newThread.isPending}>
+          <Button className="w-full justify-start gap-2" onClick={() => navigate({ to: "/agent" })}>
             <Plus className="h-4 w-4" /> {tr("New conversation", "Nueva conversación")}
           </Button>
         </div>

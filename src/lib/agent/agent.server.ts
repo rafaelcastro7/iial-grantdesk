@@ -8,6 +8,7 @@ import {
   getLovableAiGatewayRunId,
   withLovableAiGatewayRunIdHeader,
 } from "./run-id.server";
+import { cleanTitle } from "@/lib/html-text";
 import { formatAmount, webOrigin, withoutDismissed, type AgentGrantCard } from "./agent-rules.shared";
 
 const MODEL = "openai/gpt-6-astra";
@@ -89,7 +90,7 @@ async function cardsForIds(ctx: Ctx, ids: string[]): Promise<AgentGrantCard[]> {
       const native = g.amount_min != null || g.amount_max != null;
       return {
         id: g.id,
-        title: g.title,
+        title: cleanTitle(g.title),
         funder: (g.funders as { name?: string } | null)?.name ?? "",
         country: g.country ?? "",
         url: g.url ?? "",
@@ -111,16 +112,46 @@ async function dismissedIds(ctx: Ctx) {
 }
 
 function buildTools(ctx: Ctx) {
+  // Cards returned by searches in this request; show_grants can only present
+  // these (never invented ones). Earlier turns' cards are re-read from the catalog.
+  const known = new Map<string, AgentGrantCard>();
+  const keyOf = (c: AgentGrantCard) => c.id ?? c.url;
+  const remember = (cards: AgentGrantCard[]) => cards.forEach((c) => known.set(keyOf(c), c));
   return {
+    show_grants: tool({
+      description:
+        "Present to the user, as cards, ONLY the grants you recommend (best first, max 6), after search_catalog/search_web. Use the id (catalog) or url (web) exactly as returned. Skip irrelevant results instead of showing them.",
+      inputSchema: z.object({
+        items: z.array(z.object({ key: z.string().describe("grant id or url"), why: z.string().describe("one line: why it fits or what blocks it") })),
+      }),
+      execute: async ({ items }) => {
+        const missing = items.map((i) => i.key).filter((k) => !known.has(k) && /^[0-9a-f-]{36}$/.test(k));
+        if (missing.length) remember(await cardsForIds(ctx, missing));
+        const grants = items
+          .slice(0, 6)
+          .map((i) => (known.get(i.key) ? { ...known.get(i.key)!, why: i.why } : null))
+          .filter(Boolean);
+        return { grants };
+      },
+    }),
     search_catalog: tool({
       description:
         "Search the team's own grant catalog (always call this FIRST for any funding search). Returns grant cards with fit for the active organization.",
       inputSchema: z.object({ query: z.string().describe("Natural-language search, any language") }),
       execute: async ({ query }) => {
         const { searchGrantCatalogHybrid } = await import("@/lib/grant-search-hybrid.server");
-        const { matches } = await searchGrantCatalogHybrid(ctx.supabase, query, 20);
-        const cards = withoutDismissed(await cardsForIds(ctx, matches.map((m) => m.grantId)), await dismissedIds(ctx));
-        return { count: cards.length, grants: cards.slice(0, 10) };
+        const { matches } = await searchGrantCatalogHybrid(ctx.supabase, query, 30);
+        const relevant = matches.filter((m) => m.lexicalScore > 0 || m.semanticScore >= 0.55);
+        const cards = withoutDismissed(await cardsForIds(ctx, relevant.map((m) => m.grantId)), await dismissedIds(ctx));
+        const seen = new Set<string>();
+        const unique = cards.filter((c) => {
+          const k = c.title.toLowerCase();
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        remember(unique);
+        return { count: unique.length, grants: unique.slice(0, 12) };
       },
     }),
     search_web: tool({
@@ -155,6 +186,7 @@ function buildTools(ctx: Ctx) {
           fit: null,
           origin: g.alreadyInCatalog ? "catalog" : webOrigin(g.sourceMatch),
         }));
+        remember(grants);
         return { ok: true, count: grants.length, grants };
       },
     }),
@@ -226,7 +258,7 @@ How you work:
 4. Eligibility of countries uses check_country. Latin America may be "as a partner", not "no".
 5. Never reveal weaknesses (e.g. missing audited statements) in drafts addressed to partners or funders.
 6. Drafts (memo to the decision maker, partner emails, WhatsApp) are short, warm and professional, using the decision maker and credentials from the profile. Separate step 1 / step 2 emails when asked.
-7. Keep answers short and scannable: a one-line conclusion first, then bullets or a compact table. Do not repeat the grant cards' data in prose — the UI shows the cards; comment on the top picks and why.
+7. After searching, call show_grants with only the relevant picks (the user sees nothing from raw searches). If nothing fits, say so plainly and suggest a better search. Then answer short and scannable: a one-line conclusion, then bullets. Do not repeat card data (amount, deadline) in prose.
 8. When the user wants ongoing monitoring, call watch_search.`;
 }
 
@@ -266,6 +298,11 @@ export async function handleAgentChat(request: Request): Promise<Response> {
       { onConflict: "thread_id,ai_message_id" },
     );
     if (uErr) console.error("agent user message persist failed", uErr.message);
+    const firstText = last.parts.find((p) => p.type === "text") as { text?: string } | undefined;
+    if (thread.title === "Nueva conversación" && firstText?.text) {
+      thread.title = firstText.text.slice(0, 80);
+      await auth.supabase.from("agent_threads").update({ title: thread.title, updated_at: new Date().toISOString() }).eq("id", threadId);
+    }
   }
 
   const apiKey = process.env.LOVABLE_API_KEY;
