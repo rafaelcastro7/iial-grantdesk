@@ -44,6 +44,8 @@ const TOOL_META: Record<string, { icon: typeof Globe; en: string; es: string }> 
   search_catalog: { icon: Library, en: "Searching our catalog", es: "Buscando en el catálogo" },
   search_web: { icon: Globe, en: "Searching the internet", es: "Buscando en internet" },
   read_official_page: { icon: BookOpen, en: "Reading the official page", es: "Leyendo la página oficial" },
+  analyze_grant: { icon: Search, en: "Deep analysis (extractor agent)", es: "Análisis profundo (agente extractor)" },
+  save_to_workspace: { icon: Save, en: "Saving to your work plan", es: "Guardando en tu plan de trabajo" },
   check_country: { icon: MapPin, en: "Checking country eligibility", es: "Chequeando el país" },
   explain_terms: { icon: BookOpen, en: "Glossary", es: "Glosario" },
   watch_search: { icon: Radar, en: "Saving a watch", es: "Guardando vigilancia" },
