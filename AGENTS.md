@@ -23,3 +23,5 @@
 - Grant availability is derived by a shared conservative helper; contradictory closure and future dates require confirmation, never automatic reopening.
 - Generated dossiers stay visible after a failed save and retry persistence separately from AI generation, avoiding another paid call.
 - Source ingestion propagates partial failures and promotes funders before approving candidates; existing-funder matches reconcile incomplete candidate approvals.
+- The grant agent (`/agent`) is one AI SDK tool loop in `src/lib/agent/agent.server.ts`; tools reuse existing deterministic helpers and the UI shows cards only from `show_grants`, so raw search noise never reaches the user.
+- Proactive agent work (`agent_watches` → `agent_inbox`) uses 0-token catalog search in `src/lib/agent/watch.server.ts`; anything sent to third parties requires an explicit user approval.
