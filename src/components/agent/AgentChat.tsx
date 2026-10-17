@@ -135,7 +135,10 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
     id: threadId,
     messages: initialMessages,
     transport,
-    onFinish: () => qc.invalidateQueries({ queryKey: ["agent-threads"] }),
+    onFinish: () => {
+      qc.invalidateQueries({ queryKey: ["agent-threads"] });
+      qc.invalidateQueries({ queryKey: ["agent-workspace"] });
+    },
     onError: (e) => toast.error(e.message || tr("The agent could not answer.", "El agente no pudo responder.")),
   });
 
