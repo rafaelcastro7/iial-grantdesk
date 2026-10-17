@@ -263,6 +263,8 @@ const NAV_ES: Record<string, string> = {
   Today: "Hoy",
   "Deadlines, missing items, follow-ups": "Plazos, faltantes y seguimientos",
   "Find grants": "Buscar grants",
+  "Grant agent": "Agente de grants",
+  "Ask, search and get drafts; it watches for you": "Pregunte, busque y reciba borradores; vigila por usted",
   "Search and check if we can apply": "Buscar y verificar si podemos postular",
   "My grants": "Mis grants",
   "What we are working on, emails and the decision memo":
