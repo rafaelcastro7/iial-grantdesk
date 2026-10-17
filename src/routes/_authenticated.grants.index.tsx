@@ -624,9 +624,9 @@ function GrantsPage({ orgId }: { orgId: string }) {
             ? (grant, decision) => feedbackMutation.mutate({ grant, decision })
             : undefined,
         }}
+        catalogPagination={data.hasMore && <Button variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{tr(`Load more (${grants.length} of ${data.total})`, `Cargar más (${grants.length} de ${data.total})`)}</Button>}
         profileBar={
           <>
-            {data.hasMore && <Button variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{tr(`Load more (${grants.length} of ${data.total})`, `Cargar más (${grants.length} de ${data.total})`)}</Button>}
             <EligibilityCheckBar
               profiles={radarProfiles}
               selected={checkProfile}

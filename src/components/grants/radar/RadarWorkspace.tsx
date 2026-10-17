@@ -31,6 +31,7 @@ export function RadarWorkspace({
   actions,
   notices,
   profileBar,
+  catalogPagination,
   moreFilters,
   isAdmin,
   admin,
@@ -48,6 +49,7 @@ export function RadarWorkspace({
   actions: RadarActions;
   notices: Notice[];
   profileBar?: ReactNode;
+  catalogPagination?: ReactNode;
   moreFilters?: ReactNode;
   /** Retrieval mode of a server search, when one is active. */
   searchMode?: string | null;
@@ -328,6 +330,8 @@ export function RadarWorkspace({
               </button>
             </div>
           ))}
+
+        {catalogPagination}
 
         {!simple && profileBar}
 
