@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Corregir el fallo de graphlib al abrir el agente y verificar conversaciones guardadas.
+- [ ] Comparar OpenClaw, Hermes y capacidades de Lovable para recomendar mejoras útiles para Rocío, sin activar servicios.
+
 - [x] Agente de grants (/agent): conversaciones guardadas, catálogo → web → página oficial, fichas recomendadas, chequeo de país, glosario, vigilancias y bandeja "Hecho por el agente". Probado con sesión real.
 - [ ] Vigilancia diaria automática: falta activar la tarea programada (requiere activar programación y firma en el backend).
 - [ ] Correos del agente (resumen matutino, alertas, envíos aprobados): requiere configurar el dominio de correo de IIAL.
