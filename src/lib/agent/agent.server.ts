@@ -410,7 +410,8 @@ export async function handleAgentChat(request: Request): Promise<Response> {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return json(400, "invalid_request");
   const { threadId, lang } = parsed.data;
-  const messages = parsed.data.messages as UIMessage[];
+  // PDF attachments become extracted text before anything else touches them.
+  const messages = await materializeFileParts(parsed.data.messages as UIMessage[], lang);
 
   const { data: thread } = await auth.supabase
     .from("agent_threads")
