@@ -77,22 +77,27 @@ export const saveCatalogGrantToWorkspace = createServerFn({ method: "POST" })
 
 export const toggleWorkspaceTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ id: z.string().uuid(), taskId: z.string(), done: z.boolean() }).parse(d))
+  .inputValidator((d) => z.object({ id: z.string().uuid(), taskId: z.string(), done: z.boolean(), expectedUpdatedAt: z.string().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { data: row, error: rErr } = await context.supabase
       .from("agent_workspace")
-      .select("tasks")
+      .select("tasks, updated_at")
       .eq("id", data.id)
       .single();
     if (rErr) throw new Error(rErr.message);
+    if (data.expectedUpdatedAt && data.expectedUpdatedAt !== row.updated_at) throw new Error("WORKSPACE_CONFLICT");
+    if (!Array.isArray(row.tasks) || !(row.tasks as unknown as WorkspaceTask[]).some((t) => t.id === data.taskId)) {
+      throw new Error("WORKSPACE_CONFLICT");
+    }
     const tasks = ((row.tasks as unknown as WorkspaceTask[]) ?? []).map((t) =>
       t.id === data.taskId ? { ...t, done: data.done } : t,
     );
-    const { error } = await context.supabase
+    const { data: saved, error } = await context.supabase
       .from("agent_workspace")
       .update({ tasks: tasks as unknown as never, updated_at: new Date().toISOString() })
-      .eq("id", data.id);
+      .eq("id", data.id).eq("updated_at", row.updated_at).select("id").maybeSingle();
     if (error) throw new Error(error.message);
+    if (!saved) throw new Error("WORKSPACE_CONFLICT");
     return { ok: true };
   });
 
@@ -126,19 +131,25 @@ export const setWorkspaceStatus = createServerFn({ method: "POST" })
         id: z.string().uuid(),
         status: z.enum(["considering", "preparing", "submitted", "discarded"]),
         decision: z.string().max(500).nullish(),
+        expectedUpdatedAt: z.string().optional(),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { data: row, error: readError } = await context.supabase.from("agent_workspace")
+      .select("updated_at").eq("id", data.id).single();
+    if (readError) throw new Error(readError.message);
+    if (data.expectedUpdatedAt && data.expectedUpdatedAt !== row.updated_at) throw new Error("WORKSPACE_CONFLICT");
+    const { data: saved, error } = await context.supabase
       .from("agent_workspace")
       .update({
         status: data.status,
         ...(data.decision !== undefined ? { decision: data.decision } : {}),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", data.id);
+      .eq("id", data.id).eq("updated_at", row.updated_at).select("id").maybeSingle();
     if (error) throw new Error(error.message);
+    if (!saved) throw new Error("WORKSPACE_CONFLICT");
     return { ok: true };
   });
 

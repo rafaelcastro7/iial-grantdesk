@@ -38,7 +38,12 @@ function WorkspaceCard({ item, es }: { item: WorkspaceItem; es: boolean }) {
   const [label, setLabel] = useState("");
   const [due, setDue] = useState("");
   const refresh = () => qc.invalidateQueries({ queryKey: workspaceKey });
-  const onError = (e: Error) => toast.error(e.message);
+  const onError = (e: Error) => {
+    refresh();
+    toast.error(e.message.includes("WORKSPACE_CONFLICT")
+      ? tr("The plan changed. Check the latest version and try again.", "El plan cambió. Revisa la versión actualizada e inténtalo otra vez.")
+      : e.message);
+  };
   const addMut = useMutation({
     mutationFn: () => add({ data: { id: item.id, label, due: due || null } }),
     onSuccess: () => { setLabel(""); setDue(""); setAdding(false); refresh(); },
@@ -46,12 +51,12 @@ function WorkspaceCard({ item, es }: { item: WorkspaceItem; es: boolean }) {
   });
 
   const toggleMut = useMutation({
-    mutationFn: (v: { taskId: string; done: boolean }) => toggle({ data: { id: item.id, ...v } }),
+    mutationFn: (v: { taskId: string; done: boolean }) => toggle({ data: { id: item.id, expectedUpdatedAt: item.updated_at, ...v } }),
     onSuccess: refresh,
     onError,
   });
   const statusMut = useMutation({
-    mutationFn: (status: WorkspaceStatus) => setStatus({ data: { id: item.id, status } }),
+    mutationFn: (status: WorkspaceStatus) => setStatus({ data: { id: item.id, expectedUpdatedAt: item.updated_at, status } }),
     onSuccess: refresh,
     onError,
   });
