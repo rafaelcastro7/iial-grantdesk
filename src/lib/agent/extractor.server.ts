@@ -81,3 +81,49 @@ export async function extractGrantFacts(pageText: string, lang: "en" | "es"): Pr
     return null;
   }
 }
+
+/**
+ * Reads a PDF the user attached in the chat (data URL) with the same cheap,
+ * fast extractor model and returns its text. The conversational model never
+ * sees the raw file — only this text — so PDF reading stays off the expensive
+ * model. Returns null when the file cannot be read.
+ */
+export async function extractPdfText(
+  dataUrl: string,
+  filename: string,
+  lang: "en" | "es",
+): Promise<string | null> {
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey || !dataUrl.startsWith("data:application/pdf")) return null;
+
+  const res = await fetch(GATEWAY, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "Lovable-API-Key": apiKey,
+      "X-Lovable-AIG-SDK": "fetch",
+    },
+    body: JSON.stringify({
+      model: EXTRACTOR_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Extract the full text of this PDF document ("${filename}"). Keep section headings, tables as plain text, amounts, dates and requirements exactly as written. Do not summarize or add commentary; output only the document text. If a page is a scanned image, transcribe what you can read. Answer in the document's own language.`,
+            },
+            { type: "file", file: { filename, file_data: dataUrl } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) return null;
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) return null;
+  return content.slice(0, 20000);
+}
