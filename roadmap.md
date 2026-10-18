@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Añadir pendientes con fecha directamente en el panel del agente y comprobar guardado y lectura; correos aplazados por petición del usuario.
+
 - [x] Retirar la dependencia Mermaid/graphlib del chat; inicio y conversación guardada comprobados con sesión real, sin errores. Compilación automática y 5 pruebas pasan; la revisión publicada requiere publicación.
 - [x] Comparar OpenClaw, Hermes y capacidades de Lovable: priorizar vigilancia verificable, memoria editable, lectura de PDFs y acciones con aprobación; sin activar servicios.
 

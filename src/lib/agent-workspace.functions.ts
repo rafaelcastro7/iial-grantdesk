@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { WorkspaceItem, WorkspaceStatus, WorkspaceTask } from "@/lib/agent/agent-workspace.shared";
+import { mergeTasks } from "@/lib/agent/agent-workspace.shared";
 
 type Row = {
   id: string;
@@ -59,6 +60,28 @@ export const toggleWorkspaceTask = createServerFn({ method: "POST" })
       .update({ tasks: tasks as unknown as never, updated_at: new Date().toISOString() })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const addWorkspaceTask = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid(),
+    label: z.string().trim().min(1).max(300),
+    due: z.string().date().nullish(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase.from("agent_workspace")
+      .select("tasks, updated_at").eq("id", data.id).single();
+    if (error) throw new Error(error.message);
+    const tasks = mergeTasks(Array.isArray(row.tasks) ? row.tasks as unknown as WorkspaceTask[] : [], [
+      { label: data.label, due: data.due ?? null, done: false, source: "user" },
+    ]);
+    const { data: saved, error: saveError } = await context.supabase.from("agent_workspace")
+      .update({ tasks: tasks as unknown as never, updated_at: new Date().toISOString() })
+      .eq("id", data.id).eq("updated_at", row.updated_at).select("id").maybeSingle();
+    if (saveError) throw new Error(saveError.message);
+    if (!saved) throw new Error("The plan changed. Refresh and try again. / El plan cambió. Actualiza e inténtalo otra vez.");
     return { ok: true };
   });
 
