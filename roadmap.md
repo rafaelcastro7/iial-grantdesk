@@ -56,4 +56,4 @@
 - [x] Herramientas `analyze_grant` y `save_to_workspace`; panel "Plan de trabajo" editable junto al chat.
 - [x] Activar la vigilancia diaria automática: trabajo `iial-agent-watch-daily` (11:30 UTC) firmado con HMAC; secreto sembrado en `webhook_config`. Entra en vigor al publicar (el cron apunta a la URL publicada).
 - [ ] Correos del agente (resumen matutino, alertas). Bloqueo: falta configurar el dominio de correo de IIAL.
-- [ ] Lectura de PDFs subidos dentro del chat.
+- [x] Lectura de PDFs adjuntos en el chat: el extractor rápido (Gemini Flash) transcribe el documento y el orquestador solo recibe texto; el base64 nunca se guarda en la base de datos.

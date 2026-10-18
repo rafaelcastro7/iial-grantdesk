@@ -354,6 +354,36 @@ function buildTools(ctx: Ctx) {
   };
 }
 
+/**
+ * Replaces attached PDF file parts with their extracted text (fast extractor
+ * model) before the conversational model ever sees them. The cleaned message
+ * is also what gets persisted, so the raw base64 file never hits the database
+ * and later turns re-send plain text instead of the file.
+ */
+async function materializeFileParts(messages: UIMessage[], lang: "en" | "es"): Promise<UIMessage[]> {
+  const hasPdf = messages.some(
+    (m) => m.role === "user" && m.parts.some((p) => p.type === "file" && (p as { mediaType?: string }).mediaType === "application/pdf"),
+  );
+  if (!hasPdf) return messages;
+  const { extractPdfText } = await import("./extractor.server");
+  return Promise.all(
+    messages.map(async (m) => {
+      if (m.role !== "user") return m;
+      const parts = await Promise.all(
+        m.parts.map(async (p) => {
+          const fp = p as { type: string; mediaType?: string; url?: string; filename?: string };
+          if (fp.type !== "file" || fp.mediaType !== "application/pdf") return p;
+          const name = fp.filename ?? "document.pdf";
+          const text = fp.url?.startsWith("data:") ? await extractPdfText(fp.url, name, lang) : null;
+          const body = text ?? (lang === "es" ? "(no se pudo leer el PDF adjunto)" : "(the attached PDF could not be read)");
+          return { type: "text" as const, text: `\n[PDF: ${name}]\n${body}` };
+        }),
+      );
+      return { ...m, parts };
+    }),
+  );
+}
+
 function systemPrompt(lang: "en" | "es", org: string) {
   const today = new Date().toISOString().slice(0, 10);
   return `You are GrantDesk's grant agent: a senior grant consultant working for the user. Today is ${today}.
@@ -364,7 +394,7 @@ ${org}
 
 How you work:
 1. For any funding search call search_catalog first. Call search_web only if the catalog returned fewer than 3 relevant grants or the user asks for new/internet results.
-2. When the user pastes a link or asks to analyze a call in depth, call analyze_grant: a fast extractor agent reads the official page and returns facts with exact citations, and the result appears in the user's work plan panel. For a quick look, read_official_page is enough.
+2. When the user pastes a link or asks to analyze a call in depth, call analyze_grant: a fast extractor agent reads the official page and returns facts with exact citations, and the result appears in the user's work plan panel. For a quick look, read_official_page is enough. When the user attaches a PDF, its text arrives already extracted as "[PDF: name]"; treat it as the official document and quote it like any other source.
 3. Never invent amounts, dates or eligibility. Unknown = "No publicado"/"Not published". Mark web results without an exact citation as unverified. If a page and a fact contradict each other, say so and trust the citation.
 4. Eligibility of countries uses check_country. Latin America may be "as a partner", not "no".
 5. Never reveal weaknesses (e.g. missing audited statements) in drafts addressed to partners or funders.
@@ -380,7 +410,8 @@ export async function handleAgentChat(request: Request): Promise<Response> {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return json(400, "invalid_request");
   const { threadId, lang } = parsed.data;
-  const messages = parsed.data.messages as UIMessage[];
+  // PDF attachments become extracted text before anything else touches them.
+  const messages = await materializeFileParts(parsed.data.messages as UIMessage[], lang);
 
   const { data: thread } = await auth.supabase
     .from("agent_threads")

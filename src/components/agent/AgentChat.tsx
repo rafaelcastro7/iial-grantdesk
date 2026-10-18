@@ -2,13 +2,21 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName, type UIMessage } from "ai";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Globe, Library, ListTodo, MapPin, Radar, Save, Search } from "lucide-react";
+import { BookOpen, FileText, Globe, Library, ListTodo, MapPin, Paperclip, Radar, Save, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import { PromptInput, PromptInputFooter, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
+import {
+  PromptInput,
+  PromptInputFooter,
+  PromptInputHeader,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  usePromptInputAttachments,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
@@ -103,6 +111,41 @@ function ToolCards({ output, es }: { output: unknown; es: boolean }) {
   );
 }
 
+function AttachmentChips() {
+  const attachments = usePromptInputAttachments();
+  if (!attachments.files.length) return null;
+  return (
+    <PromptInputHeader className="flex flex-wrap gap-1.5 px-2 pt-2">
+      {attachments.files.map((f) => (
+        <span key={f.id} className="flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs">
+          <FileText className="h-3 w-3 text-muted-foreground" />
+          <span className="max-w-40 truncate">{f.filename}</span>
+          <button type="button" aria-label="Remove" onClick={() => attachments.remove(f.id)} className="text-muted-foreground hover:text-foreground">
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+    </PromptInputHeader>
+  );
+}
+
+function AttachButton({ es }: { es: boolean }) {
+  const attachments = usePromptInputAttachments();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="gap-1.5 text-xs text-muted-foreground"
+      title={es ? "Adjuntar PDF (convocatoria, guía, bases)" : "Attach a PDF (call, guide, guidelines)"}
+      onClick={() => attachments.openFileDialog()}
+    >
+      <Paperclip className="h-3.5 w-3.5" />
+      {es ? "PDF" : "PDF"}
+    </Button>
+  );
+}
+
 const PENDING_KEY = (id: string) => `agent:pending:${id}`;
 export function setPendingAgentMessage(threadId: string, text: string) {
   sessionStorage.setItem(PENDING_KEY(threadId), text);
@@ -156,10 +199,10 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
 
   const busy = status === "submitted" || status === "streaming";
   const [panelOpen, setPanelOpen] = useState(false);
-  const submit = (value: string) => {
-    const v = value.trim();
-    if (!v || busy) return;
-    sendMessage({ text: v });
+  const submit = (msg: PromptInputMessage) => {
+    const v = msg.text.trim();
+    if ((!v && !msg.files.length) || busy) return;
+    sendMessage({ text: v, files: msg.files });
     setText("");
   };
 
@@ -229,24 +272,34 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
             ))}
           </Suggestions>
         )}
-        <PromptInput onSubmit={(msg) => submit(msg.text)}>
+        <PromptInput
+          accept="application/pdf"
+          maxFiles={3}
+          maxFileSize={15 * 1024 * 1024}
+          onError={(e) => toast.error(e.message)}
+          onSubmit={submit}
+        >
+          <AttachmentChips />
           <PromptInputTextarea
             autoFocus
             value={text}
             onChange={(e) => setText(e.currentTarget.value)}
-            placeholder={tr("Ask for grants, paste a link, ask for a memo…", "Pida grants, pegue un enlace, pida un memo…")}
+            placeholder={tr("Ask for grants, paste a link, attach a PDF…", "Pida grants, pegue un enlace, adjunte un PDF…")}
           />
           <PromptInputFooter className="justify-between">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-xs text-muted-foreground"
-              onClick={() => setPanelOpen((v) => !v)}
-            >
-              <ListTodo className="h-3.5 w-3.5" />
-              {tr("Work plan", "Plan de trabajo")}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs text-muted-foreground"
+                onClick={() => setPanelOpen((v) => !v)}
+              >
+                <ListTodo className="h-3.5 w-3.5" />
+                {tr("Work plan", "Plan de trabajo")}
+              </Button>
+              <AttachButton es={es} />
+            </div>
             <PromptInputSubmit status={status} onStop={stop} disabled={!busy && !text.trim()} />
           </PromptInputFooter>
         </PromptInput>
