@@ -272,24 +272,34 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
             ))}
           </Suggestions>
         )}
-        <PromptInput onSubmit={(msg) => submit(msg.text)}>
+        <PromptInput
+          accept="application/pdf"
+          maxFiles={3}
+          maxFileSize={15 * 1024 * 1024}
+          onError={(e) => toast.error(e.message)}
+          onSubmit={submit}
+        >
+          <AttachmentChips />
           <PromptInputTextarea
             autoFocus
             value={text}
             onChange={(e) => setText(e.currentTarget.value)}
-            placeholder={tr("Ask for grants, paste a link, ask for a memo…", "Pida grants, pegue un enlace, pida un memo…")}
+            placeholder={tr("Ask for grants, paste a link, attach a PDF…", "Pida grants, pegue un enlace, adjunte un PDF…")}
           />
           <PromptInputFooter className="justify-between">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-xs text-muted-foreground"
-              onClick={() => setPanelOpen((v) => !v)}
-            >
-              <ListTodo className="h-3.5 w-3.5" />
-              {tr("Work plan", "Plan de trabajo")}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs text-muted-foreground"
+                onClick={() => setPanelOpen((v) => !v)}
+              >
+                <ListTodo className="h-3.5 w-3.5" />
+                {tr("Work plan", "Plan de trabajo")}
+              </Button>
+              <AttachButton es={es} />
+            </div>
             <PromptInputSubmit status={status} onStop={stop} disabled={!busy && !text.trim()} />
           </PromptInputFooter>
         </PromptInput>
