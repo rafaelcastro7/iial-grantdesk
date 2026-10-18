@@ -1,7 +1,8 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName, type UIMessage } from "ai";
 import { Link } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { BookOpen, FileText, Globe, Library, ListTodo, MapPin, Paperclip, Radar, Save, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AgentWorkspacePanel } from "@/components/agent/AgentWorkspacePanel";
+import { saveCatalogGrantToWorkspace } from "@/lib/agent-workspace.functions";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { useTr, useUiLang } from "@/lib/ui-lang";
 import type { AgentGrantCard } from "@/lib/agent/agent-rules.shared";
@@ -60,6 +62,20 @@ const TOOL_META: Record<string, { icon: typeof Globe; en: string; es: string }> 
 };
 
 function GrantCard({ g, es }: { g: AgentGrantCard; es: boolean }) {
+  const qc = useQueryClient();
+  const { activeOrgId } = useActiveTenant();
+  const save = useServerFn(saveCatalogGrantToWorkspace);
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      if (!g.id) throw new Error(es ? "Falta el grant del catálogo." : "Catalog grant missing.");
+      return save({ data: { grantId: g.id, orgId: activeOrgId } });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent-workspace"] });
+      toast.success(es ? "Guardado en el plan de trabajo" : "Saved to your work plan");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const origin =
     g.origin === "catalog"
       ? es ? "Catálogo" : "Catalog"
@@ -84,6 +100,13 @@ function GrantCard({ g, es }: { g: AgentGrantCard; es: boolean }) {
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <Badge variant={g.origin === "web_unverified" ? "outline" : "secondary"}>{origin}</Badge>
+        {g.id && (
+          <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs"
+            disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
+            <Save className="h-3 w-3" />
+            {es ? "Guardar en el plan" : "Save to work plan"}
+          </Button>
+        )}
         {g.id && (
           <Link to="/grants/$id" params={{ id: g.id }} className="text-primary hover:underline">
             {es ? "Ver detalle y plan" : "Details and plan"}
