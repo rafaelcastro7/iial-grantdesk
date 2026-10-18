@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName, type UIMessage } from "ai";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Globe, Library, ListTodo, MapPin, Radar, Save, Search } from "lucide-react";
+import { BookOpen, FileText, Globe, Library, ListTodo, MapPin, Paperclip, Radar, Save, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -164,10 +164,10 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
 
   const busy = status === "submitted" || status === "streaming";
   const [panelOpen, setPanelOpen] = useState(false);
-  const submit = (value: string) => {
-    const v = value.trim();
-    if (!v || busy) return;
-    sendMessage({ text: v });
+  const submit = (msg: PromptInputMessage) => {
+    const v = msg.text.trim();
+    if ((!v && !msg.files.length) || busy) return;
+    sendMessage({ text: v, files: msg.files });
     setText("");
   };
 
