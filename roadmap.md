@@ -1,5 +1,6 @@
 # Roadmap
 
+- [ ] Proteger marcado de pendientes y cambios de estado contra actualizaciones simultáneas; refrescar el plan ante un conflicto sin perder el texto pendiente.
 - [x] Guardar un grant del catálogo desde su ficha del chat sin una llamada IA, conservando el análisis y los pendientes existentes; 8 pruebas pasan y guardado repetido comprobado con sesión real.
 - [x] Añadir pendientes con fecha directamente en el panel del agente, con procedencia del usuario, deduplicación y protección contra cambios simultáneos; 5 pruebas pasan y compilación automática OK. Correos aplazados por petición del usuario.
 - [x] Comprobar creación y lectura de pendientes con sesión real: guardar grant, añadir pendiente fechado, recargar, volver a guardar sin duplicación y marcar completado; plan temporal de prueba retirado, sin llamadas IA.
