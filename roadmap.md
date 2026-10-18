@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Añadir pendientes con fecha directamente en el panel del agente, con procedencia del usuario, deduplicación y protección contra cambios simultáneos; 5 pruebas pasan y compilación automática OK. Correos aplazados por petición del usuario.
+- [ ] Comprobar creación y lectura de pendientes en el navegador: la sesión real carga el panel, pero no tiene grants guardados en el plan; no se inició una llamada IA pagada para crear uno.
+
 - [x] Retirar la dependencia Mermaid/graphlib del chat; inicio y conversación guardada comprobados con sesión real, sin errores. Compilación automática y 5 pruebas pasan; la revisión publicada requiere publicación.
 - [x] Comparar OpenClaw, Hermes y capacidades de Lovable: priorizar vigilancia verificable, memoria editable, lectura de PDFs y acciones con aprobación; sin activar servicios.
 
