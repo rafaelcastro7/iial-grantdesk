@@ -42,6 +42,39 @@ export const listWorkspace = createServerFn({ method: "GET" })
     return (data ?? []).map((r) => toItem(r as unknown as Row));
   });
 
+/** Save identity only: never replace analysis, decisions or tasks on an existing plan. */
+export const saveCatalogGrantToWorkspace = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ grantId: z.string().uuid(), orgId: z.string().uuid().nullish() }).parse(d))
+  .handler(async ({ data, context }) => {
+    if (data.orgId) {
+      const { data: member, error } = await context.supabase.rpc("is_tenant_member", { _org_id: data.orgId });
+      if (error) throw new Error(error.message);
+      if (!member) throw new Error("Organization access denied.");
+    }
+    const { data: grant, error: grantError } = await context.supabase.from("grants")
+      .select("id, title, url").eq("id", data.grantId).single();
+    if (grantError) throw new Error(grantError.message);
+    const findExisting = () => context.supabase.from("agent_workspace").select("id")
+      .eq("user_id", context.userId).eq("grant_id", grant.id).maybeSingle();
+    const { data: existing, error: readError } = await findExisting();
+    if (readError) throw new Error(readError.message);
+    if (existing) return { id: existing.id };
+    const { data: saved, error: saveError } = await context.supabase.from("agent_workspace")
+      .insert({ user_id: context.userId, org_id: data.orgId ?? null, grant_id: grant.id,
+        title: grant.title, url: grant.url, status: "considering" })
+      .select("id").single();
+    // Another click may have inserted first; read that row without overwriting its plan.
+    if (saveError?.code === "23505") {
+      const { data: concurrent, error } = await findExisting();
+      if (error) throw new Error(error.message);
+      if (concurrent) return { id: concurrent.id };
+    }
+    if (saveError) throw new Error(saveError.message);
+    if (!saved) throw new Error("The grant could not be saved.");
+    return { id: saved.id };
+  });
+
 export const toggleWorkspaceTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid(), taskId: z.string(), done: z.boolean() }).parse(d))
