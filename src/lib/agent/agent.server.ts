@@ -354,6 +354,36 @@ function buildTools(ctx: Ctx) {
   };
 }
 
+/**
+ * Replaces attached PDF file parts with their extracted text (fast extractor
+ * model) before the conversational model ever sees them. The cleaned message
+ * is also what gets persisted, so the raw base64 file never hits the database
+ * and later turns re-send plain text instead of the file.
+ */
+async function materializeFileParts(messages: UIMessage[], lang: "en" | "es"): Promise<UIMessage[]> {
+  const hasPdf = messages.some(
+    (m) => m.role === "user" && m.parts.some((p) => p.type === "file" && (p as { mediaType?: string }).mediaType === "application/pdf"),
+  );
+  if (!hasPdf) return messages;
+  const { extractPdfText } = await import("./extractor.server");
+  return Promise.all(
+    messages.map(async (m) => {
+      if (m.role !== "user") return m;
+      const parts = await Promise.all(
+        m.parts.map(async (p) => {
+          const fp = p as { type: string; mediaType?: string; url?: string; filename?: string };
+          if (fp.type !== "file" || fp.mediaType !== "application/pdf") return p;
+          const name = fp.filename ?? "document.pdf";
+          const text = fp.url?.startsWith("data:") ? await extractPdfText(fp.url, name, lang) : null;
+          const body = text ?? (lang === "es" ? "(no se pudo leer el PDF adjunto)" : "(the attached PDF could not be read)");
+          return { type: "text" as const, text: `\n[PDF: ${name}]\n${body}` };
+        }),
+      );
+      return { ...m, parts };
+    }),
+  );
+}
+
 function systemPrompt(lang: "en" | "es", org: string) {
   const today = new Date().toISOString().slice(0, 10);
   return `You are GrantDesk's grant agent: a senior grant consultant working for the user. Today is ${today}.
