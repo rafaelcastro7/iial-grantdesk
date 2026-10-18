@@ -1,5 +1,6 @@
 # Roadmap
 
+- [ ] Guardar un grant del catálogo desde su ficha del chat sin una llamada IA, conservando el análisis y los pendientes existentes; verificar creación, fechas y lectura tras recargar.
 - [x] Añadir pendientes con fecha directamente en el panel del agente, con procedencia del usuario, deduplicación y protección contra cambios simultáneos; 5 pruebas pasan y compilación automática OK. Correos aplazados por petición del usuario.
 - [ ] Comprobar creación y lectura de pendientes en el navegador: la sesión real carga el panel, pero no tiene grants guardados en el plan; no se inició una llamada IA pagada para crear uno.
 
