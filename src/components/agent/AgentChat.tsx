@@ -111,6 +111,41 @@ function ToolCards({ output, es }: { output: unknown; es: boolean }) {
   );
 }
 
+function AttachmentChips() {
+  const attachments = usePromptInputAttachments();
+  if (!attachments.files.length) return null;
+  return (
+    <PromptInputHeader className="flex flex-wrap gap-1.5 px-2 pt-2">
+      {attachments.files.map((f) => (
+        <span key={f.id} className="flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs">
+          <FileText className="h-3 w-3 text-muted-foreground" />
+          <span className="max-w-40 truncate">{f.filename}</span>
+          <button type="button" aria-label="Remove" onClick={() => attachments.remove(f.id)} className="text-muted-foreground hover:text-foreground">
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+    </PromptInputHeader>
+  );
+}
+
+function AttachButton({ es }: { es: boolean }) {
+  const attachments = usePromptInputAttachments();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="gap-1.5 text-xs text-muted-foreground"
+      title={es ? "Adjuntar PDF (convocatoria, guía, bases)" : "Attach a PDF (call, guide, guidelines)"}
+      onClick={() => attachments.openFileDialog()}
+    >
+      <Paperclip className="h-3.5 w-3.5" />
+      {es ? "PDF" : "PDF"}
+    </Button>
+  );
+}
+
 const PENDING_KEY = (id: string) => `agent:pending:${id}`;
 export function setPendingAgentMessage(threadId: string, text: string) {
   sessionStorage.setItem(PENDING_KEY(threadId), text);
