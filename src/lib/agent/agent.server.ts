@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from "ai";
+import { convertToModelMessages, stepCountIs, streamText, tool, wrapLanguageModel, type UIMessage } from "ai";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
@@ -10,13 +10,14 @@ import {
 } from "./run-id.server";
 import { cleanTitle } from "@/lib/html-text";
 import { formatAmount, webOrigin, withoutDismissed, type AgentGrantCard } from "./agent-rules.shared";
+import { isProviderFailure, ProviderRest } from "./rescue.shared";
 
 const MODEL = "openai/gpt-6-astra";
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
 // ---- Rescue: the agent keeps working when Lovable AI credits run out ----
 // When the gateway answers 402 (Payment Required), chat continues on the
-// user's own keys (Groq, then Cerebras, then Gemini) instead of dying. A short
+// user's own keys (Gemini, then Groq, then Cerebras) instead of dying. A short
 // probe/cool-down avoids paying a full turn just to discover the 402 again.
 let gatewayBlockedUntil = 0;
 let gatewayCheckedAt = 0;
@@ -46,41 +47,60 @@ async function gatewayAvailable(apiKey: string): Promise<boolean> {
   return gatewayOk;
 }
 
-function rescueModel(): {
-  name: string;
-  model: ReturnType<ReturnType<typeof createOpenAI>["chat"]>;
-} | null {
+type ChatModel = ReturnType<ReturnType<typeof createOpenAI>["chat"]>;
+const providerRest = new ProviderRest();
+
+/**
+ * The user's own keys as one model: every step tries the providers in the
+ * project's cost-first order (Gemini → Groq → Cerebras) and moves to the next
+ * when one is out of quota or failing, resting it for the wait it reports.
+ */
+function rescueModel(): { name: string; model: ChatModel } | null {
   // Read keys directly: a blank or malformed unrelated secret must not make
   // serverEnv() throw and take the whole chat down exactly when credits end.
   const key = (...names: string[]) =>
     names.map((n) => process.env[n]?.trim()).find((v): v is string => !!v && v.length >= 10);
-  const env = {
-    GROQ_API_KEY: key("GROQ_API_KEY"),
-    CEREBRAS_API_KEY: key("CEREBRAS_API_KEY"),
-    GOOGLE_AI_STUDIO_KEY: key("GOOGLE_AI_STUDIO_KEY", "GEMINI_API_KEY"),
-  };
-  if (env.GROQ_API_KEY) {
-    const provider = createOpenAI({
-      baseURL: "https://api.groq.com/openai/v1",
-      apiKey: env.GROQ_API_KEY,
-    });
-    return { name: "groq", model: provider.chat("openai/gpt-oss-120b") };
+  const candidates: Array<{ name: string; model: ChatModel }> = [];
+  const gemini = key("GOOGLE_AI_STUDIO_KEY", "GEMINI_API_KEY");
+  if (gemini) {
+    const provider = createOpenAI({ baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", apiKey: gemini });
+    candidates.push({ name: "gemini", model: provider.chat("gemini-2.5-flash") });
   }
-  if (env.CEREBRAS_API_KEY) {
-    const provider = createOpenAI({
-      baseURL: "https://api.cerebras.ai/v1",
-      apiKey: env.CEREBRAS_API_KEY,
-    });
-    return { name: "cerebras", model: provider.chat("qwen-3.8-27b") };
+  const groq = key("GROQ_API_KEY");
+  if (groq) {
+    const provider = createOpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: groq });
+    candidates.push({ name: "groq", model: provider.chat("openai/gpt-oss-120b") });
   }
-  if (env.GOOGLE_AI_STUDIO_KEY) {
-    const provider = createOpenAI({
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-      apiKey: env.GOOGLE_AI_STUDIO_KEY,
-    });
-    return { name: "gemini", model: provider.chat("gemini-2.5-flash") };
+  const cerebras = key("CEREBRAS_API_KEY");
+  if (cerebras) {
+    const provider = createOpenAI({ baseURL: "https://api.cerebras.ai/v1", apiKey: cerebras });
+    candidates.push({ name: "cerebras", model: provider.chat("qwen-3.8-27b") });
   }
-  return null;
+  if (!candidates.length) return null;
+
+  async function attempt<R>(call: (m: ChatModel) => PromiseLike<R>): Promise<R> {
+    let lastError: unknown;
+    for (const c of providerRest.order(candidates)) {
+      try {
+        return await call(c.model);
+      } catch (error) {
+        lastError = error;
+        if (!isProviderFailure(error)) throw error;
+        providerRest.rest(c.name, error);
+        console.warn(`agent chat: rescue provider ${c.name} failed, trying the next one`, (error as Error)?.message?.slice(0, 200));
+      }
+    }
+    throw lastError;
+  }
+
+  const model = wrapLanguageModel({
+    model: candidates[0].model,
+    middleware: {
+      wrapGenerate: ({ params }) => attempt((m) => m.doGenerate(params)),
+      wrapStream: ({ params }) => attempt((m) => m.doStream(params)),
+    },
+  }) as ChatModel;
+  return { name: candidates.map((c) => c.name).join(" → "), model };
 }
 
 const bodySchema = z.object({
@@ -566,7 +586,7 @@ export async function handleAgentChat(request: Request): Promise<Response> {
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(50),
-      maxRetries: 1,
+      maxRetries: 0,
       abortSignal: request.signal,
     });
   }
