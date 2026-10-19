@@ -14,6 +14,59 @@ import { formatAmount, webOrigin, withoutDismissed, type AgentGrantCard } from "
 const MODEL = "openai/gpt-6-astra";
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
+// ---- Rescue: the agent keeps working when Lovable AI credits run out ----
+// When the gateway answers 402 (Payment Required), chat continues on the
+// user's own keys (Groq first, then Cerebras) instead of dying. A short
+// probe/cool-down avoids paying a full turn just to discover the 402 again.
+let gatewayBlockedUntil = 0;
+let gatewayCheckedAt = 0;
+let gatewayOk = true;
+
+async function gatewayAvailable(apiKey: string): Promise<boolean> {
+  if (Date.now() < gatewayBlockedUntil) return false;
+  if (Date.now() - gatewayCheckedAt < 60_000) return gatewayOk;
+  gatewayCheckedAt = Date.now();
+  try {
+    const res = await fetch(`${GATEWAY}/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "X-Lovable-AIG-SDK": "fetch",
+      },
+      body: JSON.stringify({ model: MODEL, input: "ping", max_output_tokens: 16, store: false }),
+    });
+    // A rate limit (429) is not a credit problem: keep the gateway.
+    gatewayOk = res.ok || res.status === 429;
+    if (!gatewayOk && res.status === 402) gatewayBlockedUntil = Date.now() + 10 * 60_000;
+  } catch {
+    gatewayOk = false;
+  }
+  if (!gatewayOk) gatewayBlockedUntil = Math.max(gatewayBlockedUntil, Date.now() + 60_000);
+  return gatewayOk;
+}
+
+function rescueModel(): {
+  name: string;
+  model: ReturnType<ReturnType<typeof createOpenAI>["chat"]>;
+} | null {
+  if (process.env.GROQ_API_KEY) {
+    const provider = createOpenAI({
+      baseURL: "https://api.groq.com/openai/v1",
+      apiKey: process.env.GROQ_API_KEY,
+    });
+    return { name: "groq", model: provider.chat("openai/gpt-oss-120b") };
+  }
+  if (process.env.CEREBRAS_API_KEY) {
+    const provider = createOpenAI({
+      baseURL: "https://api.cerebras.ai/v1",
+      apiKey: process.env.CEREBRAS_API_KEY,
+    });
+    return { name: "cerebras", model: provider.chat("qwen-3.8-27b") };
+  }
+  return null;
+}
+
 const bodySchema = z.object({
   threadId: z.string().uuid(),
   orgId: z.string().uuid().nullable().optional(),
@@ -448,42 +501,71 @@ export async function handleAgentChat(request: Request): Promise<Response> {
     }
   }
 
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return json(500, "ai_not_configured");
-
   const runIdFetch = createLovableAiGatewayRunIdFetch(getLovableAiGatewayRunId(request));
-  const provider = createOpenAI({
-    baseURL: GATEWAY,
-    apiKey,
-    headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
-    fetch: runIdFetch.fetch,
-  });
+  const apiKey = process.env.LOVABLE_API_KEY;
+  const instructions = systemPrompt(lang, await orgContext(ctx));
+  const modelMessages = await convertToModelMessages(messages);
+  const tools = buildTools(ctx);
 
-  const result = streamText({
-    model: provider.responses(MODEL),
-    instructions: systemPrompt(lang, await orgContext(ctx)),
-    messages: await convertToModelMessages(messages),
-    tools: buildTools(ctx),
-    stopWhen: stepCountIs(50),
-    maxRetries: 0,
-    abortSignal: request.signal,
-    providerOptions: {
-      openai: {
-        forceReasoning: true,
-        reasoningEffort: "medium",
-        reasoningSummary: "auto",
-        store: false,
-        include: ["reasoning.encrypted_content"],
+  let result;
+  if (apiKey && (await gatewayAvailable(apiKey))) {
+    const provider = createOpenAI({
+      baseURL: GATEWAY,
+      apiKey,
+      headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
+      fetch: runIdFetch.fetch,
+    });
+    result = streamText({
+      model: provider.responses(MODEL),
+      instructions,
+      messages: modelMessages,
+      tools,
+      stopWhen: stepCountIs(50),
+      maxRetries: 0,
+      abortSignal: request.signal,
+      providerOptions: {
+        openai: {
+          forceReasoning: true,
+          reasoningEffort: "medium",
+          reasoningSummary: "auto",
+          store: false,
+          include: ["reasoning.encrypted_content"],
+        },
       },
-    },
-  });
+    });
+  } else {
+    const rescue = rescueModel();
+    if (!rescue) {
+      return json(
+        500,
+        lang === "es"
+          ? "Sin créditos de IA y sin claves de respaldo."
+          : "Out of AI credits and no fallback keys are configured.",
+      );
+    }
+    console.info(`agent chat: Lovable AI unavailable, using rescue provider ${rescue.name}`);
+    result = streamText({
+      model: rescue.model,
+      system: instructions,
+      messages: modelMessages,
+      tools,
+      stopWhen: stepCountIs(50),
+      maxRetries: 1,
+      abortSignal: request.signal,
+    });
+  }
 
   const response = result.toUIMessageStreamResponse({
     originalMessages: messages,
     sendReasoning: true,
     onError: (error) => {
       const msg = error instanceof Error ? error.message : String(error);
-      if (/402|credits/i.test(msg)) return lang === "es" ? "Sin créditos de IA. Recargue en Settings → Plans & credits." : "Out of AI credits. Top up in Settings → Plans & credits.";
+      if (/402|payment|credits/i.test(msg)) {
+        gatewayBlockedUntil = Date.now() + 10 * 60_000;
+        return lang === "es"
+          ? "Se agotaron los créditos de IA. Envía tu mensaje otra vez: el agente continuará con la clave de respaldo."
+          : "Out of AI credits. Send your message again: the agent will continue with the fallback key.";
+      }
       if (/429|rate/i.test(msg)) return lang === "es" ? "Demasiadas solicitudes; intente en un minuto." : "Rate limited; try again in a minute.";
       return msg.slice(0, 300);
     },
