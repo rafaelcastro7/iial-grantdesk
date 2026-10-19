@@ -62,3 +62,9 @@
 - [x] Activar la vigilancia diaria automática: trabajo `iial-agent-watch-daily` (11:30 UTC) firmado con HMAC; secreto sembrado en `webhook_config`. Entra en vigor al publicar (el cron apunta a la URL publicada).
 - [ ] Correos del agente (resumen matutino, alertas). Bloqueo: falta configurar el dominio de correo de IIAL.
 - [x] Lectura de PDFs adjuntos en el chat: el extractor rápido (Gemini Flash) transcribe el documento y el orquestador solo recibe texto; el base64 nunca se guarda en la base de datos.
+- [x] Rescate sin créditos Lovable: chat con claves propias (Groq → Cerebras → Gemini) y extractor (Gemini → Groq); cada cita se verifica contra el texto de la página y los datos sin cita real quedan "No publicado". 22 pruebas pasan.
+- [ ] Probar en vivo el rescate con las claves propias (chat + analyze_grant) con sesión real.
+- [x] Chat más amigable: pasos legibles en vez de JSON crudo, "Analizar a fondo" en cada ficha, siguientes pasos sugeridos sin IA (`agent-followups.shared.ts`), copiar respuesta y reintentar tras error. 25 pruebas y build OK.
+- [ ] Probar en navegador con sesión real los pasos, sugerencias y el reintento.
+- [x] Panel "Plan de trabajo" se abre y resalta el grant cuando el agente lo analiza o guarda; botón móvil con grant activo y progreso (p. ej. "SSHRC 3/8").
+- [ ] Configurar al menos una clave propia (GROQ_API_KEY, CEREBRAS_API_KEY o GEMINI_API_KEY) en Lovable Cloud → Secrets para que el rescate funcione sin créditos.

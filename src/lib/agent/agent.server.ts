@@ -1,4 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
+import { serverEnv } from "@/lib/env.server";
 import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from "ai";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -16,7 +17,7 @@ const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
 // ---- Rescue: the agent keeps working when Lovable AI credits run out ----
 // When the gateway answers 402 (Payment Required), chat continues on the
-// user's own keys (Groq first, then Cerebras) instead of dying. A short
+// user's own keys (Groq, then Cerebras, then Gemini) instead of dying. A short
 // probe/cool-down avoids paying a full turn just to discover the 402 again.
 let gatewayBlockedUntil = 0;
 let gatewayCheckedAt = 0;
@@ -50,19 +51,27 @@ function rescueModel(): {
   name: string;
   model: ReturnType<ReturnType<typeof createOpenAI>["chat"]>;
 } | null {
-  if (process.env.GROQ_API_KEY) {
+  const env = serverEnv();
+  if (env.GROQ_API_KEY) {
     const provider = createOpenAI({
       baseURL: "https://api.groq.com/openai/v1",
-      apiKey: process.env.GROQ_API_KEY,
+      apiKey: env.GROQ_API_KEY,
     });
     return { name: "groq", model: provider.chat("openai/gpt-oss-120b") };
   }
-  if (process.env.CEREBRAS_API_KEY) {
+  if (env.CEREBRAS_API_KEY) {
     const provider = createOpenAI({
       baseURL: "https://api.cerebras.ai/v1",
-      apiKey: process.env.CEREBRAS_API_KEY,
+      apiKey: env.CEREBRAS_API_KEY,
     });
     return { name: "cerebras", model: provider.chat("qwen-3.8-27b") };
+  }
+  if (env.GOOGLE_AI_STUDIO_KEY) {
+    const provider = createOpenAI({
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+      apiKey: env.GOOGLE_AI_STUDIO_KEY,
+    });
+    return { name: "gemini", model: provider.chat("gemini-2.5-flash") };
   }
   return null;
 }
@@ -539,8 +548,8 @@ export async function handleAgentChat(request: Request): Promise<Response> {
       return json(
         500,
         lang === "es"
-          ? "Sin créditos de IA y sin claves de respaldo."
-          : "Out of AI credits and no fallback keys are configured.",
+          ? "Sin créditos de Lovable AI y sin claves de respaldo. Añade GROQ_API_KEY, CEREBRAS_API_KEY o GEMINI_API_KEY en Lovable → Cloud → Secrets."
+          : "Out of Lovable AI credits and no fallback keys. Add GROQ_API_KEY, CEREBRAS_API_KEY or GEMINI_API_KEY in Lovable → Cloud → Secrets.",
       );
     }
     console.info(`agent chat: Lovable AI unavailable, using rescue provider ${rescue.name}`);

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Circle, ExternalLink, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,11 @@ const STATUS_META: Record<WorkspaceStatus, { en: string; es: string }> = {
   discarded: { en: "Discarded", es: "Descartada" },
 };
 
-function WorkspaceCard({ item, es }: { item: WorkspaceItem; es: boolean }) {
+function WorkspaceCard({ item, es, focused }: { item: WorkspaceItem; es: boolean; focused?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focused]);
   const tr = useTr();
   const qc = useQueryClient();
   const toggle = useServerFn(toggleWorkspaceTask);
@@ -65,7 +69,13 @@ function WorkspaceCard({ item, es }: { item: WorkspaceItem; es: boolean }) {
   const a = item.analysis;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 text-sm">
+    <div
+      ref={ref}
+      className={cn(
+        "rounded-lg border border-border bg-card p-3 text-sm transition-shadow",
+        focused && "ring-2 ring-primary/60",
+      )}
+    >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="font-semibold leading-snug">{item.title}</div>
@@ -182,7 +192,7 @@ function WorkspaceCard({ item, es }: { item: WorkspaceItem; es: boolean }) {
   );
 }
 
-export function AgentWorkspacePanel({ onClose }: { onClose?: () => void }) {
+export function AgentWorkspacePanel({ onClose, focusId }: { onClose?: () => void; focusId?: string | null }) {
   const tr = useTr();
   const langEs = useUiLang() === "es";
   const q = useQuery({ queryKey: workspaceKey, queryFn: () => listWorkspace(), refetchInterval: 30_000 });
@@ -211,8 +221,7 @@ export function AgentWorkspacePanel({ onClose }: { onClose?: () => void }) {
           </p>
         )}
         {items.map((i) => (
-          <WorkspaceCard key={i.id} item={i} es={langEs} />
-
+          <WorkspaceCard key={i.id} item={i} es={langEs} focused={i.id === focusId} />
         ))}
       </div>
     </div>

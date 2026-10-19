@@ -1,14 +1,14 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName, type UIMessage } from "ai";
 import { Link } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { BookOpen, FileText, Globe, Library, ListTodo, MapPin, Paperclip, Radar, Save, Search, X } from "lucide-react";
+import { AlertCircle, BookOpen, Check, Copy, FileText, Globe, Library, ListTodo, Loader2, MapPin, Paperclip, Radar, RotateCcw, Save, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { Message, MessageAction, MessageActions, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputFooter,
@@ -21,14 +21,15 @@ import {
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
-import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "@/components/ai-elements/tool";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AgentWorkspacePanel } from "@/components/agent/AgentWorkspacePanel";
-import { saveCatalogGrantToWorkspace } from "@/lib/agent-workspace.functions";
+import { AgentWorkspacePanel, workspaceKey } from "@/components/agent/AgentWorkspacePanel";
+import { listWorkspace, saveCatalogGrantToWorkspace } from "@/lib/agent-workspace.functions";
+import { activeWorkspaceItem, tasksProgress } from "@/lib/agent/agent-workspace.shared";
 import { useActiveTenant } from "@/lib/tenant-context";
 import { useTr, useUiLang } from "@/lib/ui-lang";
 import type { AgentGrantCard } from "@/lib/agent/agent-rules.shared";
+import { agentFollowUps } from "@/lib/agent/agent-followups.shared";
 import agentMark from "@/assets/agent-mark.png";
 
 export function agentSuggestions(es: boolean) {
@@ -61,7 +62,32 @@ const TOOL_META: Record<string, { icon: typeof Globe; en: string; es: string }> 
   watch_search: { icon: Radar, en: "Saving a watch", es: "Guardando vigilancia" },
 };
 
-function GrantCard({ g, es }: { g: AgentGrantCard; es: boolean }) {
+/** One friendly line per tool step; raw inputs/outputs never reach the user. */
+function ToolStep({ name, state, es }: { name: string; state: string; es: boolean }) {
+  const meta = TOOL_META[name];
+  const Icon = meta?.icon ?? Sparkles;
+  const label = meta ? (es ? meta.es : meta.en) : name;
+  const done = state === "output-available";
+  const failed = state === "output-error";
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span className={done || failed ? "" : "animate-pulse"}>{label}</span>
+      {done ? (
+        <Check className="h-3.5 w-3.5 text-emerald-600" />
+      ) : failed ? (
+        <span className="flex items-center gap-1 text-destructive">
+          <AlertCircle className="h-3.5 w-3.5" />
+          {es ? "no se pudo, sigo con otra fuente" : "failed, trying another source"}
+        </span>
+      ) : (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      )}
+    </div>
+  );
+}
+
+function GrantCard({ g, es, onAsk }: { g: AgentGrantCard; es: boolean; onAsk: (text: string) => void }) {
   const qc = useQueryClient();
   const { activeOrgId } = useActiveTenant();
   const save = useServerFn(saveCatalogGrantToWorkspace);
@@ -100,6 +126,11 @@ function GrantCard({ g, es }: { g: AgentGrantCard; es: boolean }) {
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <Badge variant={g.origin === "web_unverified" ? "outline" : "secondary"}>{origin}</Badge>
+        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs"
+          onClick={() => onAsk(es ? `Analiza a fondo: ${g.title}${g.url ? ` ${g.url}` : ""}` : `Analyze in depth: ${g.title}${g.url ? ` ${g.url}` : ""}`)}>
+          <Search className="h-3 w-3" />
+          {es ? "Analizar a fondo" : "Analyze in depth"}
+        </Button>
         {g.id && (
           <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs"
             disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
@@ -122,13 +153,18 @@ function GrantCard({ g, es }: { g: AgentGrantCard; es: boolean }) {
   );
 }
 
-function ToolCards({ output, es }: { output: unknown; es: boolean }) {
+function cardsOf(output: unknown): AgentGrantCard[] {
   const grants = (output as { grants?: AgentGrantCard[] } | null)?.grants;
-  if (!Array.isArray(grants) || grants.length === 0) return null;
+  return Array.isArray(grants) ? grants : [];
+}
+
+function ToolCards({ output, es, onAsk }: { output: unknown; es: boolean; onAsk: (text: string) => void }) {
+  const grants = cardsOf(output);
+  if (grants.length === 0) return null;
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       {grants.slice(0, 8).map((g, i) => (
-        <GrantCard key={(g.id ?? g.url) + i} g={g} es={es} />
+        <GrantCard key={(g.id ?? g.url) + i} g={g} es={es} onAsk={onAsk} />
       ))}
     </div>
   );
@@ -197,7 +233,7 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
       }),
   );
 
-  const { messages, sendMessage, status, stop, error } = useChat({
+  const { messages, sendMessage, regenerate, status, stop, error } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
@@ -222,12 +258,74 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
 
   const busy = status === "submitted" || status === "streaming";
   const [panelOpen, setPanelOpen] = useState(false);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const ws = useQuery({ queryKey: workspaceKey, queryFn: () => listWorkspace(), refetchInterval: 30_000 });
+  const active = activeWorkspaceItem(ws.data ?? []);
+  const activeProg = active ? tasksProgress(active) : null;
+
+  // When the agent writes to the work plan in this session, refresh it right
+  // away, open it on small screens and highlight the grant it touched.
+  // Tool calls already in the loaded history never trigger this.
+  const seenCalls = useRef<Set<string> | null>(null);
+  const awaitingFocus = useRef(false);
+  useEffect(() => {
+    const finished = messages.flatMap((m) =>
+      m.parts
+        .filter(isToolUIPart)
+        .filter((p) => ["analyze_grant", "save_to_workspace"].includes(getToolName(p)) && p.state === "output-available")
+        .map((p) => p.toolCallId),
+    );
+    if (!seenCalls.current) {
+      seenCalls.current = new Set(finished);
+      return;
+    }
+    const fresh = finished.filter((id) => !seenCalls.current!.has(id));
+    if (!fresh.length) return;
+    fresh.forEach((id) => seenCalls.current!.add(id));
+    awaitingFocus.current = true;
+    setPanelOpen(true);
+    qc.invalidateQueries({ queryKey: workspaceKey });
+  }, [messages, qc]);
+  useEffect(() => {
+    if (awaitingFocus.current && active && !ws.isFetching) {
+      awaitingFocus.current = false;
+      setFocusId(active.id);
+    }
+  }, [active, ws.isFetching]);
   const submit = (msg: PromptInputMessage) => {
     const v = msg.text.trim();
     if ((!v && !msg.files.length) || busy) return;
     sendMessage({ text: v, files: msg.files });
     setText("");
   };
+  const ask = (v: string) => {
+    if (!busy) sendMessage({ text: v });
+  };
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copy = async (m: UIMessage) => {
+    const body = m.parts.map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join("\n\n");
+    try {
+      await navigator.clipboard.writeText(body);
+      setCopiedId(m.id);
+      setTimeout(() => setCopiedId((c) => (c === m.id ? null : c)), 1500);
+    } catch {
+      toast.error(tr("Could not copy.", "No se pudo copiar."));
+    }
+  };
+  const last = messages[messages.length - 1];
+  const followUps =
+    !busy && !error && last?.role === "assistant"
+      ? agentFollowUps(
+          {
+            tools: last.parts.filter(isToolUIPart).map((p) => getToolName(p)),
+            grantTitles: last.parts
+              .filter(isToolUIPart)
+              .filter((p) => getToolName(p) === "show_grants" && p.state === "output-available")
+              .flatMap((p) => cardsOf(p.output).map((g) => g.title)),
+          },
+          es,
+        )
+      : [];
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -259,31 +357,43 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
                     ) : null;
                   if (isToolUIPart(part)) {
                     const name = getToolName(part);
-                    const meta = TOOL_META[name];
                     return (
                       <div key={i} className="flex flex-col gap-2">
-                        <Tool defaultOpen={false}>
-                          {part.type === "dynamic-tool" ? (
-                            <ToolHeader type="dynamic-tool" state={part.state} toolName={name} title={meta ? (es ? meta.es : meta.en) : name} />
-                          ) : (
-                            <ToolHeader type={part.type} state={part.state} title={meta ? (es ? meta.es : meta.en) : name} />
-                          )}
-                          <ToolContent>
-                            <ToolInput input={part.input} />
-                            <ToolOutput output={part.state === "output-available" ? part.output : undefined} errorText={part.state === "output-error" ? part.errorText : undefined} />
-                          </ToolContent>
-                        </Tool>
-                        {part.state === "output-available" && name === "show_grants" && <ToolCards output={part.output} es={es} />}
+                        {name !== "show_grants" && <ToolStep name={name} state={part.state} es={es} />}
+                        {part.state === "output-available" && name === "show_grants" && <ToolCards output={part.output} es={es} onAsk={ask} />}
                       </div>
                     );
                   }
                   return null;
                 })}
               </MessageContent>
+              {m.role === "assistant" && !(busy && m.id === last?.id) && m.parts.some((p) => p.type === "text" && p.text) && (
+                <MessageActions>
+                  <MessageAction tooltip={tr("Copy answer", "Copiar respuesta")} onClick={() => copy(m)}>
+                    {copiedId === m.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  </MessageAction>
+                </MessageActions>
+              )}
             </Message>
           ))}
           {status === "submitted" && <Shimmer>{tr("Thinking…", "Pensando…")}</Shimmer>}
-          {error && <p className="text-sm text-destructive">{error.message}</p>}
+          {error && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1">{error.message || tr("The agent could not answer.", "El agente no pudo responder.")}</span>
+              <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => regenerate()}>
+                <RotateCcw className="h-3.5 w-3.5" />
+                {tr("Try again", "Reintentar")}
+              </Button>
+            </div>
+          )}
+          {followUps.length > 0 && (
+            <Suggestions>
+              {followUps.map((s) => (
+                <Suggestion key={s} suggestion={s} onClick={ask} />
+              ))}
+            </Suggestions>
+          )}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
@@ -315,11 +425,18 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="gap-1.5 text-xs text-muted-foreground"
+                className="max-w-56 gap-1.5 text-xs text-muted-foreground lg:hidden"
                 onClick={() => setPanelOpen((v) => !v)}
               >
-                <ListTodo className="h-3.5 w-3.5" />
-                {tr("Work plan", "Plan de trabajo")}
+                <ListTodo className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {active ? active.title : tr("Work plan", "Plan de trabajo")}
+                </span>
+                {activeProg && activeProg.total > 0 && (
+                  <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
+                    {activeProg.done}/{activeProg.total}
+                  </Badge>
+                )}
               </Button>
               <AttachButton es={es} />
             </div>
@@ -329,12 +446,12 @@ export function AgentChat({ threadId, initialMessages }: { threadId: string; ini
       </div>
     </div>
     <aside className="hidden w-80 shrink-0 border-l border-border bg-muted/20 lg:block">
-      <AgentWorkspacePanel />
+      <AgentWorkspacePanel focusId={focusId} />
     </aside>
     {panelOpen && (
       <div className="fixed inset-0 z-40 flex justify-end bg-background/60 lg:hidden" onClick={() => setPanelOpen(false)}>
         <div className="h-full w-80 max-w-[85vw] border-l border-border bg-background shadow-xl" onClick={(e) => e.stopPropagation()}>
-          <AgentWorkspacePanel onClose={() => setPanelOpen(false)} />
+          <AgentWorkspacePanel focusId={focusId} onClose={() => setPanelOpen(false)} />
         </div>
       </div>
     )}

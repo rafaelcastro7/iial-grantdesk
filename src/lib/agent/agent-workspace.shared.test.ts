@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeTasks, nextTask, tasksProgress, type WorkspaceTask } from "./agent-workspace.shared";
+import { activeWorkspaceItem, mergeTasks, nextTask, tasksProgress, type WorkspaceTask } from "./agent-workspace.shared";
 
 const t = (label: string, done = false, source: WorkspaceTask["source"] = "agent"): WorkspaceTask => ({
   id: label,
@@ -39,5 +39,18 @@ describe("nextTask", () => {
 describe("tasksProgress", () => {
   it("counts done over total", () => {
     expect(tasksProgress({ tasks: [t("a", true), t("b"), t("c", true)] })).toEqual({ done: 2, total: 3 });
+  });
+});
+
+
+describe("activeWorkspaceItem", () => {
+  it("picks the most recently updated grant that is not discarded", () => {
+    const items = [
+      { id: "a", status: "preparing" as const, updated_at: "2026-10-18T10:00:00Z" },
+      { id: "b", status: "discarded" as const, updated_at: "2026-10-19T10:00:00Z" },
+      { id: "c", status: "considering" as const, updated_at: "2026-10-19T09:00:00Z" },
+    ];
+    expect(activeWorkspaceItem(items)?.id).toBe("c");
+    expect(activeWorkspaceItem([])).toBeNull();
   });
 });

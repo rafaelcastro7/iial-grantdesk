@@ -74,3 +74,12 @@ export function nextTask(item: Pick<WorkspaceItem, "tasks">): WorkspaceTask | nu
 export function tasksProgress(item: Pick<WorkspaceItem, "tasks">): { done: number; total: number } {
   return { done: item.tasks.filter((t) => t.done).length, total: item.tasks.length };
 }
+
+/** The grant the user is working on now: most recently updated, not discarded. */
+export function activeWorkspaceItem<T extends Pick<WorkspaceItem, "status" | "updated_at">>(items: T[]): T | null {
+  return (
+    items
+      .filter((i) => i.status !== "discarded")
+      .reduce<T | null>((best, i) => (!best || i.updated_at > best.updated_at ? i : best), null)
+  );
+}

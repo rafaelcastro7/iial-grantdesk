@@ -9,6 +9,7 @@
 // agent keeps working without Lovable credits.
 
 import { serverEnv } from "@/lib/env.server";
+import { verifyFactCitations } from "./extractor.shared";
 import { z } from "zod";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -167,7 +168,7 @@ export async function extractGrantFacts(pageText: string, lang: "en" | "es"): Pr
     const content = await attempt();
     if (!content) continue;
     try {
-      return factsSchema.parse(normalizeFacts(JSON.parse(content)));
+      return verifyFactCitations(factsSchema.parse(normalizeFacts(JSON.parse(content))), pageText);
     } catch {
       // Malformed JSON from this provider: try the next one.
     }
