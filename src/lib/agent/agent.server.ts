@@ -1,5 +1,4 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { serverEnv } from "@/lib/env.server";
 import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from "ai";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -51,7 +50,15 @@ function rescueModel(): {
   name: string;
   model: ReturnType<ReturnType<typeof createOpenAI>["chat"]>;
 } | null {
-  const env = serverEnv();
+  // Read keys directly: a blank or malformed unrelated secret must not make
+  // serverEnv() throw and take the whole chat down exactly when credits end.
+  const key = (...names: string[]) =>
+    names.map((n) => process.env[n]?.trim()).find((v): v is string => !!v && v.length >= 10);
+  const env = {
+    GROQ_API_KEY: key("GROQ_API_KEY"),
+    CEREBRAS_API_KEY: key("CEREBRAS_API_KEY"),
+    GOOGLE_AI_STUDIO_KEY: key("GOOGLE_AI_STUDIO_KEY", "GEMINI_API_KEY"),
+  };
   if (env.GROQ_API_KEY) {
     const provider = createOpenAI({
       baseURL: "https://api.groq.com/openai/v1",
